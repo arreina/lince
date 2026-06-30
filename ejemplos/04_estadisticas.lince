@@ -1,0 +1,94 @@
+# 🐆 Lince — Estadísticas
+# Análisis estadístico de datos con módulo matematica
+
+importar "matematica"
+
+# Funciones estadísticas implementadas en Lince
+funcion media(val lista datos): numero {
+    sea suma = reducir(datos, 0, funcion(val numero acc, val numero x): numero {
+        devolver acc + x
+    })
+    devolver suma / datos.longitud()
+}
+
+funcion varianza(val lista datos): numero {
+    sea m = media(datos)
+    sea difs = mapear(datos, funcion(val numero x): numero {
+        devolver (x - m) * (x - m)
+    })
+    devolver media(difs)
+}
+
+funcion desviacion(val lista datos): numero {
+    devolver matematica.raiz(varianza(datos))
+}
+
+funcion minimo(val lista datos): numero {
+    devolver reducir(datos, datos[0], funcion(val numero acc, val numero x): numero {
+        si x < acc { devolver x }
+        devolver acc
+    })
+}
+
+funcion maximo(val lista datos): numero {
+    devolver reducir(datos, datos[0], funcion(val numero acc, val numero x): numero {
+        si x > acc { devolver x }
+        devolver acc
+    })
+}
+
+funcion mediana(val lista datos): numero {
+    sea n = datos.longitud()
+    # Ordenación burbuja simple
+    sea lista copia = []
+    para cada numero x en datos { copia.agregar(x) }
+    para (i = 0; i < n; i++) {
+        para (j = 0; j < n - i - 1; j++) {
+            si copia[j] > copia[j+1] {
+                sea tmp = copia[j]
+                copia[j]   = copia[j+1]
+                copia[j+1] = tmp
+            }
+        }
+    }
+    si n % 2 == 0 {
+        devolver (copia[n/2 - 1] + copia[n/2]) / 2
+    }
+    devolver copia[n/2]
+}
+
+funcion analizar(val texto nombre, val lista datos): nulo {
+    escribir("📊 " + nombre)
+    escribir("   n         = " + datos.longitud())
+    escribir("   mínimo    = " + minimo(datos))
+    escribir("   máximo    = " + maximo(datos))
+    escribir("   media     = " + media(datos))
+    escribir("   mediana   = " + mediana(datos))
+    escribir("   desv. est = " + desviacion(datos))
+    escribir("")
+}
+
+# Notas de un curso
+sea lista notas = [7.5, 8.0, 6.5, 9.0, 5.5, 8.5, 7.0, 9.5, 6.0, 8.0]
+analizar("Notas del curso", notas)
+
+# Temperaturas de una semana
+sea lista temps = [18.5, 20.1, 22.3, 19.8, 17.5, 21.0, 23.5]
+analizar("Temperaturas semanales (°C)", temps)
+
+# Ventas mensuales
+sea lista ventas = [
+    1250, 1480, 1100, 1620, 1350, 1700,
+    1450, 1580, 1300, 1750, 1900, 2100
+]
+analizar("Ventas mensuales (€)", ventas)
+
+# Filtrar notas aprobadas
+sea aprobados = filtrar(notas, funcion(val numero n): logico {
+    devolver n >= 5
+})
+sea suspensos = filtrar(notas, funcion(val numero n): logico {
+    devolver n < 5
+})
+escribir("Aprobados: " + aprobados.longitud() + "/" + notas.longitud())
+escribir("Suspensos: " + suspensos.longitud() + "/" + notas.longitud())

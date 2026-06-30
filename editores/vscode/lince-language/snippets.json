@@ -1,0 +1,142 @@
+{
+  "Función": {
+    "prefix": "fun",
+    "body": [
+      "funcion ${1:nombre}(val ${2:tipo} ${3:param}): ${4:nulo} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Define una función en Lince"
+  },
+  "Función sin parámetros": {
+    "prefix": "fun0",
+    "body": [
+      "funcion ${1:nombre}(): ${2:nulo} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Define una función sin parámetros"
+  },
+  "Variable": {
+    "prefix": "sea",
+    "body": ["sea ${1:nombre} = ${2:valor}"],
+    "description": "Declara una variable mutable"
+  },
+  "Constante": {
+    "prefix": "fijo",
+    "body": ["fijo ${1:NOMBRE} = ${2:valor}"],
+    "description": "Declara una constante"
+  },
+  "Lista": {
+    "prefix": "lista",
+    "body": ["sea lista ${1:nombre} = [${2}]"],
+    "description": "Declara una lista tipada"
+  },
+  "Diccionario": {
+    "prefix": "dic",
+    "body": ["sea diccionario ${1:nombre} = {\"${2:clave}\": ${3:valor}}"],
+    "description": "Declara un diccionario tipado"
+  },
+  "Si": {
+    "prefix": "si",
+    "body": [
+      "si ${1:condicion} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Condicional si"
+  },
+  "Si / Sino": {
+    "prefix": "sino",
+    "body": [
+      "si ${1:condicion} {",
+      "\t$2",
+      "} sino {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Condicional si/sino"
+  },
+  "Para clásico": {
+    "prefix": "para",
+    "body": [
+      "para (${1:i} = 0; ${1:i} < ${2:10}; ${1:i}++) {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Bucle para clásico"
+  },
+  "Para cada": {
+    "prefix": "cada",
+    "body": [
+      "para cada ${1:numero} ${2:elem} en ${3:lista} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Bucle para cada"
+  },
+  "Mientras": {
+    "prefix": "mientras",
+    "body": [
+      "mientras ${1:condicion} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Bucle mientras"
+  },
+  "Hacer...mientras": {
+    "prefix": "hacer",
+    "body": [
+      "hacer {",
+      "\t$0",
+      "} mientras (${1:condicion})"
+    ],
+    "description": "Bucle hacer...mientras"
+  },
+  "Clase": {
+    "prefix": "clase",
+    "body": [
+      "clase ${1:NombreClase} {",
+      "\tfuncion crear(val ${2:tipo} ${3:param}): nulo {",
+      "\t\tmi.${3:param} = ${3:param}",
+      "\t}",
+      "",
+      "\t$0",
+      "}"
+    ],
+    "description": "Define una clase"
+  },
+  "Clase con herencia": {
+    "prefix": "clasex",
+    "body": [
+      "clase ${1:NombreClase} extiende ${2:ClasePadre} {",
+      "\tfuncion crear(val ${3:tipo} ${4:param}): nulo {",
+      "\t\tpadre(${4:param})",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Define una clase con herencia"
+  },
+  "Intentar/Capturar": {
+    "prefix": "intentar",
+    "body": [
+      "intentar {",
+      "\t$1",
+      "} capturar (error ${2:e}) {",
+      "\tescribir(${2:e}.mensaje)",
+      "}"
+    ],
+    "description": "Bloque intentar/capturar"
+  },
+  "Importar módulo": {
+    "prefix": "importar",
+    "body": ["importar \"${1|matematica,texto,archivos,tiempo|}\""],
+    "description": "Importa un módulo estándar"
+  },
+  "Escribir": {
+    "prefix": "esc",
+    "body": ["escribir(${1:\"mensaje\"})"],
+    "description": "Imprime en pantalla"
+  }
+}

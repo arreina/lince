@@ -1,0 +1,32 @@
+# TEST: variables_y_tipos
+# Cada línea de salida debe coincidir con lo esperado
+
+# Variables mutables
+sea x = 42
+escribir(x)
+
+sea nombre = "Lince"
+escribir(nombre)
+
+sea activo = verdadero
+escribir(activo)
+
+sea nada = nulo
+escribir(nada)
+
+# Constantes
+fijo PI = 3.14159
+escribir(PI)
+
+# Reasignación
+sea contador = 0
+contador = contador + 1
+contador = contador + 1
+escribir(contador)
+
+# Tipos en declaración
+sea lista nums = [1, 2, 3]
+escribir(nums.longitud())
+
+sea diccionario d = {"clave": "valor"}
+escribir(d["clave"])

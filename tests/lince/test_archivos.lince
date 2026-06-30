@@ -1,0 +1,43 @@
+# TEST: archivos
+importar "archivos"
+
+# Escribir y leer
+archivos.escribir("/tmp/lince_test_arc.txt", "hola mundo")
+escribir(archivos.existe("/tmp/lince_test_arc.txt"))
+sea contenido = archivos.leer("/tmp/lince_test_arc.txt")
+escribir(contenido)
+
+# Agregar
+archivos.agregar("/tmp/lince_test_arc.txt", "\nlinea dos")
+sea c2 = archivos.leer("/tmp/lince_test_arc.txt")
+escribir(c2.contiene("linea dos"))
+
+# Copiar
+archivos.copiar("/tmp/lince_test_arc.txt", "/tmp/lince_copia_arc.txt")
+escribir(archivos.existe("/tmp/lince_copia_arc.txt"))
+
+# Mover
+archivos.mover("/tmp/lince_copia_arc.txt", "/tmp/lince_movido_arc.txt")
+escribir(archivos.existe("/tmp/lince_movido_arc.txt"))
+escribir(archivos.existe("/tmp/lince_copia_arc.txt"))
+
+# Eliminar
+archivos.eliminar("/tmp/lince_test_arc.txt")
+archivos.eliminar("/tmp/lince_movido_arc.txt")
+escribir(archivos.existe("/tmp/lince_test_arc.txt"))
+
+# Directorios
+archivos.crear_directorio("/tmp/lince_dir_arc")
+escribir(archivos.es_directorio("/tmp/lince_dir_arc"))
+escribir(archivos.es_directorio("/tmp"))
+escribir(archivos.es_directorio("/tmp/lince_test_arc.txt"))
+
+# Listar
+archivos.escribir("/tmp/lince_dir_arc/a.txt", "a")
+archivos.escribir("/tmp/lince_dir_arc/b.txt", "b")
+sea archivos_dir = archivos.listar("/tmp/lince_dir_arc")
+escribir(archivos_dir.longitud() >= 2)
+
+# Limpiar
+archivos.eliminar("/tmp/lince_dir_arc/a.txt")
+archivos.eliminar("/tmp/lince_dir_arc/b.txt")

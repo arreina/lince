@@ -1,0 +1,151 @@
+# 🐆 Lince — runner.lince
+# Suite de tests escrita en el propio lenguaje Lince
+
+importar "archivos"
+importar "sistema"
+importar "texto"
+importar "tiempo"
+
+# ── Configuración ─────────────────────────────────────────────
+fijo LINCE     = "./lince"
+fijo DIR_TESTS = "tests/lince"
+
+# ── Contadores ────────────────────────────────────────────────
+sea total    = 0
+sea pasados  = 0
+sea fallidos = 0
+sea lista nombres_fallidos = []
+
+# ── Colores ANSI ──────────────────────────────────────────────
+fijo RESET    = "\e[0m"
+fijo VERDE    = "\e[32m"
+fijo ROJO     = "\e[31m"
+fijo AMARILLO = "\e[33m"
+fijo CYAN     = "\e[36m"
+fijo GRIS     = "\e[90m"
+fijo NEGRITA  = "\e[1m"
+
+funcion color(val texto c, val texto t): texto {
+    devolver c + t + RESET
+}
+
+# ── Funciones auxiliares ───────────────────────────────────────
+funcion recortar_salida(val texto s): texto {
+    devolver s.recortar()
+}
+
+funcion ejecutar_test(val texto nombre): nulo {
+    sea archivo  = DIR_TESTS + "/" + nombre + ".lince"
+    sea esperado = DIR_TESTS + "/" + nombre + ".esperado"
+
+    si no archivos.existe(archivo) {
+        escribir(color(AMARILLO, "  ⚠  ") + nombre + " — archivo no encontrado")
+        devolver nulo
+    }
+
+    si no archivos.existe(esperado) {
+        escribir(color(AMARILLO, "  ⚠  ") + nombre + " — sin .esperado")
+        devolver nulo
+    }
+
+    total = total + 1
+
+    sea cmd      = LINCE + " " + archivo
+    sea salida   = recortar_salida(sistema.ejecutar(cmd))
+    sea esperada = recortar_salida(archivos.leer(esperado))
+
+    si salida == esperada {
+        pasados = pasados + 1
+        escribir(color(VERDE, "  ✅ ") + nombre)
+    } sino {
+        fallidos = fallidos + 1
+        nombres_fallidos.agregar(nombre)
+        escribir(color(ROJO, "  ❌ ") + nombre + " — salida diferente")
+        mostrar_diff(esperada, salida)
+    }
+}
+
+funcion mostrar_diff(val texto esperada, val texto real): nulo {
+    sea lineas_esp  = texto.dividir(esperada, "\n")
+    sea lineas_real = texto.dividir(real, "\n")
+    sea max_len = lineas_esp.longitud()
+    si lineas_real.longitud() > max_len {
+        max_len = lineas_real.longitud()
+    }
+
+    escribir(color(GRIS, "    ── esperado ──────── real ────────"))
+    para (i = 0; i < max_len; i++) {
+        sea esp  = ""
+        sea rel  = ""
+        si i < lineas_esp.longitud()  { esp = lineas_esp[i] }
+        si i < lineas_real.longitud() { rel = lineas_real[i] }
+
+        si esp == rel {
+            escribir(color(GRIS, "    = ") + esp)
+        } sino {
+            escribir(color(VERDE,  "    + ") + esp)
+            escribir(color(ROJO,   "    - ") + rel)
+        }
+    }
+}
+
+# ── Lista de tests ─────────────────────────────────────────────
+sea lista tests = [
+    "test_variables",
+    "test_operadores",
+    "test_condicionales",
+    "test_bucles",
+    "test_funciones",
+    "test_listas",
+    "test_diccionarios",
+    "test_texto",
+    "test_clases",
+    "test_errores",
+    "test_modulos",
+    "test_json",
+    "test_sistema",
+    "test_enumeraciones",
+    "test_interfaces",
+    "test_closures",
+    "test_recursion",
+    "test_casos_limite",
+    "test_generadores",
+    "test_matematica",
+    "test_archivos",
+    "test_expresiones"
+]
+
+# ── Cabecera ───────────────────────────────────────────────────
+escribir("")
+escribir(color(CYAN, NEGRITA + "🐆 Lince — Suite de Tests" + RESET))
+escribir("")
+escribir(color(NEGRITA, "Tests de integración:"))
+
+sea inicio = tiempo.ahora()
+
+# ── Ejecutar todos los tests ───────────────────────────────────
+para cada texto nombre en tests {
+    ejecutar_test(nombre)
+}
+
+# ── Resumen ────────────────────────────────────────────────────
+sea duracion = tiempo.ahora() - inicio
+
+escribir("")
+escribir("══════════════════════════════════════════════════")
+
+si fallidos == 0 {
+    escribir(color(VERDE, NEGRITA + "✅ " + pasados + "/" + total + " tests pasaron") +
+             color(GRIS, " (" + duracion + "s)"))
+} sino {
+    escribir(color(ROJO, NEGRITA + "❌ " + fallidos + " fallos de " + total + " tests") +
+             color(GRIS, " (" + duracion + "s)"))
+    escribir("")
+    escribir(color(AMARILLO, "Tests fallidos:"))
+    para cada texto nombre en nombres_fallidos {
+        escribir("  • " + nombre)
+    }
+}
+
+escribir("══════════════════════════════════════════════════")
+escribir("")

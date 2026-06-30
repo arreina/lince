@@ -1,0 +1,34 @@
+# TEST: listas
+sea lista nums = [10, 20, 30, 40, 50]
+
+# Acceso
+escribir(nums[0])
+escribir(nums[4])
+escribir(nums[-1])
+
+# Longitud
+escribir(nums.longitud())
+
+# Agregar y eliminar
+nums.agregar(60)
+escribir(nums.longitud())
+nums.eliminar(0)
+escribir(nums[0])
+
+# Contiene
+escribir(nums.contiene(20))
+escribir(nums.contiene(10))
+
+# Modificar por índice
+nums[0] = 99
+escribir(nums[0])
+
+# Lista vacía
+sea lista vacia = []
+vacia.agregar(1)
+vacia.agregar(2)
+escribir(vacia.longitud())
+
+# Listas anidadas
+sea lista matriz = [[1, 2], [3, 4], [5, 6]]
+escribir(matriz.longitud())

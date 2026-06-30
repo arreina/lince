@@ -1,0 +1,52 @@
+# TEST: clases y herencia
+clase Figura {
+    funcion crear(val texto nombre): nulo {
+        mi.nombre = nombre
+    }
+    funcion describir(): texto {
+        devolver "Figura: " + mi.nombre
+    }
+}
+
+clase Rectangulo extiende Figura {
+    funcion crear(val numero ancho, val numero alto): nulo {
+        padre("Rectangulo")
+        mi.ancho = ancho
+        mi.alto  = alto
+    }
+    funcion area(): numero {
+        devolver mi.ancho * mi.alto
+    }
+    funcion perimetro(): numero {
+        devolver 2 * (mi.ancho + mi.alto)
+    }
+}
+
+clase Cuadrado extiende Rectangulo {
+    funcion crear(val numero lado): nulo {
+        padre(lado, lado)
+    }
+}
+
+# Pruebas
+sea r = Rectangulo(5, 3)
+escribir(r.describir())
+escribir(r.area())
+escribir(r.perimetro())
+
+sea c = Cuadrado(4)
+escribir(c.describir())
+escribir(c.area())
+escribir(c.perimetro())
+
+# Acceso a campos
+escribir(r.ancho)
+escribir(r.alto)
+
+# Lista de objetos
+sea lista figuras = [Rectangulo(2, 3), Rectangulo(4, 5), Cuadrado(3)]
+sea area_total = 0
+para cada elemento f en figuras {
+    area_total = area_total + f.area()
+}
+escribir(area_total)

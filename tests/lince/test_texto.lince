@@ -1,0 +1,40 @@
+# TEST: texto
+sea s = "Hola Mundo"
+
+# Métodos básicos
+escribir(s.longitud())
+escribir(s.mayusculas())
+escribir(s.minusculas())
+escribir(s.contiene("Mundo"))
+escribir(s.contiene("lince"))
+escribir(s.reemplazar("Mundo", "Lince"))
+
+# Recortar
+sea con_espacios = "   hola   "
+escribir(con_espacios.recortar())
+
+# Acceso por índice
+escribir(s[0])
+escribir(s[5])
+
+# Concatenación
+sea resultado = "Hola" + ", " + "Lince" + "!"
+escribir(resultado)
+
+# Número a texto y texto a número
+importar "texto"
+escribir(texto.de_numero(42))
+escribir(texto.a_numero("3.14"))
+escribir(texto.es_numero("123"))
+escribir(texto.es_numero("abc"))
+escribir(texto.es_vacio(""))
+escribir(texto.es_vacio("algo"))
+escribir(texto.empieza_con("hola mundo", "hola"))
+escribir(texto.termina_con("hola mundo", "mundo"))
+escribir(texto.posicion("hola mundo", "mundo"))
+escribir(texto.contar("banana", "a"))
+escribir(texto.extraer("hola mundo", 5, 10))
+escribir(texto.invertir("Lince"))
+escribir(texto.repetir("ab", 3))
+escribir(texto.rellenar_izq("5", 4, "0"))
+escribir(texto.centrar("hi", 6, "-"))

@@ -1,0 +1,130 @@
+# 🐆 Lince — Gestor de Notas
+# Crea, lista y gestiona notas en ficheros de texto
+
+importar "archivos"
+importar "tiempo"
+
+fijo DIRECTORIO = "/tmp/notas_lince"
+
+funcion inicializar(): nulo {
+    si no archivos.es_directorio(DIRECTORIO) {
+        archivos.crear_directorio(DIRECTORIO)
+        escribir("📁 Directorio de notas creado: " + DIRECTORIO)
+    }
+}
+
+funcion ruta_nota(val texto titulo): texto {
+    # Sanitizar el título para usarlo como nombre de archivo
+    sea nombre = ""
+    para cada texto c en titulo {
+        si c == " " {
+            nombre = nombre + "_"
+        } sino si c == "/" o c == "." o c == ":" {
+            nombre = nombre + "-"
+        } sino {
+            nombre = nombre + c
+        }
+    }
+    devolver DIRECTORIO + "/" + nombre + ".txt"
+}
+
+funcion crear_nota(val texto titulo, val texto contenido): nulo {
+    sea ruta = ruta_nota(titulo)
+    sea fecha = tiempo.fecha()
+    sea hora  = tiempo.hora()
+    sea texto_completo = "# " + titulo + "\n" +
+                         "Creada: " + fecha + " " + hora + "\n\n" +
+                         contenido
+    archivos.escribir(ruta, texto_completo)
+    escribir("✅ Nota guardada: " + titulo)
+}
+
+funcion leer_nota(val texto titulo): nulo {
+    sea ruta = ruta_nota(titulo)
+    si no archivos.existe(ruta) {
+        escribir("❌ Nota no encontrada: " + titulo)
+        devolver nulo
+    }
+    sea contenido = archivos.leer(ruta)
+    escribir("─────────────────────────────")
+    escribir(contenido)
+    escribir("─────────────────────────────")
+}
+
+funcion listar_notas(): nulo {
+    sea notas = archivos.listar(DIRECTORIO)
+    si notas.longitud() == 0 {
+        escribir("No hay notas guardadas.")
+        devolver nulo
+    }
+    escribir("📋 Notas guardadas (" + notas.longitud() + "):")
+    para cada texto nombre en notas {
+        # Quitar la extensión .txt
+        sea titulo = ""
+        sea sin_ext = verdadero
+        para cada texto c en nombre {
+            si c == "." { sin_ext = falso }
+            si sin_ext { titulo = titulo + c }
+        }
+        # Reemplazar guiones bajos por espacios
+        sea titulo_limpio = ""
+        para cada texto c en titulo {
+            si c == "_" {
+                titulo_limpio = titulo_limpio + " "
+            } sino {
+                titulo_limpio = titulo_limpio + c
+            }
+        }
+        escribir("  • " + titulo_limpio)
+    }
+}
+
+funcion eliminar_nota(val texto titulo): nulo {
+    sea ruta = ruta_nota(titulo)
+    si no archivos.existe(ruta) {
+        escribir("❌ Nota no encontrada: " + titulo)
+        devolver nulo
+    }
+    archivos.eliminar(ruta)
+    escribir("🗑️  Nota eliminada: " + titulo)
+}
+
+# Programa principal
+inicializar()
+
+escribir("📝 GESTOR DE NOTAS EN LINCE")
+escribir("============================")
+escribir("")
+
+# Crear algunas notas de ejemplo
+crear_nota("Lista de la compra",
+    "- Leche\n- Pan\n- Frutas\n- Verduras\n- Café")
+
+crear_nota("Ideas para el proyecto",
+    "1. Implementar interfaz gráfica\n" +
+    "2. Añadir exportación a PDF\n" +
+    "3. Sistema de etiquetas\n" +
+    "4. Búsqueda por contenido")
+
+crear_nota("Cosas pendientes",
+    "- Llamar al médico\n" +
+    "- Pagar facturas\n" +
+    "- Renovar DNI")
+
+escribir("")
+listar_notas()
+
+escribir("")
+escribir("📖 Leyendo nota 'Ideas para el proyecto':")
+leer_nota("Ideas para el proyecto")
+
+escribir("")
+escribir("📝 Añadiendo contenido a una nota...")
+sea ruta = ruta_nota("Cosas pendientes")
+archivos.agregar(ruta, "\n- Revisar correo")
+leer_nota("Cosas pendientes")
+
+escribir("")
+eliminar_nota("Lista de la compra")
+escribir("")
+listar_notas()

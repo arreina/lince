@@ -1,0 +1,62 @@
+# TEST COMPILADOR: variables, operadores, condicionales, bucles
+fijo MAX = 100
+sea a = 10
+sea b = 3
+
+# Aritméticos
+escribir(a + b)
+escribir(a - b)
+escribir(a * b)
+escribir(a / b)
+escribir(a % b)
+
+# Comparación
+escribir(a > b)
+escribir(a < b)
+escribir(a == b)
+escribir(a != b)
+escribir(a >= 10)
+escribir(a <= 10)
+
+# Lógicos
+escribir(verdadero y verdadero)
+escribir(verdadero y falso)
+escribir(falso o verdadero)
+escribir(no verdadero)
+
+# Condicional
+si a > b {
+    escribir("mayor")
+} sino {
+    escribir("menor")
+}
+
+# Elegir/caso
+elegir a {
+    caso 10 { escribir("diez") }
+    caso 20 { escribir("veinte") }
+    otro    { escribir("otro") }
+}
+
+# Para
+sea suma = 0
+para (i = 1; i <= 5; i++) {
+    suma = suma + i
+}
+escribir(suma)
+
+# Mientras
+sea n = 1
+sea prod = 1
+mientras n <= 5 {
+    prod = prod * n
+    n = n + 1
+}
+escribir(prod)
+
+# Hacer mientras
+sea cuenta = 0
+hacer {
+    cuenta = cuenta + 1
+} mientras (cuenta < 3)
+escribir(cuenta)

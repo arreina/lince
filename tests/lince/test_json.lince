@@ -1,0 +1,50 @@
+# TEST: json
+importar "json"
+
+# Parsear objeto simple
+sea d = json.parsear("{\"nombre\": \"Ana\", \"edad\": 22}")
+escribir(d["nombre"])
+escribir(d["edad"])
+
+# Parsear array
+sea nums = json.parsear("[10, 20, 30]")
+escribir(nums.longitud())
+escribir(nums[0])
+escribir(nums[2])
+
+# Parsear booleanos y nulo
+sea b = json.parsear("{\"activo\": true, \"vacio\": null, \"ok\": false}")
+escribir(b["activo"])
+escribir(b["vacio"])
+escribir(b["ok"])
+
+# Parsear objeto anidado
+sea anidado = json.parsear("{\"persona\": {\"nombre\": \"Luis\"}, \"tags\": [\"a\", \"b\", \"c\"]}")
+escribir(anidado["persona"]["nombre"])
+escribir(anidado["tags"].longitud())
+escribir(anidado["tags"][1])
+
+# Serializar diccionario
+sea diccionario p = {"nombre": "Ana", "edad": 22}
+sea j = json.texto(p)
+escribir(j.contiene("Ana"))
+escribir(j.contiene("edad"))
+
+# Serializar lista
+sea lista items = [1, 2, 3]
+sea jl = json.texto(items)
+escribir(jl.contiene("1"))
+escribir(jl.contiene("3"))
+
+# Serializar tipos primitivos
+escribir(json.texto(verdadero))
+escribir(json.texto(falso))
+escribir(json.texto(nulo))
+escribir(json.texto(42))
+escribir(json.texto(3.14))
+
+# Parsear y re-serializar
+sea original = "{\"x\": 1, \"y\": 2}"
+sea obj = json.parsear(original)
+escribir(obj["x"])
+escribir(obj["y"])

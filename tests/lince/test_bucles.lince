@@ -1,0 +1,51 @@
+# TEST: bucles
+# Para clásico
+sea suma = 0
+para (i = 1; i <= 5; i++) {
+    suma = suma + i
+}
+escribir(suma)
+
+# Mientras
+sea n = 10
+sea acc = 0
+mientras n > 0 {
+    acc = acc + n
+    n = n - 2
+}
+escribir(acc)
+
+# Hacer...mientras
+sea x = 5
+sea veces = 0
+hacer {
+    veces = veces + 1
+    x = x - 1
+} mientras (x > 0)
+escribir(veces)
+
+# Hacer se ejecuta al menos una vez
+sea vez = 0
+hacer {
+    vez = vez + 1
+} mientras (falso)
+escribir(vez)
+
+# Para cada — lista
+sea lista letras_test = ["a", "b", "c"]
+para cada texto l en letras_test {
+    escribir(l)
+}
+
+# Para cada — texto
+para cada texto c en "hola" {
+    escribir(c)
+}
+
+# Para cada — diccionario (claves)
+sea diccionario d = {"x": 1, "y": 2}
+sea lista claves = []
+para cada texto k en d {
+    claves.agregar(k)
+}
+escribir(claves.longitud())

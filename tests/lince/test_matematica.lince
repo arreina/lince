@@ -1,0 +1,40 @@
+# TEST: matematica
+importar "matematica"
+
+# Funciones básicas existentes
+escribir(matematica.abs(-5))
+escribir(matematica.piso(3.9))
+escribir(matematica.techo(3.1))
+escribir(matematica.redondear(3.5))
+escribir(matematica.raiz(25))
+escribir(matematica.potencia(2, 8))
+escribir(matematica.maximo(3, 7))
+escribir(matematica.minimo(3, 7))
+escribir(matematica.seno(0))
+escribir(matematica.coseno(0))
+escribir(matematica.tangente(0))
+escribir(matematica.logaritmo(1))
+
+# Nuevas funciones
+escribir(matematica.truncar(3.9))
+escribir(matematica.truncar(-3.9))
+escribir(matematica.truncar(5.0))
+escribir(matematica.es_entero(4.0))
+escribir(matematica.es_entero(4.5))
+escribir(matematica.factorial(0))
+escribir(matematica.factorial(1))
+escribir(matematica.factorial(5))
+escribir(matematica.factorial(10))
+escribir(matematica.combinaciones(5, 0))
+escribir(matematica.combinaciones(5, 2))
+escribir(matematica.combinaciones(5, 5))
+escribir(matematica.log2(1))
+escribir(matematica.log2(8))
+escribir(matematica.log10(1))
+escribir(matematica.log10(1000))
+
+# Constantes
+sea pi_ok = matematica.PI > 3.14 y matematica.PI < 3.15
+escribir(pi_ok)
+sea e_ok = matematica.E > 2.71 y matematica.E < 2.72
+escribir(e_ok)

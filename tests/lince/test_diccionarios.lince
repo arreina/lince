@@ -1,0 +1,34 @@
+# TEST: diccionarios
+sea diccionario d = {"nombre": "Ana", "edad": 22, "ciudad": "Madrid"}
+
+# Acceso
+escribir(d["nombre"])
+escribir(d["edad"])
+
+# Longitud
+escribir(d.longitud())
+
+# Nueva clave
+d["pais"] = "España"
+escribir(d.longitud())
+escribir(d["pais"])
+
+# Modificar clave existente
+d["edad"] = 23
+escribir(d["edad"])
+
+# Contiene
+escribir(d.contiene("nombre"))
+escribir(d.contiene("telefono"))
+
+# Eliminar
+d.eliminar("ciudad")
+escribir(d.longitud())
+escribir(d.contiene("ciudad"))
+
+# Iterar claves
+sea lista claves = []
+para cada texto k en d {
+    claves.agregar(k)
+}
+escribir(claves.longitud())

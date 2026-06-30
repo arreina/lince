@@ -1,0 +1,68 @@
+importar "sistema"
+importar "archivos"
+
+sea lista tests = [
+    "test_basico",
+    "test_listas_dics",
+    "test_funciones",
+    "test_clases",
+    "test_closures",
+    "test_generadores",
+    "test_errores",
+    "test_modulos"
+]
+
+sea dir_tests = "tests/compilador"
+sea pasados = 0
+sea fallados = 0
+
+escribir("")
+escribir("══════════════════════════════════════════════════")
+escribir("🐆 Lince — Tests del Compilador")
+escribir("══════════════════════════════════════════════════")
+escribir("")
+
+para cada texto nombre en tests {
+    sea fuente   = dir_tests + "/" + nombre + ".lince"
+    sea esperado = dir_tests + "/" + nombre + ".esperado"
+    sea binario  = "/tmp/lince_comp_" + nombre
+
+    # Compilar — verificar que el binario existe
+    sea cmd_comp = "./lince compilar " + fuente + " -o " + binario + " > /dev/null 2>&1"
+    sistema.ejecutar(cmd_comp)
+    sea compilado = archivos.existe(binario)
+
+    si no compilado {
+        escribir("  ❌ " + nombre + " — falló al compilar")
+        fallados = fallados + 1
+    } sino {
+        sea salida_tmp = "/tmp/lince_comp_out_" + nombre + ".txt"
+        sea cmd_run = binario + " > " + salida_tmp + " 2>&1"
+        sistema.ejecutar(cmd_run)
+
+        # Comparar con esperado
+        sea salida   = archivos.leer(salida_tmp)
+        sea esperada = archivos.leer(esperado)
+
+        si salida == esperada {
+            escribir("  ✅ " + nombre)
+            pasados = pasados + 1
+        } sino {
+            escribir("  ❌ " + nombre + " — salida incorrecta")
+            fallados = fallados + 1
+        }
+
+        # Limpiar temporales
+        sistema.ejecutar("rm -f " + salida_tmp + " " + binario)
+    }
+}
+
+escribir("")
+escribir("══════════════════════════════════════════════════")
+si fallados == 0 {
+    escribir("✅ " + pasados + "/" + (pasados + fallados) + " tests del compilador pasaron")
+} sino {
+    escribir("❌ " + fallados + " tests fallaron (" + pasados + " pasaron)")
+}
+escribir("══════════════════════════════════════════════════")
+escribir("")

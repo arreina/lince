@@ -1,0 +1,51 @@
+# TEST COMPILADOR: intentar/capturar/finalmente
+intentar {
+    lanzar Error("algo salió mal")
+} capturar (error e) {
+    escribir("capturado: " + e.mensaje)
+}
+
+# Tipo específico
+intentar {
+    lanzar ErrorRango("fuera de rango")
+} capturar (ErrorRango e) {
+    escribir("rango: " + e.mensaje)
+} capturar (error e) {
+    escribir("generico")
+}
+
+# Error en función
+funcion dividir(val numero a, val numero b): numero {
+    si b == 0 {
+        lanzar ErrorMatematico("division por cero")
+    }
+    devolver a / b
+}
+
+intentar {
+    sea r = dividir(10, 0)
+    escribir(r)
+} capturar (ErrorMatematico e) {
+    escribir("matematico: " + e.mensaje)
+}
+
+escribir(dividir(10, 2))
+
+# finalmente
+intentar {
+    lanzar Error("test finalmente")
+} capturar (error e) {
+    escribir("en captura")
+} finalmente {
+    escribir("en finalmente")
+}
+
+# Error no capturado se captura con error genérico
+intentar {
+    lanzar ErrorTipo("tipo incorrecto")
+} capturar (error e) {
+    escribir(e.tipo)
+    escribir(e.mensaje)
+}
+
+escribir("programa continua")

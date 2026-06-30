@@ -1,0 +1,73 @@
+# 🐆 Lince — Calculadora
+# Una calculadora interactiva de línea de comandos
+
+funcion calcular(val numero a, val texto op, val numero b): numero {
+    elegir op {
+        caso "+" { devolver a + b }
+        caso "-" { devolver a - b }
+        caso "*" { devolver a * b }
+        caso "/" {
+            si b == 0 { lanzar ErrorMatematico("División por cero") }
+            devolver a / b
+        }
+        caso "%" { devolver a % b }
+        otro { lanzar Error("Operador desconocido: " + op) }
+    }
+    devolver 0
+}
+
+funcion mostrar_resultado(val numero a, val texto op, val numero b, val numero r): nulo {
+    escribir(a + " " + op + " " + b + " = " + r)
+}
+
+# Ejemplos directos
+mostrar_resultado(10, "+", 5, calcular(10, "+", 5))
+mostrar_resultado(10, "-", 3, calcular(10, "-", 3))
+mostrar_resultado(6,  "*", 7, calcular(6,  "*", 7))
+mostrar_resultado(15, "/", 4, calcular(15, "/", 4))
+mostrar_resultado(17, "%", 5, calcular(17, "%", 5))
+
+# Calculadora interactiva
+escribir("")
+escribir("=== Calculadora interactiva ===")
+escribir("(escribe 'salir' para terminar)")
+escribir("")
+
+sea seguir = verdadero
+mientras seguir {
+    sea entrada = leer("Expresión (ej: 10 + 5): ")
+
+    si entrada == "salir" o entrada == "" {
+        seguir = falso
+    } sino {
+        intentar {
+            sea partes = []
+            sea actual = ""
+            para cada texto c en entrada {
+                si c == " " {
+                    si actual != "" {
+                        partes.agregar(actual)
+                        actual = ""
+                    }
+                } sino {
+                    actual = actual + c
+                }
+            }
+            si actual != "" { partes.agregar(actual) }
+
+            si partes.longitud() != 3 {
+                lanzar Error("Formato: número operador número")
+            }
+
+            sea a  = a_numero(partes[0])
+            sea op = partes[1]
+            sea b  = a_numero(partes[2])
+            sea r  = calcular(a, op, b)
+            escribir("= " + r)
+        } capturar (error e) {
+            escribir("Error: " + e.mensaje)
+        }
+    }
+}
+
+escribir("¡Hasta luego!")

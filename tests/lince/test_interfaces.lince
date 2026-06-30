@@ -1,0 +1,77 @@
+# TEST: interfaces
+interfaz Forma {
+    funcion area(): numero
+    funcion perimetro(): numero
+    funcion describir(): texto
+}
+
+interfaz Serializable {
+    funcion serializar(): texto
+}
+
+clase Rectangulo implementa Forma {
+    funcion crear(val numero ancho, val numero alto): nulo {
+        mi.ancho = ancho
+        mi.alto  = alto
+    }
+    funcion area(): numero {
+        devolver mi.ancho * mi.alto
+    }
+    funcion perimetro(): numero {
+        devolver 2 * (mi.ancho + mi.alto)
+    }
+    funcion describir(): texto {
+        devolver "Rectangulo " + mi.ancho + "x" + mi.alto
+    }
+}
+
+clase Cuadrado implementa Forma, Serializable {
+    funcion crear(val numero lado): nulo {
+        mi.lado = lado
+    }
+    funcion area(): numero {
+        devolver mi.lado * mi.lado
+    }
+    funcion perimetro(): numero {
+        devolver 4 * mi.lado
+    }
+    funcion describir(): texto {
+        devolver "Cuadrado de lado " + mi.lado
+    }
+    funcion serializar(): texto {
+        devolver "lado=" + mi.lado
+    }
+}
+
+# Uso básico
+sea r = Rectangulo(5, 3)
+escribir(r.describir())
+escribir(r.area())
+escribir(r.perimetro())
+
+sea c = Cuadrado(4)
+escribir(c.describir())
+escribir(c.area())
+escribir(c.perimetro())
+escribir(c.serializar())
+
+# Polimorfismo
+sea lista formas = [Rectangulo(2, 3), Cuadrado(5), Rectangulo(10, 2)]
+para cada elemento f en formas {
+    escribir(f.area())
+}
+
+# Herencia + interfaz
+clase Cuadrado3D extiende Cuadrado {
+    funcion crear(val numero lado): nulo {
+        padre(lado)
+    }
+    funcion volumen(): numero {
+        devolver mi.lado * mi.lado * mi.lado
+    }
+}
+
+sea q = Cuadrado3D(3)
+escribir(q.area())
+escribir(q.volumen())
+escribir(q.describir())

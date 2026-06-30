@@ -1,0 +1,8 @@
+# 🐆 Lince — Hola Mundo
+# El programa más simple posible
+
+escribir("¡Hola, Mundo!")
+
+# Con entrada del usuario
+sea nombre = leer("¿Cómo te llamas? ")
+escribir("¡Hola, " + nombre + "! Bienvenido a Lince.")

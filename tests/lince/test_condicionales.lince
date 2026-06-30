@@ -1,0 +1,41 @@
+# TEST: condicionales
+sea x = 10
+
+si x > 5 {
+    escribir("mayor")
+}
+
+si x > 20 {
+    escribir("ERROR")
+} sino {
+    escribir("no mayor que 20")
+}
+
+si x == 5 {
+    escribir("ERROR")
+} sino si x == 10 {
+    escribir("es 10")
+} sino {
+    escribir("ERROR")
+}
+
+# Condicional con logicos
+sea a = verdadero
+sea b = falso
+
+si a y no b {
+    escribir("a y no b")
+}
+
+si a o b {
+    escribir("a o b")
+}
+
+# Condicionales anidados
+para (i = 1; i <= 5; i++) {
+    si i % 2 == 0 {
+        escribir("par")
+    } sino {
+        escribir("impar")
+    }
+}

@@ -1,0 +1,75 @@
+# 🐆 Lince — Juego de Adivinanza
+# Adivina el número que ha pensado el ordenador
+
+importar "matematica"
+importar "tiempo"
+
+funcion jugar(val numero min, val numero max, val numero max_intentos): logico {
+    sea secreto = matematica.aleatorio(min, max)
+    sea intentos = 0
+    sea ganado = falso
+
+    escribir("")
+    escribir("He pensado un número entre " + min + " y " + max + ".")
+    escribir("Tienes " + max_intentos + " intentos. ¡Buena suerte!")
+    escribir("")
+
+    mientras intentos < max_intentos y no ganado {
+        sea entrada = leer("Intento " + (intentos + 1) + "/" + max_intentos + ": ")
+
+        si entrada == "" {
+            escribir("(sin entrada — juego terminado)")
+            devolver falso
+        }
+
+        sea intento = a_numero(entrada)
+        intentos = intentos + 1
+
+        si intento == secreto {
+            ganado = verdadero
+            escribir("🎉 ¡CORRECTO! Era el " + secreto)
+            si intentos == 1 {
+                escribir("¡Increíble, a la primera!")
+            } sino si intentos <= 3 {
+                escribir("¡Excelente! Solo " + intentos + " intentos.")
+            } sino {
+                escribir("Bien hecho en " + intentos + " intentos.")
+            }
+        } sino si intento < secreto {
+            sea restantes = max_intentos - intentos
+            si restantes > 0 {
+                escribir("⬆  Demasiado bajo. Te quedan " + restantes + " intentos.")
+            }
+        } sino {
+            sea restantes = max_intentos - intentos
+            si restantes > 0 {
+                escribir("⬇  Demasiado alto. Te quedan " + restantes + " intentos.")
+            }
+        }
+    }
+
+    si no ganado {
+        escribir("😔 ¡Se acabaron los intentos! Era el " + secreto + ".")
+    }
+
+    devolver ganado
+}
+
+# Programa principal
+escribir("🎮 JUEGO DE ADIVINANZA")
+escribir("======================")
+
+sea victorias = 0
+sea partidas  = 0
+
+# Una partida de ejemplo
+partidas = partidas + 1
+sea gano = jugar(1, 100, 7)
+si gano { victorias = victorias + 1 }
+
+escribir("")
+escribir("=== Resultado ===")
+escribir("Partidas: " + partidas)
+escribir("Victorias: " + victorias)
+escribir("")
+escribir("¡Gracias por jugar con Lince! 🐆")

@@ -1,0 +1,50 @@
+# 🐆 Lince — afirmar.lince
+# Librería de aserciones para tests
+
+sea _tests_total    = 0
+sea _tests_ok       = 0
+sea _tests_fallidos = 0
+sea _suite_actual   = ""
+
+funcion suite(val texto nombre): nulo {
+    _suite_actual = nombre
+    escribir("  ▶ " + nombre)
+}
+
+funcion afirmar(val texto descripcion, val logico condicion): nulo {
+    _tests_total = _tests_total + 1
+    si condicion {
+        _tests_ok = _tests_ok + 1
+        escribir("    ✅ " + descripcion)
+    } sino {
+        _tests_fallidos = _tests_fallidos + 1
+        escribir("    ❌ FALLO: " + descripcion)
+    }
+}
+
+funcion afirmar_igual(val texto descripcion, val numero a, val numero b): nulo {
+    afirmar(descripcion + " (" + a + " == " + b + ")", a == b)
+}
+
+funcion afirmar_texto(val texto descripcion, val texto a, val texto b): nulo {
+    afirmar(descripcion + " (\"" + a + "\" == \"" + b + "\")", a == b)
+}
+
+funcion afirmar_logico(val texto descripcion, val logico a, val logico b): nulo {
+    afirmar(descripcion, a == b)
+}
+
+funcion afirmar_error(val texto descripcion, val logico se_lanzo): nulo {
+    afirmar(descripcion, se_lanzo)
+}
+
+funcion resumen(): nulo {
+    escribir("")
+    escribir("══════════════════════════════")
+    si _tests_fallidos == 0 {
+        escribir("✅ " + _tests_ok + "/" + _tests_total + " tests pasaron")
+    } sino {
+        escribir("❌ " + _tests_fallidos + " fallos de " + _tests_total + " tests")
+    }
+    escribir("══════════════════════════════")
+}

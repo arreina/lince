@@ -1,0 +1,38 @@
+# TEST: modulos
+importar "matematica"
+importar "texto"
+
+# Matematica
+escribir(matematica.abs(-5))
+escribir(matematica.piso(3.9))
+escribir(matematica.techo(3.1))
+escribir(matematica.redondear(3.5))
+escribir(matematica.potencia(2, 10))
+escribir(matematica.raiz(25))
+escribir(matematica.maximo(3, 7))
+escribir(matematica.minimo(3, 7))
+escribir(matematica.seno(0))
+escribir(matematica.coseno(0))
+
+# Constantes
+sea pi_redondeado = matematica.redondear(matematica.PI * 100) / 100
+escribir(pi_redondeado)
+
+# Texto
+sea partes = texto.dividir("a,b,c,d", ",")
+escribir(partes.longitud())
+escribir(texto.unir(partes, "-"))
+escribir(texto.repetir("ab", 3))
+escribir(texto.invertir("Lince"))
+escribir(texto.formato("Hola {}, tienes {} años", ["Ana", 22]))
+escribir(texto.posicion("hola mundo", "mundo"))
+escribir(texto.contar("aababc", "a"))
+escribir(texto.extraer("hola mundo", 0, 4))
+escribir(texto.es_numero("42"))
+escribir(texto.es_numero("hola"))
+escribir(texto.es_vacio(""))
+escribir(texto.empieza_con("hola", "ho"))
+escribir(texto.termina_con("hola", "la"))
+escribir(texto.rellenar_izq("7", 3, "0"))
+escribir(texto.rellenar_der("hi", 5, "."))
+escribir(texto.centrar("ok", 6, "-"))

@@ -1,0 +1,37 @@
+{
+  "scope": "source.lince",
+  "completions": [
+    { "trigger": "sea\tVariable", "contents": "sea ${1:nombre} = ${2:valor}" },
+    { "trigger": "fijo\tConstante", "contents": "fijo ${1:NOMBRE} = ${2:valor}" },
+    { "trigger": "lista\tLista", "contents": "sea lista ${1:nombre} = [${2}]" },
+    { "trigger": "dic\tDiccionario", "contents": "sea diccionario ${1:nombre} = {\"${2:clave}\": ${3:valor}}" },
+
+    { "trigger": "fun\tFunción", "contents": "funcion ${1:nombre}(val ${2:tipo} ${3:param}): ${4:nulo} {\n\t$0\n}" },
+    { "trigger": "fun0\tFunción sin params", "contents": "funcion ${1:nombre}(): ${2:nulo} {\n\t$0\n}" },
+
+    { "trigger": "si\tCondicional", "contents": "si ${1:condicion} {\n\t$0\n}" },
+    { "trigger": "sino\tSi/Sino", "contents": "si ${1:condicion} {\n\t$2\n} sino {\n\t$0\n}" },
+
+    { "trigger": "para\tBucle para", "contents": "para (${1:i} = 0; ${1:i} < ${2:10}; ${1:i}++) {\n\t$0\n}" },
+    { "trigger": "cada\tPara cada", "contents": "para cada ${1:numero} ${2:elem} en ${3:lista} {\n\t$0\n}" },
+    { "trigger": "mientras\tMientras", "contents": "mientras ${1:condicion} {\n\t$0\n}" },
+    { "trigger": "hacer\tHacer...mientras", "contents": "hacer {\n\t$0\n} mientras (${1:condicion})" },
+
+    { "trigger": "clase\tClase", "contents": "clase ${1:NombreClase} {\n\tfuncion crear(val ${2:tipo} ${3:param}): nulo {\n\t\tmi.${3:param} = ${3:param}\n\t}\n\n\t$0\n}" },
+    { "trigger": "clasex\tClase con herencia", "contents": "clase ${1:NombreClase} extiende ${2:ClasePadre} {\n\tfuncion crear(val ${3:tipo} ${4:param}): nulo {\n\t\tpadre(${4:param})\n\t\t$0\n\t}\n}" },
+
+    { "trigger": "intentar\tIntentar/Capturar", "contents": "intentar {\n\t$1\n} capturar (error ${2:e}) {\n\tescribir(${2:e}.mensaje)\n}" },
+    { "trigger": "lanzar\tLanzar error", "contents": "lanzar Error(\"${1:mensaje}\")" },
+
+    { "trigger": "importar\tImportar módulo", "contents": "importar \"${1:matematica}\"" },
+    { "trigger": "esc\tEscribir", "contents": "escribir(${1:\"mensaje\"})" },
+
+    "sea", "fijo", "funcion", "clase", "extiende", "mi", "padre", "importar",
+    "si", "sino", "para", "cada", "en", "mientras", "hacer", "devolver",
+    "intentar", "capturar", "finalmente", "lanzar",
+    "val", "ref", "numero", "texto", "logico", "lista", "diccionario", "nulo",
+    "verdadero", "falso", "y", "o", "no", "escribir",
+    "Error", "ErrorTipo", "ErrorRango", "ErrorNulo", "ErrorMatematico", "ErrorArgumento", "ErrorRecursion",
+    "matematica", "archivos", "tiempo"
+  ]
+}

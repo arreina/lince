@@ -1,0 +1,56 @@
+# TEST COMPILADOR: clases y herencia
+clase Animal {
+    funcion crear(val texto nombre, val texto sonido): nulo {
+        mi.nombre = nombre
+        mi.sonido = sonido
+    }
+    funcion hablar(): texto {
+        devolver mi.nombre + " dice " + mi.sonido
+    }
+    funcion nombre(): texto {
+        devolver mi.nombre
+    }
+}
+
+clase Perro extiende Animal {
+    funcion crear(val texto nombre): nulo {
+        padre(nombre, "guau")
+        mi.raza = "mestizo"
+    }
+    funcion hablar(): texto {
+        devolver mi.nombre + " ladra: guau!"
+    }
+    funcion raza(): texto {
+        devolver mi.raza
+    }
+}
+
+clase Labrador extiende Perro {
+    funcion crear(val texto nombre): nulo {
+        padre(nombre)
+        mi.raza = "Labrador"
+    }
+}
+
+# Animal
+sea a = Animal("Gato", "miau")
+escribir(a.hablar())
+escribir(a.nombre())
+
+# Perro
+sea p = Perro("Rex")
+escribir(p.hablar())
+escribir(p.nombre())
+escribir(p.raza())
+
+# Labrador hereda hablar() de Perro
+sea l = Labrador("Toby")
+escribir(l.hablar())
+escribir(l.nombre())
+escribir(l.raza())
+
+# Polimorfismo
+sea lista animales = [Animal("Pez", "blub"), Perro("Luna"), Labrador("Max")]
+para cada elemento an en animales {
+    escribir(an.hablar())
+}

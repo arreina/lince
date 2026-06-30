@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NotepadPlus>
+  <UserLang name="Lince" ext="lince" udlVersion="2.1">
+    <Settings>
+      <Global caseIgnored="no" allowFoldOfComments="yes" foldCompact="no" forcePureLC="0" decimalSeparator="0"/>
+      <Prefix Keywords1="no" Keywords2="no" Keywords3="no" Keywords4="no" Keywords5="no" Keywords6="no" Keywords7="no" Keywords8="no"/>
+    </Settings>
+
+    <KeywordLists>
+      <!-- Control de flujo -->
+      <Keywords name="Keywords1">
+        si sino para cada en mientras hacer devolver intentar capturar finalmente lanzar
+      </Keywords>
+
+      <!-- Declaraciones -->
+      <Keywords name="Keywords2">
+        sea fijo funcion clase extiende mi padre importar val ref
+      </Keywords>
+
+      <!-- Tipos de dato -->
+      <Keywords name="Keywords3">
+        numero texto logico lista diccionario nulo
+      </Keywords>
+
+      <!-- Literales y operadores lógicos -->
+      <Keywords name="Keywords4">
+        verdadero falso y o no
+      </Keywords>
+
+      <!-- Tipos de error predefinidos -->
+      <Keywords name="Keywords5">
+        Error ErrorTipo ErrorRango ErrorNulo ErrorMatematico ErrorArgumento ErrorRecursion
+      </Keywords>
+
+      <!-- Módulos estándar -->
+      <Keywords name="Keywords6">
+        escribir matematica texto archivos tiempo
+      </Keywords>
+
+      <!-- Operadores -->
+      <Keywords name="Keywords7">
+        ++ -- == != &lt;= &gt;= &lt; &gt; = + - * / %
+      </Keywords>
+
+      <!-- Reservado para uso futuro -->
+      <Keywords name="Keywords8"></Keywords>
+    </KeywordLists>
+
+    <Styles>
+      <!-- Comentarios: verde -->
+      <WordsStyle name="COMMENTS" fgColor="6A9955" bgColor="FFFFFF" fontName="" fontStyle="2" nesting="0"/>
+      <!-- Línea de comentario -->
+      <WordsStyle name="LINE COMMENTS" fgColor="6A9955" bgColor="FFFFFF" fontName="" fontStyle="2" nesting="0"/>
+      <!-- Cadenas de texto: naranja/salmón -->
+      <WordsStyle name="STRINGS" fgColor="CE9178" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Números: verde claro -->
+      <WordsStyle name="NUMBERS" fgColor="B5CEA8" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Control de flujo: rosa/magenta -->
+      <WordsStyle name="Keywords1" fgColor="C586C0" bgColor="FFFFFF" fontName="" fontStyle="1" nesting="0"/>
+      <!-- Declaraciones: azul -->
+      <WordsStyle name="Keywords2" fgColor="569CD6" bgColor="FFFFFF" fontName="" fontStyle="1" nesting="0"/>
+      <!-- Tipos: azul claro -->
+      <WordsStyle name="Keywords3" fgColor="4EC9B0" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Literales: azul brillante -->
+      <WordsStyle name="Keywords4" fgColor="569CD6" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Errores: amarillo -->
+      <WordsStyle name="Keywords5" fgColor="DCDCAA" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Módulos y funciones builtin: amarillo -->
+      <WordsStyle name="Keywords6" fgColor="DCDCAA" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Operadores: blanco/gris claro -->
+      <WordsStyle name="Keywords7" fgColor="D4D4D4" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <WordsStyle name="Keywords8" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Delimitadores: blanco -->
+      <WordsStyle name="OPERATORS" fgColor="D4D4D4" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Identificadores -->
+      <WordsStyle name="IDENTIFIERS" fgColor="9CDCFE" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <!-- Texto seleccionado -->
+      <WordsStyle name="PREPROCESSOR" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <WordsStyle name="FOLDERS IN CODE1, OPEN" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <WordsStyle name="FOLDERS IN CODE1, CLOSE" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <WordsStyle name="FOLDERS IN COMMENT, OPEN" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <WordsStyle name="FOLDERS IN COMMENT, CLOSE" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <WordsStyle name="FOLDER IN CODE2, OPEN" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+      <WordsStyle name="FOLDER IN CODE2, CLOSE" fgColor="000000" bgColor="FFFFFF" fontName="" fontStyle="0" nesting="0"/>
+    </Styles>
+
+    <Comments>
+      <Comment multiCommentStart="" multiCommentEnd="" multiCommentLine="" singleCommentLine1="#" singleCommentLine2=""/>
+    </Comments>
+
+    <Numbers>
+      <Number decimalSeparator="." leadingZero="yes" trailingDecimal="no" negativeSignFollowedBySpace="no" ignoreCase="no" allowedCharsInRanges="" suffixesAllowed="" Extras1="" Extras2="" rangeMax1="9" rangeMin1="0" rangeMax2="" rangeMin2=""/>
+    </Numbers>
+
+    <StringDelimiters>
+      <StringDelimiter begin="&quot;" end="&quot;" escapeChar="\" multiLine="no" allowedRange=""/>
+    </StringDelimiters>
+
+    <Operators>
+      <Operators startOperators="" stopOperators="" additionalOperators="+-*/%=&lt;&gt;!&amp;|^~()[]{}.,;:"/>
+    </Operators>
+
+    <Folding>
+      <Folding startFolding="{" stopFolding="}"/>
+    </Folding>
+  </UserLang>
+</NotepadPlus>

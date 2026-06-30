@@ -1,0 +1,102 @@
+# 🐆 Lince — Generadores y Secuencias
+# Demuestra el poder de los generadores en Lince
+
+importar "matematica"
+
+# Generador de números de Fibonacci
+generador fibonacci(val numero cantidad): numero {
+    sea a = 0
+    sea b = 1
+    sea i = 0
+    mientras i < cantidad {
+        producir a
+        sea tmp = a + b
+        a = b
+        b = tmp
+        i = i + 1
+    }
+}
+
+# Generador de números primos (criba simple)
+generador primos(val numero hasta): numero {
+    para cada numero n en rango(2, hasta) {
+        sea es_primo = verdadero
+        para cada numero d en rango(2, n) {
+            si d * d > n {
+                d = n  # salir del bucle
+            }
+            si n % d == 0 {
+                es_primo = falso
+            }
+        }
+        si es_primo { producir n }
+    }
+}
+
+# Generador de múltiplos
+generador multiplos(val numero base, val numero cantidad): numero {
+    para cada numero i en rango(1, cantidad + 1) {
+        producir base * i
+    }
+}
+
+# Generador de potencias de 2
+generador potencias_de_2(val numero n): numero {
+    sea p = 1
+    para cada numero i en rango(n) {
+        producir p
+        p = p * 2
+    }
+}
+
+# Primeros 10 Fibonacci
+escribir("🔢 Primeros 10 números de Fibonacci:")
+sea lista fibs = []
+para cada numero n en fibonacci(10) {
+    fibs.agregar(n)
+}
+escribir(fibs)
+escribir("")
+
+# Primos hasta 50
+escribir("🔢 Números primos hasta 50:")
+sea lista lista_primos = []
+para cada numero p en primos(50) {
+    lista_primos.agregar(p)
+}
+escribir(lista_primos)
+escribir("Total: " + lista_primos.longitud())
+escribir("")
+
+# Tabla de múltiplos
+escribir("🔢 Múltiplos de 7 (primeros 10):")
+para cada numero m en multiplos(7, 10) {
+    escribir("  7 x " + (m / 7) + " = " + m)
+}
+escribir("")
+
+# Potencias de 2
+escribir("🔢 Primeras 12 potencias de 2:")
+sea lista pots = []
+para cada numero p en potencias_de_2(12) {
+    pots.agregar(p)
+}
+escribir(pots)
+escribir("")
+
+# Combinar generadores con funciones de orden superior
+escribir("🔢 Suma de primos hasta 30:")
+sea lista ps30 = []
+para cada numero p en primos(30) { ps30.agregar(p) }
+sea suma_primos = reducir(ps30, 0, funcion(val numero acc, val numero x): numero {
+    devolver acc + x
+})
+escribir(suma_primos)
+
+# rango() con paso
+escribir("")
+escribir("🔢 Cuenta atrás desde 10:")
+para cada numero n en rango(10, 0, -1) {
+    escribir(n)
+}
+escribir("¡Despegue!")

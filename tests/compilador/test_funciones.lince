@@ -1,0 +1,54 @@
+# TEST COMPILADOR: funciones y recursión
+funcion sumar(val numero a, val numero b): numero {
+    devolver a + b
+}
+escribir(sumar(3, 7))
+
+# Valor por defecto
+funcion saludar(val texto nombre, val texto saludo = "Hola"): texto {
+    devolver saludo + ", " + nombre
+}
+escribir(saludar("Ana"))
+escribir(saludar("Luis", "Buenos días"))
+
+# Recursión
+funcion factorial(val numero n): numero {
+    si n <= 1 { devolver 1 }
+    devolver n * factorial(n - 1)
+}
+escribir(factorial(0))
+escribir(factorial(1))
+escribir(factorial(5))
+escribir(factorial(10))
+
+# Fibonacci
+funcion fib(val numero n): numero {
+    si n <= 1 { devolver n }
+    devolver fib(n - 1) + fib(n - 2)
+}
+escribir(fib(0))
+escribir(fib(1))
+escribir(fib(7))
+escribir(fib(10))
+
+# Recursión mutua
+funcion es_par(val numero n): logico {
+    si n == 0 { devolver verdadero }
+    devolver es_impar(n - 1)
+}
+funcion es_impar(val numero n): logico {
+    si n == 0 { devolver falso }
+    devolver es_par(n - 1)
+}
+escribir(es_par(4))
+escribir(es_par(7))
+escribir(es_impar(3))
+
+# Funciones como argumentos
+funcion aplicar(val numero x, val funcion f): numero {
+    devolver f(x)
+}
+sea doble = funcion(val numero x): numero { devolver x * 2 }
+sea cuadrado = funcion(val numero x): numero { devolver x * x }
+escribir(aplicar(5, doble))
+escribir(aplicar(5, cuadrado))

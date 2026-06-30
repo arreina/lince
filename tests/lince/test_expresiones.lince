@@ -1,0 +1,38 @@
+# TEST: expresiones
+importar "expresiones"
+
+# coincidir — comprueba si hay coincidencia
+escribir(expresiones.coincidir("hola mundo", "mundo"))
+escribir(expresiones.coincidir("hola mundo", "^hola"))
+escribir(expresiones.coincidir("hola mundo", "^[0-9]+$"))
+escribir(expresiones.coincidir("abc123", "[0-9]+"))
+escribir(expresiones.coincidir("abc", "[0-9]+"))
+
+# buscar — primera coincidencia
+sea r1 = expresiones.buscar("precio: 42 euros", "[0-9]+")
+escribir(r1)
+
+sea r2 = expresiones.buscar("sin numeros aqui", "[0-9]+")
+escribir(r2 == nulo)
+
+sea r3 = expresiones.buscar("correo@ejemplo.com", "[a-z]+@[a-z]+")
+escribir(r3)
+
+# todos — todas las coincidencias
+sea nums = expresiones.todos("uno 1 dos 2 tres 3", "[0-9]+")
+escribir(nums.longitud())
+escribir(nums[0])
+escribir(nums[1])
+escribir(nums[2])
+
+sea palabras = expresiones.todos("hola mundo lince", "[a-z]+")
+escribir(palabras.longitud())
+escribir(palabras[0])
+
+sea vacio = expresiones.todos("abc", "[0-9]+")
+escribir(vacio.longitud())
+
+# reemplazar — sustituir coincidencias
+escribir(expresiones.reemplazar("hola mundo cruel", "cruel", "hermoso"))
+escribir(expresiones.reemplazar("1 mas 2 mas 3", "[0-9]+", "N"))
+escribir(expresiones.reemplazar("sin cambios", "[0-9]+", "X"))

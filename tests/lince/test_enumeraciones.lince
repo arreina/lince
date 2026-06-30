@@ -1,0 +1,59 @@
+# TEST: enumeraciones
+enumeracion Color {
+    Rojo
+    Verde
+    Azul
+}
+
+enumeracion Estado {
+    Activo
+    Inactivo
+    Pendiente
+}
+
+# Acceso a valores
+escribir(Color.Rojo)
+escribir(Color.Verde)
+escribir(Color.Azul)
+
+# Comparación
+sea c = Color.Rojo
+escribir(c == Color.Rojo)
+escribir(c == Color.Verde)
+escribir(c != Color.Azul)
+
+# En elegir/caso
+elegir c {
+    caso Color.Rojo  { escribir("rojo") }
+    caso Color.Verde { escribir("verde") }
+    caso Color.Azul  { escribir("azul") }
+}
+
+# En función
+funcion nombre_estado(val texto e): texto {
+    elegir e {
+        caso Estado.Activo   { devolver "activo" }
+        caso Estado.Inactivo { devolver "inactivo" }
+        otro                 { devolver "pendiente" }
+    }
+    devolver ""
+}
+escribir(nombre_estado(Estado.Activo))
+escribir(nombre_estado(Estado.Inactivo))
+escribir(nombre_estado(Estado.Pendiente))
+
+# En lista
+sea lista colores = [Color.Rojo, Color.Verde, Color.Azul]
+escribir(colores.longitud())
+escribir(colores[0])
+escribir(colores[2])
+
+# Múltiples enumeraciones independientes
+enumeracion Direccion {
+    Norte
+    Sur
+    Este
+    Oeste
+}
+escribir(Direccion.Norte)
+escribir(Direccion.Oeste)

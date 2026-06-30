@@ -1,0 +1,54 @@
+# TEST: funciones
+# Función básica
+funcion sumar(val numero a, val numero b): numero {
+    devolver a + b
+}
+escribir(sumar(3, 7))
+
+# Función con texto
+funcion saludar(val texto nombre): texto {
+    devolver "Hola, " + nombre
+}
+escribir(saludar("Lince"))
+
+# Función recursiva
+funcion factorial(val numero n): numero {
+    si n <= 1 {
+        devolver 1
+    }
+    devolver n * factorial(n - 1)
+}
+escribir(factorial(5))
+escribir(factorial(10))
+
+# Función con ref
+funcion agregar_doble(ref lista nums, val numero x): nulo {
+    nums.agregar(x * 2)
+}
+sea lista miLista = [1, 2, 3]
+agregar_doble(miLista, 5)
+escribir(miLista.longitud())
+escribir(miLista[3])
+
+# Valores por defecto
+funcion potencia(val numero base, val numero exp = 2): numero {
+    sea r = 1
+    para (i = 0; i < exp; i++) {
+        r = r * base
+    }
+    devolver r
+}
+escribir(potencia(3))
+escribir(potencia(2, 8))
+
+# Lambda en variable
+sea triple = funcion(val numero x): numero {
+    devolver x * 3
+}
+escribir(triple(7))
+
+# Lambda como argumento
+funcion aplicar(val numero x, val funcion f): numero {
+    devolver f(x)
+}
+escribir(aplicar(4, funcion(val numero n): numero { devolver n * n }))

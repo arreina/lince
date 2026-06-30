@@ -1,0 +1,116 @@
+# 🐆 Lince — Agenda de Contactos
+# Gestión de contactos con clases, listas y archivos
+
+importar "json"
+importar "archivos"
+
+clase Contacto {
+    funcion crear(val texto nombre, val texto telefono, val texto email): nulo {
+        mi.nombre    = nombre
+        mi.telefono  = telefono
+        mi.email     = email
+    }
+    funcion mostrar(): nulo {
+        escribir("  Nombre:    " + mi.nombre)
+        escribir("  Teléfono:  " + mi.telefono)
+        escribir("  Email:     " + mi.email)
+    }
+    funcion a_dic(): diccionario {
+        devolver {
+            "nombre":   mi.nombre,
+            "telefono": mi.telefono,
+            "email":    mi.email
+        }
+    }
+}
+
+clase Agenda {
+    funcion crear(): nulo {
+        mi.contactos = []
+        mi.archivo   = "agenda.json"
+        mi.cargar()
+    }
+
+    funcion cargar(): nulo {
+        si archivos.existe(mi.archivo) {
+            intentar {
+                sea datos = json.parsear(archivos.leer(mi.archivo))
+                sea carga = datos["contactos"]
+                para cada elemento c en carga {
+                    mi.contactos.agregar(
+                        Contacto(c["nombre"], c["telefono"], c["email"])
+                    )
+                }
+            } capturar (error e) {
+                escribir("Aviso: no se pudo cargar la agenda.")
+            }
+        }
+    }
+
+    funcion guardar(): nulo {
+        sea lista datos = []
+        para cada elemento c en mi.contactos {
+            datos.agregar(c.a_dic())
+        }
+        sea contenido = json.texto({"contactos": datos})
+        archivos.escribir(mi.archivo, contenido)
+    }
+
+    funcion agregar(val texto nombre, val texto tel, val texto email): nulo {
+        mi.contactos.agregar(Contacto(nombre, tel, email))
+        mi.guardar()
+        escribir("✅ Contacto añadido: " + nombre)
+    }
+
+    funcion buscar(val texto nombre): nulo {
+        sea encontrados = 0
+        para cada elemento c en mi.contactos {
+            si c.nombre.contiene(nombre) {
+                c.mostrar()
+                escribir("")
+                encontrados = encontrados + 1
+            }
+        }
+        si encontrados == 0 {
+            escribir("No se encontraron contactos con '" + nombre + "'")
+        }
+    }
+
+    funcion listar(): nulo {
+        si mi.contactos.longitud() == 0 {
+            escribir("La agenda está vacía.")
+            devolver nulo
+        }
+        escribir("📋 Agenda (" + mi.contactos.longitud() + " contactos):")
+        escribir("")
+        para cada elemento c en mi.contactos {
+            c.mostrar()
+            escribir("")
+        }
+    }
+
+    funcion total(): numero {
+        devolver mi.contactos.longitud()
+    }
+}
+
+# Programa principal
+sea agenda = Agenda()
+
+escribir("🐆 Agenda de Contactos")
+escribir("======================")
+escribir("")
+
+# Añadir algunos contactos
+agenda.agregar("Ana García",    "+34 612 345 678", "ana@ejemplo.com")
+agenda.agregar("Luis Martínez", "+34 698 765 432", "luis@ejemplo.com")
+agenda.agregar("Marta López",   "+34 655 111 222", "marta@ejemplo.com")
+agenda.agregar("Carlos Ruiz",   "+34 677 333 444", "carlos@ejemplo.com")
+
+escribir("")
+agenda.listar()
+
+escribir("🔍 Buscando 'García':")
+agenda.buscar("García")
+
+escribir("Total de contactos: " + agenda.total())

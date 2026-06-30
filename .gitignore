@@ -1,0 +1,18 @@
+# Binarios compilados
+/lince
+*.o
+*.a
+
+# Salidas del compilador de Lince
+*.c.gen
+a.out
+
+# Archivos temporales de tests
+agenda.json
+*.tmp
+
+# Editores
+.vscode/settings.json
+*.swp
+*~
+.DS_Store

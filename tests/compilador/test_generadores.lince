@@ -1,0 +1,64 @@
+# TEST COMPILADOR: generadores
+generador contar(val numero hasta): numero {
+    sea i = 0
+    mientras i < hasta {
+        producir i
+        i = i + 1
+    }
+}
+
+para cada numero n en contar(4) {
+    escribir(n)
+}
+
+# rango básico
+para cada numero n en rango(3) {
+    escribir(n)
+}
+
+# rango con inicio y fin
+para cada numero n en rango(2, 5) {
+    escribir(n)
+}
+
+# rango con paso
+para cada numero n en rango(0, 10, 3) {
+    escribir(n)
+}
+
+# Generador con filtro
+generador multiplos(val numero base, val numero hasta): numero {
+    para cada numero n en rango(hasta) {
+        si n % base == 0 {
+            producir n
+        }
+    }
+}
+
+para cada numero n en multiplos(3, 12) {
+    escribir(n)
+}
+
+# Generador de textos
+generador dias(): texto {
+    producir "lunes"
+    producir "martes"
+    producir "miercoles"
+}
+
+para cada texto d en dias() {
+    escribir(d)
+}
+
+# Generador vacío
+generador vacio(): numero {
+    sea x = 10
+    mientras x < 0 {
+        producir x
+    }
+}
+sea lista r = []
+para cada numero n en vacio() {
+    r.agregar(n)
+}
+escribir(r.longitud())

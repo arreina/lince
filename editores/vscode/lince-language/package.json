@@ -1,0 +1,38 @@
+{
+  "name": "lince-language",
+  "displayName": "Lince",
+  "description": "Soporte de lenguaje para Lince — el lenguaje de programación en español",
+  "version": "0.3.0",
+  "publisher": "lince-lang",
+  "engines": { "vscode": "^1.70.0" },
+  "categories": ["Programming Languages"],
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tu-usuario/lince"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "lince",
+        "aliases": ["Lince", "lince"],
+        "extensions": [".lince"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lince",
+        "scopeName": "source.lince",
+        "path": "./lince.tmLanguage.json"
+      }
+    ],
+    "themes": [],
+    "snippets": [
+      {
+        "language": "lince",
+        "path": "./snippets.json"
+      }
+    ]
+  }
+}

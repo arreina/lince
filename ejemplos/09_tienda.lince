@@ -1,0 +1,145 @@
+# 🐆 Lince - Programación Orientada a Objetos
+# Herencia, interfaces, polimorfismo y enumeraciones
+
+enumeracion Categoria { Electronica Ropa Alimentacion Hogar }
+enumeracion Estado     { Disponible Agotado Descontinuado }
+
+interfaz Vendible {
+    funcion precio_final(): numero
+    funcion descripcion(): texto
+}
+
+interfaz Descuentable {
+    funcion aplicar_descuento(val numero pct): nulo
+}
+
+clase Producto implementa Vendible {
+    funcion crear(val texto nombre, val numero precio, val texto cat): nulo {
+        mi.nombre    = nombre
+        mi.precio    = precio
+        mi.categoria = cat
+        mi.estado    = Estado.Disponible
+        mi.stock     = 0
+    }
+    funcion precio_final(): numero {
+        devolver mi.precio
+    }
+    funcion descripcion(): texto {
+        devolver mi.nombre + " (" + mi.categoria + ") - " + mi.precio + "€"
+    }
+    funcion reponer(val numero cantidad): nulo {
+        mi.stock = mi.stock + cantidad
+        si mi.stock > 0 { mi.estado = Estado.Disponible }
+    }
+    funcion vender(val numero cantidad): logico {
+        si mi.stock < cantidad {
+            escribir("⚠  Stock insuficiente de " + mi.nombre)
+            devolver falso
+        }
+        mi.stock = mi.stock - cantidad
+        si mi.stock == 0 { mi.estado = Estado.Agotado }
+        devolver verdadero
+    }
+    funcion mostrar(): nulo {
+        escribir("  📦 " + mi.nombre)
+        escribir("     Precio:    " + mi.precio_final() + "€")
+        escribir("     Categoría: " + mi.categoria)
+        escribir("     Estado:    " + mi.estado)
+        escribir("     Stock:     " + mi.stock + " unidades")
+    }
+}
+
+clase ProductoOferta extiende Producto implementa Descuentable {
+    funcion crear(val texto nombre, val numero precio, val texto cat, val numero dto): nulo {
+        padre(nombre, precio, cat)
+        mi.descuento = dto
+    }
+    funcion precio_final(): numero {
+        devolver mi.precio * (1 - mi.descuento / 100)
+    }
+    funcion descripcion(): texto {
+        devolver mi.nombre + " (" + mi.categoria + ") - " +
+                 mi.precio_final() + "€ (-" + mi.descuento + "%)"
+    }
+    funcion aplicar_descuento(val numero pct): nulo {
+        mi.descuento = mi.descuento + pct
+        si mi.descuento > 90 { mi.descuento = 90 }
+        escribir("💥 Nuevo descuento en " + mi.nombre + ": -" + mi.descuento + "%")
+    }
+    funcion mostrar(): nulo {
+        escribir("  🏷️  " + mi.nombre + " [OFERTA -" + mi.descuento + "%]")
+        escribir("     Precio orig: " + mi.precio + "€")
+        escribir("     Precio final: " + mi.precio_final() + "€")
+        escribir("     Categoría:   " + mi.categoria)
+        escribir("     Stock:       " + mi.stock + " unidades")
+    }
+}
+
+clase Tienda {
+    funcion crear(val texto nombre): nulo {
+        mi.nombre    = nombre
+        mi.productos = []
+    }
+    funcion agregar_producto(val Producto p): nulo {
+        mi.productos.agregar(p)
+    }
+    funcion total_stock(): numero {
+        sea total = 0
+        para cada elemento p en mi.productos {
+            total = total + p.stock
+        }
+        devolver total
+    }
+    funcion mostrar_catalogo(): nulo {
+        escribir("🏪 " + mi.nombre + " - Catálogo")
+        escribir("==============================")
+        para cada elemento p en mi.productos {
+            p.mostrar()
+            escribir("")
+        }
+    }
+    funcion contar_disponibles(): numero {
+        sea total = 0
+        para cada elemento p en mi.productos {
+            si p.estado == Estado.Disponible {
+                total = total + 1
+            }
+        }
+        devolver total
+    }
+}
+
+# Programa principal
+sea tienda = Tienda("TiendaLince")
+
+sea laptop = Producto("Portátil ProMax", 999, Categoria.Electronica)
+laptop.reponer(10)
+
+sea camisa = ProductoOferta("Camisa Slim Fit", 39, Categoria.Ropa, 20)
+camisa.reponer(50)
+
+sea cafe = Producto("Café Premium 500g", 8, Categoria.Alimentacion)
+cafe.reponer(100)
+
+sea tv = ProductoOferta("Smart TV 55\"", 599, Categoria.Electronica, 15)
+tv.reponer(5)
+
+tienda.agregar_producto(laptop)
+tienda.agregar_producto(camisa)
+tienda.agregar_producto(cafe)
+tienda.agregar_producto(tv)
+
+tienda.mostrar_catalogo()
+
+escribir("🛒 Realizando ventas...")
+laptop.vender(3)
+camisa.vender(15)
+cafe.vender(200)  # debería fallar
+escribir("")
+
+tv.aplicar_descuento(10)
+escribir("")
+
+escribir("📊 Productos disponibles: " + tienda.contar_disponibles())
+escribir("")
+tienda.mostrar_catalogo()

@@ -1,0 +1,97 @@
+# 🐆 Lince — Programación Funcional
+# Demuestra mapear, filtrar, reducir, closures y composición
+
+# ── Funciones de orden superior ──────────────────
+funcion componer(val funcion f, val funcion g): funcion {
+    devolver funcion(val numero x): numero {
+        devolver f(g(x))
+    }
+}
+
+funcion aplicar_todos(val lista fns, val numero x): lista {
+    devolver mapear(fns, funcion(val funcion f): numero {
+        devolver f(x)
+    })
+}
+
+# ── Transformaciones ──────────────────────────────
+sea doble     = funcion(val numero x): numero { devolver x * 2 }
+sea triple    = funcion(val numero x): numero { devolver x * 3 }
+sea cuadrado  = funcion(val numero x): numero { devolver x * x }
+sea mas_uno   = funcion(val numero x): numero { devolver x + 1 }
+sea negativo  = funcion(val numero x): numero { devolver -x }
+
+# ── Predicados ────────────────────────────────────
+sea es_par    = funcion(val numero x): logico { devolver x % 2 == 0 }
+sea es_impar  = funcion(val numero x): logico { devolver x % 2 != 0 }
+sea es_pos    = funcion(val numero x): logico { devolver x > 0 }
+
+# ── Closures con estado ───────────────────────────
+funcion acumulador(val numero inicial): funcion {
+    sea total = inicial
+    devolver funcion(val numero x): numero {
+        total = total + x
+        devolver total
+    }
+}
+
+funcion multiplicador(val numero factor): funcion {
+    devolver funcion(val numero x): numero { devolver x * factor }
+}
+
+# ── Demostración ──────────────────────────────────
+sea lista nums = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+escribir("🔢 Lista original:")
+escribir(nums)
+escribir("")
+
+escribir("📐 Transformaciones:")
+escribir("  x2:    " + mapear(nums, doble))
+escribir("  x²:    " + mapear(nums, cuadrado))
+escribir("  x²+1:  " + mapear(nums, componer(mas_uno, cuadrado)))
+escribir("")
+
+escribir("🔍 Filtros:")
+escribir("  pares:    " + filtrar(nums, es_par))
+escribir("  impares:  " + filtrar(nums, es_impar))
+escribir("  > 5:      " + filtrar(nums, funcion(val numero x): logico { devolver x > 5 }))
+escribir("")
+
+escribir("📊 Reducciones:")
+sea suma    = reducir(nums, 0,  funcion(val numero a, val numero x): numero { devolver a + x })
+sea producto = reducir(nums, 1, funcion(val numero a, val numero x): numero { devolver a * x })
+sea maximo  = reducir(nums, nums[0], funcion(val numero a, val numero x): numero {
+    si x > a { devolver x }
+    devolver a
+})
+escribir("  suma:     " + suma)
+escribir("  producto: " + producto)
+escribir("  máximo:   " + maximo)
+escribir("")
+
+escribir("🔗 Composición de funciones:")
+sea doble_luego_cuadrado  = componer(cuadrado, doble)
+sea cuadrado_luego_doble  = componer(doble, cuadrado)
+escribir("  (x→2x)→x²  de 3: " + doble_luego_cuadrado(3))   # (3*2)² = 36
+escribir("  (x→x²)→2x  de 3: " + cuadrado_luego_doble(3))   # (3²)*2 = 18
+escribir("")
+
+escribir("🏭 Closures: fábricas de funciones:")
+sea multiplicadores = [multiplicador(2), multiplicador(5), multiplicador(10)]
+sea resultados = aplicar_todos(multiplicadores, 7)
+escribir("  7 × [2, 5, 10] = " + resultados)
+escribir("")
+
+escribir("🔄 Pipeline de transformaciones:")
+sea lista datos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+sea resultado = reducir(
+    mapear(
+        filtrar(datos, es_par),
+        cuadrado
+    ),
+    0,
+    funcion(val numero a, val numero x): numero { devolver a + x }
+)
+escribir("  suma(x² para x par en [1..10]) = " + resultado)
+# Pares: 2,4,6,8,10 → cuadrados: 4,16,36,64,100 → suma: 220

@@ -1,0 +1,54 @@
+# TEST: closures
+# Closure básico — captura variable del entorno exterior
+funcion crear_contador(): funcion {
+    sea cuenta = 0
+    devolver funcion(): numero {
+        cuenta = cuenta + 1
+        devolver cuenta
+    }
+}
+
+sea contador = crear_contador()
+escribir(contador())
+escribir(contador())
+escribir(contador())
+
+# Dos contadores independientes
+sea c1 = crear_contador()
+sea c2 = crear_contador()
+escribir(c1())
+escribir(c1())
+escribir(c2())
+
+# Closure con parámetro capturado
+funcion multiplicador(val numero factor): funcion {
+    devolver funcion(val numero x): numero {
+        devolver x * factor
+    }
+}
+
+sea doble  = multiplicador(2)
+sea triple = multiplicador(3)
+escribir(doble(5))
+escribir(triple(5))
+escribir(doble(10))
+
+# Closure en variable y uso
+sea suma1 = funcion(val numero x): numero { devolver x + 1 }
+sea doble2 = funcion(val numero x): numero { devolver x * 2 }
+sea cuad  = funcion(val numero x): numero { devolver x * x }
+escribir(suma1(4))
+escribir(doble2(4))
+escribir(cuad(4))
+
+# Closure que usa variable capturada (solo lectura)
+funcion saludador(val texto nombre): funcion {
+    devolver funcion(): texto {
+        devolver "Hola, " + nombre
+    }
+}
+sea saluda_ana  = saludador("Ana")
+sea saluda_luis = saludador("Luis")
+escribir(saluda_ana())
+escribir(saluda_luis())
+escribir(saluda_ana())

@@ -1,0 +1,50 @@
+# TEST COMPILADOR: listas y diccionarios
+sea lista nums = [1, 2, 3, 4, 5]
+
+# Acceso y longitud
+escribir(nums.longitud())
+escribir(nums[0])
+escribir(nums[-1])
+
+# Agregar y eliminar
+nums.agregar(6)
+escribir(nums.longitud())
+escribir(nums[5])
+nums.eliminar(0)
+escribir(nums.longitud())
+escribir(nums[0])
+
+# contiene
+escribir(nums.contiene(3))
+escribir(nums.contiene(99))
+
+# Para cada
+sea total = 0
+para cada numero n en nums {
+    total = total + n
+}
+escribir(total)
+
+# Lista anidada
+sea lista mat = [[1, 2], [3, 4], [5, 6]]
+escribir(mat.longitud())
+para cada elemento fila en mat {
+    para cada numero v en fila {
+        escribir(v)
+    }
+}
+
+# Diccionario
+sea diccionario persona = {"nombre": "Ana", "edad": 22}
+escribir(persona["nombre"])
+escribir(persona["edad"])
+escribir(persona.longitud())
+escribir(persona.contiene("nombre"))
+escribir(persona.contiene("ciudad"))
+
+persona["ciudad"] = "Madrid"
+escribir(persona.longitud())
+escribir(persona["ciudad"])
+
+persona.eliminar("edad")
+escribir(persona.longitud())

@@ -1,0 +1,62 @@
+# TEST: generadores
+generador contar(val numero hasta): numero {
+    sea i = 0
+    mientras i < hasta {
+        producir i
+        i = i + 1
+    }
+}
+
+para cada numero n en contar(4) {
+    escribir(n)
+}
+
+# rango() básico
+para cada numero n en rango(3) {
+    escribir(n)
+}
+
+# rango con inicio y fin
+para cada numero n en rango(2, 5) {
+    escribir(n)
+}
+
+# rango con paso
+para cada numero n en rango(0, 10, 4) {
+    escribir(n)
+}
+
+# Generador de textos
+generador saludos(): texto {
+    producir "hola"
+    producir "adios"
+    producir "hasta luego"
+}
+para cada texto s en saludos() {
+    escribir(s)
+}
+
+# Generador vacío
+generador vacio(): numero {
+    sea x = 0
+    mientras x > 10 {
+        producir x
+    }
+}
+sea lista r = []
+para cada numero n en vacio() {
+    r.agregar(n)
+}
+escribir(r.longitud())
+
+# Generador con parámetro y filtro
+generador multiplos(val numero base, val numero hasta): numero {
+    para cada numero n en rango(hasta) {
+        si n % base == 0 {
+            producir n
+        }
+    }
+}
+para cada numero n en multiplos(3, 10) {
+    escribir(n)
+}

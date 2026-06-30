@@ -1,0 +1,66 @@
+# TEST: errores
+# Error genérico capturado
+intentar {
+    lanzar Error("error de prueba")
+} capturar (error e) {
+    escribir(e.mensaje)
+    escribir(e.tipo)
+}
+
+# ErrorTipo capturado
+intentar {
+    lanzar ErrorTipo("tipo incorrecto")
+} capturar (ErrorTipo e) {
+    escribir("tipo: " + e.mensaje)
+} capturar (error e) {
+    escribir("ERROR: no debería llegar aquí")
+}
+
+# Error no capturado se propaga
+funcion lanza_error(): nulo {
+    lanzar ErrorRango("fuera de rango")
+}
+intentar {
+    lanza_error()
+} capturar (ErrorRango e) {
+    escribir("rango: " + e.mensaje)
+}
+
+# Finalmente siempre se ejecuta
+sea ejecutado = falso
+intentar {
+    lanzar Error("algo")
+} capturar (error e) {
+    ejecutado = verdadero
+} finalmente {
+    escribir("finalmente")
+}
+escribir(ejecutado)
+
+# División por cero capturada
+intentar {
+    sea x = 1 / 0
+} capturar (ErrorMatematico e) {
+    escribir("division por cero")
+}
+
+# Recursión infinita capturada
+funcion inf(val numero n): numero {
+    devolver inf(n + 1)
+}
+intentar {
+    inf(0)
+} capturar (ErrorRecursion e) {
+    escribir("recursion capturada")
+}
+
+# Error de tipo en parámetro capturado
+funcion solo_numeros(val numero n): numero {
+    devolver n * 2
+}
+intentar {
+    solo_numeros(0)
+    escribir("ok sin error")
+} capturar (error e) {
+    escribir("ERROR: no debería fallar")
+}

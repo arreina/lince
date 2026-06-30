@@ -1,0 +1,27 @@
+# TEST: sistema
+importar "sistema"
+importar "archivos"
+
+# Ejecutar comando simple
+sea salida = sistema.ejecutar("echo Hola")
+escribir(salida.recortar())
+# Ejecutar y capturar salida multilinea
+sea salida2 = sistema.ejecutar("printf 'linea1\nlinea2\nlinea3\n'")
+importar "texto"
+sea lineas = texto.dividir(salida2.recortar(), "\n")
+escribir(lineas.longitud())
+escribir(lineas[0])
+escribir(lineas[2])
+
+# sistema.existe
+archivos.escribir("/tmp/lince_test_existe.txt", "prueba")
+escribir(sistema.existe("/tmp/lince_test_existe.txt"))
+escribir(sistema.existe("/tmp/archivo_que_no_existe_lince.txt"))
+
+# Ejecutar lince mismo
+sea resultado = sistema.ejecutar("./lince -v 2>&1 || echo 'ok'")
+escribir(resultado.recortar().longitud() > 0)
+
+# Comando con salida de error redirigida
+sea ok = sistema.ejecutar("ls /tmp/lince_test_existe.txt 2>/dev/null")
+escribir(ok.recortar().longitud() > 0)

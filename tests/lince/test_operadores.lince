@@ -1,0 +1,34 @@
+# TEST: operadores
+# Aritméticos
+escribir(2 + 3)
+escribir(10 - 4)
+escribir(3 * 7)
+escribir(15 / 4)
+escribir(17 % 5)
+
+# Concatenación de texto
+escribir("Hola" + ", " + "Mundo")
+escribir("El número es " + 42)
+
+# Comparación
+escribir(5 > 3)
+escribir(5 < 3)
+escribir(5 == 5)
+escribir(5 != 4)
+escribir(5 >= 5)
+escribir(4 <= 5)
+
+# Lógicos
+escribir(verdadero y verdadero)
+escribir(verdadero y falso)
+escribir(falso o verdadero)
+escribir(no verdadero)
+escribir(no falso)
+
+# Incremento/decremento
+sea i = 10
+i++
+escribir(i)
+i--
+i--
+escribir(i)
