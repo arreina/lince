@@ -716,13 +716,14 @@ static Valor *fn_tpo_hora(Valor **a, int n) {
 }
 
 /* ─────────────────────────────────────────
-   MÓDULO: servidor — HTTP básico
+   MÓDULO: servidor — HTTP con rutas dinámicas, cookies y concurrencia
 ───────────────────────────────────────── */
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <sys/wait.h>
 #endif
 
 /* Llamar a una función Lince desde C */
@@ -733,7 +734,7 @@ static Valor *llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *ent) {
 typedef struct {
     char    metodo[8];
     char    ruta[256];
-    Valor  *manejador;    /* función Lince */
+    Valor  *manejador;
     Entorno *entorno_fn;
 } SrvRuta;
 
@@ -743,40 +744,155 @@ static char      _srv_dir_estaticos[256] = "";
 static Entorno  *_srv_entorno_global = NULL;
 static Entorno  *_srv_ent_tmp        = NULL;
 
-/* Función para llamar a un manejador Lince con el objeto petición */
+/* Forward declaration */
 static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
                                      const char *metodo, const char *ruta,
-                                     const char *cuerpo, const char *query);
+                                     const char *cuerpo, Valor *consulta,
+                                     Valor *params, Valor *cookies);
 
-/* Parsear petición HTTP mínima */
+/* ── Utilidades ────────────────────────── */
+
+static void _srv_url_decode(const char *src, char *dst, int dstlen) {
+    int i = 0;
+    while (*src && i < dstlen - 1) {
+        if (*src == '%' && src[1] && src[2]) {
+            char hex[3] = {src[1], src[2], 0};
+            dst[i++] = (char)strtol(hex, NULL, 16);
+            src += 3;
+        } else {
+            dst[i++] = (*src == '+') ? ' ' : *src;
+            src++;
+        }
+    }
+    dst[i] = '\0';
+}
+
+/* "a=1&b=2" → diccionario Lince */
+static Valor *_srv_parsear_query(const char *qs) {
+    Valor *dic = valor_diccionario_crear();
+    if (!qs || !*qs) return dic;
+    char buf[2048];
+    strncpy(buf, qs, sizeof(buf) - 1);
+    buf[sizeof(buf)-1] = '\0';
+    char *p = buf;
+    while (p && *p) {
+        char *amp = strchr(p, '&');
+        if (amp) *amp = '\0';
+        char *eq = strchr(p, '=');
+        if (eq) {
+            *eq = '\0';
+            char key[256], val[512];
+            _srv_url_decode(p,    key, sizeof(key));
+            _srv_url_decode(eq+1, val, sizeof(val));
+            int idx = dic->diccionario.cantidad;
+            if (idx < 64) {
+                dic->diccionario.claves[idx]  = strdup(key);
+                dic->diccionario.valores[idx] = valor_texto(val);
+                dic->diccionario.cantidad++;
+            }
+        }
+        p = amp ? amp + 1 : NULL;
+    }
+    return dic;
+}
+
+/* Cabecera "Cookie: n=v; n2=v2" → diccionario Lince */
+static Valor *_srv_parsear_cookies(const char *buf) {
+    Valor *dic = valor_diccionario_crear();
+    const char *hdr = strstr(buf, "\r\nCookie:");
+    if (!hdr) hdr = strstr(buf, "\r\ncookie:");
+    if (!hdr) return dic;
+    hdr += 9;  /* saltar "\r\nCookie:" */
+    while (*hdr == ' ') hdr++;
+    const char *fin = strstr(hdr, "\r\n");
+    char linea[2048] = "";
+    if (fin) { size_t len = (size_t)(fin - hdr); if (len >= sizeof(linea)) len = sizeof(linea)-1; strncpy(linea, hdr, len); }
+    else strncpy(linea, hdr, sizeof(linea)-1);
+
+    char *p = linea;
+    while (p && *p) {
+        while (*p == ' ') p++;
+        char *sc = strchr(p, ';');
+        if (sc) *sc = '\0';
+        char *eq = strchr(p, '=');
+        if (eq) {
+            *eq = '\0';
+            char *nombre = p, *valor = eq + 1;
+            while (*nombre == ' ') nombre++;
+            int idx = dic->diccionario.cantidad;
+            if (idx < 64) {
+                dic->diccionario.claves[idx]  = strdup(nombre);
+                dic->diccionario.valores[idx] = valor_texto(valor);
+                dic->diccionario.cantidad++;
+            }
+        }
+        p = sc ? sc + 1 : NULL;
+    }
+    return dic;
+}
+
+/* Coincide "/api/items/:id/detalle" con "/api/items/42/detalle".
+   Devuelve 1 si hay coincidencia y rellena params con los capturas. */
+static int _srv_coincidir_ruta(const char *patron, const char *ruta, Valor *params) {
+    /* Copia mutables para tokenizar */
+    char pat[256], rut[256];
+    strncpy(pat, patron, 255); pat[255] = '\0';
+    strncpy(rut, ruta,   255); rut[255] = '\0';
+
+    char *pseg[32], *rseg[32];
+    int np = 0, nr = 0;
+
+    /* Dividir por '/' */
+    char *tok = strtok(pat, "/");
+    while (tok && np < 32) { pseg[np++] = tok; tok = strtok(NULL, "/"); }
+    tok = strtok(rut, "/");
+    while (tok && nr < 32) { rseg[nr++] = tok; tok = strtok(NULL, "/"); }
+
+    if (np != nr) return 0;
+
+    for (int i = 0; i < np; i++) {
+        if (pseg[i][0] == ':') {
+            /* Segmento paramétrico — capturar */
+            int idx = params->diccionario.cantidad;
+            if (idx < 64) {
+                params->diccionario.claves[idx]  = strdup(pseg[i] + 1);
+                params->diccionario.valores[idx] = valor_texto(rseg[i]);
+                params->diccionario.cantidad++;
+            }
+        } else if (strcmp(pseg[i], rseg[i]) != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* ── Parsear petición HTTP ──────────────── */
+
 static void _srv_parsear_peticion(const char *buf, char *metodo,
                                    char *ruta, char *query, char *cuerpo) {
     metodo[0] = ruta[0] = query[0] = cuerpo[0] = '\0';
-    /* Método */
     const char *p = buf;
     int i = 0;
     while (*p && *p != ' ' && *p != '\r' && *p != '\n' && i < 7)
         metodo[i++] = *p++;
     metodo[i] = '\0';
     if (*p == ' ') p++;
-    /* Ruta */
     i = 0;
     while (*p && *p != ' ' && *p != '?' && *p != '\r' && *p != '\n' && i < 255)
         ruta[i++] = *p++;
     ruta[i] = '\0';
-    /* Query string */
     if (*p == '?') {
         p++; i = 0;
         while (*p && *p != ' ' && *p != '\r' && *p != '\n' && i < 1023)
             query[i++] = *p++;
         query[i] = '\0';
     }
-    /* Cuerpo — después de \r\n\r\n */
     const char *sep = strstr(buf, "\r\n\r\n");
     if (sep) strncpy(cuerpo, sep + 4, 65535);
 }
 
-/* Respuestas predefinidas */
+/* ── MIME ───────────────────────────────── */
+
 static const char *_srv_mime(const char *ext) {
     if (!ext) return "text/plain";
     if (strcmp(ext, ".html")==0 || strcmp(ext, ".htm")==0) return "text/html; charset=utf-8";
@@ -790,24 +906,53 @@ static const char *_srv_mime(const char *ext) {
     return "text/plain";
 }
 
+/* ── Enviar respuesta HTTP ──────────────── */
+
 static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
-                                   const char *cuerpo) {
+                                   const char *cuerpo, Valor *cookies) {
     const char *estado = "OK";
-    if (codigo == 404) estado = "Not Found";
-    else if (codigo == 500) estado = "Internal Server Error";
+    if (codigo == 201) estado = "Created";
+    else if (codigo == 204) estado = "No Content";
+    else if (codigo == 302) estado = "Found";
+    else if (codigo == 400) estado = "Bad Request";
+    else if (codigo == 401) estado = "Unauthorized";
+    else if (codigo == 403) estado = "Forbidden";
+    else if (codigo == 404) estado = "Not Found";
     else if (codigo == 405) estado = "Method Not Allowed";
-    char cabecera[1024];
-    snprintf(cabecera, sizeof(cabecera),
+    else if (codigo == 500) estado = "Internal Server Error";
+
+    size_t cuerpo_len = cuerpo ? strlen(cuerpo) : 0;
+
+    /* Construir cabeceras base */
+    char cab[2048];
+    int clen = snprintf(cab, sizeof(cab),
         "HTTP/1.1 %d %s\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %zu\r\n"
         "Connection: close\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
-        "\r\n",
-        codigo, estado, tipo, cuerpo ? strlen(cuerpo) : 0);
-    send(fd, cabecera, strlen(cabecera), 0);
-    if (cuerpo) send(fd, cuerpo, strlen(cuerpo), 0);
+        "Access-Control-Allow-Origin: *\r\n",
+        codigo, estado, tipo, cuerpo_len);
+
+    send(fd, cab, clen, 0);
+
+    /* Set-Cookie por cada entrada del diccionario cookies */
+    if (cookies && cookies->tipo == VAL_DICCIONARIO) {
+        for (int i = 0; i < cookies->diccionario.cantidad; i++) {
+            char sc[512];
+            int sclen = snprintf(sc, sizeof(sc),
+                "Set-Cookie: %s=%s; Path=/; HttpOnly\r\n",
+                cookies->diccionario.claves[i],
+                cookies->diccionario.valores[i]->tipo == VAL_TEXTO
+                    ? cookies->diccionario.valores[i]->texto : "");
+            send(fd, sc, sclen, 0);
+        }
+    }
+
+    send(fd, "\r\n", 2, 0);
+    if (cuerpo && cuerpo_len > 0) send(fd, cuerpo, cuerpo_len, 0);
 }
+
+/* ── Manejar conexión ───────────────────── */
 
 static void _srv_manejar_conexion(int fd, Entorno *ent) {
     char buf[65536] = "";
@@ -815,40 +960,65 @@ static void _srv_manejar_conexion(int fd, Entorno *ent) {
     if (n <= 0) { close(fd); return; }
     buf[n] = '\0';
 
-    char metodo[8], ruta[256], query[1024], cuerpo[65536];
-    _srv_parsear_peticion(buf, metodo, ruta, query, cuerpo);
+    char metodo[8], ruta[256], query_raw[1024], cuerpo[65536];
+    _srv_parsear_peticion(buf, metodo, ruta, query_raw, cuerpo);
 
-    /* Archivo estático */
+    Valor *consulta = _srv_parsear_query(query_raw);
+    Valor *cookies  = _srv_parsear_cookies(buf);
+
+    /* Archivo estático (antes de buscar rutas para priorizar la API) */
     if (_srv_dir_estaticos[0] && strcmp(metodo, "GET") == 0) {
-        char ruta_file[512];
-        const char *r = ruta;
-        if (strcmp(r, "/") == 0) r = "/index.html";
-        snprintf(ruta_file, sizeof(ruta_file), "%s%s", _srv_dir_estaticos, r);
-        FILE *f = fopen(ruta_file, "rb");
-        if (f) {
-            fseek(f, 0, SEEK_END); long tam = ftell(f); rewind(f);
-            char *cont = malloc(tam + 1);
-            fread(cont, 1, tam, f); cont[tam] = '\0'; fclose(f);
-            /* Extensión para MIME */
-            const char *ext = strrchr(ruta_file, '.');
-            _srv_enviar_respuesta(fd, 200, _srv_mime(ext), cont);
-            free(cont); close(fd); return;
+        /* Solo si no hay ruta registrada que coincida */
+        int tiene_ruta = 0;
+        for (int i = 0; i < _srv_nrutas; i++) {
+            Valor *p = valor_diccionario_crear();
+            if (_srv_coincidir_ruta(_srv_rutas[i].ruta, ruta, p)) {
+                if (_srv_rutas[i].metodo[0] == '\0' ||
+                    strcmp(_srv_rutas[i].metodo, metodo) == 0)
+                    tiene_ruta = 1;
+            }
+            valor_destruir(p);
+            if (tiene_ruta) break;
+        }
+        if (!tiene_ruta) {
+            char ruta_file[512];
+            const char *r = ruta;
+            if (strcmp(r, "/") == 0) r = "/index.html";
+            snprintf(ruta_file, sizeof(ruta_file), "%s%s", _srv_dir_estaticos, r);
+            FILE *f = fopen(ruta_file, "rb");
+            if (f) {
+                fseek(f, 0, SEEK_END); long tam = ftell(f); rewind(f);
+                char *cont = malloc(tam + 1);
+                fread(cont, 1, tam, f); cont[tam] = '\0'; fclose(f);
+                const char *ext = strrchr(ruta_file, '.');
+                _srv_enviar_respuesta(fd, 200, _srv_mime(ext), cont, NULL);
+                free(cont); close(fd);
+                valor_destruir(consulta); valor_destruir(cookies);
+                return;
+            }
         }
     }
 
-    /* Buscar ruta registrada */
+    /* Buscar ruta registrada (con soporte de parámetros) */
     for (int i = 0; i < _srv_nrutas; i++) {
-        if (strcmp(_srv_rutas[i].ruta, ruta) != 0) continue;
         if (_srv_rutas[i].metodo[0] != '\0' &&
             strcmp(_srv_rutas[i].metodo, metodo) != 0) continue;
-        /* Llamar al manejador */
+
+        Valor *params = valor_diccionario_crear();
+        int coincide = _srv_coincidir_ruta(_srv_rutas[i].ruta, ruta, params);
+        if (!coincide) { valor_destruir(params); continue; }
+
         Valor *resp = _srv_llamar_manejador(
             _srv_rutas[i].manejador,
             _srv_entorno_global,
-            metodo, ruta, cuerpo, query);
+            metodo, ruta, cuerpo, consulta, params, cookies);
+
+        valor_destruir(params);
+
+        Valor *cookies_resp = NULL;
         if (resp && resp->tipo == VAL_DICCIONARIO) {
-            /* {codigo, tipo, cuerpo} */
-            int cod = 200; const char *tipo_r = "text/html; charset=utf-8";
+            int cod = 200;
+            const char *tipo_r = "text/html; charset=utf-8";
             char *cuerpo_r = "";
             for (int j = 0; j < resp->diccionario.cantidad; j++) {
                 if (strcmp(resp->diccionario.claves[j], "codigo") == 0 &&
@@ -860,26 +1030,34 @@ static void _srv_manejar_conexion(int fd, Entorno *ent) {
                 if (strcmp(resp->diccionario.claves[j], "cuerpo") == 0 &&
                     resp->diccionario.valores[j]->tipo == VAL_TEXTO)
                     cuerpo_r = resp->diccionario.valores[j]->texto;
+                if (strcmp(resp->diccionario.claves[j], "cookies") == 0 &&
+                    resp->diccionario.valores[j]->tipo == VAL_DICCIONARIO)
+                    cookies_resp = resp->diccionario.valores[j];
             }
-            _srv_enviar_respuesta(fd, cod, tipo_r, cuerpo_r);
+            _srv_enviar_respuesta(fd, cod, tipo_r, cuerpo_r, cookies_resp);
         } else if (resp && resp->tipo == VAL_TEXTO) {
-            _srv_enviar_respuesta(fd, 200, "text/html; charset=utf-8", resp->texto);
+            _srv_enviar_respuesta(fd, 200, "text/html; charset=utf-8", resp->texto, NULL);
         } else {
-            _srv_enviar_respuesta(fd, 200, "text/plain", "");
+            _srv_enviar_respuesta(fd, 200, "text/plain", "", NULL);
         }
-        close(fd); return;
+        close(fd);
+        valor_destruir(consulta); valor_destruir(cookies);
+        return;
     }
-    /* 404 */
+
     _srv_enviar_respuesta(fd, 404, "text/html",
-        "<h1>404 — No encontrado</h1><p>La página no existe.</p>");
+        "<h1>404 — No encontrado</h1><p>La página no existe.</p>", NULL);
     close(fd);
+    valor_destruir(consulta); valor_destruir(cookies);
 }
+
+/* ── Llamar manejador Lince ─────────────── */
 
 static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
                                      const char *metodo, const char *ruta_s,
-                                     const char *cuerpo, const char *query) {
+                                     const char *cuerpo, Valor *consulta,
+                                     Valor *params, Valor *cookies) {
     if (!fn || fn->tipo != VAL_FUNCION) return valor_nulo();
-    /* Crear objeto peticion */
     Valor *req = valor_diccionario_crear();
     req->diccionario.claves[0]  = strdup("metodo");
     req->diccionario.valores[0] = valor_texto(metodo);
@@ -888,13 +1066,19 @@ static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
     req->diccionario.claves[2]  = strdup("cuerpo");
     req->diccionario.valores[2] = valor_texto(cuerpo);
     req->diccionario.claves[3]  = strdup("consulta");
-    req->diccionario.valores[3] = valor_texto(query);
-    req->diccionario.cantidad   = 4;
+    req->diccionario.valores[3] = consulta ? consulta : valor_diccionario_crear();
+    req->diccionario.claves[4]  = strdup("params");
+    req->diccionario.valores[4] = params  ? params   : valor_diccionario_crear();
+    req->diccionario.claves[5]  = strdup("cookies");
+    req->diccionario.valores[5] = cookies ? cookies  : valor_diccionario_crear();
+    req->diccionario.cantidad   = 6;
 
     Valor *args[1] = { req };
-    hay_error = 0;  /* limpiar errores anteriores */
+    hay_error = 0;
     return llamar_funcion(fn, args, 1, ent ? ent : _srv_entorno_global);
 }
+
+/* ── Registro de rutas ──────────────────── */
 
 static Valor *fn_srv_ruta(Valor **a, int n) {
     if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
@@ -915,7 +1099,7 @@ static Valor *fn_srv_obtener(Valor **a, int n) {
     if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
     strncpy(_srv_rutas[_srv_nrutas].metodo, "GET", 7);
     strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
-    a[1]->refs++;  /* retener: la ruta vivirá más que esta llamada */
+    a[1]->refs++;
     _srv_rutas[_srv_nrutas].manejador  = a[1];
     _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
     _srv_nrutas++;
@@ -935,6 +1119,34 @@ static Valor *fn_srv_enviar(Valor **a, int n) {
     return valor_nulo();
 }
 
+static Valor *fn_srv_borrar(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
+        return valor_nulo();
+    if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
+    strncpy(_srv_rutas[_srv_nrutas].metodo, "DELETE", 7);
+    strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
+    a[1]->refs++;
+    _srv_rutas[_srv_nrutas].manejador  = a[1];
+    _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
+    _srv_nrutas++;
+    return valor_nulo();
+}
+
+static Valor *fn_srv_actualizar(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
+        return valor_nulo();
+    if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
+    strncpy(_srv_rutas[_srv_nrutas].metodo, "PUT", 7);
+    strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
+    a[1]->refs++;
+    _srv_rutas[_srv_nrutas].manejador  = a[1];
+    _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
+    _srv_nrutas++;
+    return valor_nulo();
+}
+
+/* ── Constructores de respuesta ─────────── */
+
 static Valor *fn_srv_estaticos(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo == VAL_TEXTO)
@@ -943,7 +1155,6 @@ static Valor *fn_srv_estaticos(Valor **a, int n) {
 }
 
 static Valor *fn_srv_html(Valor **a, int n) {
-    (void)n;
     const char *cont = (a[0]->tipo == VAL_TEXTO) ? a[0]->texto : "";
     int cod = (n >= 2 && a[1]->tipo == VAL_NUMERO) ? (int)a[1]->numero : 200;
     Valor *res = valor_diccionario_crear();
@@ -958,7 +1169,6 @@ static Valor *fn_srv_html(Valor **a, int n) {
 }
 
 static Valor *fn_srv_json(Valor **a, int n) {
-    (void)n;
     const char *cont = (a[0]->tipo == VAL_TEXTO) ? a[0]->texto : "{}";
     int cod = (n >= 2 && a[1]->tipo == VAL_NUMERO) ? (int)a[1]->numero : 200;
     Valor *res = valor_diccionario_crear();
@@ -973,7 +1183,6 @@ static Valor *fn_srv_json(Valor **a, int n) {
 }
 
 static Valor *fn_srv_texto(Valor **a, int n) {
-    (void)n;
     const char *cont = (a[0]->tipo == VAL_TEXTO) ? a[0]->texto : "";
     int cod = (n >= 2 && a[1]->tipo == VAL_NUMERO) ? (int)a[1]->numero : 200;
     Valor *res = valor_diccionario_crear();
@@ -1004,6 +1213,8 @@ static Valor *fn_srv_redirigir(Valor **a, int n) {
     return res;
 }
 
+/* ── Escuchar (con fork por conexión) ───── */
+
 static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
     int puerto = (n >= 1 && a[0]->tipo == VAL_NUMERO) ? (int)a[0]->numero : 8080;
     _srv_entorno_global = ent;
@@ -1013,6 +1224,8 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
     return valor_nulo();
 #else
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGCHLD, SIG_IGN);  /* recolectar hijos automáticamente */
+
     int srv_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (srv_fd < 0) {
         hay_error = 1;
@@ -1034,7 +1247,7 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
             "No se pudo enlazar el puerto (¿está en uso?)", 0);
         return valor_nulo();
     }
-    listen(srv_fd, 10);
+    listen(srv_fd, 128);
     printf("🐆 Servidor Lince escuchando en http://localhost:%d\n", puerto);
     fflush(stdout);
 
@@ -1043,7 +1256,17 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
         socklen_t cli_len = sizeof(cli);
         int cli_fd = accept(srv_fd, (struct sockaddr*)&cli, &cli_len);
         if (cli_fd < 0) continue;
-        _srv_manejar_conexion(cli_fd, ent);
+
+        pid_t pid = fork();
+        if (pid == 0) {
+            /* Proceso hijo: manejar esta conexión y salir */
+            close(srv_fd);
+            _srv_manejar_conexion(cli_fd, ent);
+            exit(0);
+        } else {
+            /* Proceso padre: seguir aceptando */
+            close(cli_fd);
+        }
     }
     return valor_nulo();
 #endif
@@ -2007,18 +2230,20 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
         /* escuchar necesita acceso al entorno — lo pasamos via global */
         _srv_ent_tmp = entorno;
         FuncionNativa fns[] = {
-            {"ruta",       fn_srv_ruta,          2},
-            {"obtener",    fn_srv_obtener,        2},
-            {"enviar",     fn_srv_enviar,         2},
-            {"estaticos",  fn_srv_estaticos,      1},
-            {"html",       fn_srv_html,          -1},
-            {"json",       fn_srv_json,          -1},
-            {"texto",      fn_srv_texto,         -1},
-            {"redirigir",  fn_srv_redirigir,      1},
-            {"escuchar",   fn_srv_escuchar_wrap, -1},
+            {"ruta",       fn_srv_ruta,           2},
+            {"obtener",    fn_srv_obtener,         2},
+            {"enviar",     fn_srv_enviar,          2},
+            {"borrar",     fn_srv_borrar,          2},
+            {"actualizar", fn_srv_actualizar,      2},
+            {"estaticos",  fn_srv_estaticos,       1},
+            {"html",       fn_srv_html,           -1},
+            {"json",       fn_srv_json,           -1},
+            {"texto",      fn_srv_texto,          -1},
+            {"redirigir",  fn_srv_redirigir,       1},
+            {"escuchar",   fn_srv_escuchar_wrap,  -1},
         };
         registrar_modulo_diccionario(entorno, "servidor",
-            fns, 9, NULL, NULL, 0);
+            fns, 11, NULL, NULL, 0);
         return;
     }
 
