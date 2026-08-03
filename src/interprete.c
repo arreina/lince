@@ -310,8 +310,28 @@ static int es_verdadero(Valor *v) {
 /* ─────────────────────────────────────────
    ENTORNO
 ───────────────────────────────────────── */
+/* Lista de entornos reutilizables. Un Entorno ocupa ~6 KB y se crea y
+   destruye en cada llamada, cada bloque y cada iteración de bucle, así
+   que reciclarlos evita casi todo ese tráfico de malloc/free. Se enlazan
+   por el campo 'padre', que está libre mientras el entorno no se usa. */
+static Entorno *_ent_libres     = NULL;
+static int      _ent_libres_num = 0;
+#define MAX_ENT_LIBRES 256   /* tope de retención: ~1,5 MB */
+
 static Entorno *entorno_crear(Entorno *padre) {
-    Entorno *e  = calloc(1, sizeof(Entorno));
+    /* malloc, no calloc: 'vars' ocupa casi todo el struct (MAX_VARS
+       entradas) y cada entrada se escribe por completo en
+       entorno_definir antes de leerse; nadie mira más allá de
+       'cantidad'. Poner a cero ~6 KB en cada creación dominaba el
+       tiempo de ejecución. */
+    Entorno *e;
+    if (_ent_libres) {
+        e = _ent_libres;
+        _ent_libres = e->padre;
+        _ent_libres_num--;
+    } else {
+        e = malloc(sizeof(Entorno));
+    }
     e->padre    = padre;
     e->cantidad = 0;
     e->refs     = 1;
@@ -341,7 +361,13 @@ static void entorno_destruir(Entorno *e) {
         valor_destruir(e->vars[i].valor);
     }
     Entorno *padre = e->padre;
-    free(e);
+    if (_ent_libres_num < MAX_ENT_LIBRES) {
+        e->padre = _ent_libres;
+        _ent_libres = e;
+        _ent_libres_num++;
+    } else {
+        free(e);
+    }
     if (padre) entorno_destruir(padre);
 }
 
