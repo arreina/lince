@@ -789,6 +789,9 @@ static Valor *_srv_parsear_query(const char *qs) {
                 dic->diccionario.claves[idx]  = strdup(key);
                 dic->diccionario.valores[idx] = valor_texto(val);
                 dic->diccionario.cantidad++;
+            } else {
+                fprintf(stderr, "⚠  servidor: query string con más de 64 parámetros, "
+                                "se descartan los sobrantes\n");
             }
         }
         p = amp ? amp + 1 : NULL;
@@ -824,6 +827,9 @@ static Valor *_srv_parsear_cookies(const char *buf) {
                 dic->diccionario.claves[idx]  = strdup(nombre);
                 dic->diccionario.valores[idx] = valor_texto(valor);
                 dic->diccionario.cantidad++;
+            } else {
+                fprintf(stderr, "⚠  servidor: más de 64 cookies en la petición, "
+                                "se descartan las sobrantes\n");
             }
         }
         p = sc ? sc + 1 : NULL;
@@ -922,6 +928,7 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
     else if (codigo == 500) estado = "Internal Server Error";
 
     size_t cuerpo_len = cuerpo ? strlen(cuerpo) : 0;
+    if (!tipo || strpbrk(tipo, "\r\n")) tipo = "text/plain";
 
     /* Construir cabeceras base */
     char cab[2048];
@@ -932,19 +939,26 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
         "Connection: close\r\n"
         "Access-Control-Allow-Origin: *\r\n",
         codigo, estado, tipo, cuerpo_len);
+    if (clen < 0) clen = 0;
+    else if ((size_t)clen >= sizeof(cab)) clen = sizeof(cab) - 1;
 
-    send(fd, cab, clen, 0);
+    send(fd, cab, (size_t)clen, 0);
 
     /* Set-Cookie por cada entrada del diccionario cookies */
     if (cookies && cookies->tipo == VAL_DICCIONARIO) {
         for (int i = 0; i < cookies->diccionario.cantidad; i++) {
+            const char *nombre = cookies->diccionario.claves[i];
+            const char *valor  = cookies->diccionario.valores[i]->tipo == VAL_TEXTO
+                    ? cookies->diccionario.valores[i]->texto : "";
+            /* Evitar inyección/división de cabeceras: descartar CR/LF */
+            if (strpbrk(nombre, "\r\n") || strpbrk(valor, "\r\n")) continue;
+
             char sc[512];
             int sclen = snprintf(sc, sizeof(sc),
-                "Set-Cookie: %s=%s; Path=/; HttpOnly\r\n",
-                cookies->diccionario.claves[i],
-                cookies->diccionario.valores[i]->tipo == VAL_TEXTO
-                    ? cookies->diccionario.valores[i]->texto : "");
-            send(fd, sc, sclen, 0);
+                "Set-Cookie: %s=%s; Path=/; HttpOnly\r\n", nombre, valor);
+            if (sclen < 0) continue;
+            if ((size_t)sclen >= sizeof(sc)) sclen = sizeof(sc) - 1;
+            send(fd, sc, (size_t)sclen, 0);
         }
     }
 
@@ -966,40 +980,10 @@ static void _srv_manejar_conexion(int fd, Entorno *ent) {
     Valor *consulta = _srv_parsear_query(query_raw);
     Valor *cookies  = _srv_parsear_cookies(buf);
 
-    /* Archivo estático (antes de buscar rutas para priorizar la API) */
-    if (_srv_dir_estaticos[0] && strcmp(metodo, "GET") == 0) {
-        /* Solo si no hay ruta registrada que coincida */
-        int tiene_ruta = 0;
-        for (int i = 0; i < _srv_nrutas; i++) {
-            Valor *p = valor_diccionario_crear();
-            if (_srv_coincidir_ruta(_srv_rutas[i].ruta, ruta, p)) {
-                if (_srv_rutas[i].metodo[0] == '\0' ||
-                    strcmp(_srv_rutas[i].metodo, metodo) == 0)
-                    tiene_ruta = 1;
-            }
-            valor_destruir(p);
-            if (tiene_ruta) break;
-        }
-        if (!tiene_ruta) {
-            char ruta_file[512];
-            const char *r = ruta;
-            if (strcmp(r, "/") == 0) r = "/index.html";
-            snprintf(ruta_file, sizeof(ruta_file), "%s%s", _srv_dir_estaticos, r);
-            FILE *f = fopen(ruta_file, "rb");
-            if (f) {
-                fseek(f, 0, SEEK_END); long tam = ftell(f); rewind(f);
-                char *cont = malloc(tam + 1);
-                fread(cont, 1, tam, f); cont[tam] = '\0'; fclose(f);
-                const char *ext = strrchr(ruta_file, '.');
-                _srv_enviar_respuesta(fd, 200, _srv_mime(ext), cont, NULL);
-                free(cont); close(fd);
-                valor_destruir(consulta); valor_destruir(cookies);
-                return;
-            }
-        }
-    }
-
-    /* Buscar ruta registrada (con soporte de parámetros) */
+    /* Buscar ruta registrada (con soporte de parámetros). Las rutas de la
+       API tienen prioridad sobre los archivos estáticos, así que se
+       intenta el despacho primero; solo si ninguna ruta coincide se
+       recurre a servir un archivo estático (para GET) o al 404. */
     for (int i = 0; i < _srv_nrutas; i++) {
         if (_srv_rutas[i].metodo[0] != '\0' &&
             strcmp(_srv_rutas[i].metodo, metodo) != 0) continue;
@@ -1040,9 +1024,29 @@ static void _srv_manejar_conexion(int fd, Entorno *ent) {
         } else {
             _srv_enviar_respuesta(fd, 200, "text/plain", "", NULL);
         }
+        valor_destruir(resp);
         close(fd);
         valor_destruir(consulta); valor_destruir(cookies);
         return;
+    }
+
+    /* Ninguna ruta coincide: intentar servir un archivo estático (GET) */
+    if (_srv_dir_estaticos[0] && strcmp(metodo, "GET") == 0) {
+        char ruta_file[512];
+        const char *r = ruta;
+        if (strcmp(r, "/") == 0) r = "/index.html";
+        snprintf(ruta_file, sizeof(ruta_file), "%s%s", _srv_dir_estaticos, r);
+        FILE *f = fopen(ruta_file, "rb");
+        if (f) {
+            fseek(f, 0, SEEK_END); long tam = ftell(f); rewind(f);
+            char *cont = malloc(tam + 1);
+            fread(cont, 1, tam, f); cont[tam] = '\0'; fclose(f);
+            const char *ext = strrchr(ruta_file, '.');
+            _srv_enviar_respuesta(fd, 200, _srv_mime(ext), cont, NULL);
+            free(cont); close(fd);
+            valor_destruir(consulta); valor_destruir(cookies);
+            return;
+        }
     }
 
     _srv_enviar_respuesta(fd, 404, "text/html",
@@ -1072,6 +1076,13 @@ static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
     req->diccionario.claves[5]  = strdup("cookies");
     req->diccionario.valores[5] = cookies ? cookies  : valor_diccionario_crear();
     req->diccionario.cantidad   = 6;
+    /* req toma una referencia propia de consulta/params/cookies: el
+       llamador conserva su propia referencia y los libera él mismo,
+       así que aquí hay que retenerlos para no dejar el refcount en 0
+       cuando el entorno de la función se destruya. */
+    if (consulta) consulta->refs++;
+    if (params)   params->refs++;
+    if (cookies)  cookies->refs++;
 
     Valor *args[1] = { req };
     hay_error = 0;
@@ -1080,11 +1091,11 @@ static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
 
 /* ── Registro de rutas ──────────────────── */
 
-static Valor *fn_srv_ruta(Valor **a, int n) {
+static Valor *_srv_registrar_ruta(Valor **a, int n, const char *metodo) {
     if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
         return valor_nulo();
     if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
-    strncpy(_srv_rutas[_srv_nrutas].metodo, "", 7);
+    strncpy(_srv_rutas[_srv_nrutas].metodo, metodo, 7);
     strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
     a[1]->refs++;
     _srv_rutas[_srv_nrutas].manejador  = a[1];
@@ -1093,57 +1104,11 @@ static Valor *fn_srv_ruta(Valor **a, int n) {
     return valor_nulo();
 }
 
-static Valor *fn_srv_obtener(Valor **a, int n) {
-    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
-        return valor_nulo();
-    if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
-    strncpy(_srv_rutas[_srv_nrutas].metodo, "GET", 7);
-    strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
-    a[1]->refs++;
-    _srv_rutas[_srv_nrutas].manejador  = a[1];
-    _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
-    _srv_nrutas++;
-    return valor_nulo();
-}
-
-static Valor *fn_srv_enviar(Valor **a, int n) {
-    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
-        return valor_nulo();
-    if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
-    strncpy(_srv_rutas[_srv_nrutas].metodo, "POST", 7);
-    strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
-    a[1]->refs++;
-    _srv_rutas[_srv_nrutas].manejador  = a[1];
-    _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
-    _srv_nrutas++;
-    return valor_nulo();
-}
-
-static Valor *fn_srv_borrar(Valor **a, int n) {
-    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
-        return valor_nulo();
-    if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
-    strncpy(_srv_rutas[_srv_nrutas].metodo, "DELETE", 7);
-    strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
-    a[1]->refs++;
-    _srv_rutas[_srv_nrutas].manejador  = a[1];
-    _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
-    _srv_nrutas++;
-    return valor_nulo();
-}
-
-static Valor *fn_srv_actualizar(Valor **a, int n) {
-    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_FUNCION)
-        return valor_nulo();
-    if (_srv_nrutas >= SRV_MAX_RUTAS) return valor_nulo();
-    strncpy(_srv_rutas[_srv_nrutas].metodo, "PUT", 7);
-    strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
-    a[1]->refs++;
-    _srv_rutas[_srv_nrutas].manejador  = a[1];
-    _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
-    _srv_nrutas++;
-    return valor_nulo();
-}
+static Valor *fn_srv_ruta(Valor **a, int n)       { return _srv_registrar_ruta(a, n, ""); }
+static Valor *fn_srv_obtener(Valor **a, int n)    { return _srv_registrar_ruta(a, n, "GET"); }
+static Valor *fn_srv_enviar(Valor **a, int n)     { return _srv_registrar_ruta(a, n, "POST"); }
+static Valor *fn_srv_borrar(Valor **a, int n)     { return _srv_registrar_ruta(a, n, "DELETE"); }
+static Valor *fn_srv_actualizar(Valor **a, int n) { return _srv_registrar_ruta(a, n, "PUT"); }
 
 /* ── Constructores de respuesta ─────────── */
 
@@ -1261,10 +1226,19 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
         if (pid == 0) {
             /* Proceso hijo: manejar esta conexión y salir */
             close(srv_fd);
+            /* Restaurar SIGCHLD por defecto: el padre lo ignora para
+               autorecolectar hijos, pero heredarlo aquí rompería
+               pclose()/waitpid() si el manejador de la ruta usa
+               sistema.proceso() u otro popen(). */
+            signal(SIGCHLD, SIG_DFL);
             _srv_manejar_conexion(cli_fd, ent);
             exit(0);
-        } else {
+        } else if (pid > 0) {
             /* Proceso padre: seguir aceptando */
+            close(cli_fd);
+        } else {
+            /* fork() falló (p. ej. límite de procesos alcanzado):
+               no se puede atender esta conexión, cerrarla. */
             close(cli_fd);
         }
     }
