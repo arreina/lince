@@ -1,0 +1,48 @@
+# 🐆 Lince — servidor de pruebas para el test de humo
+#
+# Cubre los caminos del módulo 'servidor' donde han aparecido fallos de
+# memoria: el diccionario de parámetros de ruta, el de la query, el de
+# cookies de la petición y la escritura de cabeceras Set-Cookie.
+#
+# Lo arranca tests/servidor/smoke.sh, que hace las peticiones y comprueba
+# las respuestas. No está pensado para ejecutarse a mano.
+
+importar "servidor"
+importar "texto"
+importar "sistema"
+
+# Ruta con parámetro + query + cookies de la petición.
+# El manejador *lee* los tres diccionarios: si el intérprete los libera
+# antes de tiempo, aquí es donde AddressSanitizer lo detecta.
+servidor.obtener("/eco/:nombre", funcion(val diccionario peticion): diccionario {
+    sea cuerpo = "nombre=" + peticion["params"]["nombre"] +
+                 " q=" + peticion["consulta"]["q"] +
+                 " galleta=" + peticion["cookies"]["sesion"]
+    devolver {"codigo": 200, "tipo": "text/plain", "cuerpo": cuerpo}
+})
+
+# Cookie de respuesta más larga que el buffer de cabeceras (512 bytes).
+# Antes provocaba una lectura fuera de límites al pasar el valor de
+# retorno de snprintf directamente a send().
+servidor.obtener("/galleta-larga", funcion(val diccionario peticion): diccionario {
+    sea largo = texto.repetir("A", 600)
+    devolver {"codigo": 200, "tipo": "text/plain", "cuerpo": "ok",
+              "cookies": {"token": largo}}
+})
+
+# Cookie con CR/LF: debe descartarse en vez de partir la respuesta.
+servidor.obtener("/galleta-crlf", funcion(val diccionario peticion): diccionario {
+    devolver {"codigo": 200, "tipo": "text/plain", "cuerpo": "ok",
+              "cookies": {"malo": "x\r\nSet-Cookie: inyectada=1"}}
+})
+
+# Cuerpo de una petición POST.
+servidor.enviar("/enviar", funcion(val diccionario peticion): diccionario {
+    devolver {"codigo": 201, "tipo": "text/plain",
+              "cuerpo": "recibido:" + peticion["cuerpo"]}
+})
+
+# El puerto lo fija smoke.sh, para poder correr varias suites a la vez
+# (por ejemplo la normal y la de AddressSanitizer) sin que choquen.
+sea puerto = texto.a_numero(sistema.entorno("LINCE_PUERTO_TEST", "8123"))
+servidor.escuchar(puerto)

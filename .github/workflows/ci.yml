@@ -1,0 +1,48 @@
+# 🐆 Lince — integración continua
+#
+# Dos trabajos: uno comprueba que el lenguaje se comporta como debe y el
+# otro repite las mismas suites con AddressSanitizer para cazar errores de
+# memoria. Se separan para que al ver un fallo se sepa de inmediato si es
+# de lógica o de memoria.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compilar
+        run: make
+
+      - name: Suite de integración
+        run: make test
+
+      - name: Suite del compilador
+        run: make test-compilador
+
+      - name: Test de humo del servidor
+        run: make test-servidor
+
+  sanitizer:
+    name: AddressSanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Las mismas suites sobre el binario instrumentado. Es lo que
+      # detecta los usos de memoria liberada del intérprete y del módulo
+      # 'servidor', que en un build normal pasan desapercibidos o se
+      # manifiestan como fallos intermitentes.
+      - name: Compilar con AddressSanitizer
+        run: make debug
+
+      - name: Suites bajo AddressSanitizer
+        run: make test-asan

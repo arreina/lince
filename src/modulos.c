@@ -930,7 +930,10 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
     size_t cuerpo_len = cuerpo ? strlen(cuerpo) : 0;
     if (!tipo || strpbrk(tipo, "\r\n")) tipo = "text/plain";
 
-    /* Construir cabeceras base */
+    /* Construir cabeceras base. Si no cabe entero no se puede enviar
+       truncado: cortar a media línea dejaría la respuesta sin el fin de
+       cabeceras y el cliente leería el cuerpo como si fuera una más. En
+       ese caso se recurre a un Content-Type genérico, que siempre cabe. */
     char cab[2048];
     int clen = snprintf(cab, sizeof(cab),
         "HTTP/1.1 %d %s\r\n"
@@ -939,8 +942,18 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
         "Connection: close\r\n"
         "Access-Control-Allow-Origin: *\r\n",
         codigo, estado, tipo, cuerpo_len);
-    if (clen < 0) clen = 0;
-    else if ((size_t)clen >= sizeof(cab)) clen = sizeof(cab) - 1;
+    if (clen < 0 || (size_t)clen >= sizeof(cab)) {
+        fprintf(stderr, "⚠  servidor: cabeceras demasiado largas "
+                        "(¿'tipo' excesivo?), se usa text/plain\n");
+        clen = snprintf(cab, sizeof(cab),
+            "HTTP/1.1 %d %s\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n"
+            "Access-Control-Allow-Origin: *\r\n",
+            codigo, estado, cuerpo_len);
+        if (clen < 0) return;
+    }
 
     send(fd, cab, (size_t)clen, 0);
 
@@ -957,7 +970,14 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
             int sclen = snprintf(sc, sizeof(sc),
                 "Set-Cookie: %s=%s; Path=/; HttpOnly\r\n", nombre, valor);
             if (sclen < 0) continue;
-            if ((size_t)sclen >= sizeof(sc)) sclen = sizeof(sc) - 1;
+            /* Si no cabe se descarta la cookie entera: enviarla truncada
+               se comería el \r\n final y dejaría la respuesta malformada. */
+            if ((size_t)sclen >= sizeof(sc)) {
+                fprintf(stderr, "⚠  servidor: cookie '%s' demasiado larga "
+                                "(máx. %zu bytes), se descarta\n",
+                        nombre, sizeof(sc) - 1);
+                continue;
+            }
             send(fd, sc, (size_t)sclen, 0);
         }
     }

@@ -13,6 +13,10 @@ sea lista tests = [
 ]
 
 sea dir_tests = "tests/compilador"
+
+# Binario a probar. Configurable para poder pasar la misma suite por el
+# build con AddressSanitizer (LINCE_BIN=./lince_debug).
+fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
 sea pasados = 0
 sea fallados = 0
 
@@ -28,7 +32,7 @@ para cada texto nombre en tests {
     sea binario  = "/tmp/lince_comp_" + nombre
 
     # Compilar — verificar que el binario existe
-    sea cmd_comp = "./lince compilar " + fuente + " -o " + binario + " > /dev/null 2>&1"
+    sea cmd_comp = LINCE + " compilar " + fuente + " -o " + binario + " > /dev/null 2>&1"
     sistema.ejecutar(cmd_comp)
     sea compilado = archivos.existe(binario)
 
@@ -66,3 +70,9 @@ si fallados == 0 {
 }
 escribir("══════════════════════════════════════════════════")
 escribir("")
+
+# Código de salida distinto de cero si algo falló, para que la
+# integración continua detecte los fallos.
+si fallados != 0 {
+    sistema.salir(1)
+}

@@ -7,7 +7,9 @@ importar "texto"
 importar "tiempo"
 
 # ── Configuración ─────────────────────────────────────────────
-fijo LINCE     = "./lince"
+# Binario a probar. Configurable para poder pasar la misma suite por el
+# build con AddressSanitizer (LINCE_BIN=./lince_debug).
+fijo LINCE     = sistema.entorno("LINCE_BIN", "./lince")
 fijo DIR_TESTS = "tests/lince"
 
 # ── Contadores ────────────────────────────────────────────────
@@ -149,3 +151,9 @@ si fallidos == 0 {
 
 escribir("══════════════════════════════════════════════════")
 escribir("")
+
+# Código de salida distinto de cero si algo falló, para que la
+# integración continua detecte los fallos.
+si fallidos != 0 {
+    sistema.salir(1)
+}

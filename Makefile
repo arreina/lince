@@ -35,15 +35,43 @@ debug: $(SRC)
 # ── Valgrind — detectar leaks de memoria ──
 valgrind: debug
 	valgrind --leak-check=full --show-leak-kinds=all \
-		./lince_debug ejemplos/hola_mundo.lince 2>&1 | head -40
+		./lince_debug ejemplos/01_hola_mundo.lince 2>&1 | head -40
 
 # ── Ejecutar un ejemplo ───────────────────
 ejemplo: $(BIN)
-	./$(BIN) ejemplos/hola_mundo.lince
+	./$(BIN) ejemplos/01_hola_mundo.lince
 
 # ── Tests ─────────────────────────────────
 test: $(BIN)
 	@./$(BIN) tests/runner.lince
+
+test-compilador: $(BIN)
+	@./$(BIN) tests/runner_compilador.lince
+
+# Test de humo del servidor: levanta un servidor real y le hace
+# peticiones. Es la única cobertura del módulo 'servidor'.
+test-servidor: $(BIN)
+	@tests/servidor/smoke.sh ./$(BIN) 8123
+
+# ── Tests bajo AddressSanitizer ───────────
+# Las mismas suites, pero ejecutando el binario instrumentado:
+#   detect_leaks=0  el intérprete no libera el AST ni las tablas de
+#                   módulos al salir, así que LeakSanitizer sólo daría
+#                   ruido preexistente ajeno a lo que se prueba.
+#   ulimit -s       ASan usa marcos de pila mucho mayores y la recursión
+#                   profunda de tests/lince/test_recursion.lince no cabe
+#                   en los 8 MB por defecto.
+#   LINCE_BIN       los runners lanzan el intérprete como subproceso; sin
+#                   esto probarían el binario normal, no el instrumentado.
+ASAN_ENV = ASAN_OPTIONS=detect_leaks=0 LINCE_BIN=./lince_debug
+
+test-asan: debug
+	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner.lince'
+	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner_compilador.lince'
+	@bash -c 'ulimit -s 65536; $(ASAN_ENV) tests/servidor/smoke.sh ./lince_debug 8124'
+
+# Todo lo que corre la integración continua.
+test-todo: test test-compilador test-servidor test-asan
 
 # ── Limpiar ───────────────────────────────
 clean:
@@ -69,5 +97,6 @@ else
 	@echo "🗑️  Lince desinstalado"
 endif
 
-.PHONY: all debug ejemplo test clean install uninstall
+.PHONY: all debug ejemplo test test-compilador test-servidor test-asan \
+        test-todo clean install uninstall
 
