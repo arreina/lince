@@ -1,0 +1,111 @@
+# 🐆 Lince — Listas y estadísticas
+#
+# Calcular mínimo, máximo, suma, media y mediana de una lista de notas,
+# primero a mano y luego con las funciones de orden superior.
+#
+# Muestra: listas, acceso por índice (incluido el negativo), .agregar(),
+#          .longitud(), y las integradas mapear / filtrar / reducir.
+
+importar "matematica"
+
+fijo NOTAS = [7, 4, 9, 10, 5, 8, 6, 9]
+
+escribir("Notas: " + NOTAS)
+escribir("Cuántas: " + NOTAS.longitud())
+escribir("Primera: " + NOTAS[0] + "   Última: " + NOTAS[-1])
+
+# ── A mano, con un bucle ──────────────────────────────────────
+
+funcion suma_manual(val lista datos): numero {
+    sea total = 0
+    para cada numero x en datos {
+        total = total + x
+    }
+    devolver total
+}
+
+funcion minimo_manual(val lista datos): numero {
+    sea m = datos[0]
+    para cada numero x en datos {
+        si x < m { m = x }
+    }
+    devolver m
+}
+
+funcion maximo_manual(val lista datos): numero {
+    sea m = datos[0]
+    para cada numero x en datos {
+        si x > m { m = x }
+    }
+    devolver m
+}
+
+escribir("")
+escribir("── A mano ──")
+escribir("  suma   = " + suma_manual(NOTAS))
+escribir("  mínimo = " + minimo_manual(NOTAS))
+escribir("  máximo = " + maximo_manual(NOTAS))
+escribir("  media  = " + (suma_manual(NOTAS) / NOTAS.longitud()))
+
+# ── Con funciones de orden superior ───────────────────────────
+
+# reducir() acumula: parte de 0 y va sumando cada elemento.
+sea suma = reducir(NOTAS, 0, funcion(val numero acc, val numero x): numero {
+    devolver acc + x
+})
+
+# mapear() transforma cada elemento y devuelve una lista nueva.
+sea dobles = mapear(NOTAS, funcion(val numero x): numero {
+    devolver x * 2
+})
+
+# filtrar() se queda con los que cumplen la condición.
+sea aprobados = filtrar(NOTAS, funcion(val numero x): logico {
+    devolver x >= 5
+})
+
+escribir("")
+escribir("── Con mapear / filtrar / reducir ──")
+escribir("  suma      = " + suma)
+escribir("  dobles    = " + dobles)
+escribir("  aprobados = " + aprobados + "  (" + aprobados.longitud() + " de " +
+         NOTAS.longitud() + ")")
+
+# ── Mediana ───────────────────────────────────────────────────
+
+# La mediana necesita los datos ordenados. Se ordena una copia con el
+# método de la burbuja (ver 07_ordenar_y_buscar.lince).
+funcion ordenar(val lista datos): lista {
+    sea lista copia = []
+    para cada numero x en datos {
+        copia.agregar(x)
+    }
+    sea n = copia.longitud()
+    para (i = 0; i < n - 1; i++) {
+        para (j = 0; j < n - 1 - i; j++) {
+            si copia[j] > copia[j + 1] {
+                sea tmp = copia[j]
+                copia[j] = copia[j + 1]
+                copia[j + 1] = tmp
+            }
+        }
+    }
+    devolver copia
+}
+
+funcion mediana(val lista datos): numero {
+    sea ordenadas = ordenar(datos)
+    sea n = ordenadas.longitud()
+    sea mitad = matematica.piso(n / 2)
+    # Con un número par de elementos se promedian los dos centrales.
+    si n % 2 == 0 {
+        devolver (ordenadas[mitad - 1] + ordenadas[mitad]) / 2
+    }
+    devolver ordenadas[mitad]
+}
+
+escribir("")
+escribir("── Ordenar y mediana ──")
+escribir("  ordenadas = " + ordenar(NOTAS))
+escribir("  mediana   = " + mediana(NOTAS))
+escribir("  mediana de [1, 3, 5] = " + mediana([1, 3, 5]))

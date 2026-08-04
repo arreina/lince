@@ -1,0 +1,75 @@
+# 🐆 Lince — Números primos
+#
+# Comprobar si un número es primo, listar los primos hasta 50 y
+# descomponer un número en factores primos.
+#
+# Muestra: funciones que devuelven 'logico', bucles con salida temprana
+#          mediante 'devolver', listas que crecen con .agregar(),
+#          y el módulo 'matematica'.
+
+importar "matematica"
+
+# Sólo hace falta probar divisores hasta la raíz cuadrada: si n = a * b
+# y ambos fueran mayores que la raíz, su producto pasaría de n.
+funcion es_primo(val numero n): logico {
+    si n < 2 {
+        devolver falso
+    }
+    sea limite = matematica.piso(matematica.raiz(n))
+    para (d = 2; d <= limite; d++) {
+        si n % d == 0 {
+            devolver falso
+        }
+    }
+    devolver verdadero
+}
+
+escribir("── ¿Es primo? ──")
+para cada numero n en [1, 2, 9, 17, 25, 29, 91] {
+    si es_primo(n) {
+        escribir("  " + n + " → sí")
+    } sino {
+        escribir("  " + n + " → no")
+    }
+}
+
+# ── Primos hasta 50 ───────────────────────────────────────────
+
+sea lista primos = []
+para cada numero n en rango(2, 51) {
+    si es_primo(n) {
+        primos.agregar(n)
+    }
+}
+
+escribir("")
+escribir("── Primos hasta 50 ──")
+escribir(primos)
+escribir("Hay " + primos.longitud() + " primos por debajo de 50.")
+
+# ── Factorización ─────────────────────────────────────────────
+
+# Se divide por cada factor tantas veces como se pueda; lo que quede al
+# final, si es mayor que 1, es primo y es el último factor.
+funcion factorizar(val numero n): lista {
+    sea lista factores = []
+    sea resto = n
+    sea d = 2
+    mientras d * d <= resto {
+        mientras resto % d == 0 {
+            factores.agregar(d)
+            resto = resto / d
+        }
+        d = d + 1
+    }
+    si resto > 1 {
+        factores.agregar(resto)
+    }
+    devolver factores
+}
+
+escribir("")
+escribir("── Factores primos ──")
+para cada numero n en [12, 60, 97, 360] {
+    escribir("  " + n + " = " + factorizar(n))
+}

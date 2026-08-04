@@ -64,3 +64,15 @@ intentar {
 } capturar (error e) {
     escribir("ERROR: no debería fallar")
 }
+
+# Un error al evaluar la expresión de 'devolver' debe caer en el
+# 'capturar' que lo envuelve, no escapar como nulo.
+funcion dividir_seguro(val numero a, val numero b): numero {
+    intentar {
+        devolver a / b
+    } capturar (ErrorMatematico e) {
+        devolver -1
+    }
+}
+escribir(dividir_seguro(10, 2))
+escribir(dividir_seguro(10, 0))

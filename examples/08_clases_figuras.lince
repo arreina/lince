@@ -1,0 +1,90 @@
+# 🐆 Lince — Clases: figuras geométricas
+#
+# El ejercicio de siempre para practicar herencia: una figura general y
+# varias figuras concretas que calculan su área a su manera.
+#
+# Muestra: clases, constructor 'crear', campos con 'mi', herencia con
+#          'extiende', llamada al constructor del padre con 'padre()' y
+#          sobrescritura de métodos.
+
+importar "matematica"
+
+# ── Clase base ────────────────────────────────────────────────
+
+clase Figura {
+    funcion crear(val texto nombre): nulo {
+        mi.nombre = nombre
+    }
+
+    # Las hijas la reemplazan; aquí sirve de valor por defecto.
+    funcion area(): numero {
+        devolver 0
+    }
+
+    funcion describir(): texto {
+        devolver mi.nombre + " — área " + mi.area()
+    }
+}
+
+# ── Figuras concretas ─────────────────────────────────────────
+
+clase Rectangulo extiende Figura {
+    funcion crear(val numero ancho, val numero alto): nulo {
+        padre("Rectángulo")
+        mi.ancho = ancho
+        mi.alto  = alto
+    }
+    funcion area(): numero {
+        devolver mi.ancho * mi.alto
+    }
+    funcion perimetro(): numero {
+        devolver 2 * (mi.ancho + mi.alto)
+    }
+}
+
+# Un cuadrado es un rectángulo con los dos lados iguales: se aprovecha
+# todo lo del padre y sólo cambia el constructor.
+clase Cuadrado extiende Rectangulo {
+    funcion crear(val numero lado): nulo {
+        padre(lado, lado)
+        mi.nombre = "Cuadrado"
+    }
+}
+
+clase Circulo extiende Figura {
+    funcion crear(val numero radio): nulo {
+        padre("Círculo")
+        mi.radio = radio
+    }
+    funcion area(): numero {
+        devolver matematica.PI * mi.radio * mi.radio
+    }
+}
+
+# ── Usarlas ───────────────────────────────────────────────────
+
+sea r = Rectangulo(5, 3)
+sea c = Cuadrado(4)
+sea ci = Circulo(2)
+
+escribir("── Cada figura calcula su área ──")
+escribir("  " + r.describir())
+escribir("  " + c.describir())
+escribir("  " + ci.describir())
+
+escribir("")
+escribir("── Métodos propios del rectángulo ──")
+escribir("  perímetro del rectángulo: " + r.perimetro())
+escribir("  el cuadrado lo hereda   : " + c.perimetro())
+
+# Una lista puede mezclar figuras distintas: cada una responde con su
+# propia versión de area(). Eso es el polimorfismo.
+escribir("")
+escribir("── Todas juntas ──")
+sea lista figuras = [Rectangulo(2, 2), Cuadrado(3), Circulo(1)]
+sea total = 0
+para cada Figura f en figuras {
+    escribir("  " + f.describir())
+    total = total + f.area()
+}
+escribir("  área total: " + total)

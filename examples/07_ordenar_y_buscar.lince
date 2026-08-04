@@ -1,0 +1,143 @@
+# 🐆 Lince — Ordenar y buscar
+#
+# Ordenación por burbuja y por selección, búsqueda lineal y búsqueda
+# binaria. Los cuatro algoritmos de iniciación.
+#
+# Muestra: bucles anidados, intercambio de elementos, listas por
+#          referencia ('ref') frente a por valor ('val').
+
+importar "matematica"
+
+# ── Ordenación por burbuja ────────────────────────────────────
+
+# Recorre la lista comparando pares contiguos y los intercambia si están
+# desordenados. En cada pasada el mayor "sube" hasta el final, así que
+# la siguiente pasada puede acortarse en uno.
+funcion burbuja(val lista datos): lista {
+    sea lista l = []
+    para cada numero x en datos { l.agregar(x) }
+
+    sea n = l.longitud()
+    para (i = 0; i < n - 1; i++) {
+        para (j = 0; j < n - 1 - i; j++) {
+            si l[j] > l[j + 1] {
+                sea tmp = l[j]
+                l[j]     = l[j + 1]
+                l[j + 1] = tmp
+            }
+        }
+    }
+    devolver l
+}
+
+# ── Ordenación por selección ──────────────────────────────────
+
+# Busca el menor de lo que queda y lo pone en su sitio.
+funcion seleccion(val lista datos): lista {
+    sea lista l = []
+    para cada numero x en datos { l.agregar(x) }
+
+    sea n = l.longitud()
+    para (i = 0; i < n - 1; i++) {
+        sea menor = i
+        para (j = i + 1; j < n; j++) {
+            si l[j] < l[menor] { menor = j }
+        }
+        si menor != i {
+            sea tmp = l[i]
+            l[i]     = l[menor]
+            l[menor] = tmp
+        }
+    }
+    devolver l
+}
+
+fijo DATOS = [42, 7, 19, 3, 25, 11, 8]
+
+escribir("Sin ordenar : " + DATOS)
+escribir("Burbuja     : " + burbuja(DATOS))
+escribir("Selección   : " + seleccion(DATOS))
+escribir("El original no se toca: " + DATOS)
+
+# ── Búsqueda lineal ───────────────────────────────────────────
+
+# Mira uno por uno. Devuelve la posición, o -1 si no está.
+funcion buscar_lineal(val lista datos, val numero objetivo): numero {
+    para (i = 0; i < datos.longitud(); i++) {
+        si datos[i] == objetivo {
+            devolver i
+        }
+    }
+    devolver -1
+}
+
+# ── Búsqueda binaria ──────────────────────────────────────────
+
+# Mucho más rápida, pero exige que la lista esté ordenada: en cada paso
+# descarta la mitad que no puede contener el objetivo.
+funcion buscar_binaria(val lista ordenados, val numero objetivo): numero {
+    sea izq = 0
+    sea der = ordenados.longitud() - 1
+    mientras izq <= der {
+        sea medio = matematica.piso((izq + der) / 2)
+        si ordenados[medio] == objetivo {
+            devolver medio
+        }
+        si ordenados[medio] < objetivo {
+            izq = medio + 1
+        } sino {
+            der = medio - 1
+        }
+    }
+    devolver -1
+}
+
+sea ordenados = burbuja(DATOS)
+
+escribir("")
+escribir("── Buscar en " + ordenados + " ──")
+para cada numero objetivo en [3, 25, 42, 100] {
+    sea lineal  = buscar_lineal(ordenados, objetivo)
+    sea binaria = buscar_binaria(ordenados, objetivo)
+    si lineal == -1 {
+        escribir("  " + objetivo + " → no está")
+    } sino {
+        escribir("  " + objetivo + " → posición " + lineal)
+    }
+    # Las dos búsquedas tienen que dar lo mismo.
+    si lineal != binaria {
+        escribir("    ¡las dos búsquedas no coinciden!")
+    }
+}
+
+# ── Qué se copia y qué se comparte ────────────────────────────
+#
+# Conviene tenerlo claro, porque es fuente de sorpresas:
+#
+#   · Los números, textos y lógicos se copian. Lo que la función haga
+#     con ellos se queda dentro.
+#   · Las listas y los diccionarios se comparten. Si la función cambia
+#     su contenido, el cambio se ve fuera.
+#
+# Por eso las funciones de ordenación de arriba empiezan copiando la
+# lista a mano: si ordenaran la que reciben, modificarían la del que
+# llama sin avisar.
+
+funcion tocar_numero(val numero x): nulo {
+    x = 999
+}
+
+funcion tocar_lista(val lista l): nulo {
+    l.agregar(999)
+}
+
+sea numero_suelto = 1
+sea lista lista_suelta = [1, 2, 3]
+
+tocar_numero(numero_suelto)
+tocar_lista(lista_suelta)
+
+escribir("")
+escribir("── Qué se copia y qué se comparte ──")
+escribir("  el número sigue igual : " + numero_suelto)
+escribir("  la lista sí cambió    : " + lista_suelta)

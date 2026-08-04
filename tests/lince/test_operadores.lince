@@ -32,3 +32,10 @@ escribir(i)
 i--
 i--
 escribir(i)
+
+# Comparación entre lógicos (== y != entre booleanos)
+escribir(verdadero == verdadero)
+escribir(falso == falso)
+escribir(verdadero == falso)
+escribir(verdadero != verdadero)
+escribir(verdadero != falso)

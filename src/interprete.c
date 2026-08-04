@@ -488,6 +488,16 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
         else if (strcmp(op, "!=") == 0) resultado = valor_booleano(cmp != 0);
     }
 
+    /* Comparaciones entre lógicos. Sin esto caerían en el caso general
+       de más abajo, que sólo sabe comparar nulos, y 'verdadero ==
+       verdadero' daba falso. */
+    if (!resultado && izq->tipo == VAL_BOOLEANO && der->tipo == VAL_BOOLEANO) {
+        int a = izq->booleano ? 1 : 0;
+        int b = der->booleano ? 1 : 0;
+        if (strcmp(op, "==") == 0) resultado = valor_booleano(a == b);
+        else if (strcmp(op, "!=") == 0) resultado = valor_booleano(a != b);
+    }
+
     /* Lógica booleana */
     if (!resultado) {
         if (strcmp(op, "y") == 0)
@@ -941,7 +951,16 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         }
 
         case NODO_DEVOLVER: {
-            valor_retorno = ejecutar(n->devolver, e);
+            Valor *v = ejecutar(n->devolver, e);
+            /* Si la expresión falló, propagar el error en vez de marcar
+               retorno: con 'hay_retorno' puesto, el bloque 'capturar'
+               que envuelva a este 'devolver' se saltaría sus sentencias
+               y el error escaparía del intentar/capturar como nulo. */
+            if (hay_error) {
+                valor_destruir(v);
+                return valor_nulo();
+            }
+            valor_retorno = v;
             hay_retorno   = 1;
             return valor_nulo();
         }

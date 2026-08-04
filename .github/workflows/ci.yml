@@ -31,6 +31,9 @@ jobs:
       - name: Test de humo del servidor
         run: make test-servidor
 
+      - name: Los ejercicios de examples/ se ejecutan
+        run: make test-ejemplos
+
   sanitizer:
     name: AddressSanitizer
     runs-on: ubuntu-latest

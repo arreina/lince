@@ -1,0 +1,78 @@
+# 🐆 Lince — Tablas y figuras de texto
+#
+# Tabla de multiplicar, triángulos de asteriscos y una pirámide. Los
+# ejercicios de siempre para practicar bucles anidados.
+#
+# Muestra: bucles anidados, construir texto acumulando, texto.repetir(),
+#          rellenar para alinear columnas y generadores propios.
+
+importar "texto"
+
+# ── Tabla de multiplicar ──────────────────────────────────────
+
+escribir("── Tabla del 7 ──")
+para cada numero i en rango(1, 11) {
+    escribir("  7 x " + i + " = " + (7 * i))
+}
+
+# ── Tabla completa, en rejilla ────────────────────────────────
+
+# Se construye cada fila entera en una variable y se imprime de una vez.
+# rellenar_izq alinea los números a la derecha para que las columnas
+# queden rectas.
+escribir("")
+escribir("── Tabla del 1 al 9 ──")
+para cada numero fila en rango(1, 10) {
+    sea linea = "  "
+    para cada numero col en rango(1, 10) {
+        linea = linea + texto.rellenar_izq(a_texto(fila * col), 4, " ")
+    }
+    escribir(linea)
+}
+
+# ── Triángulos ────────────────────────────────────────────────
+
+escribir("")
+escribir("── Triángulo creciente ──")
+para cada numero i en rango(1, 7) {
+    escribir("  " + texto.repetir("*", i))
+}
+
+escribir("")
+escribir("── Triángulo decreciente ──")
+para cada numero i en rango(6, 0, -1) {
+    escribir("  " + texto.repetir("*", i))
+}
+
+# ── Pirámide ──────────────────────────────────────────────────
+
+# Cada fila lleva delante los espacios que le faltan para centrarse, y
+# un número impar de asteriscos: 1, 3, 5, 7...
+escribir("")
+escribir("── Pirámide ──")
+fijo ALTURA = 6
+para cada numero i en rango(1, ALTURA + 1) {
+    sea espacios   = texto.repetir(" ", ALTURA - i)
+    sea asteriscos = texto.repetir("*", 2 * i - 1)
+    escribir("  " + espacios + asteriscos)
+}
+
+# ── Un generador propio ───────────────────────────────────────
+
+# 'generador' + 'producir' construyen una secuencia perezosa, que se
+# recorre con 'para cada' igual que una lista.
+generador pares(val numero hasta): numero {
+    sea n = 0
+    mientras n <= hasta {
+        producir n
+        n = n + 2
+    }
+}
+
+escribir("")
+escribir("── Pares hasta 20, con un generador ──")
+sea linea = "  "
+para cada numero n en pares(20) {
+    linea = linea + n + " "
+}
+escribir(linea)

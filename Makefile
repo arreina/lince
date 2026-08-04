@@ -53,6 +53,15 @@ test-compilador: $(BIN)
 test-servidor: $(BIN)
 	@tests/servidor/smoke.sh ./$(BIN) 8123
 
+# Comprueba que los ejercicios de examples/ siguen ejecutándose. No
+# compara la salida: sólo evita que se queden obsoletos en silencio si
+# cambia el lenguaje.
+test-ejemplos: $(BIN)
+	@for f in examples/*.lince; do \
+		./$(BIN) "$$f" > /dev/null || { echo "❌ falla $$f"; exit 1; }; \
+	done
+	@echo "✅ Los ejercicios de examples/ se ejecutan sin errores"
+
 # ── Tests bajo AddressSanitizer ───────────
 # Las mismas suites, pero ejecutando el binario instrumentado:
 #   detect_leaks=0  el intérprete no libera el AST ni las tablas de
@@ -71,7 +80,7 @@ test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) tests/servidor/smoke.sh ./lince_debug 8124'
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-servidor test-asan
+test-todo: test test-compilador test-servidor test-ejemplos test-asan
 
 # ── Limpiar ───────────────────────────────
 clean:
@@ -97,6 +106,6 @@ else
 	@echo "🗑️  Lince desinstalado"
 endif
 
-.PHONY: all debug ejemplo test test-compilador test-servidor test-asan \
-        test-todo clean install uninstall
+.PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
+        test-asan test-todo clean install uninstall
 

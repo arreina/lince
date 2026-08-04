@@ -1,0 +1,99 @@
+# 🐆 Lince — Palíndromos
+#
+# Un palíndromo se lee igual del derecho que del revés. El ejercicio
+# tiene truco: hay que ignorar mayúsculas y espacios antes de comparar.
+#
+# Muestra: métodos de texto (.longitud, .minusculas), recorrido de texto
+#          con 'para cada', índices negativos y el módulo 'texto'.
+
+importar "texto"
+
+# Se queda sólo con las letras y las pasa a minúsculas, para que
+# "Anita lava la tina" cuente como palíndromo.
+funcion normalizar(val texto s): texto {
+    sea limpio = ""
+    para cada texto c en s.minusculas() {
+        si c != " " y c != "," y c != "." {
+            limpio = limpio + c
+        }
+    }
+    devolver limpio
+}
+
+# Comparando con la versión invertida: corto y directo.
+funcion es_palindromo(val texto s): logico {
+    sea limpio = normalizar(s)
+    devolver limpio == texto.invertir(limpio)
+}
+
+# La otra forma habitual: dos índices que se acercan desde los extremos.
+# Nota los índices negativos, que cuentan desde el final.
+funcion es_palindromo_dos_indices(val texto s): logico {
+    sea limpio = normalizar(s)
+    sea n = limpio.longitud()
+    para (i = 0; i < n / 2; i++) {
+        si limpio[i] != limpio[n - 1 - i] {
+            devolver falso
+        }
+    }
+    devolver verdadero
+}
+
+# Ojo: los métodos de texto de Lince trabajan por bytes, no por
+# caracteres, así que las vocales acentuadas (que en UTF-8 ocupan dos
+# bytes) se parten al invertir. Por eso los ejemplos van sin tildes.
+# Al final del archivo se ve el efecto.
+sea lista frases = [
+    "reconocer",
+    "Anita lava la tina",
+    "Somos o no somos",
+    "Amor a Roma",
+    "hola mundo",
+    "Lince"
+]
+
+escribir("── ¿Es palíndromo? ──")
+para cada texto f en frases {
+    si es_palindromo(f) {
+        escribir("  «" + f + "» → sí")
+    } sino {
+        escribir("  «" + f + "» → no")
+    }
+}
+
+escribir("")
+escribir("── Los dos métodos coinciden ──")
+para cada texto f en frases {
+    si es_palindromo(f) != es_palindromo_dos_indices(f) {
+        escribir("  ¡discrepancia en «" + f + "»!")
+    }
+}
+escribir("  comprobadas las " + frases.longitud() + " frases ✓")
+
+# ── Invertir texto a mano ─────────────────────────────────────
+
+funcion invertir(val texto s): texto {
+    sea r = ""
+    para cada texto c en s {
+        # Cada carácter nuevo va delante: así se construye al revés.
+        r = c + r
+    }
+    devolver r
+}
+
+escribir("")
+escribir("── Invertir ──")
+escribir("  a mano          → " + invertir("Lince"))
+escribir("  texto.invertir  → " + texto.invertir("Lince"))
+
+# ── Aviso sobre acentos ───────────────────────────────────────
+# "canoa" son 5 letras y 5 bytes, así que se invierte bien.
+# "camión" son 6 letras pero 7 bytes: la 'ó' ocupa dos y al darles la
+# vuelta por separado deja de ser una letra válida.
+sea lista muestras = ["canoa", "camion", "camión"]
+escribir("")
+escribir("── Los acentos ocupan dos bytes ──")
+para cada texto m en muestras {
+    escribir("  «" + m + "» mide " + m.longitud() + " e invertida es «" +
+             texto.invertir(m) + "»")
+}

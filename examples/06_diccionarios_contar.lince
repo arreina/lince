@@ -1,0 +1,95 @@
+# 🐆 Lince — Diccionarios: contar cosas
+#
+# Contar cuántas veces aparece cada palabra en una frase y cuántas veces
+# cada letra. Es el uso más típico de un diccionario: llevar la cuenta.
+#
+# Muestra: diccionarios, .contiene(), .longitud(), .eliminar(),
+#          recorrerlos con 'para cada', y texto.dividir().
+
+importar "texto"
+
+fijo FRASE = "el gato y el perro y el pez"
+
+# ── Contar palabras ───────────────────────────────────────────
+
+# La clave es la palabra; el valor, las veces que ha salido.
+# Hay que comprobar si ya existe antes de sumarle uno.
+funcion contar_palabras(val texto frase): diccionario {
+    sea diccionario cuenta = {}
+    para cada texto palabra en texto.dividir(frase, " ") {
+        si cuenta.contiene(palabra) {
+            cuenta[palabra] = cuenta[palabra] + 1
+        } sino {
+            cuenta[palabra] = 1
+        }
+    }
+    devolver cuenta
+}
+
+sea palabras = contar_palabras(FRASE)
+
+escribir("Frase: «" + FRASE + "»")
+escribir("")
+escribir("── Veces que sale cada palabra ──")
+para cada texto palabra en palabras {
+    escribir("  " + palabra + " → " + palabras[palabra])
+}
+escribir("Palabras distintas: " + palabras.longitud())
+
+# ── Contar letras ─────────────────────────────────────────────
+
+funcion contar_letras(val texto s): diccionario {
+    sea diccionario cuenta = {}
+    para cada texto c en s {
+        si c != " " {
+            si cuenta.contiene(c) {
+                cuenta[c] = cuenta[c] + 1
+            } sino {
+                cuenta[c] = 1
+            }
+        }
+    }
+    devolver cuenta
+}
+
+sea letras = contar_letras(FRASE)
+
+escribir("")
+escribir("── Letras que salen más de una vez ──")
+para cada texto c en letras {
+    si letras[c] > 1 {
+        escribir("  " + c + " → " + letras[c])
+    }
+}
+
+# ── Buscar el máximo ──────────────────────────────────────────
+
+sea mas_repetida = ""
+sea max_veces    = 0
+para cada texto palabra en palabras {
+    si palabras[palabra] > max_veces {
+        max_veces    = palabras[palabra]
+        mas_repetida = palabra
+    }
+}
+
+escribir("")
+escribir("── La más repetida ──")
+escribir("  «" + mas_repetida + "», " + max_veces + " veces")
+
+# ── Operaciones sueltas ───────────────────────────────────────
+
+sea diccionario persona = {"nombre": "Ana", "edad": 22, "ciudad": "Madrid"}
+
+escribir("")
+escribir("── Un diccionario cualquiera ──")
+escribir("  entero          → " + persona)
+escribir("  persona[nombre] → " + persona["nombre"])
+escribir("  ¿tiene 'edad'?  → " + persona.contiene("edad"))
+escribir("  ¿tiene 'email'? → " + persona.contiene("email"))
+
+persona["email"] = "ana@ejemplo.com"
+persona.eliminar("ciudad")
+
+escribir("  tras añadir email y quitar ciudad:")
+escribir("  " + persona)

@@ -1,0 +1,104 @@
+# 🐆 Lince — Manejo de errores
+#
+# División segura, validación de datos y recuperación ante fallos:
+# los casos donde conviene capturar un error en vez de dejar que
+# el programa termine.
+#
+# Muestra: intentar / capturar / finalmente, 'lanzar', tipos de error
+#          predefinidos y los campos del error (mensaje, tipo).
+
+# ── División por cero ─────────────────────────────────────────
+
+# Dividir por cero lanza ErrorMatematico, que se puede capturar.
+funcion dividir_seguro(val numero a, val numero b): numero {
+    intentar {
+        devolver a / b
+    } capturar (ErrorMatematico e) {
+        escribir("    (aviso: " + e.mensaje + ")")
+        devolver 0
+    }
+}
+
+escribir("── División segura ──")
+escribir("  10 / 2 = " + dividir_seguro(10, 2))
+escribir("  10 / 0 = " + dividir_seguro(10, 0))
+
+# ── Lanzar errores propios ────────────────────────────────────
+
+# Validar antes de calcular, y avisar con el tipo de error adecuado.
+funcion raiz_cuadrada(val numero n): numero {
+    si n < 0 {
+        lanzar ErrorRango("no hay raíz cuadrada real de un negativo")
+    }
+    # Aproximación por el método de Newton.
+    sea x = n
+    si x == 0 { devolver 0 }
+    para (i = 0; i < 20; i++) {
+        x = (x + n / x) / 2
+    }
+    devolver x
+}
+
+escribir("")
+escribir("── Raíz cuadrada con validación ──")
+para cada numero n en [16, 2, -4] {
+    intentar {
+        # Conviene guardar el resultado antes de imprimirlo: si la
+        # llamada falla dentro del propio escribir(), la línea se
+        # imprime igualmente antes de saltar al capturar.
+        sea r = raiz_cuadrada(n)
+        escribir("  raíz de " + n + " = " + r)
+    } capturar (ErrorRango e) {
+        escribir("  raíz de " + n + " → " + e.tipo + ": " + e.mensaje)
+    }
+}
+
+# ── Varios capturar encadenados ───────────────────────────────
+
+# Se prueban en orden: el primero que encaje es el que se ejecuta.
+# 'error' al final hace de comodín para lo que no se haya previsto.
+funcion clasificar(val numero cual): nulo {
+    intentar {
+        si cual == 1 { lanzar ErrorTipo("el dato no es del tipo esperado") }
+        si cual == 2 { lanzar ErrorRango("índice fuera de rango") }
+        si cual == 3 { lanzar ErrorArgumento("faltan argumentos") }
+        escribir("  " + cual + " → no lanza nada")
+    } capturar (ErrorTipo e) {
+        escribir("  " + cual + " → era de tipo: " + e.mensaje)
+    } capturar (ErrorRango e) {
+        escribir("  " + cual + " → era de rango: " + e.mensaje)
+    } capturar (error e) {
+        escribir("  " + cual + " → otro cualquiera (" + e.tipo + "): " + e.mensaje)
+    }
+}
+
+escribir("")
+escribir("── Capturar según el tipo ──")
+para cada numero i en rango(0, 4) {
+    clasificar(i)
+}
+
+# ── finalmente ────────────────────────────────────────────────
+
+# El bloque 'finalmente' se ejecuta siempre, haya error o no. Es donde
+# se cierra lo que haya que cerrar.
+funcion con_limpieza(val logico fallar): nulo {
+    intentar {
+        escribir("    abriendo recurso")
+        si fallar {
+            lanzar Error("algo se ha roto")
+        }
+        escribir("    trabajo terminado")
+    } capturar (error e) {
+        escribir("    capturado: " + e.mensaje)
+    } finalmente {
+        escribir("    cerrando recurso (esto pasa siempre)")
+    }
+}
+
+escribir("")
+escribir("── finalmente ──")
+escribir("  cuando va bien:")
+con_limpieza(falso)
+escribir("  cuando falla:")
+con_limpieza(verdadero)

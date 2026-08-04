@@ -1,0 +1,39 @@
+# 🐆 Lince — FizzBuzz
+#
+# Ejercicio clásico: números del 1 al 20, pero los múltiplos de 3 se
+# sustituyen por "Fizz", los de 5 por "Buzz" y los de ambos por
+# "FizzBuzz".
+#
+# Muestra: bucle 'para' clásico, encadenado si / sino si / sino,
+#          operador módulo (%).
+
+escribir("── FizzBuzz del 1 al 20 ──")
+
+para (i = 1; i <= 20; i++) {
+    # El caso de ambos va primero: si no, nunca se alcanzaría.
+    si i % 15 == 0 {
+        escribir("FizzBuzz")
+    } sino si i % 3 == 0 {
+        escribir("Fizz")
+    } sino si i % 5 == 0 {
+        escribir("Buzz")
+    } sino {
+        escribir(i)
+    }
+}
+
+# La misma lógica, pero devolviendo el texto en vez de imprimirlo.
+# Así se puede reutilizar y probar.
+funcion fizzbuzz(val numero n): texto {
+    si n % 15 == 0 { devolver "FizzBuzz" }
+    si n % 3  == 0 { devolver "Fizz" }
+    si n % 5  == 0 { devolver "Buzz" }
+    devolver a_texto(n)
+}
+
+escribir("")
+escribir("── Como función, casos sueltos ──")
+escribir("9  → " + fizzbuzz(9))
+escribir("10 → " + fizzbuzz(10))
+escribir("30 → " + fizzbuzz(30))
+escribir("7  → " + fizzbuzz(7))
