@@ -136,6 +136,10 @@ void   entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constan
 extern int    hay_error;
 extern Valor *valor_error;
 
+/* Pone un error nuevo soltando el pendiente. Usa esto, no la asignación
+   directa a valor_error, que fuga el anterior. */
+Valor *valor_error_nuevo(const char *tipo, const char *mensaje, int linea);
+
 /* ─────────────────────────────────────────
    INTÉRPRETE
 ───────────────────────────────────────── */
@@ -157,4 +161,6 @@ void        valor_destruir(Valor *v);
 #endif /* LINCE_INTERPRETE_H */
 
 /* Llamar a una función Lince desde C externo */
-Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *ent);
+/* Llama a una función Lince desde un módulo nativo. Se queda con la
+   propiedad de args[]. */
+Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs);

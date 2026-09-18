@@ -14,11 +14,6 @@
 
 #include "interprete.h"
 
-/* Fija el Entorno en el que se invocará el callback de motor.al_actualizar.
- * Debe llamarse justo antes de registrar el módulo, igual que _srv_ent_tmp
- * para el módulo servidor. */
-void modulo_motor_fijar_entorno(Entorno *entorno);
-
 /* Ciclo de vida y bucle */
 Valor *fn_motor_iniciar(Valor **a, int n);
 Valor *fn_motor_terminar(Valor **a, int n);

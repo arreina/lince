@@ -49,7 +49,7 @@ static Valor *fn_mat_raiz(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_NUMERO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo", "raiz() espera un numero", 0);
+        valor_error = valor_error_nuevo("ErrorTipo", "raiz() espera un numero", 0);
         return valor_nulo();
     }
     return valor_numero(sqrt(a[0]->numero));
@@ -99,7 +99,7 @@ static Valor *fn_mat_logaritmo(Valor **a, int n) {
     (void)n;
     if (a[0]->numero <= 0) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorMatematico",
+        valor_error = valor_error_nuevo("ErrorMatematico",
             "logaritmo() requiere un número positivo", 0);
         return valor_nulo();
     }
@@ -140,7 +140,7 @@ static Valor *fn_mat_factorial(Valor **a, int n) {
     long long x = (long long)a[0]->numero;
     if (x < 0) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorMatematico",
+        valor_error = valor_error_nuevo("ErrorMatematico",
             "factorial() no acepta números negativos.", 0);
         return valor_nulo();
     }
@@ -167,7 +167,7 @@ static Valor *fn_mat_log2(Valor **a, int n) {
     (void)n;
     if (a[0]->numero <= 0) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorMatematico",
+        valor_error = valor_error_nuevo("ErrorMatematico",
             "log2() solo acepta números positivos.", 0);
         return valor_nulo();
     }
@@ -178,7 +178,7 @@ static Valor *fn_mat_log10(Valor **a, int n) {
     (void)n;
     if (a[0]->numero <= 0) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorMatematico",
+        valor_error = valor_error_nuevo("ErrorMatematico",
             "log10() solo acepta números positivos.", 0);
         return valor_nulo();
     }
@@ -193,7 +193,7 @@ static Valor *fn_txt_dividir(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "dividir() espera dos textos", 0);
         return valor_nulo();
     }
@@ -232,7 +232,7 @@ static Valor *fn_txt_unir(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "unir() espera una lista y un texto separador", 0);
         return valor_nulo();
     }
@@ -253,7 +253,7 @@ static Valor *fn_txt_repetir(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "repetir() espera un texto y un numero", 0);
         return valor_nulo();
     }
@@ -269,7 +269,7 @@ static Valor *fn_txt_invertir(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "invertir() espera un texto", 0);
         return valor_nulo();
     }
@@ -287,7 +287,7 @@ static Valor *fn_txt_formato(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_LISTA) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "formato() espera un texto y una lista de argumentos", 0);
         return valor_nulo();
     }
@@ -323,7 +323,7 @@ static Valor *fn_txt_a_numero(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "a_numero() espera un texto", 0);
         return valor_nulo();
     }
@@ -331,7 +331,7 @@ static Valor *fn_txt_a_numero(Valor **a, int n) {
     double d = strtod(a[0]->texto, &fin);
     if (fin == a[0]->texto) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "No se puede convertir ese texto a número", 0);
         return valor_nulo();
     }
@@ -342,7 +342,7 @@ static Valor *fn_txt_de_numero(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_NUMERO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "de_numero() espera un numero", 0);
         return valor_nulo();
     }
@@ -358,7 +358,7 @@ static Valor *fn_txt_a_lista(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "a_lista() espera un texto", 0);
         return valor_nulo();
     }
@@ -374,7 +374,7 @@ static Valor *fn_txt_posicion(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "posicion() espera dos textos", 0);
         return valor_nulo();
     }
@@ -387,7 +387,7 @@ static Valor *fn_txt_contar(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "contar() espera dos textos", 0);
         return valor_nulo();
     }
@@ -405,7 +405,7 @@ static Valor *fn_txt_extraer(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO || a[2]->tipo != VAL_NUMERO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "extraer() espera texto, inicio y fin", 0);
         return valor_nulo();
     }
@@ -464,7 +464,7 @@ static Valor *fn_txt_rellenar_izq(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO || a[2]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "rellenar_izq() espera texto, ancho y caracter de relleno", 0);
         return valor_nulo();
     }
@@ -484,7 +484,7 @@ static Valor *fn_txt_rellenar_der(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO || a[2]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "rellenar_der() espera texto, ancho y caracter de relleno", 0);
         return valor_nulo();
     }
@@ -504,7 +504,7 @@ static Valor *fn_txt_centrar(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO || a[2]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "centrar() espera texto, ancho y caracter de relleno", 0);
         return valor_nulo();
     }
@@ -532,7 +532,7 @@ static Valor *fn_arc_leer(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "leer() espera una ruta de archivo", 0);
         return valor_nulo();
     }
@@ -541,7 +541,7 @@ static Valor *fn_arc_leer(Valor **a, int n) {
         char msg[512];
         snprintf(msg, sizeof(msg), "No se pudo abrir el archivo '%s'", a[0]->texto);
         hay_error = 1;
-        valor_error = valor_crear_error("Error", msg, 0);
+        valor_error = valor_error_nuevo("Error", msg, 0);
         return valor_nulo();
     }
     fseek(f, 0, SEEK_END);
@@ -560,7 +560,7 @@ static Valor *fn_arc_escribir(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "escribir() espera ruta y contenido", 0);
         return valor_nulo();
     }
@@ -569,7 +569,7 @@ static Valor *fn_arc_escribir(Valor **a, int n) {
         char msg[512];
         snprintf(msg, sizeof(msg), "No se pudo escribir en '%s'", a[0]->texto);
         hay_error = 1;
-        valor_error = valor_crear_error("Error", msg, 0);
+        valor_error = valor_error_nuevo("Error", msg, 0);
         return valor_nulo();
     }
     fputs(a[1]->texto, f);
@@ -581,7 +581,7 @@ static Valor *fn_arc_agregar(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "agregar() espera ruta y contenido", 0);
         return valor_nulo();
     }
@@ -590,7 +590,7 @@ static Valor *fn_arc_agregar(Valor **a, int n) {
         char msg[512];
         snprintf(msg, sizeof(msg), "No se pudo abrir '%s'", a[0]->texto);
         hay_error = 1;
-        valor_error = valor_crear_error("Error", msg, 0);
+        valor_error = valor_error_nuevo("Error", msg, 0);
         return valor_nulo();
     }
     fputs(a[1]->texto, f);
@@ -729,26 +729,24 @@ static Valor *fn_tpo_hora(Valor **a, int n) {
 #include <sys/wait.h>
 #endif
 
-/* Llamar a una función Lince desde C */
-static Valor *llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *ent) {
-    return interprete_llamar_funcion(fn, args, nargs, ent);
-}
+/* Antes había aquí un envoltorio que además del manejador le pasaba a
+   interprete_llamar_funcion el Entorno en el que ejecutarlo, y de ese
+   parámetro colgaba todo el tinglado de _srv_ent_tmp / _srv_entorno_global /
+   SrvRuta.entorno_fn. Nunca sirvió de nada: una función Lince se ejecuta
+   siempre en su propio closure, así que ese Entorno no llegaba a leerse. */
 #define SRV_MAX_RUTAS 64
 typedef struct {
     char    metodo[8];
     char    ruta[256];
     Valor  *manejador;
-    Entorno *entorno_fn;
 } SrvRuta;
 
 static SrvRuta   _srv_rutas[SRV_MAX_RUTAS];
 static int       _srv_nrutas = 0;
 static char      _srv_dir_estaticos[256] = "";
-static Entorno  *_srv_entorno_global = NULL;
-static Entorno  *_srv_ent_tmp        = NULL;
 
 /* Forward declaration */
-static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
+static Valor *_srv_llamar_manejador(Valor *fn,
                                      const char *metodo, const char *ruta,
                                      const char *cuerpo, Valor *consulta,
                                      Valor *params, Valor *cookies);
@@ -991,7 +989,7 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
 
 /* ── Manejar conexión ───────────────────── */
 
-static void _srv_manejar_conexion(int fd, Entorno *ent) {
+static void _srv_manejar_conexion(int fd) {
     char buf[65536] = "";
     ssize_t n = recv(fd, buf, sizeof(buf)-1, 0);
     if (n <= 0) { close(fd); return; }
@@ -1017,7 +1015,6 @@ static void _srv_manejar_conexion(int fd, Entorno *ent) {
 
         Valor *resp = _srv_llamar_manejador(
             _srv_rutas[i].manejador,
-            _srv_entorno_global,
             metodo, ruta, cuerpo, consulta, params, cookies);
 
         valor_destruir(params);
@@ -1080,7 +1077,7 @@ static void _srv_manejar_conexion(int fd, Entorno *ent) {
 
 /* ── Llamar manejador Lince ─────────────── */
 
-static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
+static Valor *_srv_llamar_manejador(Valor *fn,
                                      const char *metodo, const char *ruta_s,
                                      const char *cuerpo, Valor *consulta,
                                      Valor *params, Valor *cookies) {
@@ -1109,7 +1106,7 @@ static Valor *_srv_llamar_manejador(Valor *fn, Entorno *ent,
 
     Valor *args[1] = { req };
     hay_error = 0;
-    return llamar_funcion(fn, args, 1, ent ? ent : _srv_entorno_global);
+    return interprete_llamar_funcion(fn, args, 1);
 }
 
 /* ── Registro de rutas ──────────────────── */
@@ -1122,7 +1119,6 @@ static Valor *_srv_registrar_ruta(Valor **a, int n, const char *metodo) {
     strncpy(_srv_rutas[_srv_nrutas].ruta, a[0]->texto, 255);
     a[1]->refs++;
     _srv_rutas[_srv_nrutas].manejador  = a[1];
-    _srv_rutas[_srv_nrutas].entorno_fn = _srv_ent_tmp;
     _srv_nrutas++;
     return valor_nulo();
 }
@@ -1203,9 +1199,8 @@ static Valor *fn_srv_redirigir(Valor **a, int n) {
 
 /* ── Escuchar (con fork por conexión) ───── */
 
-static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
+static Valor *fn_srv_escuchar(Valor **a, int n) {
     int puerto = (n >= 1 && a[0]->tipo == VAL_NUMERO) ? (int)a[0]->numero : 8080;
-    _srv_entorno_global = ent;
 
 #ifdef _WIN32
     printf("⚠  El módulo servidor no está disponible en Windows aún.\n");
@@ -1217,7 +1212,7 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
     int srv_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (srv_fd < 0) {
         hay_error = 1;
-        valor_error = valor_crear_error("Error", "No se pudo crear el socket", 0);
+        valor_error = valor_error_nuevo("Error", "No se pudo crear el socket", 0);
         return valor_nulo();
     }
     int opt = 1;
@@ -1231,7 +1226,7 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
     if (bind(srv_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         close(srv_fd);
         hay_error = 1;
-        valor_error = valor_crear_error("Error",
+        valor_error = valor_error_nuevo("Error",
             "No se pudo enlazar el puerto (¿está en uso?)", 0);
         return valor_nulo();
     }
@@ -1254,7 +1249,7 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
                pclose()/waitpid() si el manejador de la ruta usa
                sistema.proceso() u otro popen(). */
             signal(SIGCHLD, SIG_DFL);
-            _srv_manejar_conexion(cli_fd, ent);
+            _srv_manejar_conexion(cli_fd);
             exit(0);
         } else if (pid > 0) {
             /* Proceso padre: seguir aceptando */
@@ -1267,10 +1262,6 @@ static Valor *fn_srv_escuchar(Valor **a, int n, Entorno *ent) {
     }
     return valor_nulo();
 #endif
-}
-
-static Valor *fn_srv_escuchar_wrap(Valor **a, int n) {
-    return fn_srv_escuchar(a, n, _srv_ent_tmp);
 }
 
 /* ─────────────────────────────────────────
@@ -1464,7 +1455,7 @@ static Valor *fn_sis_ejecutar(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "ejecutar() espera un texto con el comando", 0);
         return valor_nulo();
     }
@@ -1472,7 +1463,7 @@ static Valor *fn_sis_ejecutar(Valor **a, int n) {
     FILE *proc = popen(a[0]->texto, "r");
     if (!proc) {
         hay_error = 1;
-        valor_error = valor_crear_error("Error",
+        valor_error = valor_error_nuevo("Error",
             "No se pudo ejecutar el comando", 0);
         return valor_nulo();
     }
@@ -1699,7 +1690,7 @@ static Valor *fn_json_parsear(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "json.parsear() espera un texto", 0);
         return valor_nulo();
     }
@@ -1816,7 +1807,7 @@ static Valor *hacer_peticion(const char *metodo, const char *url,
     FILE *proc = popen(cmd, "r");
     if (!proc) {
         hay_error = 1;
-        valor_error = valor_crear_error("Error",
+        valor_error = valor_error_nuevo("Error",
             "No se pudo conectar. ¿Está curl instalado?", 0);
         return valor_nulo();
     }
@@ -1853,7 +1844,7 @@ static Valor *hacer_peticion(const char *metodo, const char *url,
 static Valor *fn_red_obtener(Valor **a, int n) {
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo", "obtener() espera una URL", 0);
+        valor_error = valor_error_nuevo("ErrorTipo", "obtener() espera una URL", 0);
         return valor_nulo();
     }
     Valor *cabeceras = (n >= 2) ? a[1] : NULL;
@@ -1863,7 +1854,7 @@ static Valor *fn_red_obtener(Valor **a, int n) {
 static Valor *fn_red_enviar(Valor **a, int n) {
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo", "enviar() espera una URL", 0);
+        valor_error = valor_error_nuevo("ErrorTipo", "enviar() espera una URL", 0);
         return valor_nulo();
     }
     const char *cuerpo   = (n >= 2 && a[1]->tipo == VAL_TEXTO) ? a[1]->texto : "";
@@ -1874,7 +1865,7 @@ static Valor *fn_red_enviar(Valor **a, int n) {
 static Valor *fn_red_actualizar(Valor **a, int n) {
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo", "actualizar() espera una URL", 0);
+        valor_error = valor_error_nuevo("ErrorTipo", "actualizar() espera una URL", 0);
         return valor_nulo();
     }
     const char *cuerpo   = (n >= 2 && a[1]->tipo == VAL_TEXTO) ? a[1]->texto : "";
@@ -1885,7 +1876,7 @@ static Valor *fn_red_actualizar(Valor **a, int n) {
 static Valor *fn_red_eliminar(Valor **a, int n) {
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo", "eliminar() espera una URL", 0);
+        valor_error = valor_error_nuevo("ErrorTipo", "eliminar() espera una URL", 0);
         return valor_nulo();
     }
     Valor *cabeceras = (n >= 2) ? a[1] : NULL;
@@ -2230,8 +2221,6 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     }
 
     if (strcmp(nombre, "servidor") == 0) {
-        /* escuchar necesita acceso al entorno — lo pasamos via global */
-        _srv_ent_tmp = entorno;
         FuncionNativa fns[] = {
             {"ruta",       fn_srv_ruta,           2},
             {"obtener",    fn_srv_obtener,         2},
@@ -2243,7 +2232,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
             {"json",       fn_srv_json,           -1},
             {"texto",      fn_srv_texto,          -1},
             {"redirigir",  fn_srv_redirigir,       1},
-            {"escuchar",   fn_srv_escuchar_wrap,  -1},
+            {"escuchar",   fn_srv_escuchar,       -1},
         };
         registrar_modulo_diccionario(entorno, "servidor",
             fns, 11, NULL, NULL, 0);
@@ -2277,7 +2266,6 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
 
 #ifdef LINCE_MOTOR
     if (strcmp(nombre, "motor") == 0) {
-        modulo_motor_fijar_entorno(entorno);
         FuncionNativa fns[] = {
             /* Ciclo de vida y bucle */
             {"iniciar",             fn_motor_iniciar,             -1},
@@ -2323,5 +2311,5 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
 #endif
         ,
         nombre);
-    valor_error = valor_crear_error("Error", msg, 0);
+    valor_error = valor_error_nuevo("Error", msg, 0);
 }

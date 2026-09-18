@@ -113,8 +113,42 @@ si frames2 > 0 {
     escribir("FALLO: el bucle sin parametro no dio ni un frame")
 }
 
+# ── Fase 5: un handle destruido no puede aliasar al siguiente ──
+# El handle lleva la generación del hueco además del índice. Con el índice
+# pelado, destruir una textura y cargar otra devolvía el mismo número y el
+# código que guardara el viejo dibujaba la nueva sin un solo aviso.
 motor.textura_destruir(t2)
+sea t3 = motor.textura_cargar(RUTA_PNG)
+intentar {
+    motor.textura_tamano(t2)
+    escribir("FALLO: el handle destruido seguia valiendo")
+} capturar (error e) {
+    escribir("handle destruido no aliasa al siguiente")
+}
+
+# ── Fase 6: los volteos exigen booleano, como el resto de argumentos ──
+intentar {
+    motor.dibujar_sprite(t3, 0.0, 0.0, 0, 0, 0, 0, 1.0, 0.0, 1, 0)
+    escribir("FALLO: dibujar_sprite acepto numeros como volteo")
+} capturar (error e) {
+    escribir("volteo no booleano da error")
+}
+
+motor.textura_destruir(t3)
 motor.terminar()
+
+# ── Fase 7: correr() sin callback avisa en vez de colgarse ──
+sea ok3 = motor.iniciar(160, 120, "sin callback")
+si ok3 {
+    intentar {
+        motor.correr()
+        escribir("FALLO: correr() sin callback no aviso")
+    } capturar (error e) {
+        escribir("correr sin callback avisa")
+    }
+    motor.terminar()
+}
+
 escribir("fin")
 
 }

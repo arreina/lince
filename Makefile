@@ -37,8 +37,13 @@ LINCE_MOTOR_DIR ?= ../lince-motor
 MOTOR_BIN        = lince-motor
 MOTOR_SRC        = $(SRC) src/modulo_motor.c
 MOTOR_LIB        = $(LINCE_MOTOR_DIR)/build/libmotor.a
-MOTOR_CFLAGS     = $(CFLAGS) -DLINCE_MOTOR -I$(LINCE_MOTOR_DIR)/include \
+# Las flags propias del build del motor, en un solo sitio: las comparten
+# 'motor' y 'motor-debug'. Duplicadas, añadir un -D o mover el include de
+# lince-motor arreglaba uno y dejaba el otro fallando con un "no such file"
+# que no parece tener nada que ver.
+MOTOR_BASE_FLAGS = -DLINCE_MOTOR -I$(LINCE_MOTOR_DIR)/include \
                     $(shell pkg-config --cflags sdl2 SDL2_image)
+MOTOR_CFLAGS     = $(CFLAGS) $(MOTOR_BASE_FLAGS)
 MOTOR_LDFLAGS    = $(MOTOR_LIB) $(shell pkg-config --libs sdl2 SDL2_image) $(LDFLAGS)
 
 motor: $(MOTOR_LIB)
@@ -54,9 +59,10 @@ $(MOTOR_LIB):
 # los fallos del binding son de memoria y sin instrumentar no se ven.
 MOTOR_BIN_DEBUG  = lince-motor-debug
 
+# Mismos avisos que el build normal: si el binario instrumentado usara otras
+# flags, la CI leería warnings que el release silencia a propósito (o al revés).
 motor-debug: $(MOTOR_LIB)
-	$(CC) -Wall -g -fsanitize=address -DLINCE_MOTOR -I$(LINCE_MOTOR_DIR)/include \
-	    $(shell pkg-config --cflags sdl2 SDL2_image) \
+	$(CC) $(CFLAGS) -O0 -g -fsanitize=address $(MOTOR_BASE_FLAGS) \
 	    -o $(MOTOR_BIN_DEBUG) $(MOTOR_SRC) $(MOTOR_LDFLAGS)
 	@echo "✅ Lince Motor debug compilado"
 

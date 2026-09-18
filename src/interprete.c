@@ -101,6 +101,17 @@ Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea) {
     return v;
 }
 
+/* Pone un error nuevo soltando el que hubiera pendiente. 'valor_error' es una
+   global y hasta ahora los ~60 sitios que la escriben la pisaban sin más, con
+   lo que el anterior se fugaba entero (el Valor y sus tipo/mensaje duplicados).
+   Se nota cuando algo sigue ejecutándose con un error puesto y acaba poniendo
+   otro encima. */
+Valor *valor_error_nuevo(const char *tipo, const char *mensaje, int linea) {
+    valor_destruir(valor_error);
+    valor_error = NULL;
+    return valor_crear_error(tipo, mensaje, linea);
+}
+
 /* Incrementa referencias */
 static Valor *valor_retener(Valor *v) {
     if (v) v->refs++;
@@ -384,7 +395,7 @@ static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
     if (linea > 0) {
         snprintf(msg, sizeof(msg),
             "La variable '%s' no está definida.", nombre);
-        valor_error = valor_crear_error("Error", msg, linea);
+        valor_error = valor_error_nuevo("Error", msg, linea);
         hay_error = 1;
         return valor_nulo();
     }
@@ -464,7 +475,7 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
         else if (strcmp(op, "*")  == 0) resultado = valor_numero(a * b);
         else if (strcmp(op, "/")  == 0) {
             if (b == 0) {
-                valor_error = valor_crear_error("ErrorMatematico", "División por cero.", 0);
+                valor_error = valor_error_nuevo("ErrorMatematico", "División por cero.", 0);
                 hay_error = 1;
                 valor_destruir(izq);
                 valor_destruir(der);
@@ -550,7 +561,7 @@ static void validar_tipo(Valor *v, TipoDato tipo, const char *contexto,
             contexto, nombre,
             tipo < 8 ? esperado[tipo] : "?",
             v->tipo < 10 ? recibido[v->tipo] : "?");
-        valor_error = valor_crear_error("ErrorTipo", msg, linea);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, linea);
         hay_error = 1;
     }
 }
@@ -830,7 +841,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 snprintf(msg, sizeof(msg),
                     "Demasiadas llamadas anidadas — ¿hay una recursión infinita en '%s'?",
                     n->llamada.nombre);
-                valor_error = valor_crear_error("ErrorRecursion", msg, n->linea);
+                valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
                 hay_error   = 1;
                 return valor_nulo();
             }
@@ -1005,7 +1016,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 if (idx->tipo != VAL_NUMERO) {
                     char msg[128];
                     snprintf(msg, sizeof(msg), "El índice de una lista debe ser un número.");
-                    valor_error = valor_crear_error("ErrorTipo", msg, n->linea);
+                    valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
                     hay_error = 1;
                     valor_destruir(obj); valor_destruir(idx);
                     return valor_nulo();
@@ -1017,7 +1028,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     snprintf(msg, sizeof(msg),
                         "Índice %d fuera de rango. La lista tiene %d elementos.",
                         i, obj->lista.cantidad);
-                    valor_error = valor_crear_error("ErrorRango", msg, n->linea);
+                    valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
                     hay_error = 1;
                     valor_destruir(obj); valor_destruir(idx);
                     return valor_nulo();
@@ -1028,7 +1039,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             }
             if (obj->tipo == VAL_DICCIONARIO) {
                 if (idx->tipo != VAL_TEXTO) {
-                    valor_error = valor_crear_error("ErrorTipo",
+                    valor_error = valor_error_nuevo("ErrorTipo",
                         "La clave de un diccionario debe ser texto.", n->linea);
                     hay_error = 1;
                     valor_destruir(obj); valor_destruir(idx);
@@ -1044,14 +1055,14 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 char msg[256];
                 snprintf(msg, sizeof(msg),
                     "La clave \"%s\" no existe en el diccionario.", idx->texto);
-                valor_error = valor_crear_error("ErrorRango", msg, n->linea);
+                valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
                 hay_error = 1;
                 valor_destruir(obj); valor_destruir(idx);
                 return valor_nulo();
             }
             if (obj->tipo == VAL_TEXTO) {
                 if (idx->tipo != VAL_NUMERO) {
-                    valor_error = valor_crear_error("ErrorTipo",
+                    valor_error = valor_error_nuevo("ErrorTipo",
                         "El índice de un texto debe ser un número.", n->linea);
                     hay_error = 1;
                     valor_destruir(obj); valor_destruir(idx);
@@ -1064,7 +1075,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     char msg[128];
                     snprintf(msg, sizeof(msg),
                         "Índice %d fuera de rango. El texto tiene %d caracteres.", i, len);
-                    valor_error = valor_crear_error("ErrorRango", msg, n->linea);
+                    valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
                     hay_error = 1;
                     valor_destruir(obj); valor_destruir(idx);
                     return valor_nulo();
@@ -1074,7 +1085,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(obj); valor_destruir(idx);
                 return res;
             }
-            valor_error = valor_crear_error("ErrorTipo",
+            valor_error = valor_error_nuevo("ErrorTipo",
                 "Solo puedes usar [] en listas, diccionarios o texto.", n->linea);
             hay_error = 1;
             valor_destruir(obj); valor_destruir(idx);
@@ -1198,7 +1209,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     char msg[128];
                     snprintf(msg, sizeof(msg),
                         "Demasiadas llamadas anidadas en método '%s'.", met_nombre);
-                    valor_error = valor_crear_error("ErrorRecursion", msg, n->linea);
+                    valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
                     hay_error   = 1;
                     valor_destruir(obj);
                     return valor_nulo();
@@ -1456,13 +1467,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         case NODO_PRODUCIR: {
             /* Solo válido dentro de un generador en ejecución */
             if (!generador_actual) {
-                valor_error = valor_crear_error("Error",
+                valor_error = valor_error_nuevo("Error",
                     "'producir' solo puede usarse dentro de un generador.", n->linea);
                 hay_error = 1;
                 return valor_nulo();
             }
             if (generador_actual->generador.cantidad >= MAX_GENERADOR) {
-                valor_error = valor_crear_error("Error",
+                valor_error = valor_error_nuevo("Error",
                     "El generador ha superado el límite de 10000 valores.", n->linea);
                 hay_error = 1;
                 return valor_nulo();
@@ -1528,14 +1539,14 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                         "El paquete '%s' no está instalado.\n"
                         "   Instálalo con: lince instalar <url>",
                         nom_paquete);
-                    valor_error = valor_crear_error("Error", msg, n->linea);
+                    valor_error = valor_error_nuevo("Error", msg, n->linea);
                     hay_error = 1;
                     return valor_nulo();
                 }
                 /* Ejecutar el archivo del paquete en el entorno actual */
                 FILE *f = fopen(ruta, "r");
                 if (!f) {
-                    valor_error = valor_crear_error("Error",
+                    valor_error = valor_error_nuevo("Error",
                         "No se pudo leer el paquete.", n->linea);
                     hay_error = 1;
                     return valor_nulo();
@@ -1569,7 +1580,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     char msg[256];
                     snprintf(msg, sizeof(msg),
                         "No se encontró el archivo '%s'.", ruta);
-                    valor_error = valor_crear_error("Error", msg, n->linea);
+                    valor_error = valor_error_nuevo("Error", msg, n->linea);
                     hay_error = 1;
                     return valor_nulo();
                 }
@@ -1669,13 +1680,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                         break;
                     }
                 }
-                valor_error = valor_crear_error(tipo, msg ? msg : "sin mensaje", 0);
+                valor_error = valor_error_nuevo(tipo, msg ? msg : "sin mensaje", 0);
                 free(tipo);
                 if (msg) free(msg);
                 valor_destruir(vobj);
             } else {
                 char *s = valor_a_texto(vobj);
-                valor_error = valor_crear_error("Error", s, 0);
+                valor_error = valor_error_nuevo("Error", s, 0);
                 free(s);
                 valor_destruir(vobj);
             }
@@ -1750,14 +1761,21 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(ejecutar(n->intentar.finalmente, e_fin));   /* ver la nota de NODO_LLAMADA */
                 entorno_destruir(e_fin);
 
-                /* Restaurar señales */
+                /* Restaurar señales. Si el propio 'finalmente' ha puesto un
+                   error o ha hecho 'devolver', gana lo suyo — pero entonces lo
+                   que veníamos guardando hay que soltarlo, que si no se pierde
+                   con su tipo y su mensaje. */
                 if (!hay_error) {
                     hay_error   = error_guardado;
                     valor_error = err_guardado;
+                } else {
+                    valor_destruir(err_guardado);
                 }
                 if (!hay_retorno) {
                     hay_retorno   = retorno_guardado;
                     valor_retorno = ret_guardado;
+                } else {
+                    valor_destruir(ret_guardado);
                 }
             }
 
@@ -2025,7 +2043,7 @@ static Valor *fn_mapear(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_FUNCION) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "mapear() espera una lista y una función", 0);
         return valor_nulo();
     }
@@ -2063,7 +2081,7 @@ static Valor *fn_filtrar(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_FUNCION) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "filtrar() espera una lista y una función", 0);
         return valor_nulo();
     }
@@ -2104,7 +2122,7 @@ static Valor *fn_reducir(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_LISTA || a[2]->tipo != VAL_FUNCION) {
         hay_error = 1;
-        valor_error = valor_crear_error("ErrorTipo",
+        valor_error = valor_error_nuevo("ErrorTipo",
             "reducir() espera una lista, valor inicial y una función", 0);
         return valor_nulo();
     }
@@ -2152,7 +2170,7 @@ static Valor *fn_rango(Valor **a, int n) {
         paso   = a[2]->numero;
     }
     if (paso == 0) {
-        valor_error = valor_crear_error("Error", "El paso de rango() no puede ser cero.", 0);
+        valor_error = valor_error_nuevo("Error", "El paso de rango() no puede ser cero.", 0);
         hay_error = 1;
         return valor_nulo();
     }
@@ -2180,7 +2198,7 @@ static Valor *fn_conv_numero(Valor **a, int n) {
                 char msg[256];
                 snprintf(msg, sizeof(msg),
                     "No se puede convertir \"%s\" a numero.", v->texto);
-                valor_error = valor_crear_error("ErrorTipo", msg, 0);
+                valor_error = valor_error_nuevo("ErrorTipo", msg, 0);
                 return valor_nulo();
             }
             return valor_numero(d);
@@ -2188,7 +2206,7 @@ static Valor *fn_conv_numero(Valor **a, int n) {
         case VAL_NULO: return valor_numero(0);
         default: {
             hay_error = 1;
-            valor_error = valor_crear_error("ErrorTipo",
+            valor_error = valor_error_nuevo("ErrorTipo",
                 "numero() no puede convertir este tipo.", 0);
             return valor_nulo();
         }
@@ -2212,7 +2230,7 @@ static Valor *fn_conv_texto(Valor **a, int n) {
         case VAL_NULO:     return valor_texto("nulo");
         default: {
             hay_error = 1;
-            valor_error = valor_crear_error("ErrorTipo",
+            valor_error = valor_error_nuevo("ErrorTipo",
                 "texto() no puede convertir este tipo.", 0);
             return valor_nulo();
         }
@@ -2341,7 +2359,7 @@ static void soltar_args(Valor **args, int desde, int nargs) {
     for (int i = desde; i < nargs; i++) valor_destruir(args[i]);
 }
 
-Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *ent) {
+Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {
     if (!fn || fn->tipo != VAL_FUNCION) { soltar_args(args, 0, nargs); return valor_nulo(); }
     FuncionLince *f = fn->funcion;
     if (!f) { soltar_args(args, 0, nargs); return valor_nulo(); }
@@ -2359,10 +2377,28 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *en
         return r;
     }
 
+    /* Declarar más parámetros de los que el módulo va a pasar no es algo que
+       se pueda salvar: los de más se quedarían sin definir y el cuerpo
+       fallaría con "la variable X no está definida" una vez por frame, desde
+       dentro del bucle de render y sin decir de dónde viene. Al revés sí se
+       admite — un callback que no necesita el delta puede declararse
+       'funcion(): nulo' — que es la comodidad que justifica esta ruta. */
+    if (f->num_parametros > nargs) {
+        char msg[256];
+        snprintf(msg, sizeof(msg),
+            "'%s' declara %d parámetro(s), pero se le llama desde un módulo "
+            "con %d. Declara como mucho esos %d.",
+            f->nombre ? f->nombre : "la función",
+            f->num_parametros, nargs, nargs);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, 0);
+        hay_error   = 1;
+        soltar_args(args, 0, nargs);
+        return valor_nulo();
+    }
+
     /* Sostener la función mientras dura la llamada. Esta es la única ruta que
        ejecuta un cuerpo Lince sin tener referencia propia a la función: la de
-       NODO_LLAMADA se apoya en su 'vfun', que es lo que le permite leer
-       f->tipo_retorno después del cuerpo. Aquí quien llama puede ser el único
+       NODO_LLAMADA se apoya en su 'vfun'. Aquí quien llama puede ser el único
        dueño — el módulo motor guarda el callback de al_actualizar, el módulo
        servidor el manejador de la ruta — y ese cuerpo puede soltarlo desde
        dentro:
@@ -2371,18 +2407,31 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *en
                motor.al_actualizar(otra)     # suelta la que se está ejecutando
            })
 
-       Con el valor liberado, 'f' queda colgando para el resto de la llamada.
-       Hoy no se lee nada de 'f' después de ejecutar el cuerpo y no se nota,
-       pero es una línea de distancia: basta con validar aquí el tipo de
-       retorno, como ya hace NODO_LLAMADA, para que sea un use-after-free. */
+       Sin este refs++, 'f' quedaría colgando para el resto de la llamada, y
+       la validación del tipo de retorno de más abajo lo leería ya liberado. */
     fn->refs++;
 
-    Entorno *fn_e = entorno_crear(f->entorno_closure ? f->entorno_closure : ent);
-    for (int i = 0; i < f->num_parametros && i < nargs; i++)
+    Entorno *fn_e = entorno_crear(f->entorno_closure);
+    for (int i = 0; i < f->num_parametros; i++) {
+        /* Mismo trato que en las demás rutas de llamada: si el parámetro
+           declara un tipo, se comprueba. Sin esto el tipo declarado era
+           mentira — un 'val texto delta' recibía el número del frame. */
+        validar_tipo(args[i], f->parametros[i].tipo, "parámetro",
+                     f->parametros[i].nombre, 0);
         entorno_definir(fn_e, f->parametros[i].nombre, args[i], 0);
+    }
     soltar_args(args, f->num_parametros, nargs);
-    valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
-    Valor *r = tomar_retorno();
+
+    Valor *r = valor_nulo();
+    if (!hay_error) {
+        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+        valor_destruir(r);
+        r = tomar_retorno();
+        if (!hay_error)
+            validar_tipo(r, f->tipo_retorno, "retorno de función",
+                         f->nombre ? f->nombre : "(anónima)", 0);
+    }
+
     entorno_destruir(fn_e);
     valor_destruir(fn);
     return r;

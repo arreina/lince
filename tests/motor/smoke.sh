@@ -38,7 +38,9 @@ FALLOS=0
 # de código se recorra entero, no lo que se vea.
 export SDL_VIDEODRIVER=dummy
 export SDL_RENDER_DRIVER=software
-export LINCE_MOTOR_PNG="$PNG"
+# Respeta la que venga puesta: el .lince la documenta como configurable y
+# pisarla aquí dejaba ese parámetro sin efecto a través del runner.
+export LINCE_MOTOR_PNG="${LINCE_MOTOR_PNG:-$PNG}"
 
 # Sin detect_leaks en las pasadas normales: LeakSanitizer sale por una vía
 # que no vacía stdout, así que el informe se comería la salida del script
@@ -81,11 +83,20 @@ fi
 
 contiene "la ventana se crea con el tamaño pedido" "ventana 320x240"     "$LOG"
 contiene "el teclado arranca en reposo"            "entrada en reposo"   "$LOG"
-contiene "la textura se carga y mide bien"         "textura 32x32"       "$LOG"
+# Sin tamaño fijo: apuntar $2 a un lince-motor cuyo lince.png no midiera
+# 32x32 fallaba señalando el tamaño en vez de la causa real.
+if grep -qE '^textura [1-9][0-9]*x[1-9][0-9]*$' "$LOG"; then
+    bien "la textura se carga y mide bien ($(sed -n 's/^textura //p' "$LOG" | head -1))"
+else
+    mal "la textura se carga y mide bien"
+fi
 contiene "el bucle llama al callback con delta"    "bucle con parametro ok" "$LOG"
 contiene "el delta del frame llega al callback"    "delta llega al callback" "$LOG"
 contiene "terminar() invalida los handles viejos"  "handle invalidado tras terminar" "$LOG"
 contiene "el bucle acepta un callback sin delta"   "bucle sin parametro ok" "$LOG"
+contiene "un handle destruido no aliasa al siguiente" "handle destruido no aliasa al siguiente" "$LOG"
+contiene "los volteos exigen booleano"             "volteo no booleano da error" "$LOG"
+contiene "correr() sin callback avisa, no cuelga"  "correr sin callback avisa" "$LOG"
 contiene "el script termina limpiamente"           "fin"                 "$LOG"
 
 if grep -q "FALLO" "$LOG"; then
