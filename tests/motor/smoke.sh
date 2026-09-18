@@ -26,6 +26,12 @@ MOTOR_DIR="${2:-../lince-motor}"
 PNG="${MOTOR_DIR}/assets/lince.png"
 LOG="$(mktemp -t lince-motor-XXXXXX.log)"
 LOG2="$(mktemp -t lince-motor-XXXXXX.log)"
+# La medición de fugas tiene sus propios ficheros: si reutilizara los de
+# arriba, machacaría la salida DESPUÉS de haberla mirado y los errores del
+# sanitizer de esas dos pasadas — las más largas de toda la suite — no los
+# vería nadie.
+LOGF1="$(mktemp -t lince-motor-fugas-XXXXXX.log)"
+LOGF2="$(mktemp -t lince-motor-fugas-XXXXXX.log)"
 FALLOS=0
 
 # Sin pantalla y con el render por software: sólo nos interesa que el camino
@@ -40,7 +46,7 @@ export LINCE_MOTOR_PNG="$PNG"
 # encender, y ahí sólo miramos stderr.
 export ASAN_OPTIONS="detect_leaks=0:abort_on_error=0${ASAN_OPTIONS:+:$ASAN_OPTIONS}"
 
-limpiar() { rm -f "$LOG" "$LOG2"; }
+limpiar() { rm -f "$LOG" "$LOG2" "$LOGF1" "$LOGF2"; }
 trap limpiar EXIT
 
 bien()  { printf '  \033[32m✅\033[0m %s\n' "$1"; }
@@ -114,23 +120,42 @@ if grep -qE "ERROR: AddressSanitizer|runtime error:" "$LOG" "$LOG2"; then
 fi
 
 # ── Lo que se fuga no puede crecer con los frames ──────────────
-# Sólo tiene sentido con un binario instrumentado; con uno normal no hay
-# informe de LeakSanitizer que comparar y se salta.
+# Sólo tiene sentido con un binario instrumentado. Y hay que saberlo mirando
+# el binario, no la salida: cuando no hay ni una fuga LeakSanitizer no imprime
+# nada, que es exactamente lo mismo que imprime un binario sin sanitizer. Si
+# se dedujera de ahí, esta comprobación se apagaría sola el día que dejara de
+# haber fugas — justo cuando empieza a servir para algo.
+tiene_asan() {
+    ldd "$BIN" 2>/dev/null | grep -q libasan && return 0
+    grep -qa "__asan_init" "$BIN" 2>/dev/null
+}
+
+# Imprime las asignaciones que LeakSanitizer da por fugadas, 0 si no hay
+# informe (cero fugas) o "timeout" si la pasada no terminó.
 cuenta_fugas() {  # cuenta_fugas <segundos> <fichero>
     LINCE_MOTOR_SEGUNDOS="$1" ASAN_OPTIONS="detect_leaks=1:abort_on_error=0" \
         timeout 120 "$BIN" tests/motor/motor_test.lince >"$2" 2>&1
-    sed -n 's/^SUMMARY: AddressSanitizer: [0-9]* byte(s) leaked in \([0-9]*\) allocation(s)\..*/\1/p' "$2"
+    if [ $? -eq 124 ]; then echo "timeout"; return; fi
+    n=$(sed -n 's/^SUMMARY: AddressSanitizer: [0-9]* byte(s) leaked in \([0-9]*\) allocation(s)\..*/\1/p' "$2")
+    echo "${n:-0}"
 }
 
-corto=$(cuenta_fugas 0.2 "$LOG")
-largo=$(cuenta_fugas 2.0 "$LOG2")
-
-if [ -z "$corto" ] || [ -z "$largo" ]; then
-    printf '  \033[90m•\033[0m sin AddressSanitizer: me salto la comprobación de fugas por frame\n'
-elif [ "$corto" = "$largo" ]; then
-    bien "lo que se fuga no crece con los frames ($corto asignaciones en ambos)"
+if ! tiene_asan; then
+    printf '  \033[90m•\033[0m binario sin AddressSanitizer: me salto la comprobación de fugas por frame\n'
 else
-    mal "algo se fuga por frame: $corto asignaciones con un bucle corto, $largo con uno largo"
+    corto=$(cuenta_fugas 0.2 "$LOGF1")
+    largo=$(cuenta_fugas 2.0 "$LOGF2")
+
+    if [ "$corto" = timeout ] || [ "$largo" = timeout ]; then
+        mal "la medición de fugas no terminó (corto=$corto largo=$largo)"
+    elif grep -qE "ERROR: AddressSanitizer|runtime error:" "$LOGF1" "$LOGF2"; then
+        mal "el sanitizer detectó errores de memoria midiendo las fugas"
+        grep -hE -A20 "ERROR: AddressSanitizer|runtime error:" "$LOGF1" "$LOGF2" | sed 's/^/       /'
+    elif [ "$corto" = "$largo" ]; then
+        bien "lo que se fuga no crece con los frames ($corto asignaciones en ambos)"
+    else
+        mal "algo se fuga por frame: $corto asignaciones con un bucle corto, $largo con uno largo"
+    fi
 fi
 
 echo ""

@@ -1552,7 +1552,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 Token  *tok = lexer_tokenizar(lx, &cnt);
                 Parser *pa  = parser_crear(tok, cnt);
                 Nodo   *ast = parser_parsear(pa);
-                ejecutar(ast, e);
+                valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
                 /* No destruimos el AST — las funciones definidas lo referencian */
                 parser_destruir(pa);
                 lexer_destruir(lx);
@@ -1585,7 +1585,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 Token  *tok = lexer_tokenizar(lx, &cnt);
                 Parser *pa  = parser_crear(tok, cnt);
                 Nodo   *ast = parser_parsear(pa);
-                ejecutar(ast, e);
+                valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
                 /* No destruimos el AST — las funciones definidas lo referencian */
                 parser_destruir(pa);
                 lexer_destruir(lx);
@@ -1686,7 +1686,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         case NODO_INTENTAR: {
             /* Ejecutar el bloque intentar */
             Entorno *e_try = entorno_crear(e);
-            ejecutar(n->intentar.cuerpo, e_try);
+            valor_destruir(ejecutar(n->intentar.cuerpo, e_try));   /* ver la nota de NODO_LLAMADA */
             entorno_destruir(e_try);
 
             if (hay_error) {
@@ -1721,7 +1721,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                         entorno_definir(e_cap, n->intentar.vars_captura[i],
                                         valor_objeto(obj), 0);
 
-                        ejecutar(n->intentar.cuerpos_captura[i], e_cap);
+                        valor_destruir(ejecutar(n->intentar.cuerpos_captura[i], e_cap));   /* ver la nota de NODO_LLAMADA */
                         entorno_destruir(e_cap);
                         capturado = 1;
                     }
@@ -1747,7 +1747,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_error = NULL;
 
                 Entorno *e_fin = entorno_crear(e);
-                ejecutar(n->intentar.finalmente, e_fin);
+                valor_destruir(ejecutar(n->intentar.finalmente, e_fin));   /* ver la nota de NODO_LLAMADA */
                 entorno_destruir(e_fin);
 
                 /* Restaurar señales */
@@ -2300,7 +2300,7 @@ void interprete_destruir(Interprete *interp) {
 }
 
 void interprete_ejecutar(Interprete *interp, Nodo *programa) {
-    ejecutar(programa, interp->global);
+    valor_destruir(ejecutar(programa, interp->global));   /* ver la nota de NODO_LLAMADA */
     if (hay_error && valor_error) {
         fprintf(stderr,
             "\n❌ %s: %s\n\n",

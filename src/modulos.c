@@ -1933,7 +1933,13 @@ static void registrar_modulo_diccionario(Entorno *entorno,
         f->cuerpo          = (Nodo*)(uintptr_t)fns[i].fn; /* truco: guardar puntero */
         f->entorno_closure = NULL; /* señal de función nativa */
 
-        Valor *vf = malloc(sizeof(Valor));
+        /* calloc, no malloc: 'es_modulo' no se toca aquí y el intérprete lo
+           lee — en NODO_LLAMADA vale 99 para marcar un generador. Con la
+           basura del montón dentro, un 'sea f = matematica.raiz' seguido de
+           'f()' hacía que tratara el puntero a función nativa como cuerpo de
+           generador y lo desreferenciara. Lo mismo vale para cualquier campo
+           que se le añada a Valor en el futuro. */
+        Valor *vf = calloc(1, sizeof(Valor));
         vf->tipo  = VAL_FUNCION;
         vf->refs  = 1;
         vf->funcion = f;
