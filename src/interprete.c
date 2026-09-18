@@ -555,6 +555,18 @@ static void validar_tipo(Valor *v, TipoDato tipo, const char *contexto,
     }
 }
 
+/* El valor que devuelve una función: el de su 'devolver' si lo hubo, y nulo
+   si no. Hay que mirar hay_retorno ANTES de crear el nulo — creándolo primero
+   y pisándolo después se fugaba uno por cada llamada que devolviera algo, que
+   en mapear/filtrar/reducir es uno por elemento de la lista. */
+static Valor *tomar_retorno(void) {
+    if (!hay_retorno) return valor_nulo();
+    Valor *r      = valor_retorno;
+    valor_retorno = NULL;
+    hay_retorno   = 0;
+    return r;
+}
+
 static Valor *ejecutar(Nodo *n, Entorno *e) {
     if (!n || hay_retorno || hay_error) return valor_nulo();
 
@@ -862,9 +874,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 Valor *gen_anterior = generador_actual;
                 generador_actual    = gen;
 
-                ejecutar(f->cuerpo, fn_e);
+                valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
 
                 generador_actual = gen_anterior;
+                /* Un 'devolver' dentro de un generador no le llega a nadie,
+                   pero el valor está creado: hay que soltarlo. */
+                if (hay_retorno) valor_destruir(valor_retorno);
                 hay_retorno      = 0;
                 valor_retorno    = NULL;
                 hay_producir     = 0;
@@ -940,12 +955,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             valor_destruir(ejecutar(f->cuerpo, fn_e));
             entorno_destruir(fn_e);
 
-            Valor *retorno = valor_nulo();
-            if (hay_retorno) {
-                retorno       = valor_retorno;
-                valor_retorno = NULL;
-                hay_retorno   = 0;
-            }
+            Valor *retorno = tomar_retorno();
 
             if (!hay_error)
                 validar_tipo(retorno, f->tipo_retorno, "retorno de función", f->nombre, n->linea);
@@ -1203,13 +1213,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 ClaseLince *cls_ant    = clase_actual;
                 esto_actual  = obj;
                 clase_actual = cls;
-                ejecutar(f->cuerpo, fn_e);
-                Valor *retorno = valor_nulo();
-                if (hay_retorno) {
-                    retorno       = valor_retorno;
-                    valor_retorno = NULL;
-                    hay_retorno   = 0;
-                }
+                valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+                Valor *retorno = tomar_retorno();
                 esto_actual  = esto_anterior;
                 clase_actual = cls_ant;
                 entorno_destruir(fn_e);
@@ -1640,8 +1645,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
             ClaseLince *cls_ant = clase_actual;
             clase_actual = cls_padre;
-            ejecutar(f->cuerpo, fn_e);
+            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
             clase_actual  = cls_ant;
+            if (hay_retorno) valor_destruir(valor_retorno);
             hay_retorno   = 0;
             valor_retorno = NULL;
             entorno_destruir(fn_e);
@@ -1924,9 +1930,10 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 ClaseLince *cls_ant    = clase_actual;
                 esto_actual  = vobj;
                 clase_actual = cls;
-                ejecutar(f->cuerpo, fn_e);
+                valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
                 esto_actual  = esto_anterior;
                 clase_actual = cls_ant;
+                if (hay_retorno) valor_destruir(valor_retorno);
                 hay_retorno   = 0;
                 valor_retorno = NULL;
                 entorno_destruir(fn_e);
@@ -2040,11 +2047,10 @@ static Valor *fn_mapear(Valor **a, int n) {
             Entorno *fn_e = entorno_crear(f->entorno_closure);
             if (f->num_parametros >= 1)
                 entorno_definir(fn_e, f->parametros[0].nombre, elem, 0);
-            ejecutar(f->cuerpo, fn_e);
-            Valor *r = valor_nulo();
-            if (hay_retorno) {
-                r = valor_retorno; valor_retorno = NULL; hay_retorno = 0;
-            }
+            else
+                valor_destruir(elem);   /* la lambda no declara parámetro */
+            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+            Valor *r = tomar_retorno();
             entorno_destruir(fn_e);
             lista_agregar(resultado, r);
         }
@@ -2080,11 +2086,8 @@ static Valor *fn_filtrar(Valor **a, int n) {
             if (f->num_parametros >= 1)
                 entorno_definir(fn_e, f->parametros[0].nombre,
                     valor_copiar(elem), 0);
-            ejecutar(f->cuerpo, fn_e);
-            Valor *r = valor_nulo();
-            if (hay_retorno) {
-                r = valor_retorno; valor_retorno = NULL; hay_retorno = 0;
-            }
+            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+            Valor *r = tomar_retorno();
             ok = es_verdadero(r);
             valor_destruir(r);
             entorno_destruir(fn_e);
@@ -2126,13 +2129,8 @@ static Valor *fn_reducir(Valor **a, int n) {
             if (f->num_parametros >= 2)
                 entorno_definir(fn_e, f->parametros[1].nombre,
                     valor_copiar(elem), 0);
-            ejecutar(f->cuerpo, fn_e);
-            nuevo_acc = valor_nulo();
-            if (hay_retorno) {
-                nuevo_acc = valor_retorno;
-                valor_retorno = NULL;
-                hay_retorno   = 0;
-            }
+            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+            nuevo_acc = tomar_retorno();
             entorno_destruir(fn_e);
         }
         valor_destruir(acc);
@@ -2351,12 +2349,14 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *en
     if (!f->entorno_closure && !f->cuerpo) { soltar_args(args, 0, nargs); return valor_nulo(); }
 
     if (f->entorno_closure == NULL) {
-        /* Función nativa. Aquí no soltamos args: las nativas reciben sus
-           argumentos prestados en la ruta normal del intérprete y alguna
-           devuelve uno tal cual, así que liberarlos sería un doble free. */
+        /* Función nativa. Las nativas no se quedan con sus argumentos: la
+           ruta normal del intérprete también los libera al volver (ver la
+           llamada a método de módulo), así que aquí hacemos lo mismo. */
         typedef Valor *(*FnNativa)(Valor**, int);
         FnNativa fnnat = (FnNativa)(uintptr_t)f->cuerpo;
-        return fnnat ? fnnat(args, nargs) : valor_nulo();
+        Valor *r = fnnat ? fnnat(args, nargs) : valor_nulo();
+        soltar_args(args, 0, nargs);
+        return r;
     }
 
     Entorno *fn_e = entorno_crear(f->entorno_closure ? f->entorno_closure : ent);
@@ -2364,10 +2364,7 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *en
         entorno_definir(fn_e, f->parametros[i].nombre, args[i], 0);
     soltar_args(args, f->num_parametros, nargs);
     valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
-    Valor *r = valor_nulo();
-    if (hay_retorno) {
-        r = valor_retorno; valor_retorno = NULL; hay_retorno = 0;
-    }
+    Valor *r = tomar_retorno();
     entorno_destruir(fn_e);
     return r;
 }
