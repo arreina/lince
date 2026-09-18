@@ -932,7 +932,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 entorno_definir(fn_e, param->nombre, arg, 0);
             }
 
-            ejecutar(f->cuerpo, fn_e);
+            /* El valor del cuerpo no es el retorno de la función (eso va por
+               valor_retorno): es el de su última sentencia, y lo posee quien
+               llama — NODO_BLOQUE ya libera así todos los anteriores. Sin
+               este destruir se fugaban 40 bytes por llamada, que en un bucle
+               de juego son 40 por función y por frame. */
+            valor_destruir(ejecutar(f->cuerpo, fn_e));
             entorno_destruir(fn_e);
 
             Valor *retorno = valor_nulo();
@@ -2327,15 +2332,28 @@ char *valor_a_texto_repl(Valor *v) {
 /* ─────────────────────────────────────────
    API pública para llamar funciones desde módulos
 ───────────────────────────────────────── */
-Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *ent) {
-    if (!fn || fn->tipo != VAL_FUNCION) return valor_nulo();
-    FuncionLince *f = fn->funcion;
-    if (!f) return valor_nulo();
 
-    if (!f->entorno_closure && !f->cuerpo) return valor_nulo();
+/* Quien llama cede la propiedad de args[]: los que adopta el entorno local
+   de la función los libera entorno_destruir, pero los sobrantes (o todos, si
+   ni siquiera llegamos a llamar) no los libera nadie. Importa porque estas
+   llamadas salen de bucles: una vez por petición en 'servidor', una vez por
+   frame en motor.al_actualizar. Un callback declarado sin parámetros fugaba
+   el delta de cada frame. */
+static void soltar_args(Valor **args, int desde, int nargs) {
+    for (int i = desde; i < nargs; i++) valor_destruir(args[i]);
+}
+
+Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *ent) {
+    if (!fn || fn->tipo != VAL_FUNCION) { soltar_args(args, 0, nargs); return valor_nulo(); }
+    FuncionLince *f = fn->funcion;
+    if (!f) { soltar_args(args, 0, nargs); return valor_nulo(); }
+
+    if (!f->entorno_closure && !f->cuerpo) { soltar_args(args, 0, nargs); return valor_nulo(); }
 
     if (f->entorno_closure == NULL) {
-        /* Función nativa */
+        /* Función nativa. Aquí no soltamos args: las nativas reciben sus
+           argumentos prestados en la ruta normal del intérprete y alguna
+           devuelve uno tal cual, así que liberarlos sería un doble free. */
         typedef Valor *(*FnNativa)(Valor**, int);
         FnNativa fnnat = (FnNativa)(uintptr_t)f->cuerpo;
         return fnnat ? fnnat(args, nargs) : valor_nulo();
@@ -2344,7 +2362,8 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *en
     Entorno *fn_e = entorno_crear(f->entorno_closure ? f->entorno_closure : ent);
     for (int i = 0; i < f->num_parametros && i < nargs; i++)
         entorno_definir(fn_e, f->parametros[i].nombre, args[i], 0);
-    ejecutar(f->cuerpo, fn_e);
+    soltar_args(args, f->num_parametros, nargs);
+    valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
     Valor *r = valor_nulo();
     if (hay_retorno) {
         r = valor_retorno; valor_retorno = NULL; hay_retorno = 0;

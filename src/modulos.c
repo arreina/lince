@@ -19,6 +19,9 @@
 #endif
 #include "modulos.h"
 #include "plataforma.h"
+#ifdef LINCE_MOTOR
+#include "modulo_motor.h"
+#endif
 
 /* Función del entorno — declaración externa */
 
@@ -2266,11 +2269,53 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
         return;
     }
 
+#ifdef LINCE_MOTOR
+    if (strcmp(nombre, "motor") == 0) {
+        modulo_motor_fijar_entorno(entorno);
+        FuncionNativa fns[] = {
+            /* Ciclo de vida y bucle */
+            {"iniciar",             fn_motor_iniciar,             -1},
+            {"terminar",            fn_motor_terminar,             0},
+            {"error",               fn_motor_error,                0},
+            {"al_actualizar",       fn_motor_al_actualizar,        1},
+            {"correr",              fn_motor_correr,               0},
+            {"parar",               fn_motor_parar,                0},
+            /* Tiempo */
+            {"delta",               fn_motor_delta,                0},
+            {"tiempo",              fn_motor_tiempo,               0},
+            {"fps",                 fn_motor_fps,                  0},
+            {"fijar_limite_fps",    fn_motor_fijar_limite_fps,     1},
+            /* Entrada */
+            {"tecla_pulsada",       fn_motor_tecla_pulsada,        1},
+            {"tecla_recien_pulsada",fn_motor_tecla_recien_pulsada, 1},
+            {"raton_posicion",      fn_motor_raton_posicion,       0},
+            {"raton_pulsado",       fn_motor_raton_pulsado,        1},
+            /* Ventana */
+            {"ventana_tamano",      fn_motor_ventana_tamano,       0},
+            {"ventana_titulo",      fn_motor_ventana_titulo,       1},
+            {"fondo",               fn_motor_fondo,                3},
+            /* Texturas y sprites */
+            {"textura_cargar",      fn_motor_textura_cargar,       1},
+            {"textura_destruir",    fn_motor_textura_destruir,     1},
+            {"textura_tamano",      fn_motor_textura_tamano,       1},
+            {"dibujar_textura",     fn_motor_dibujar_textura,      3},
+            {"dibujar_sprite",      fn_motor_dibujar_sprite,      11},
+        };
+        registrar_modulo_diccionario(entorno, "motor",
+            fns, sizeof(fns) / sizeof(fns[0]), NULL, NULL, 0);
+        return;
+    }
+#endif
+
     /* Módulo desconocido */
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones",
+        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones"
+#ifdef LINCE_MOTOR
+        ", motor"
+#endif
+        ,
         nombre);
     valor_error = valor_crear_error("Error", msg, 0);
 }

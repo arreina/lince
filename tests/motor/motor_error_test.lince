@@ -1,0 +1,23 @@
+# 🐆 Lince — el error dentro del callback tiene que devolver el control
+#
+# Regresión: el puente C -> Lince ignoraba hay_error, así que un error de
+# Lince en el callback por frame dejaba el bucle girando para siempre —
+# ventana congelada y motor.correr() sin volver nunca. Ahora para el bucle
+# y el error sube como cualquier otro.
+#
+# Lo arranca tests/motor/smoke.sh con un tiempo límite: si vuelve a colgarse,
+# el que falla es el timeout.
+
+importar "motor"
+
+sea ok = motor.iniciar(160, 120, "error en el callback")
+si no ok {
+    escribir("FALLO iniciar: " + motor.error())
+} sino {
+    motor.al_actualizar(funcion(val numero delta): nulo {
+        sea l = [1, 2, 3]
+        escribir(l[99])
+    })
+    motor.correr()
+    escribir("FALLO: correr() volvio sin propagar el error")
+}

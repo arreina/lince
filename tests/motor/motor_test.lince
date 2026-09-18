@@ -1,0 +1,122 @@
+# 🐆 Lince — script del test de humo del módulo 'motor'
+#
+# Recorre el binding de lince-motor de punta a punta sin necesitar pantalla
+# (smoke.sh fuerza el driver de vídeo 'dummy' de SDL). Cubre sobre todo los
+# caminos donde han salido fallos:
+#
+#   - el callback por frame con y sin parámetro declarado (el delta del
+#     frame se fugaba cuando la función no declaraba ninguno),
+#   - iniciar/terminar/iniciar, que dejaba los handles de textura apuntando
+#     a SDL_Texture ya destruidas,
+#   - un error de Lince dentro del callback, que colgaba el bucle para
+#     siempre en vez de devolver el control.
+#
+# Lo arranca tests/motor/smoke.sh, que comprueba las líneas de salida. No
+# está pensado para ejecutarse a mano.
+
+importar "motor"
+importar "sistema"
+importar "texto"
+
+sea RUTA_PNG = sistema.entorno("LINCE_MOTOR_PNG", "../lince-motor/assets/lince.png")
+
+# Cuánto dura cada bucle. smoke.sh lo varía para comprobar, con un binario
+# de AddressSanitizer, que lo que se fuga no depende del número de frames.
+sea SEGUNDOS = texto.a_numero(sistema.entorno("LINCE_MOTOR_SEGUNDOS", "0.3"))
+
+# ── Fase 1: arranque, ventana y textura ────────────────────────
+sea ok = motor.iniciar(320, 240, "humo")
+si no ok {
+    escribir("FALLO iniciar: " + motor.error())
+} sino {
+
+sea tam = motor.ventana_tamano()
+escribir("ventana " + tam["ancho"] + "x" + tam["alto"])
+
+motor.ventana_titulo("otro titulo")
+motor.fondo(10, 20, 30)
+motor.fijar_limite_fps(0)
+
+# Sin nadie tocando el teclado, todo tiene que estar suelto.
+si motor.tecla_pulsada("espacio") {
+    escribir("FALLO: espacio aparece pulsada")
+} sino {
+    escribir("entrada en reposo")
+}
+
+sea t = motor.textura_cargar(RUTA_PNG)
+si t == nulo {
+    escribir("FALLO textura: " + motor.error())
+} sino {
+
+sea tt = motor.textura_tamano(t)
+escribir("textura " + tt["ancho"] + "x" + tt["alto"])
+
+# ── Fase 2: bucle con callback CON parámetro ───────────────────
+sea frames    = 0
+sea delta_max = 0.0
+
+motor.al_actualizar(funcion(val numero delta): nulo {
+    frames = frames + 1
+    si delta > delta_max {
+        delta_max = delta
+    }
+    motor.dibujar_textura(t, 4.0, 4.0)
+    motor.dibujar_sprite(t, 8.0, 8.0, 0, 0, 0, 0, 2.0, 45.0, verdadero, falso)
+    si motor.tiempo() > SEGUNDOS {
+        motor.parar()
+    }
+})
+motor.correr()
+
+si frames > 0 {
+    escribir("bucle con parametro ok")
+} sino {
+    escribir("FALLO: el bucle no dio ni un frame")
+}
+si delta_max > 0.0 {
+    escribir("delta llega al callback")
+} sino {
+    escribir("FALLO: el delta siempre fue 0")
+}
+
+# ── Fase 3: terminar invalida los handles de textura ───────────
+motor.terminar()
+sea ok2 = motor.iniciar(320, 240, "humo 2")
+si no ok2 {
+    escribir("FALLO reiniciar: " + motor.error())
+} sino {
+
+intentar {
+    motor.textura_tamano(t)
+    escribir("FALLO: el handle viejo seguia valiendo tras terminar")
+} capturar (error e) {
+    escribir("handle invalidado tras terminar")
+}
+
+# ── Fase 4: bucle con callback SIN parámetro ───────────────────
+sea t2 = motor.textura_cargar(RUTA_PNG)
+sea frames2 = 0
+
+motor.al_actualizar(funcion(): nulo {
+    frames2 = frames2 + 1
+    motor.dibujar_textura(t2, 0.0, 0.0)
+    si motor.tiempo() > SEGUNDOS {
+        motor.parar()
+    }
+})
+motor.correr()
+
+si frames2 > 0 {
+    escribir("bucle sin parametro ok")
+} sino {
+    escribir("FALLO: el bucle sin parametro no dio ni un frame")
+}
+
+motor.textura_destruir(t2)
+motor.terminar()
+escribir("fin")
+
+}
+}
+}
