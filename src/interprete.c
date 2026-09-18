@@ -2359,6 +2359,24 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *en
         return r;
     }
 
+    /* Sostener la función mientras dura la llamada. Esta es la única ruta que
+       ejecuta un cuerpo Lince sin tener referencia propia a la función: la de
+       NODO_LLAMADA se apoya en su 'vfun', que es lo que le permite leer
+       f->tipo_retorno después del cuerpo. Aquí quien llama puede ser el único
+       dueño — el módulo motor guarda el callback de al_actualizar, el módulo
+       servidor el manejador de la ruta — y ese cuerpo puede soltarlo desde
+       dentro:
+
+           motor.al_actualizar(funcion(val numero d): nulo {
+               motor.al_actualizar(otra)     # suelta la que se está ejecutando
+           })
+
+       Con el valor liberado, 'f' queda colgando para el resto de la llamada.
+       Hoy no se lee nada de 'f' después de ejecutar el cuerpo y no se nota,
+       pero es una línea de distancia: basta con validar aquí el tipo de
+       retorno, como ya hace NODO_LLAMADA, para que sea un use-after-free. */
+    fn->refs++;
+
     Entorno *fn_e = entorno_crear(f->entorno_closure ? f->entorno_closure : ent);
     for (int i = 0; i < f->num_parametros && i < nargs; i++)
         entorno_definir(fn_e, f->parametros[i].nombre, args[i], 0);
@@ -2366,5 +2384,6 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs, Entorno *en
     valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
     Valor *r = tomar_retorno();
     entorno_destruir(fn_e);
+    valor_destruir(fn);
     return r;
 }
