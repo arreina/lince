@@ -3,8 +3,12 @@
 # Ordenación por burbuja y por selección, búsqueda lineal y búsqueda
 # binaria. Los cuatro algoritmos de iniciación.
 #
-# Muestra: bucles anidados, intercambio de elementos, listas por
-#          referencia ('ref') frente a por valor ('val').
+# Lince ya trae ordenar() incorporado, y en un programa de verdad es el
+# que hay que usar: es merge sort, mucho más rápido que la burbuja. Aquí
+# se escriben a mano porque el objetivo es entender cómo funcionan.
+#
+# Muestra: bucles anidados, intercambio de elementos, y qué se copia y
+#          qué se comparte al pasar datos a una función.
 
 importar "matematica"
 
@@ -57,6 +61,7 @@ fijo DATOS = [42, 7, 19, 3, 25, 11, 8]
 escribir("Sin ordenar : " + DATOS)
 escribir("Burbuja     : " + burbuja(DATOS))
 escribir("Selección   : " + seleccion(DATOS))
+escribir("ordenar()   : " + DATOS.ordenar() + "   ← la que trae Lince")
 escribir("El original no se toca: " + DATOS)
 
 # ── Búsqueda lineal ───────────────────────────────────────────

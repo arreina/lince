@@ -206,11 +206,42 @@ nums[0]              # acceso — devuelve 1
 nums[-1]             # último elemento
 nums[0] = 99         # asignación
 
+# Modifican la lista
 nums.agregar(4)
-nums.eliminar(0)
+nums.eliminar(0)        # por índice
+nums.insertar(1, 99)    # índice y valor
+
+# Consultan, sin modificar
 nums.longitud()
 nums.contiene(3)
+nums.posicion(3)        # índice, o -1 si no está
+
+# Devuelven una lista nueva — la original no se toca
+nums.ordenar()
+nums.invertir()
+nums.copiar()
 ```
+
+`ordenar()` usa el orden natural: números por valor, textos
+alfabéticamente. Para otro criterio se le pasa una función comparadora
+que devuelve un número negativo si el primer elemento va antes, positivo
+si va después y cero si da igual:
+
+```lince
+# De mayor a menor
+nums.ordenar(funcion(val numero a, val numero b): numero {
+    devolver b - a
+})
+```
+
+La ordenación es estable: los elementos equivalentes conservan el orden
+que tenían.
+
+La regla general de los métodos de lista: los que **añaden o quitan**
+modifican la lista, y los que **transforman** devuelven una copia nueva.
+Conviene recordarlo porque las listas se pasan compartidas a las
+funciones, así que `copiar()` es la forma de trabajar sin tocar la
+original.
 
 ---
 

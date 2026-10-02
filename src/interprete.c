@@ -585,6 +585,93 @@ static void validar_tipo(Valor *v, TipoDato tipo, const char *contexto,
     }
 }
 
+/* ─────────────────────────────────────────
+   ORDENACIÓN DE LISTAS
+───────────────────────────────────────── */
+
+/* Orden natural: números por valor, textos alfabéticamente, lógicos con
+   falso antes que verdadero. Entre tipos distintos se ordena por tipo,
+   para que el resultado sea predecible en vez de depender del orden de
+   entrada. */
+static int valor_comparar_natural(Valor *a, Valor *b) {
+    if (a->tipo == VAL_NUMERO && b->tipo == VAL_NUMERO)
+        return a->numero < b->numero ? -1 : (a->numero > b->numero ? 1 : 0);
+    if (a->tipo == VAL_TEXTO && b->tipo == VAL_TEXTO)
+        return strcmp(a->texto, b->texto);
+    if (a->tipo == VAL_BOOLEANO && b->tipo == VAL_BOOLEANO)
+        return (a->booleano ? 1 : 0) - (b->booleano ? 1 : 0);
+    return (int)a->tipo - (int)b->tipo;
+}
+
+/* Comparador de ordenar(): el natural si no se pasó función, y si se
+   pasó, lo que devuelva ella (negativo, cero o positivo). */
+typedef struct {
+    Valor *fn;   /* función comparadora de Lince, o NULL */
+} CtxOrden;
+
+static int orden_comparar(CtxOrden *ctx, Valor *a, Valor *b) {
+    if (!ctx->fn) return valor_comparar_natural(a, b);
+
+    FuncionLince *f = ctx->fn->funcion;
+    Valor *r = NULL;
+
+    if (f->entorno_closure == NULL) {
+        /* Comparador nativo */
+        typedef Valor *(*FnNativa)(Valor**, int);
+        FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
+        Valor *args[2] = { valor_copiar(a), valor_copiar(b) };
+        r = fn ? fn(args, 2) : valor_nulo();
+        valor_destruir(args[0]);
+        valor_destruir(args[1]);
+    } else {
+        /* El entorno se queda con los argumentos, así que no se liberan
+           aquí: los destruye entorno_destruir al salir. */
+        Entorno *fn_e = entorno_crear(f->entorno_closure);
+        if (f->num_parametros >= 1)
+            entorno_definir(fn_e, f->parametros[0].nombre, valor_copiar(a), 0);
+        if (f->num_parametros >= 2)
+            entorno_definir(fn_e, f->parametros[1].nombre, valor_copiar(b), 0);
+        ejecutar(f->cuerpo, fn_e);
+        if (hay_retorno) {
+            r = valor_retorno; valor_retorno = NULL; hay_retorno = 0;
+        }
+        entorno_destruir(fn_e);
+    }
+
+    int res = 0;
+    if (r && r->tipo == VAL_NUMERO)
+        res = r->numero < 0 ? -1 : (r->numero > 0 ? 1 : 0);
+    if (r) valor_destruir(r);
+    return res;
+}
+
+/* Mezcla ordenada de [ini,med) con [med,fin) sobre 'src', dejando el
+   resultado en 'tmp' y copiándolo de vuelta. */
+static void orden_mezclar(Valor **src, Valor **tmp, int ini, int med, int fin,
+                          CtxOrden *ctx) {
+    int i = ini, j = med, k = ini;
+    while (i < med && j < fin) {
+        /* <= 0 para que la ordenación sea estable: ante elementos
+           equivalentes se conserva el orden original. */
+        if (orden_comparar(ctx, src[i], src[j]) <= 0) tmp[k++] = src[i++];
+        else                                          tmp[k++] = src[j++];
+    }
+    while (i < med) tmp[k++] = src[i++];
+    while (j < fin) tmp[k++] = src[j++];
+    for (int x = ini; x < fin; x++) src[x] = tmp[x];
+}
+
+/* Merge sort: estable y O(n log n), a diferencia de la burbuja que hay
+   que escribir a mano en los ejemplos. */
+static void orden_merge(Valor **src, Valor **tmp, int ini, int fin,
+                        CtxOrden *ctx) {
+    if (fin - ini <= 1 || hay_error) return;
+    int med = ini + (fin - ini) / 2;
+    orden_merge(src, tmp, ini, med, ctx);
+    orden_merge(src, tmp, med, fin, ctx);
+    orden_mezclar(src, tmp, ini, med, fin, ctx);
+}
+
 static Valor *ejecutar(Nodo *n, Entorno *e) {
     if (!n || hay_retorno || hay_error) return valor_nulo();
 
@@ -624,6 +711,31 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_DECLARACION: {
             Valor *v = ejecutar(n->declaracion.valor, e);
+            /* Comprobar el tipo anunciado en 'sea lista x' / 'sea
+               diccionario x'. Se hace aquí y no en el parser porque sólo
+               en ejecución se conoce el tipo de verdad: antes se exigía
+               un literal, así que 'sea lista l = datos.ordenar()' —o
+               cualquier llamada— se rechazaba sin motivo. */
+            if (!hay_error && n->declaracion.es_lista && v->tipo != VAL_LISTA) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                    "Declaraste '%s' como lista pero el valor no es una lista.",
+                    n->declaracion.nombre);
+                valor_error = valor_crear_error("ErrorTipo", msg, n->linea);
+                hay_error = 1;
+                valor_destruir(v);
+                return valor_nulo();
+            }
+            if (!hay_error && n->declaracion.es_diccionario && v->tipo != VAL_DICCIONARIO) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                    "Declaraste '%s' como diccionario pero el valor no es un diccionario.",
+                    n->declaracion.nombre);
+                valor_error = valor_crear_error("ErrorTipo", msg, n->linea);
+                hay_error = 1;
+                valor_destruir(v);
+                return valor_nulo();
+            }
             entorno_definir(e, n->declaracion.nombre, v, n->declaracion.constante);
             return valor_nulo();
         }
@@ -1299,6 +1411,97 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     }
                     valor_destruir(buscado); valor_destruir(obj);
                     return valor_booleano(encontrado);
+                }
+                if (strcmp(met, "ordenar") == 0) {
+                    /* Devuelve una lista nueva: la original no se toca.
+                       Sin argumentos usa el orden natural; con una
+                       función, la usa como comparador (negativo si el
+                       primero va antes, positivo si va después). */
+                    CtxOrden ctx = { NULL };
+                    Valor *vfn = NULL;
+                    if (n->metodo.num_argumentos >= 1) {
+                        vfn = ejecutar(n->metodo.argumentos[0], e);
+                        if (vfn->tipo != VAL_FUNCION) {
+                            valor_destruir(vfn); valor_destruir(obj);
+                            hay_error = 1;
+                            valor_error = valor_crear_error("ErrorTipo",
+                                "'ordenar' espera una función comparadora.", n->linea);
+                            return valor_nulo();
+                        }
+                        ctx.fn = vfn;
+                    }
+                    int len = obj->lista.cantidad;
+                    Valor *res = valor_lista_crear();
+                    for (int i = 0; i < len; i++)
+                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+                    if (len > 1) {
+                        Valor **tmp = malloc(sizeof(Valor*) * len);
+                        orden_merge(res->lista.elementos, tmp, 0, len, &ctx);
+                        free(tmp);
+                    }
+                    if (vfn) valor_destruir(vfn);
+                    valor_destruir(obj);
+                    return res;
+                }
+                if (strcmp(met, "invertir") == 0) {
+                    /* Lista nueva, del final al principio. */
+                    Valor *res = valor_lista_crear();
+                    for (int i = obj->lista.cantidad - 1; i >= 0; i--)
+                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+                    valor_destruir(obj);
+                    return res;
+                }
+                if (strcmp(met, "copiar") == 0) {
+                    /* Copia superficial: útil para no modificar la
+                       original, porque las listas se pasan compartidas. */
+                    Valor *res = valor_lista_crear();
+                    for (int i = 0; i < obj->lista.cantidad; i++)
+                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+                    valor_destruir(obj);
+                    return res;
+                }
+                if (strcmp(met, "posicion") == 0) {
+                    if (n->metodo.num_argumentos != 1) {
+                        fprintf(stderr, "\n❌ Error:\n   'posicion' necesita exactamente 1 argumento.\n\n");
+                        exit(1);
+                    }
+                    Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
+                    int donde = -1;
+                    for (int i = 0; i < obj->lista.cantidad; i++) {
+                        if (valor_comparar_natural(obj->lista.elementos[i], buscado) == 0) {
+                            donde = i; break;
+                        }
+                    }
+                    valor_destruir(buscado); valor_destruir(obj);
+                    return valor_numero(donde);
+                }
+                if (strcmp(met, "insertar") == 0) {
+                    if (n->metodo.num_argumentos != 2) {
+                        fprintf(stderr, "\n❌ Error:\n   'insertar' necesita 2 argumentos (índice y valor).\n\n");
+                        exit(1);
+                    }
+                    Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
+                    Valor *elem = ejecutar(n->metodo.argumentos[1], e);
+                    int idx = (int)vidx->numero;
+                    valor_destruir(vidx);
+                    /* Insertar al final es válido, de ahí el <=. */
+                    if (idx < 0 || idx > obj->lista.cantidad) {
+                        valor_destruir(elem); valor_destruir(obj);
+                        hay_error = 1;
+                        valor_error = valor_crear_error("ErrorRango",
+                            "Índice fuera de rango en 'insertar'.", n->linea);
+                        return valor_nulo();
+                    }
+                    /* Se añade al final para que crezca y luego se corre
+                       todo un hueco a la derecha. */
+                    lista_agregar(obj, elem);
+                    for (int i = obj->lista.cantidad - 1; i > idx; i--)
+                        obj->lista.elementos[i] = obj->lista.elementos[i-1];
+                    obj->lista.elementos[idx] = elem;
+                    if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
+                        entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
+                    else valor_destruir(obj);
+                    return valor_nulo();
                 }
                 fprintf(stderr, "\n❌ Error:\n   Las listas no tienen el método '%s'.\n\n", met);
                 exit(1);

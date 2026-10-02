@@ -48,3 +48,26 @@ escribir(persona["ciudad"])
 
 persona.eliminar("edad")
 escribir(persona.longitud())
+
+# Métodos de lista nuevos: el binario nativo debe dar lo mismo que el
+# intérprete (ordenar sin comparador, que es lo que admite compilado).
+sea lista desord = [42, 7, 19, 3]
+escribir(desord.ordenar())
+escribir(desord)
+escribir(desord.invertir())
+escribir(desord.posicion(19))
+escribir(desord.posicion(99))
+sea lista base = [1, 2, 3]
+sea lista cop = base.copiar()
+cop.agregar(9)
+escribir(base.longitud())
+escribir(cop.longitud())
+base.insertar(1, 99)
+escribir(base)
+# Diccionario grande: antes se corrompía la memoria a las 64 claves.
+sea diccionario muchas = {}
+para cada numero i en rango(0, 200) {
+    muchas["k" + i] = i
+}
+escribir(muchas.longitud())
+escribir(muchas["k199"])

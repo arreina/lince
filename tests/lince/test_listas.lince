@@ -32,3 +32,28 @@ escribir(vacia.longitud())
 # Listas anidadas
 sea lista matriz = [[1, 2], [3, 4], [5, 6]]
 escribir(matriz.longitud())
+
+# Métodos nuevos: ordenar, invertir, copiar, posicion, insertar.
+# ordenar/invertir/copiar devuelven una lista nueva y no tocan la original.
+sea lista desordenada = [42, 7, 19, 3, 25]
+escribir(desordenada.ordenar())
+escribir(desordenada)
+escribir(desordenada.invertir())
+sea lista frutas = ["pera", "manzana", "uva"]
+escribir(frutas.ordenar())
+escribir(desordenada.ordenar(funcion(val numero a, val numero b): numero {
+    devolver b - a
+}))
+escribir(desordenada.posicion(19))
+escribir(desordenada.posicion(99))
+sea lista base = [1, 2, 3]
+sea lista copia = base.copiar()
+copia.agregar(99)
+escribir(base)
+escribir(copia)
+base.insertar(0, 0)
+base.insertar(4, 4)
+escribir(base)
+escribir([].ordenar())
+# La ordenación es estable: los equivalentes conservan su orden.
+escribir([3, 1, 3, 1].ordenar())

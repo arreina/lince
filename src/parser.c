@@ -531,23 +531,10 @@ static Nodo *sent_declaracion(Parser *p, int constante) {
     consumir(p, TOK_IGUAL, "'='");
     Nodo *valor = expresion(p);
 
-    /* Validar que el tipo declarado coincide con el valor */
-    if (es_lista && valor->tipo != NODO_LISTA) {
-        fprintf(stderr,
-            "\n❌ Error en línea %d:\n"
-            "   Declaraste '%s' como lista pero el valor no es una lista.\n"
-            "   Una lista se escribe así: [1, 2, 3]\n\n",
-            nombre->linea, nombre->valor);
-        exit(1);
-    }
-    if (es_diccionario && valor->tipo != NODO_DICCIONARIO) {
-        fprintf(stderr,
-            "\n❌ Error en línea %d:\n"
-            "   Declaraste '%s' como diccionario pero el valor no es un diccionario.\n"
-            "   Un diccionario se escribe así: {\"clave\": valor}\n\n",
-            nombre->linea, nombre->valor);
-        exit(1);
-    }
+    /* El tipo declarado se comprueba en ejecución (ver NODO_DECLARACION
+       en interprete.c). Aquí no se puede: el parser sólo ve la forma de
+       la expresión, no su tipo, y exigir un literal rechazaba cosas
+       perfectamente válidas como 'sea lista l = datos.ordenar()'. */
 
     Nodo *n = nodo_nuevo(NODO_DECLARACION, p);
     n->declaracion.nombre        = strdup(nombre->valor);
