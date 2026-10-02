@@ -33,20 +33,20 @@ for f in examples/*.lince; do echo "== $f"; ./lince "$f"; done
 Van de menos a más: los primeros sólo usan bucles y condicionales, y los
 últimos ya entran en clases, errores y generadores.
 
-## Dos cosas que conviene saber
+## Una cosa que conviene saber
 
-Aparecen comentadas dentro de los ejemplos, pero se resumen aquí porque
-sorprenden la primera vez:
+Aparece comentada dentro de los ejemplos, pero se resume aquí porque
+sorprende la primera vez:
 
-- **El texto se maneja por bytes, no por caracteres.** Una vocal
-  acentuada ocupa dos bytes en UTF-8, así que `"camión".longitud()` da 7
-  y al invertir el texto la tilde se rompe. Se ve al final de
-  `04_palindromos.lince`.
 - **Las listas y los diccionarios se comparten.** Los números, textos y
   lógicos se copian al pasarlos a una función, pero una lista no: si la
-  función cambia su contenido, el cambio se ve fuera. Por eso las
-  ordenaciones de `07_ordenar_y_buscar.lince` copian la lista antes de
-  tocarla.
+  función cambia su contenido, el cambio se ve fuera. Para eso está
+  `copiar()`, que usa `07_ordenar_y_buscar.lince` antes de ordenar.
+
+El texto, en cambio, se cuenta por caracteres y no por bytes, así que
+`"niño".longitud()` da 4 y `"el niño".mayusculas()` da `EL NIÑO`. Una
+tilde sí cuenta como letra distinta: `"á" != "a"`, cosa que se ve al
+final de `04_palindromos.lince`.
 
 ## Y también
 

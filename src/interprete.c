@@ -178,6 +178,90 @@ void lista_agregar(Valor *lista, Valor *elem) {
 
 #define DIC_CAP_INICIAL 16
 
+/* ─────────────────────────────────────────
+   UTF-8
+   El texto de Lince se guarda en UTF-8. Estas ayudas permiten contar y
+   recorrer caracteres en vez de bytes, que es lo que espera quien
+   escribe en español: "niño" son 4 letras, no 5.
+───────────────────────────────────────── */
+
+/* Bytes que ocupa el carácter que empieza en 's'. */
+int utf8_tam(const char *s) {
+    unsigned char c = (unsigned char)*s;
+    if (c == 0)              return 0;
+    if (c < 0x80)            return 1;
+    if ((c & 0xE0) == 0xC0)  return 2;
+    if ((c & 0xF0) == 0xE0)  return 3;
+    if ((c & 0xF8) == 0xF0)  return 4;
+    return 1;  /* byte suelto no válido: se cuenta como uno */
+}
+
+/* Número de caracteres de la cadena. */
+int utf8_longitud(const char *s) {
+    int n = 0;
+    while (*s) { s += utf8_tam(s); n++; }
+    return n;
+}
+
+/* Desplazamiento en bytes del carácter número 'i', o -1 si no llega. */
+int utf8_desplazamiento(const char *s, int i) {
+    int pos = 0, n = 0;
+    while (s[pos]) {
+        if (n == i) return pos;
+        pos += utf8_tam(s + pos);
+        n++;
+    }
+    return (n == i) ? pos : -1;
+}
+
+/* Cambio de caja para ASCII y para el bloque latino de dos bytes, que
+   es donde viven á é í ó ú ü ñ. Ese bloque mantiene el número de bytes
+   al cambiar de caja, así que la cadena resultante mide lo mismo.
+   Si 'arriba' es 1 pasa a mayúsculas; si es 0, a minúsculas. */
+static char *utf8_caja(const char *s, int arriba) {
+    size_t n = strlen(s);
+    char *r = malloc(n + 1);
+    size_t i = 0;
+    while (i < n) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x80) {
+            r[i] = (char)(arriba ? toupper(c) : tolower(c));
+            i++;
+        } else if (c == 0xC3 && i + 1 < n) {
+            unsigned char d = (unsigned char)s[i + 1];
+            r[i] = (char)c;
+            /* à-þ ↔ À-Þ, separadas por 0x20 igual que en ASCII. Se
+               dejan en paz ÷ (0xB7) y × (0x97), que no son letras, y
+               ß y ÿ, cuya mayúscula no vive en este bloque. */
+            if (arriba && d >= 0xA0 && d <= 0xBE && d != 0xB7)
+                r[i + 1] = (char)(d - 0x20);
+            else if (!arriba && d >= 0x80 && d <= 0x9E && d != 0x97)
+                r[i + 1] = (char)(d + 0x20);
+            else
+                r[i + 1] = (char)d;
+            i += 2;
+        } else {
+            int k = utf8_tam(s + i);
+            for (int j = 0; j < k && i + (size_t)j < n; j++)
+                r[i + j] = s[i + j];
+            i += (size_t)k;
+        }
+    }
+    r[n] = '\0';
+    return r;
+}
+
+char *utf8_mayusculas(const char *s) { return utf8_caja(s, 1); }
+char *utf8_minusculas(const char *s) { return utf8_caja(s, 0); }
+
+/* ¿Es una letra? Cuenta como tal cualquier carácter de varios bytes,
+   que en la práctica es una vocal acentuada o una ñ. */
+int utf8_es_letra(const char *s) {
+    unsigned char c = (unsigned char)*s;
+    if (c < 0x80) return isalpha(c) ? 1 : 0;
+    return 1;
+}
+
 Valor *valor_diccionario_crear(void) {
     Valor *v = malloc(sizeof(Valor));
     v->tipo                  = VAL_DICCIONARIO;
@@ -918,8 +1002,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
             /* ── Texto — itera carácter a carácter ── */
             if (col->tipo == VAL_TEXTO) {
-                for (int i = 0; col->texto[i] && !hay_retorno && !hay_error; i++) {
-                    char tmp[2] = { col->texto[i], '\0' };
+                /* Recorre caracteres, no bytes: en "camión" el bucle da
+                   seis vueltas y una de ellas vale "ó". */
+                for (int i = 0; col->texto[i] && !hay_retorno && !hay_error; ) {
+                    int tam = utf8_tam(col->texto + i);
+                    char tmp[5] = {0};
+                    for (int k = 0; k < tam && k < 4; k++) tmp[k] = col->texto[i + k];
+                    i += tam;
                     Valor *c = valor_texto(tmp);
 
                     validar_tipo(c, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
@@ -1186,7 +1275,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     return valor_nulo();
                 }
                 int i = (int)idx->numero;
-                int len = (int)strlen(obj->texto);
+                int len = utf8_longitud(obj->texto);
                 if (i < 0) i = len + i;
                 if (i < 0 || i >= len) {
                     char msg[128];
@@ -1197,7 +1286,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     valor_destruir(obj); valor_destruir(idx);
                     return valor_nulo();
                 }
-                char tmp[2] = { obj->texto[i], '\0' };
+                /* El carácter puede ocupar varios bytes, así que se copia
+                   entero en vez de quedarse con el primero. */
+                int off = utf8_desplazamiento(obj->texto, i);
+                int tam = utf8_tam(obj->texto + off);
+                char tmp[5] = {0};
+                for (int k = 0; k < tam && k < 4; k++) tmp[k] = obj->texto[off + k];
                 Valor *res = valor_texto(tmp);
                 valor_destruir(obj); valor_destruir(idx);
                 return res;
@@ -1510,19 +1604,18 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             /* ── Métodos de TEXTO ── */
             if (obj->tipo == VAL_TEXTO) {
                 if (strcmp(met, "longitud") == 0) {
-                    int len = strlen(obj->texto);
+                    /* Caracteres, no bytes: "niño" mide 4. */
+                    int len = utf8_longitud(obj->texto);
                     valor_destruir(obj);
                     return valor_numero(len);
                 }
                 if (strcmp(met, "mayusculas") == 0) {
-                    char *s = strdup(obj->texto);
-                    for (int i = 0; s[i]; i++) s[i] = toupper((unsigned char)s[i]);
+                    char *s = utf8_mayusculas(obj->texto);
                     Valor *r = valor_texto(s); free(s); valor_destruir(obj);
                     return r;
                 }
                 if (strcmp(met, "minusculas") == 0) {
-                    char *s = strdup(obj->texto);
-                    for (int i = 0; s[i]; i++) s[i] = tolower((unsigned char)s[i]);
+                    char *s = utf8_minusculas(obj->texto);
                     Valor *r = valor_texto(s); free(s); valor_destruir(obj);
                     return r;
                 }

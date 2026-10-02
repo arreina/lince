@@ -18,9 +18,9 @@ importar "matematica"
 # desordenados. En cada pasada el mayor "sube" hasta el final, así que
 # la siguiente pasada puede acortarse en uno.
 funcion burbuja(val lista datos): lista {
-    sea lista l = []
-    para cada numero x en datos { l.agregar(x) }
-
+    # copiar() evita ordenar la lista del que llama: las listas se
+    # pasan compartidas, así que sin esto le cambiaríamos la suya.
+    sea lista l = datos.copiar()
     sea n = l.longitud()
     para (i = 0; i < n - 1; i++) {
         para (j = 0; j < n - 1 - i; j++) {
@@ -38,9 +38,9 @@ funcion burbuja(val lista datos): lista {
 
 # Busca el menor de lo que queda y lo pone en su sitio.
 funcion seleccion(val lista datos): lista {
-    sea lista l = []
-    para cada numero x en datos { l.agregar(x) }
-
+    # copiar() evita ordenar la lista del que llama: las listas se
+    # pasan compartidas, así que sin esto le cambiaríamos la suya.
+    sea lista l = datos.copiar()
     sea n = l.longitud()
     para (i = 0; i < n - 1; i++) {
         sea menor = i

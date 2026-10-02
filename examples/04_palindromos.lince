@@ -39,14 +39,12 @@ funcion es_palindromo_dos_indices(val texto s): logico {
     devolver verdadero
 }
 
-# Ojo: los métodos de texto de Lince trabajan por bytes, no por
-# caracteres, así que las vocales acentuadas (que en UTF-8 ocupan dos
-# bytes) se parten al invertir. Por eso los ejemplos van sin tildes.
-# Al final del archivo se ve el efecto.
+# Lince cuenta caracteres, no bytes, así que las tildes y la ñ se
+# manejan bien: "Sé verlas al revés" sale palíndromo.
 sea lista frases = [
     "reconocer",
     "Anita lava la tina",
-    "Somos o no somos",
+    "Sé verlas al revés",
     "Amor a Roma",
     "hola mundo",
     "Lince"
@@ -86,14 +84,23 @@ escribir("── Invertir ──")
 escribir("  a mano          → " + invertir("Lince"))
 escribir("  texto.invertir  → " + texto.invertir("Lince"))
 
-# ── Aviso sobre acentos ───────────────────────────────────────
-# "canoa" son 5 letras y 5 bytes, así que se invierte bien.
-# "camión" son 6 letras pero 7 bytes: la 'ó' ocupa dos y al darles la
-# vuelta por separado deja de ser una letra válida.
-sea lista muestras = ["canoa", "camion", "camión"]
+# ── Una tilde es otra letra ───────────────────────────────────
+# Aunque los acentos se manejan bien, 'á' y 'a' son letras distintas.
+# Por eso el clásico "Dábale arroz a la zorra el abad" no sale
+# palíndromo tal cual: para que saliera habría que quitar las tildes
+# además de los espacios.
+sea lista muestras = ["camión", "canoa", "Ñandú"]
 escribir("")
-escribir("── Los acentos ocupan dos bytes ──")
+escribir("── Contar y dar la vuelta con tildes ──")
 para cada texto m en muestras {
     escribir("  «" + m + "» mide " + m.longitud() + " e invertida es «" +
              texto.invertir(m) + "»")
+}
+sea clasico = "Dábale arroz a la zorra el abad"
+escribir("")
+escribir("  «" + clasico + "»")
+si es_palindromo(clasico) {
+    escribir("    → sí")
+} sino {
+    escribir("    → no, porque la á no es igual que la a")
 }

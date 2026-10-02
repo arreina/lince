@@ -268,7 +268,27 @@ s.recortar()
 s.contiene("algo")
 s.reemplazar("a", "b")
 s[0]                    # carácter por índice
+s[-1]                   # último carácter
 ```
+
+El texto se guarda en UTF-8 y se trabaja **por caracteres, no por
+bytes**, que es lo que se espera escribiendo en español:
+
+```lince
+sea palabra = "niño"
+palabra.longitud()      # 4, no 5
+palabra[2]              # "ñ"
+palabra.mayusculas()    # "NIÑO"
+```
+
+Las vocales acentuadas y la ñ ocupan dos bytes, pero cuentan como una
+sola letra en `longitud()`, al indexar, al recorrer con `para cada` y en
+los anchos de `rellenar_izq`, `rellenar_der` y `centrar`. El cambio de
+mayúsculas y minúsculas también las respeta: `á` ↔ `Á`, `ñ` ↔ `Ñ`.
+
+Eso sí, una letra con tilde es una letra **distinta** de la misma sin
+tilde: `"á" != "a"`. Por eso `"Dábale arroz a la zorra el abad"` no sale
+palíndromo tal cual — para eso habría que quitar los acentos primero.
 
 ---
 

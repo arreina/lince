@@ -38,3 +38,28 @@ escribir(texto.invertir("Lince"))
 escribir(texto.repetir("ab", 3))
 escribir(texto.rellenar_izq("5", 4, "0"))
 escribir(texto.centrar("hi", 6, "-"))
+
+# El texto se cuenta por caracteres, no por bytes: las vocales
+# acentuadas y la ñ ocupan dos bytes pero son una sola letra.
+sea palabra = "niño"
+escribir(palabra.longitud())
+escribir(palabra[2])
+escribir(palabra[-1])
+sea ciudad = "Alcalá"
+escribir(ciudad.longitud())
+sea frase = "el niño español"
+escribir(frase.mayusculas())
+sea grito = "EL NIÑO ESPAÑOL"
+escribir(grito.minusculas())
+sea acentos = "áéíóúüñ"
+escribir(acentos.mayusculas())
+escribir(acentos.longitud())
+sea recorrido = ""
+para cada texto c en "camión" { recorrido = recorrido + "[" + c + "]" }
+escribir(recorrido)
+escribir(texto.invertir("camión"))
+escribir(texto.a_lista("niño"))
+escribir(texto.posicion("camión", "ó"))
+escribir(texto.extraer("camión", 4, 6))
+escribir(texto.es_letra("ñ"))
+escribir(texto.rellenar_der("niño", 8, "."))
