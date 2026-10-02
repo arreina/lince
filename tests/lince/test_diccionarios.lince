@@ -32,3 +32,17 @@ para cada texto k en d {
     claves.agregar(k)
 }
 escribir(claves.longitud())
+
+# Los diccionarios crecen más allá de su capacidad inicial.
+# Antes reservaban 64 huecos fijos y la clave 65 corrompía el montón.
+sea diccionario grande = {}
+para cada numero i en rango(0, 300) {
+    grande["k" + i] = i
+}
+escribir(grande.longitud())
+escribir(grande["k0"])
+escribir(grande["k299"])
+escribir(grande.contiene("k150"))
+grande.eliminar("k150")
+escribir(grande.longitud())
+escribir(grande.contiene("k150"))

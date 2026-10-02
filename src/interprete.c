@@ -176,15 +176,45 @@ void lista_agregar(Valor *lista, Valor *elem) {
     lista->lista.elementos[lista->lista.cantidad++] = elem;
 }
 
+#define DIC_CAP_INICIAL 16
+
 Valor *valor_diccionario_crear(void) {
     Valor *v = malloc(sizeof(Valor));
     v->tipo                  = VAL_DICCIONARIO;
     v->refs                  = 1; v->es_modulo = 0;
     v->es_modulo             = 0;
     v->diccionario.cantidad  = 0;
-    v->diccionario.claves    = malloc(sizeof(char*)  * 64);
-    v->diccionario.valores   = malloc(sizeof(Valor*) * 64);
+    v->diccionario.capacidad = DIC_CAP_INICIAL;
+    v->diccionario.claves    = malloc(sizeof(char*)  * DIC_CAP_INICIAL);
+    v->diccionario.valores   = malloc(sizeof(Valor*) * DIC_CAP_INICIAL);
     return v;
+}
+
+/* Asegura hueco para 'n' entradas, duplicando como hacen las listas.
+   Antes el diccionario reservaba 64 huecos fijos y no crecía nunca, así
+   que la clave 65 escribía fuera del array y corrompía el montón. */
+void valor_diccionario_asegurar(Valor *dic, int n) {
+    if (!dic || dic->tipo != VAL_DICCIONARIO) return;
+    if (n <= dic->diccionario.capacidad) return;
+    int cap = dic->diccionario.capacidad > 0
+                ? dic->diccionario.capacidad : DIC_CAP_INICIAL;
+    while (cap < n) cap *= 2;
+    dic->diccionario.claves  = realloc(dic->diccionario.claves,
+                                       sizeof(char*)  * cap);
+    dic->diccionario.valores = realloc(dic->diccionario.valores,
+                                       sizeof(Valor*) * cap);
+    dic->diccionario.capacidad = cap;
+}
+
+/* Añade una entrada al final, creciendo si hace falta. No comprueba si
+   la clave ya existe: para eso están los sitios que buscan primero. */
+void valor_diccionario_agregar(Valor *dic, const char *clave, Valor *valor) {
+    if (!dic || dic->tipo != VAL_DICCIONARIO) return;
+    valor_diccionario_asegurar(dic, dic->diccionario.cantidad + 1);
+    int i = dic->diccionario.cantidad;
+    dic->diccionario.claves[i]  = strdup(clave);
+    dic->diccionario.valores[i] = valor;
+    dic->diccionario.cantidad++;
 }
 
 static Valor *valor_generador_crear(void) {
@@ -974,6 +1004,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_DICCIONARIO: {
             Valor *dic = valor_diccionario_crear();
+            valor_diccionario_asegurar(dic, n->diccionario.cantidad);
             for (int i = 0; i < n->diccionario.cantidad; i++) {
                 dic->diccionario.claves[i]  = strdup(n->diccionario.claves[i]);
                 dic->diccionario.valores[i] = ejecutar(n->diccionario.valores[i], e);
@@ -1103,6 +1134,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     }
                 }
                 /* Clave nueva */
+                valor_diccionario_asegurar(obj, obj->diccionario.cantidad + 1);
                 int i = obj->diccionario.cantidad;
                 obj->diccionario.claves[i]  = strdup(idx->texto);
                 obj->diccionario.valores[i] = val;

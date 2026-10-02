@@ -784,15 +784,7 @@ static Valor *_srv_parsear_query(const char *qs) {
             char key[256], val[512];
             _srv_url_decode(p,    key, sizeof(key));
             _srv_url_decode(eq+1, val, sizeof(val));
-            int idx = dic->diccionario.cantidad;
-            if (idx < 64) {
-                dic->diccionario.claves[idx]  = strdup(key);
-                dic->diccionario.valores[idx] = valor_texto(val);
-                dic->diccionario.cantidad++;
-            } else {
-                fprintf(stderr, "⚠  servidor: query string con más de 64 parámetros, "
-                                "se descartan los sobrantes\n");
-            }
+            valor_diccionario_agregar(dic, key, valor_texto(val));
         }
         p = amp ? amp + 1 : NULL;
     }
@@ -822,15 +814,7 @@ static Valor *_srv_parsear_cookies(const char *buf) {
             *eq = '\0';
             char *nombre = p, *valor = eq + 1;
             while (*nombre == ' ') nombre++;
-            int idx = dic->diccionario.cantidad;
-            if (idx < 64) {
-                dic->diccionario.claves[idx]  = strdup(nombre);
-                dic->diccionario.valores[idx] = valor_texto(valor);
-                dic->diccionario.cantidad++;
-            } else {
-                fprintf(stderr, "⚠  servidor: más de 64 cookies en la petición, "
-                                "se descartan las sobrantes\n");
-            }
+            valor_diccionario_agregar(dic, nombre, valor_texto(valor));
         }
         p = sc ? sc + 1 : NULL;
     }
@@ -859,12 +843,7 @@ static int _srv_coincidir_ruta(const char *patron, const char *ruta, Valor *para
     for (int i = 0; i < np; i++) {
         if (pseg[i][0] == ':') {
             /* Segmento paramétrico — capturar */
-            int idx = params->diccionario.cantidad;
-            if (idx < 64) {
-                params->diccionario.claves[idx]  = strdup(pseg[i] + 1);
-                params->diccionario.valores[idx] = valor_texto(rseg[i]);
-                params->diccionario.cantidad++;
-            }
+            valor_diccionario_agregar(params, pseg[i] + 1, valor_texto(rseg[i]));
         } else if (strcmp(pseg[i], rseg[i]) != 0) {
             return 0;
         }
@@ -1668,6 +1647,7 @@ static Valor *json_parsear_objeto(const char *s, int *pos) {
         if (s[*pos] == ':') (*pos)++;
         json_saltar_espacios(s, pos);
         Valor *valor = json_parsear_valor(s, pos);
+        valor_diccionario_asegurar(dic, dic->diccionario.cantidad + 1);
         int i = dic->diccionario.cantidad;
         dic->diccionario.claves[i]  = clave;
         dic->diccionario.valores[i] = valor;
@@ -1915,9 +1895,10 @@ static void registrar_modulo_diccionario(Entorno *entorno,
     modulo->tipo      = VAL_DICCIONARIO;
     modulo->refs      = 1;
     modulo->es_modulo = 1;
-    modulo->diccionario.cantidad = 0;
-    modulo->diccionario.claves   = malloc(sizeof(char*) * 128);
-    modulo->diccionario.valores  = malloc(sizeof(Valor*) * 128);
+    modulo->diccionario.cantidad  = 0;
+    modulo->diccionario.capacidad = num_fns + num_c + 8;
+    modulo->diccionario.claves   = malloc(sizeof(char*)  * modulo->diccionario.capacidad);
+    modulo->diccionario.valores  = malloc(sizeof(Valor*) * modulo->diccionario.capacidad);
 
     /* Añadir funciones como entradas especiales */
     for (int i = 0; i < num_fns; i++) {
