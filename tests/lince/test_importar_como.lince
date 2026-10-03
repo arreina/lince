@@ -14,9 +14,7 @@ escribir(diez.FACTOR)
 # Una función de la librería llamando a otra de la misma librería
 escribir(tres.escala_doble(2))
 
-# Nada se filtra al ámbito de quien importa.
-# (El 'nulo' de la primera línea es que escribir() imprime antes de que el
-# error de nombre desconocido se propague — cosa aparte, anotada.)
+# Nada se filtra al ámbito de quien importa
 intentar {
     escribir(FACTOR)
 } capturar (error e) {

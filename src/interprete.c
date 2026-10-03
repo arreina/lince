@@ -129,6 +129,14 @@ Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea) {
    Se nota cuando algo sigue ejecutándose con un error puesto y acaba poniendo
    otro encima. */
 Valor *valor_error_nuevo(const char *tipo, const char *mensaje, int linea) {
+    /* El primero gana. Con un error ya puesto, lo que venga detrás es
+       consecuencia suya y no la causa: al pasarse de MAX_PROFUNDIDAD, el
+       'ErrorRecursion' quedaba tapado por el "Operación '+' no soportada" de
+       sumar el nulo que devolvió la llamada abortada, y el mensaje útil se
+       perdía justo cuando más falta hace. Devolver el pendiente deja intacta
+       la forma de los ~60 sitios que escriben valor_error. */
+    if (hay_error && valor_error) return valor_error;
+
     valor_destruir(valor_error);
     valor_error = NULL;
     return valor_crear_error(tipo, mensaje, linea);
@@ -737,8 +745,21 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
     valor_destruir(der);
 
     if (!resultado) {
-        fprintf(stderr, "\n❌ Error: Operación '%s' no soportada entre esos tipos.\n\n", op);
-        exit(1);
+        /* Con un error ya pendiente, esto es su consecuencia y no la causa: la
+           operación ha fallado porque uno de los lados es el nulo que devolvió
+           algo que ya falló. Se propaga el de verdad y no se dice nada aquí —
+           es lo que tapaba el 'ErrorRecursion' al pasarse de MAX_PROFUNDIDAD.
+
+           Y cuando sí es la causa, error capturable en vez de exit(1): matar
+           el proceso impedía que un intentar/capturar se recuperase. */
+        if (hay_error) return valor_nulo();
+
+        char msg[192];
+        snprintf(msg, sizeof(msg),
+            "Operación '%s' no soportada entre esos tipos.", op);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, 0);
+        hay_error   = 1;
+        return valor_nulo();
     }
     return resultado;
 }
@@ -1131,6 +1152,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_ESCRIBIR: {
             Valor *v = ejecutar(n->escribir, e);
+            /* Si la expresión falló, no se imprime nada: antes salía un 'nulo'
+               por pantalla y sólo después se propagaba el error, así que la
+               salida mentía sobre lo que había pasado. */
+            if (hay_error) {
+                valor_destruir(v);
+                return valor_nulo();
+            }
             char  *s = valor_a_texto(v);
             printf("%s\n", s);
             free(s);
@@ -1336,12 +1364,28 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 return valor_nulo();
             }
             Valor *vfun = entorno_obtener(e, n->llamada.nombre, n->linea);
+
+            /* Si el nombre no existe, entorno_obtener ya ha puesto el error:
+               se propaga tal cual en vez de añadir un "no es una función"
+               encima, que sería la consecuencia y no la causa. */
+            if (hay_error) {
+                valor_destruir(vfun);
+                profundidad--;
+                return valor_nulo();
+            }
             if (vfun->tipo != VAL_FUNCION) {
-                fprintf(stderr,
-                    "\n❌ Error en línea %d:\n"
-                    "   '%s' no es una función.\n\n",
-                    n->linea, n->llamada.nombre);
-                exit(1);
+                /* Error capturable, no exit(1): matar el proceso por esto
+                   impedía que un intentar/capturar se recuperase, y el pilar
+                   del lenguaje es que los errores se cuenten, no que aborten. */
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                    "'%s' no es una función, así que no se puede llamar.",
+                    n->llamada.nombre);
+                valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+                hay_error   = 1;
+                valor_destruir(vfun);
+                profundidad--;
+                return valor_nulo();
             }
             FuncionLince *f = vfun->funcion;
 
