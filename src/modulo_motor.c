@@ -59,12 +59,12 @@ static int _entero(Valor *v, int minimo, int maximo, int *salida)
 
 static Valor *_dic2(const char *k1, Valor *v1, const char *k2, Valor *v2)
 {
+    /* Por valor_diccionario_agregar, no escribiendo el struct a mano: desde
+     * que los diccionarios crecen, la capacidad es parte de su estado y
+     * tocarla por fuera deja de ser asunto de quien los usa. */
     Valor *d = valor_diccionario_crear();
-    d->diccionario.claves[0]  = strdup(k1);
-    d->diccionario.valores[0] = v1;
-    d->diccionario.claves[1]  = strdup(k2);
-    d->diccionario.valores[1] = v2;
-    d->diccionario.cantidad   = 2;
+    valor_diccionario_agregar(d, k1, v1);
+    valor_diccionario_agregar(d, k2, v2);
     return d;
 }
 

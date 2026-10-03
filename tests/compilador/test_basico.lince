@@ -60,3 +60,19 @@ hacer {
     cuenta = cuenta + 1
 } mientras (cuenta < 3)
 escribir(cuenta)
+
+# Texto en español: el binario nativo debe contar caracteres igual que
+# el intérprete, no bytes.
+sea palabra = "niño"
+escribir(palabra.longitud())
+escribir(palabra[2])
+sea frase = "el niño español"
+escribir(frase.mayusculas())
+sea recorrido = ""
+para cada texto c en "camión" { recorrido = recorrido + "[" + c + "]" }
+escribir(recorrido)
+# Recorrer un diccionario también estaba roto compilado.
+sea diccionario d = {"a": 1, "b": 2}
+sea claves = ""
+para cada texto k en d { claves = claves + "." + k }
+escribir(claves)

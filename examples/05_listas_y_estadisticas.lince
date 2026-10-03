@@ -73,28 +73,10 @@ escribir("  aprobados = " + aprobados + "  (" + aprobados.longitud() + " de " +
 
 # ── Mediana ───────────────────────────────────────────────────
 
-# La mediana necesita los datos ordenados. Se ordena una copia con el
-# método de la burbuja (ver 07_ordenar_y_buscar.lince).
-funcion ordenar(val lista datos): lista {
-    sea lista copia = []
-    para cada numero x en datos {
-        copia.agregar(x)
-    }
-    sea n = copia.longitud()
-    para (i = 0; i < n - 1; i++) {
-        para (j = 0; j < n - 1 - i; j++) {
-            si copia[j] > copia[j + 1] {
-                sea tmp = copia[j]
-                copia[j] = copia[j + 1]
-                copia[j + 1] = tmp
-            }
-        }
-    }
-    devolver copia
-}
-
+# La mediana necesita los datos ordenados. ordenar() devuelve una lista
+# nueva, así que la original se queda como estaba.
 funcion mediana(val lista datos): numero {
-    sea ordenadas = ordenar(datos)
+    sea lista ordenadas = datos.ordenar()
     sea n = ordenadas.longitud()
     sea mitad = matematica.piso(n / 2)
     # Con un número par de elementos se promedian los dos centrales.
@@ -106,6 +88,6 @@ funcion mediana(val lista datos): numero {
 
 escribir("")
 escribir("── Ordenar y mediana ──")
-escribir("  ordenadas = " + ordenar(NOTAS))
+escribir("  ordenadas = " + NOTAS.ordenar())
 escribir("  mediana   = " + mediana(NOTAS))
 escribir("  mediana de [1, 3, 5] = " + mediana([1, 3, 5]))

@@ -187,15 +187,129 @@ void lista_agregar(Valor *lista, Valor *elem) {
     lista->lista.elementos[lista->lista.cantidad++] = elem;
 }
 
+#define DIC_CAP_INICIAL 16
+
+/* ─────────────────────────────────────────
+   UTF-8
+   El texto de Lince se guarda en UTF-8. Estas ayudas permiten contar y
+   recorrer caracteres en vez de bytes, que es lo que espera quien
+   escribe en español: "niño" son 4 letras, no 5.
+───────────────────────────────────────── */
+
+/* Bytes que ocupa el carácter que empieza en 's'. */
+int utf8_tam(const char *s) {
+    unsigned char c = (unsigned char)*s;
+    if (c == 0)              return 0;
+    if (c < 0x80)            return 1;
+    if ((c & 0xE0) == 0xC0)  return 2;
+    if ((c & 0xF0) == 0xE0)  return 3;
+    if ((c & 0xF8) == 0xF0)  return 4;
+    return 1;  /* byte suelto no válido: se cuenta como uno */
+}
+
+/* Número de caracteres de la cadena. */
+int utf8_longitud(const char *s) {
+    int n = 0;
+    while (*s) { s += utf8_tam(s); n++; }
+    return n;
+}
+
+/* Desplazamiento en bytes del carácter número 'i', o -1 si no llega. */
+int utf8_desplazamiento(const char *s, int i) {
+    int pos = 0, n = 0;
+    while (s[pos]) {
+        if (n == i) return pos;
+        pos += utf8_tam(s + pos);
+        n++;
+    }
+    return (n == i) ? pos : -1;
+}
+
+/* Cambio de caja para ASCII y para el bloque latino de dos bytes, que
+   es donde viven á é í ó ú ü ñ. Ese bloque mantiene el número de bytes
+   al cambiar de caja, así que la cadena resultante mide lo mismo.
+   Si 'arriba' es 1 pasa a mayúsculas; si es 0, a minúsculas. */
+static char *utf8_caja(const char *s, int arriba) {
+    size_t n = strlen(s);
+    char *r = malloc(n + 1);
+    size_t i = 0;
+    while (i < n) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x80) {
+            r[i] = (char)(arriba ? toupper(c) : tolower(c));
+            i++;
+        } else if (c == 0xC3 && i + 1 < n) {
+            unsigned char d = (unsigned char)s[i + 1];
+            r[i] = (char)c;
+            /* à-þ ↔ À-Þ, separadas por 0x20 igual que en ASCII. Se
+               dejan en paz ÷ (0xB7) y × (0x97), que no son letras, y
+               ß y ÿ, cuya mayúscula no vive en este bloque. */
+            if (arriba && d >= 0xA0 && d <= 0xBE && d != 0xB7)
+                r[i + 1] = (char)(d - 0x20);
+            else if (!arriba && d >= 0x80 && d <= 0x9E && d != 0x97)
+                r[i + 1] = (char)(d + 0x20);
+            else
+                r[i + 1] = (char)d;
+            i += 2;
+        } else {
+            int k = utf8_tam(s + i);
+            for (int j = 0; j < k && i + (size_t)j < n; j++)
+                r[i + j] = s[i + j];
+            i += (size_t)k;
+        }
+    }
+    r[n] = '\0';
+    return r;
+}
+
+char *utf8_mayusculas(const char *s) { return utf8_caja(s, 1); }
+char *utf8_minusculas(const char *s) { return utf8_caja(s, 0); }
+
+/* ¿Es una letra? Cuenta como tal cualquier carácter de varios bytes,
+   que en la práctica es una vocal acentuada o una ñ. */
+int utf8_es_letra(const char *s) {
+    unsigned char c = (unsigned char)*s;
+    if (c < 0x80) return isalpha(c) ? 1 : 0;
+    return 1;
+}
+
 Valor *valor_diccionario_crear(void) {
     Valor *v = malloc(sizeof(Valor));
     v->tipo                  = VAL_DICCIONARIO;
     v->refs                  = 1; v->es_modulo = 0;
     v->es_modulo             = 0;
     v->diccionario.cantidad  = 0;
-    v->diccionario.claves    = malloc(sizeof(char*)  * 64);
-    v->diccionario.valores   = malloc(sizeof(Valor*) * 64);
+    v->diccionario.capacidad = DIC_CAP_INICIAL;
+    v->diccionario.claves    = malloc(sizeof(char*)  * DIC_CAP_INICIAL);
+    v->diccionario.valores   = malloc(sizeof(Valor*) * DIC_CAP_INICIAL);
     return v;
+}
+
+/* Asegura hueco para 'n' entradas, duplicando como hacen las listas.
+   Antes el diccionario reservaba 64 huecos fijos y no crecía nunca, así
+   que la clave 65 escribía fuera del array y corrompía el montón. */
+void valor_diccionario_asegurar(Valor *dic, int n) {
+    if (!dic || dic->tipo != VAL_DICCIONARIO) return;
+    if (n <= dic->diccionario.capacidad) return;
+    int cap = dic->diccionario.capacidad > 0
+                ? dic->diccionario.capacidad : DIC_CAP_INICIAL;
+    while (cap < n) cap *= 2;
+    dic->diccionario.claves  = realloc(dic->diccionario.claves,
+                                       sizeof(char*)  * cap);
+    dic->diccionario.valores = realloc(dic->diccionario.valores,
+                                       sizeof(Valor*) * cap);
+    dic->diccionario.capacidad = cap;
+}
+
+/* Añade una entrada al final, creciendo si hace falta. No comprueba si
+   la clave ya existe: para eso están los sitios que buscan primero. */
+void valor_diccionario_agregar(Valor *dic, const char *clave, Valor *valor) {
+    if (!dic || dic->tipo != VAL_DICCIONARIO) return;
+    valor_diccionario_asegurar(dic, dic->diccionario.cantidad + 1);
+    int i = dic->diccionario.cantidad;
+    dic->diccionario.claves[i]  = strdup(clave);
+    dic->diccionario.valores[i] = valor;
+    dic->diccionario.cantidad++;
 }
 
 static Valor *valor_generador_crear(void) {
@@ -578,6 +692,96 @@ static Valor *tomar_retorno(void) {
     return r;
 }
 
+/* ─────────────────────────────────────────
+   ORDENACIÓN DE LISTAS
+───────────────────────────────────────── */
+
+/* Orden natural: números por valor, textos alfabéticamente, lógicos con
+   falso antes que verdadero. Entre tipos distintos se ordena por tipo,
+   para que el resultado sea predecible en vez de depender del orden de
+   entrada. */
+static int valor_comparar_natural(Valor *a, Valor *b) {
+    if (a->tipo == VAL_NUMERO && b->tipo == VAL_NUMERO)
+        return a->numero < b->numero ? -1 : (a->numero > b->numero ? 1 : 0);
+    if (a->tipo == VAL_TEXTO && b->tipo == VAL_TEXTO)
+        return strcmp(a->texto, b->texto);
+    if (a->tipo == VAL_BOOLEANO && b->tipo == VAL_BOOLEANO)
+        return (a->booleano ? 1 : 0) - (b->booleano ? 1 : 0);
+    return (int)a->tipo - (int)b->tipo;
+}
+
+/* Comparador de ordenar(): el natural si no se pasó función, y si se
+   pasó, lo que devuelva ella (negativo, cero o positivo). */
+typedef struct {
+    Valor *fn;   /* función comparadora de Lince, o NULL */
+} CtxOrden;
+
+static int orden_comparar(CtxOrden *ctx, Valor *a, Valor *b) {
+    if (!ctx->fn) return valor_comparar_natural(a, b);
+
+    FuncionLince *f = ctx->fn->funcion;
+    Valor *r = NULL;
+
+    if (f->entorno_closure == NULL) {
+        /* Comparador nativo */
+        typedef Valor *(*FnNativa)(Valor**, int);
+        FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
+        Valor *args[2] = { valor_copiar(a), valor_copiar(b) };
+        r = fn ? fn(args, 2) : valor_nulo();
+        valor_destruir(args[0]);
+        valor_destruir(args[1]);
+    } else {
+        /* El entorno se queda con los argumentos, así que no se liberan
+           aquí: los destruye entorno_destruir al salir. */
+        Entorno *fn_e = entorno_crear(f->entorno_closure);
+        if (f->num_parametros >= 1)
+            entorno_definir(fn_e, f->parametros[0].nombre, valor_copiar(a), 0);
+        if (f->num_parametros >= 2)
+            entorno_definir(fn_e, f->parametros[1].nombre, valor_copiar(b), 0);
+        /* ver la nota de NODO_LLAMADA: el valor del cuerpo lo posee quien
+           llama. Aquí importa más que en otros sitios, porque esto se llama
+           O(n log n) veces por cada ordenar(). */
+        valor_destruir(ejecutar(f->cuerpo, fn_e));
+        if (hay_retorno) {
+            r = valor_retorno; valor_retorno = NULL; hay_retorno = 0;
+        }
+        entorno_destruir(fn_e);
+    }
+
+    int res = 0;
+    if (r && r->tipo == VAL_NUMERO)
+        res = r->numero < 0 ? -1 : (r->numero > 0 ? 1 : 0);
+    if (r) valor_destruir(r);
+    return res;
+}
+
+/* Mezcla ordenada de [ini,med) con [med,fin) sobre 'src', dejando el
+   resultado en 'tmp' y copiándolo de vuelta. */
+static void orden_mezclar(Valor **src, Valor **tmp, int ini, int med, int fin,
+                          CtxOrden *ctx) {
+    int i = ini, j = med, k = ini;
+    while (i < med && j < fin) {
+        /* <= 0 para que la ordenación sea estable: ante elementos
+           equivalentes se conserva el orden original. */
+        if (orden_comparar(ctx, src[i], src[j]) <= 0) tmp[k++] = src[i++];
+        else                                          tmp[k++] = src[j++];
+    }
+    while (i < med) tmp[k++] = src[i++];
+    while (j < fin) tmp[k++] = src[j++];
+    for (int x = ini; x < fin; x++) src[x] = tmp[x];
+}
+
+/* Merge sort: estable y O(n log n), a diferencia de la burbuja que hay
+   que escribir a mano en los ejemplos. */
+static void orden_merge(Valor **src, Valor **tmp, int ini, int fin,
+                        CtxOrden *ctx) {
+    if (fin - ini <= 1 || hay_error) return;
+    int med = ini + (fin - ini) / 2;
+    orden_merge(src, tmp, ini, med, ctx);
+    orden_merge(src, tmp, med, fin, ctx);
+    orden_mezclar(src, tmp, ini, med, fin, ctx);
+}
+
 static Valor *ejecutar(Nodo *n, Entorno *e) {
     if (!n || hay_retorno || hay_error) return valor_nulo();
 
@@ -617,6 +821,31 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_DECLARACION: {
             Valor *v = ejecutar(n->declaracion.valor, e);
+            /* Comprobar el tipo anunciado en 'sea lista x' / 'sea
+               diccionario x'. Se hace aquí y no en el parser porque sólo
+               en ejecución se conoce el tipo de verdad: antes se exigía
+               un literal, así que 'sea lista l = datos.ordenar()' —o
+               cualquier llamada— se rechazaba sin motivo. */
+            if (!hay_error && n->declaracion.es_lista && v->tipo != VAL_LISTA) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                    "Declaraste '%s' como lista pero el valor no es una lista.",
+                    n->declaracion.nombre);
+                valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+                hay_error = 1;
+                valor_destruir(v);
+                return valor_nulo();
+            }
+            if (!hay_error && n->declaracion.es_diccionario && v->tipo != VAL_DICCIONARIO) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                    "Declaraste '%s' como diccionario pero el valor no es un diccionario.",
+                    n->declaracion.nombre);
+                valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+                hay_error = 1;
+                valor_destruir(v);
+                return valor_nulo();
+            }
             entorno_definir(e, n->declaracion.nombre, v, n->declaracion.constante);
             return valor_nulo();
         }
@@ -799,8 +1028,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
             /* ── Texto — itera carácter a carácter ── */
             if (col->tipo == VAL_TEXTO) {
-                for (int i = 0; col->texto[i] && !hay_retorno && !hay_error; i++) {
-                    char tmp[2] = { col->texto[i], '\0' };
+                /* Recorre caracteres, no bytes: en "camión" el bucle da
+                   seis vueltas y una de ellas vale "ó". */
+                for (int i = 0; col->texto[i] && !hay_retorno && !hay_error; ) {
+                    int tam = utf8_tam(col->texto + i);
+                    char tmp[5] = {0};
+                    for (int k = 0; k < tam && k < 4; k++) tmp[k] = col->texto[i + k];
+                    i += tam;
                     Valor *c = valor_texto(tmp);
 
                     validar_tipo(c, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
@@ -1000,6 +1234,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_DICCIONARIO: {
             Valor *dic = valor_diccionario_crear();
+            valor_diccionario_asegurar(dic, n->diccionario.cantidad);
             for (int i = 0; i < n->diccionario.cantidad; i++) {
                 dic->diccionario.claves[i]  = strdup(n->diccionario.claves[i]);
                 dic->diccionario.valores[i] = ejecutar(n->diccionario.valores[i], e);
@@ -1069,7 +1304,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     return valor_nulo();
                 }
                 int i = (int)idx->numero;
-                int len = (int)strlen(obj->texto);
+                int len = utf8_longitud(obj->texto);
                 if (i < 0) i = len + i;
                 if (i < 0 || i >= len) {
                     char msg[128];
@@ -1080,7 +1315,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     valor_destruir(obj); valor_destruir(idx);
                     return valor_nulo();
                 }
-                char tmp[2] = { obj->texto[i], '\0' };
+                /* El carácter puede ocupar varios bytes, así que se copia
+                   entero en vez de quedarse con el primero. */
+                int off = utf8_desplazamiento(obj->texto, i);
+                int tam = utf8_tam(obj->texto + off);
+                char tmp[5] = {0};
+                for (int k = 0; k < tam && k < 4; k++) tmp[k] = obj->texto[off + k];
                 Valor *res = valor_texto(tmp);
                 valor_destruir(obj); valor_destruir(idx);
                 return res;
@@ -1129,6 +1369,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     }
                 }
                 /* Clave nueva */
+                valor_diccionario_asegurar(obj, obj->diccionario.cantidad + 1);
                 int i = obj->diccionario.cantidad;
                 obj->diccionario.claves[i]  = strdup(idx->texto);
                 obj->diccionario.valores[i] = val;
@@ -1289,6 +1530,97 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     valor_destruir(buscado); valor_destruir(obj);
                     return valor_booleano(encontrado);
                 }
+                if (strcmp(met, "ordenar") == 0) {
+                    /* Devuelve una lista nueva: la original no se toca.
+                       Sin argumentos usa el orden natural; con una
+                       función, la usa como comparador (negativo si el
+                       primero va antes, positivo si va después). */
+                    CtxOrden ctx = { NULL };
+                    Valor *vfn = NULL;
+                    if (n->metodo.num_argumentos >= 1) {
+                        vfn = ejecutar(n->metodo.argumentos[0], e);
+                        if (vfn->tipo != VAL_FUNCION) {
+                            valor_destruir(vfn); valor_destruir(obj);
+                            hay_error = 1;
+                            valor_error = valor_error_nuevo("ErrorTipo",
+                                "'ordenar' espera una función comparadora.", n->linea);
+                            return valor_nulo();
+                        }
+                        ctx.fn = vfn;
+                    }
+                    int len = obj->lista.cantidad;
+                    Valor *res = valor_lista_crear();
+                    for (int i = 0; i < len; i++)
+                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+                    if (len > 1) {
+                        Valor **tmp = malloc(sizeof(Valor*) * len);
+                        orden_merge(res->lista.elementos, tmp, 0, len, &ctx);
+                        free(tmp);
+                    }
+                    if (vfn) valor_destruir(vfn);
+                    valor_destruir(obj);
+                    return res;
+                }
+                if (strcmp(met, "invertir") == 0) {
+                    /* Lista nueva, del final al principio. */
+                    Valor *res = valor_lista_crear();
+                    for (int i = obj->lista.cantidad - 1; i >= 0; i--)
+                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+                    valor_destruir(obj);
+                    return res;
+                }
+                if (strcmp(met, "copiar") == 0) {
+                    /* Copia superficial: útil para no modificar la
+                       original, porque las listas se pasan compartidas. */
+                    Valor *res = valor_lista_crear();
+                    for (int i = 0; i < obj->lista.cantidad; i++)
+                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+                    valor_destruir(obj);
+                    return res;
+                }
+                if (strcmp(met, "posicion") == 0) {
+                    if (n->metodo.num_argumentos != 1) {
+                        fprintf(stderr, "\n❌ Error:\n   'posicion' necesita exactamente 1 argumento.\n\n");
+                        exit(1);
+                    }
+                    Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
+                    int donde = -1;
+                    for (int i = 0; i < obj->lista.cantidad; i++) {
+                        if (valor_comparar_natural(obj->lista.elementos[i], buscado) == 0) {
+                            donde = i; break;
+                        }
+                    }
+                    valor_destruir(buscado); valor_destruir(obj);
+                    return valor_numero(donde);
+                }
+                if (strcmp(met, "insertar") == 0) {
+                    if (n->metodo.num_argumentos != 2) {
+                        fprintf(stderr, "\n❌ Error:\n   'insertar' necesita 2 argumentos (índice y valor).\n\n");
+                        exit(1);
+                    }
+                    Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
+                    Valor *elem = ejecutar(n->metodo.argumentos[1], e);
+                    int idx = (int)vidx->numero;
+                    valor_destruir(vidx);
+                    /* Insertar al final es válido, de ahí el <=. */
+                    if (idx < 0 || idx > obj->lista.cantidad) {
+                        valor_destruir(elem); valor_destruir(obj);
+                        hay_error = 1;
+                        valor_error = valor_error_nuevo("ErrorRango",
+                            "Índice fuera de rango en 'insertar'.", n->linea);
+                        return valor_nulo();
+                    }
+                    /* Se añade al final para que crezca y luego se corre
+                       todo un hueco a la derecha. */
+                    lista_agregar(obj, elem);
+                    for (int i = obj->lista.cantidad - 1; i > idx; i--)
+                        obj->lista.elementos[i] = obj->lista.elementos[i-1];
+                    obj->lista.elementos[idx] = elem;
+                    if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
+                        entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
+                    else valor_destruir(obj);
+                    return valor_nulo();
+                }
                 fprintf(stderr, "\n❌ Error:\n   Las listas no tienen el método '%s'.\n\n", met);
                 exit(1);
             }
@@ -1296,19 +1628,18 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             /* ── Métodos de TEXTO ── */
             if (obj->tipo == VAL_TEXTO) {
                 if (strcmp(met, "longitud") == 0) {
-                    int len = strlen(obj->texto);
+                    /* Caracteres, no bytes: "niño" mide 4. */
+                    int len = utf8_longitud(obj->texto);
                     valor_destruir(obj);
                     return valor_numero(len);
                 }
                 if (strcmp(met, "mayusculas") == 0) {
-                    char *s = strdup(obj->texto);
-                    for (int i = 0; s[i]; i++) s[i] = toupper((unsigned char)s[i]);
+                    char *s = utf8_mayusculas(obj->texto);
                     Valor *r = valor_texto(s); free(s); valor_destruir(obj);
                     return r;
                 }
                 if (strcmp(met, "minusculas") == 0) {
-                    char *s = strdup(obj->texto);
-                    for (int i = 0; s[i]; i++) s[i] = tolower((unsigned char)s[i]);
+                    char *s = utf8_minusculas(obj->texto);
                     Valor *r = valor_texto(s); free(s); valor_destruir(obj);
                     return r;
                 }

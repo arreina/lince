@@ -273,11 +273,20 @@ static Valor *fn_txt_invertir(Valor **a, int n) {
             "invertir() espera un texto", 0);
         return valor_nulo();
     }
-    char *s = strdup(a[0]->texto);
-    int   l = strlen(s);
-    for (int i = 0; i < l / 2; i++) {
-        char tmp = s[i]; s[i] = s[l-1-i]; s[l-1-i] = tmp;
+    /* Se invierte por caracteres: dar la vuelta a los bytes partiría
+       las vocales acentuadas y la ñ, que ocupan dos. */
+    const char *src = a[0]->texto;
+    size_t bytes = strlen(src);
+    char *s = malloc(bytes + 1);
+    size_t destino = bytes;
+    size_t i = 0;
+    while (src[i]) {
+        int tam = utf8_tam(src + i);
+        destino -= (size_t)tam;
+        memcpy(s + destino, src + i, (size_t)tam);
+        i += (size_t)tam;
     }
+    s[bytes] = '\0';
     Valor *r = valor_texto(s);
     free(s);
     return r;
@@ -363,8 +372,13 @@ static Valor *fn_txt_a_lista(Valor **a, int n) {
         return valor_nulo();
     }
     Valor *lista = valor_lista_crear();
-    for (int i = 0; a[0]->texto[i]; i++) {
-        char tmp[2] = { a[0]->texto[i], '\0' };
+    /* Un elemento por carácter, no por byte. */
+    const char *s = a[0]->texto;
+    for (int i = 0; s[i]; ) {
+        int tam = utf8_tam(s + i);
+        char tmp[5] = {0};
+        for (int k = 0; k < tam && k < 4; k++) tmp[k] = s[i + k];
+        i += tam;
         lista_agregar(lista, valor_texto(tmp));
     }
     return lista;
@@ -380,7 +394,11 @@ static Valor *fn_txt_posicion(Valor **a, int n) {
     }
     const char *found = strstr(a[0]->texto, a[1]->texto);
     if (!found) return valor_numero(-1);
-    return valor_numero(found - a[0]->texto);
+    /* Se devuelve la posición en caracteres, para que sirva como índice
+       con a[0][pos] y encaje con longitud(). */
+    int chars = 0;
+    for (const char *p = a[0]->texto; p < found; p += utf8_tam(p)) chars++;
+    return valor_numero(chars);
 }
 
 static Valor *fn_txt_contar(Valor **a, int n) {
@@ -409,15 +427,21 @@ static Valor *fn_txt_extraer(Valor **a, int n) {
             "extraer() espera texto, inicio y fin", 0);
         return valor_nulo();
     }
-    int len   = strlen(a[0]->texto);
+    /* Inicio y fin van en caracteres; se traducen a bytes para cortar
+       sin partir una letra por la mitad. */
+    int len   = utf8_longitud(a[0]->texto);
     int ini   = (int)a[1]->numero;
     int fin   = (int)a[2]->numero;
     if (ini < 0) ini = 0;
     if (fin > len) fin = len;
     if (ini >= fin) return valor_texto("");
-    int sz   = fin - ini;
+    int bini = utf8_desplazamiento(a[0]->texto, ini);
+    int bfin = utf8_desplazamiento(a[0]->texto, fin);
+    if (bini < 0) return valor_texto("");
+    if (bfin < 0) bfin = (int)strlen(a[0]->texto);
+    int sz = bfin - bini;
     char *buf = malloc(sz + 1);
-    strncpy(buf, a[0]->texto + ini, sz);
+    memcpy(buf, a[0]->texto + bini, sz);
     buf[sz] = '\0';
     Valor *r = valor_texto(buf);
     free(buf);
@@ -435,8 +459,11 @@ static Valor *fn_txt_es_numero(Valor **a, int n) {
 static Valor *fn_txt_es_letra(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) return valor_booleano(0);
-    for (int i = 0; a[0]->texto[i]; i++)
-        if (!isalpha((unsigned char)a[0]->texto[i])) return valor_booleano(0);
+    /* Las vocales acentuadas y la ñ también son letras. */
+    for (int i = 0; a[0]->texto[i]; ) {
+        if (!utf8_es_letra(a[0]->texto + i)) return valor_booleano(0);
+        i += utf8_tam(a[0]->texto + i);
+    }
     return valor_booleano(strlen(a[0]->texto) > 0);
 }
 
@@ -470,10 +497,13 @@ static Valor *fn_txt_rellenar_izq(Valor **a, int n) {
     }
     int ancho = (int)a[1]->numero;
     const char *s = a[0]->texto, *r = a[2]->texto;
-    int len = strlen(s);
+    /* El ancho se mide en caracteres, para que las columnas cuadren
+       aunque el texto lleve tildes. */
+    int len = utf8_longitud(s);
     if (len >= ancho) return valor_texto(s);
-    char *buf = malloc(ancho + 1);
     int pad = ancho - len;
+    size_t bytes = strlen(s);
+    char *buf = malloc((size_t)pad + bytes + 1);
     for (int i = 0; i < pad; i++) buf[i] = r[0];
     strcpy(buf + pad, s);
     Valor *v = valor_texto(buf); free(buf);
@@ -490,12 +520,14 @@ static Valor *fn_txt_rellenar_der(Valor **a, int n) {
     }
     int ancho = (int)a[1]->numero;
     const char *s = a[0]->texto, *r = a[2]->texto;
-    int len = strlen(s);
+    int len = utf8_longitud(s);           /* ancho en caracteres */
     if (len >= ancho) return valor_texto(s);
-    char *buf = malloc(ancho + 1);
-    strcpy(buf, s);
-    for (int i = len; i < ancho; i++) buf[i] = r[0];
-    buf[ancho] = '\0';
+    size_t bytes = strlen(s);
+    int pad = ancho - len;
+    char *buf = malloc(bytes + (size_t)pad + 1);
+    memcpy(buf, s, bytes);
+    for (int i = 0; i < pad; i++) buf[bytes + (size_t)i] = r[0];
+    buf[bytes + (size_t)pad] = '\0';
     Valor *v = valor_texto(buf); free(buf);
     return v;
 }
@@ -510,16 +542,17 @@ static Valor *fn_txt_centrar(Valor **a, int n) {
     }
     int ancho = (int)a[1]->numero;
     const char *s = a[0]->texto, *r = a[2]->texto;
-    int len = strlen(s);
+    int len = utf8_longitud(s);           /* ancho en caracteres */
     if (len >= ancho) return valor_texto(s);
+    size_t bytes = strlen(s);
     int pad_total = ancho - len;
     int pad_izq   = pad_total / 2;
     int pad_der   = pad_total - pad_izq;
-    char *buf = malloc(ancho + 1);
+    char *buf = malloc(bytes + (size_t)pad_total + 1);
     for (int i = 0; i < pad_izq; i++) buf[i] = r[0];
-    strncpy(buf + pad_izq, s, len);
-    for (int i = 0; i < pad_der; i++) buf[pad_izq + len + i] = r[0];
-    buf[ancho] = '\0';
+    memcpy(buf + pad_izq, s, bytes);
+    for (int i = 0; i < pad_der; i++) buf[(size_t)pad_izq + bytes + (size_t)i] = r[0];
+    buf[(size_t)pad_izq + bytes + (size_t)pad_der] = '\0';
     Valor *v = valor_texto(buf); free(buf);
     return v;
 }
@@ -785,15 +818,7 @@ static Valor *_srv_parsear_query(const char *qs) {
             char key[256], val[512];
             _srv_url_decode(p,    key, sizeof(key));
             _srv_url_decode(eq+1, val, sizeof(val));
-            int idx = dic->diccionario.cantidad;
-            if (idx < 64) {
-                dic->diccionario.claves[idx]  = strdup(key);
-                dic->diccionario.valores[idx] = valor_texto(val);
-                dic->diccionario.cantidad++;
-            } else {
-                fprintf(stderr, "⚠  servidor: query string con más de 64 parámetros, "
-                                "se descartan los sobrantes\n");
-            }
+            valor_diccionario_agregar(dic, key, valor_texto(val));
         }
         p = amp ? amp + 1 : NULL;
     }
@@ -823,15 +848,7 @@ static Valor *_srv_parsear_cookies(const char *buf) {
             *eq = '\0';
             char *nombre = p, *valor = eq + 1;
             while (*nombre == ' ') nombre++;
-            int idx = dic->diccionario.cantidad;
-            if (idx < 64) {
-                dic->diccionario.claves[idx]  = strdup(nombre);
-                dic->diccionario.valores[idx] = valor_texto(valor);
-                dic->diccionario.cantidad++;
-            } else {
-                fprintf(stderr, "⚠  servidor: más de 64 cookies en la petición, "
-                                "se descartan las sobrantes\n");
-            }
+            valor_diccionario_agregar(dic, nombre, valor_texto(valor));
         }
         p = sc ? sc + 1 : NULL;
     }
@@ -860,12 +877,7 @@ static int _srv_coincidir_ruta(const char *patron, const char *ruta, Valor *para
     for (int i = 0; i < np; i++) {
         if (pseg[i][0] == ':') {
             /* Segmento paramétrico — capturar */
-            int idx = params->diccionario.cantidad;
-            if (idx < 64) {
-                params->diccionario.claves[idx]  = strdup(pseg[i] + 1);
-                params->diccionario.valores[idx] = valor_texto(rseg[i]);
-                params->diccionario.cantidad++;
-            }
+            valor_diccionario_agregar(params, pseg[i] + 1, valor_texto(rseg[i]));
         } else if (strcmp(pseg[i], rseg[i]) != 0) {
             return 0;
         }
@@ -1662,6 +1674,7 @@ static Valor *json_parsear_objeto(const char *s, int *pos) {
         if (s[*pos] == ':') (*pos)++;
         json_saltar_espacios(s, pos);
         Valor *valor = json_parsear_valor(s, pos);
+        valor_diccionario_asegurar(dic, dic->diccionario.cantidad + 1);
         int i = dic->diccionario.cantidad;
         dic->diccionario.claves[i]  = clave;
         dic->diccionario.valores[i] = valor;
@@ -1909,9 +1922,10 @@ static void registrar_modulo_diccionario(Entorno *entorno,
     modulo->tipo      = VAL_DICCIONARIO;
     modulo->refs      = 1;
     modulo->es_modulo = 1;
-    modulo->diccionario.cantidad = 0;
-    modulo->diccionario.claves   = malloc(sizeof(char*) * 128);
-    modulo->diccionario.valores  = malloc(sizeof(Valor*) * 128);
+    modulo->diccionario.cantidad  = 0;
+    modulo->diccionario.capacidad = num_fns + num_c + 8;
+    modulo->diccionario.claves   = malloc(sizeof(char*)  * modulo->diccionario.capacidad);
+    modulo->diccionario.valores  = malloc(sizeof(Valor*) * modulo->diccionario.capacidad);
 
     /* Añadir funciones como entradas especiales */
     for (int i = 0; i < num_fns; i++) {

@@ -3,8 +3,12 @@
 # Ordenación por burbuja y por selección, búsqueda lineal y búsqueda
 # binaria. Los cuatro algoritmos de iniciación.
 #
-# Muestra: bucles anidados, intercambio de elementos, listas por
-#          referencia ('ref') frente a por valor ('val').
+# Lince ya trae ordenar() incorporado, y en un programa de verdad es el
+# que hay que usar: es merge sort, mucho más rápido que la burbuja. Aquí
+# se escriben a mano porque el objetivo es entender cómo funcionan.
+#
+# Muestra: bucles anidados, intercambio de elementos, y qué se copia y
+#          qué se comparte al pasar datos a una función.
 
 importar "matematica"
 
@@ -14,9 +18,9 @@ importar "matematica"
 # desordenados. En cada pasada el mayor "sube" hasta el final, así que
 # la siguiente pasada puede acortarse en uno.
 funcion burbuja(val lista datos): lista {
-    sea lista l = []
-    para cada numero x en datos { l.agregar(x) }
-
+    # copiar() evita ordenar la lista del que llama: las listas se
+    # pasan compartidas, así que sin esto le cambiaríamos la suya.
+    sea lista l = datos.copiar()
     sea n = l.longitud()
     para (i = 0; i < n - 1; i++) {
         para (j = 0; j < n - 1 - i; j++) {
@@ -34,9 +38,9 @@ funcion burbuja(val lista datos): lista {
 
 # Busca el menor de lo que queda y lo pone en su sitio.
 funcion seleccion(val lista datos): lista {
-    sea lista l = []
-    para cada numero x en datos { l.agregar(x) }
-
+    # copiar() evita ordenar la lista del que llama: las listas se
+    # pasan compartidas, así que sin esto le cambiaríamos la suya.
+    sea lista l = datos.copiar()
     sea n = l.longitud()
     para (i = 0; i < n - 1; i++) {
         sea menor = i
@@ -57,6 +61,7 @@ fijo DATOS = [42, 7, 19, 3, 25, 11, 8]
 escribir("Sin ordenar : " + DATOS)
 escribir("Burbuja     : " + burbuja(DATOS))
 escribir("Selección   : " + seleccion(DATOS))
+escribir("ordenar()   : " + DATOS.ordenar() + "   ← la que trae Lince")
 escribir("El original no se toca: " + DATOS)
 
 # ── Búsqueda lineal ───────────────────────────────────────────

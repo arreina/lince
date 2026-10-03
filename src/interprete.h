@@ -88,6 +88,7 @@ struct Valor {
             char         **claves;
             struct Valor **valores;
             int            cantidad;
+            int            capacidad;
         } diccionario;
         ClaseLince  *clase;
         ObjetoLince *objeto;
@@ -128,7 +129,21 @@ Valor *valor_texto(const char *s);
 Valor *valor_booleano(int b);
 Valor *valor_nulo(void);
 Valor *valor_lista_crear(void);
+/* ── UTF-8 ──
+   El texto se guarda en UTF-8 y estas ayudas permiten trabajar con
+   caracteres en vez de bytes: "niño" mide 4, no 5. */
+int   utf8_tam(const char *s);             /* bytes del carácter en 's' */
+int   utf8_longitud(const char *s);        /* número de caracteres */
+int   utf8_desplazamiento(const char *s, int i); /* byte del carácter i, o -1 */
+char *utf8_mayusculas(const char *s);      /* cadena nueva, con malloc */
+char *utf8_minusculas(const char *s);      /* cadena nueva, con malloc */
+int   utf8_es_letra(const char *s);
+
 Valor *valor_diccionario_crear(void);
+/* Reserva hueco para 'n' entradas en un diccionario (crece si hace falta). */
+void   valor_diccionario_asegurar(Valor *dic, int n);
+/* Añade clave/valor al final del diccionario, creciendo si hace falta. */
+void   valor_diccionario_agregar(Valor *dic, const char *clave, Valor *valor);
 void   lista_agregar(Valor *lista, Valor *elem);
 Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea);
 void   entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante);
