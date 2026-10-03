@@ -48,8 +48,22 @@ def leer_ejemplo(ruta):
             meta[m.group(1)] = m.group(2).strip()
         else:
             codigo.append(linea)
-    if meta.get("oculto") or "seccion" not in meta:
+
+    if meta.get("oculto"):
         return None
+
+    # Sin metadatos de ningún tipo es un archivo de apoyo: lo importa otro
+    # ejemplo y no sale en la página. Pero con unos y no otros es un
+    # despiste, y hay que decirlo con el nombre del archivo en vez de morir
+    # con un KeyError pelado — o, peor, dejarlo fuera del manual en silencio.
+    if not meta:
+        return None
+    for campo in ("seccion", "titulo"):
+        if not meta.get(campo):
+            sys.exit(f"❌ {ruta.name}: falta '# @{campo}:'. Si es un archivo "
+                     f"de apoyo para que otro lo importe, márcalo con "
+                     f"'# @oculto: si'.")
+
     meta["codigo"] = "\n".join(codigo).strip("\n")
     meta["archivo"] = ruta.name
     return meta
@@ -59,7 +73,17 @@ def ejecutar(ruta):
     """Ejecuta el ejemplo y devuelve su salida tal cual."""
     r = subprocess.run([str(LINCE), str(ruta)], capture_output=True,
                        text=True, timeout=30, cwd=RAIZ)
-    return (r.stdout + r.stderr).strip("\n")
+    salida = (r.stdout + r.stderr).strip("\n")
+
+    # Un ejemplo que falla no se publica bajo una etiqueta que dice "salida
+    # verificada": se empotraría el mensaje de error del intérprete como si
+    # fuera el resultado, y docs-check pasaría para siempre porque el disco y
+    # el generador coincidirían en la mentira.
+    if r.returncode != 0:
+        sys.exit(f"❌ {ruta.name} termina con código {r.returncode}. "
+                 f"Un ejemplo del manual tiene que funcionar.\n"
+                 + "\n".join("   " + l for l in salida.splitlines()[:12]))
+    return salida
 
 
 # ── Resaltado ────────────────────────────────────────────────────

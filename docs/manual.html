@@ -61,7 +61,10 @@
   nav a.sub{padding-left:2rem; border-left:2px solid transparent}
   nav a:hover{color:var(--amarillo); text-decoration:none}
   nav a.sub.activo{color:var(--amarillo); border-left-color:var(--amarillo); background:var(--bg2)}
-  nav a.oculto, .ej.oculto, section.oculto{display:none}
+  /* .grupo es el div que envuelve el enlace de sección y sus subenlaces: el
+     buscador le pone 'oculto' a él, no al enlace, así que tiene que estar
+     en esta lista o el encabezado se queda apuntando a una sección oculta. */
+  nav a.oculto, nav .grupo.oculto, .ej.oculto, section.oculto{display:none}
 
   main{flex:1; min-width:0; padding:2rem clamp(1rem,4vw,3rem) 6rem; max-width:980px}
   .intro{
