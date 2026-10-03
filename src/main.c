@@ -99,7 +99,12 @@ int main(int argc, char *argv[]) {
         Parser     *parser   = parser_crear(tokens, cantidad);
         Nodo       *programa = parser_parsear(parser);
 
-        int resultado = compilador_compilar(programa, ruta_c, ruta_bin);
+        /* Los importar de archivos locales se resuelven en el AST antes de
+           emitir nada: así el compilador los ve como código del propio
+           archivo. */
+        int resultado = compilador_expandir_imports(programa, archivo);
+        if (resultado == 0)
+            resultado = compilador_compilar(programa, ruta_c, ruta_bin);
 
         if (resultado == 0) {
             printf("✅ Compilado correctamente → %s\n\n", ruta_bin);

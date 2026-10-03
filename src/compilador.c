@@ -2377,6 +2377,154 @@ static void escanear_lambdas(Compilador *c, Nodo *n) {
     }
 }
 
+/* ─────────────────────────────────────────
+   Expansión de los importar de archivos locales
+
+   El compilador no sabía nada de ellos: dejaba un comentario en el C y luego
+   llamaba a funciones que nadie había definido, así que gcc fallaba con un
+   '_l_doble undeclared'. Y avisaba, pero generaba el C igualmente.
+
+   En vez de enseñarle al emisor qué es un archivo importado, se resuelven
+   antes: cada nodo de importación se sustituye por las sentencias del archivo,
+   y a partir de ahí el resto del compilador no ve diferencia con haberlas
+   escrito a mano. Es lo mismo que hace el intérprete, que ejecuta el archivo
+   importado en el ámbito de quien importa.
+───────────────────────────────────────── */
+
+#define MAX_IMPORTADOS_C 64
+
+typedef struct {
+    char rutas[MAX_IMPORTADOS_C][1024];
+    int  cantidad;
+} ImportsVistos;
+
+/* Directorio de 'archivo', o "." si no tiene ninguno. */
+static void dir_de(const char *archivo, char *destino, size_t max) {
+    snprintf(destino, max, "%s", archivo);
+    char *barra = strrchr(destino, '/');
+#ifdef _WIN32
+    char *contra = strrchr(destino, '\\');
+    if (!barra || (contra && contra > barra)) barra = contra;
+#endif
+    if (barra) *barra = '\0';
+    else        snprintf(destino, max, ".");
+}
+
+/* Lee un archivo entero. NULL si no se puede. */
+static char *leer_todo(const char *ruta) {
+    FILE *f = fopen(ruta, "r");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long tam = ftell(f);
+    rewind(f);
+    char *buf = malloc(tam + 1);
+    if (!buf) { fclose(f); return NULL; }
+    size_t leido = fread(buf, 1, tam, f);
+    buf[leido] = '\0';
+    fclose(f);
+    return buf;
+}
+
+static int expandir(Nodo *ast, const char *ruta_fuente, ImportsVistos *vistos);
+
+/* Resuelve y parsea un import local. Devuelve su bloque, o NULL con el error
+   ya impreso. Deja *ya_estaba a 1 si el archivo se había importado antes. */
+static Nodo *cargar_import(const char *nombre, const char *ruta_fuente,
+                           ImportsVistos *vistos, int *ya_estaba) {
+    char dir[1024], ruta[1024];
+    dir_de(ruta_fuente, dir, sizeof(dir));
+    snprintf(ruta, sizeof(ruta), "%s/%s.lince", dir, nombre);
+
+    char *codigo = leer_todo(ruta);
+    if (!codigo) {
+        /* Igual que el intérprete: junto al archivo primero, cwd después. */
+        snprintf(ruta, sizeof(ruta), "%s.lince", nombre);
+        codigo = leer_todo(ruta);
+    }
+    if (!codigo) {
+        fprintf(stderr,
+            "\n❌ No se encontró '%s.lince', ni junto a '%s' ni en el "
+            "directorio actual.\n\n", nombre, ruta_fuente);
+        return NULL;
+    }
+
+    *ya_estaba = 0;
+    for (int i = 0; i < vistos->cantidad; i++)
+        if (strcmp(vistos->rutas[i], ruta) == 0) { *ya_estaba = 1; free(codigo); return NULL; }
+    if (vistos->cantidad < MAX_IMPORTADOS_C)
+        snprintf(vistos->rutas[vistos->cantidad++], 1024, "%s", ruta);
+
+    /* El lexer, el parser y el código fuente se quedan vivos a propósito: el
+       AST que devuelven se empalma en el del programa y se usa hasta el final
+       de la compilación. Es la misma decisión que toma el intérprete al
+       importar, y el proceso termina enseguida. */
+    Lexer  *lx  = lexer_crear(codigo);
+    int     cnt = 0;
+    Token  *tok = lexer_tokenizar(lx, &cnt);
+    Parser *pa  = parser_crear(tok, cnt);
+    Nodo   *imp = parser_parsear(pa);
+
+    if (imp && expandir(imp, ruta, vistos) != 0) return NULL;
+    return imp;
+}
+
+/* Sustituye en 'ast' (un bloque) cada importar local por las sentencias del
+   archivo importado. */
+static int expandir(Nodo *ast, const char *ruta_fuente, ImportsVistos *vistos) {
+    if (!ast || ast->tipo != NODO_BLOQUE) return 0;
+
+    Nodo **nuevas = NULL;
+    int    n = 0, cap = 0;
+    int    fallo = 0;
+
+    for (int i = 0; i < ast->bloque.cantidad; i++) {
+        Nodo *s = ast->bloque.sentencias[i];
+        const char *nom = (s && s->tipo == NODO_IMPORTAR) ? s->importar.nombre : NULL;
+        int local = nom && (strncmp(nom, "./", 2) == 0 || strncmp(nom, "../", 3) == 0);
+
+        Nodo **añadir = &s;
+        int    cuantas = 1;
+        Nodo  *imp = NULL;
+
+        if (local && s->importar.alias) {
+            fprintf(stderr,
+                "\n❌ 'importar \"%s\" como %s' todavía no se puede compilar a "
+                "binario nativo.\n"
+                "   El alias necesita un espacio de nombres en el C generado, y\n"
+                "   eso no está hecho. Usa el intérprete, o importa sin 'como'.\n\n",
+                nom, s->importar.alias);
+            fallo = 1;
+        } else if (local) {
+            int ya = 0;
+            imp = cargar_import(nom, ruta_fuente, vistos, &ya);
+            if (!imp) {
+                if (!ya) fallo = 1;
+                cuantas = 0;          /* repetido: no se emite nada */
+            } else {
+                añadir  = imp->bloque.sentencias;
+                cuantas = imp->bloque.cantidad;
+            }
+        }
+
+        if (n + cuantas > cap) {
+            cap = (n + cuantas) * 2 + 8;
+            nuevas = realloc(nuevas, sizeof(Nodo *) * cap);
+            if (!nuevas) return 1;
+        }
+        for (int j = 0; j < cuantas; j++) nuevas[n++] = añadir[j];
+    }
+
+    free(ast->bloque.sentencias);
+    ast->bloque.sentencias = nuevas;
+    ast->bloque.cantidad   = n;
+    return fallo;
+}
+
+int compilador_expandir_imports(Nodo *ast, const char *ruta_fuente) {
+    ImportsVistos vistos = { .cantidad = 0 };
+    return expandir(ast, ruta_fuente, &vistos);
+}
+
 int compilador_compilar(Nodo *ast, const char *ruta_c, const char *ruta_bin) {
     FILE *f = fopen(ruta_c, "w");
     if (!f) {
@@ -2703,6 +2851,10 @@ int compilador_compilar(Nodo *ast, const char *ruta_c, const char *ruta_bin) {
     char cmd[1024];
     snprintf(cmd, sizeof(cmd), "gcc -O2 -o \"%s\" \"%s\" -lm 2>&1", ruta_bin, ruta_c);
     printf("   Compilando con gcc...\n");
+    /* Antes del system(): la cabecera va a stdout con búfer y los avisos y lo
+       que diga gcc van a stderr sin búfer, así que al redirigir todo a un
+       archivo la cabecera aparecía DESPUÉS de los errores. */
+    fflush(stdout);
     int ret = system(cmd);
     if (ret != 0) {
         fprintf(stderr,
