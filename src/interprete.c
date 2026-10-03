@@ -19,6 +19,28 @@
    el valor de 'devolver' sin excepciones.
 ───────────────────────────────────────── */
 static int    hay_retorno    = 0;
+
+/* Ruta del fichero Lince que se está ejecutando ahora mismo. La fija main.c
+   al arrancar, y NODO_IMPORTAR la cambia y la restaura alrededor de cada
+   fichero importado, para que un 'importar "./x"' dentro de una librería se
+   resuelva junto a la librería y no junto a quien la usó. */
+static char _archivo_actual[1024] = "";
+
+void interprete_fijar_archivo(const char *ruta) {
+    snprintf(_archivo_actual, sizeof(_archivo_actual), "%s", ruta ? ruta : "");
+}
+
+/* Directorio de 'archivo' en 'destino'. Cadena vacía si no tiene ninguno. */
+static void _directorio_de(const char *archivo, char *destino, size_t max) {
+    snprintf(destino, max, "%s", archivo);
+    char *barra = strrchr(destino, '/');
+#ifdef _WIN32
+    char *contra = strrchr(destino, '\\');
+    if (!barra || (contra && contra > barra)) barra = contra;
+#endif
+    if (barra) *barra = '\0';
+    else        destino[0] = '\0';
+}
 static Valor *valor_retorno  = NULL;
 static Valor *esto_actual    = NULL;
 static ClaseLince *clase_actual = NULL;
@@ -1904,13 +1926,33 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
             /* ¿Es un archivo local relativo? ./archivo o ../archivo */
             if (strncmp(nombre, "./", 2) == 0 || strncmp(nombre, "../", 3) == 0) {
+                /* Se busca primero junto al fichero que importa, y sólo si ahí
+                 * no está, en el directorio de trabajo. El orden importa:
+                 * resolviendo sólo contra el cwd, una librería en Lince se
+                 * podía usar únicamente desde la carpeta en la que vivía, lo
+                 * que la deja en «fichero que se incluye» y no en librería. El
+                 * respaldo contra el cwd se mantiene para no romper nada. */
                 char ruta[1024];
-                snprintf(ruta, sizeof(ruta), "%s.lince", nombre);
-                FILE *f = fopen(ruta, "r");
+                FILE *f = NULL;
+
+                if (_archivo_actual[0]) {
+                    char dir[1024];
+                    _directorio_de(_archivo_actual, dir, sizeof(dir));
+                    if (dir[0]) {
+                        snprintf(ruta, sizeof(ruta), "%s/%s.lince", dir, nombre);
+                        f = fopen(ruta, "r");
+                    }
+                }
                 if (!f) {
-                    char msg[256];
+                    snprintf(ruta, sizeof(ruta), "%s.lince", nombre);
+                    f = fopen(ruta, "r");
+                }
+                if (!f) {
+                    char msg[384];
                     snprintf(msg, sizeof(msg),
-                        "No se encontró el archivo '%s'.", ruta);
+                        "No se encontró '%s.lince', ni junto a '%s' ni en el "
+                        "directorio actual.", nombre,
+                        _archivo_actual[0] ? _archivo_actual : "(sin fichero)");
                     valor_error = valor_error_nuevo("Error", msg, n->linea);
                     hay_error = 1;
                     return valor_nulo();
@@ -1927,7 +1969,15 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 Token  *tok = lexer_tokenizar(lx, &cnt);
                 Parser *pa  = parser_crear(tok, cnt);
                 Nodo   *ast = parser_parsear(pa);
+
+                /* Mientras corre el fichero importado, él es el fichero actual:
+                   así sus propios 'importar "./x"' se resuelven junto a él. */
+                char anterior[1024];
+                snprintf(anterior, sizeof(anterior), "%s", _archivo_actual);
+                interprete_fijar_archivo(ruta);
                 valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
+                interprete_fijar_archivo(anterior);
+
                 /* No destruimos el AST — las funciones definidas lo referencian */
                 parser_destruir(pa);
                 lexer_destruir(lx);

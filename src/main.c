@@ -161,10 +161,10 @@ int main(int argc, char *argv[]) {
     Nodo       *programa = parser_parsear(parser);
     Interprete *interp   = interprete_crear();
 
-    /* Pasar argumentos al intérprete (sin el nombre del archivo) */
-    interprete_set_args(argc - 2, argv + 2);
+    /* Para resolver los 'importar "./x"' junto a este fichero */
+    interprete_fijar_archivo(archivo);
 
-    /* Pasar argumentos del programa (los que van después del archivo) */
+    /* Argumentos del programa (los que van después del archivo) */
     interprete_set_args(argc - 2, argv + 2);
 
     interprete_ejecutar(interp, programa);

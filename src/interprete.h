@@ -179,3 +179,8 @@ void        valor_destruir(Valor *v);
 /* Llama a una función Lince desde un módulo nativo. Se queda con la
    propiedad de args[]. */
 Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs);
+
+/* Ruta del fichero que se va a ejecutar. Sirve para resolver los
+   'importar "./x"' junto al fichero que los escribe, no junto al directorio
+   de trabajo de quien lanza el programa. */
+void interprete_fijar_archivo(const char *ruta);

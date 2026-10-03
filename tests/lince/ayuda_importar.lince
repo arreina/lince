@@ -1,0 +1,9 @@
+# Fichero de apoyo de test_importar.lince — no es un test por sí mismo (no
+# está en la lista de tests/runner.lince). Vive en tests/lince/ mientras el
+# runner lanza el intérprete desde la raíz del repo, así que sólo se
+# encuentra si 'importar "./x"' se resuelve junto al fichero que importa.
+fijo ORIGEN = "tests/lince"
+
+funcion doble(val numero x): numero {
+    devolver x * 2
+}

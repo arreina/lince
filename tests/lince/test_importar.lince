@@ -1,0 +1,13 @@
+# TEST: importar un fichero local se resuelve junto al fichero que importa
+#
+# El runner lanza el intérprete desde la raíz del repo, no desde tests/lince,
+# así que si la ruta se resolviera contra el directorio de trabajo esto no
+# encontraría nada.
+importar "./ayuda_importar"
+
+escribir(ORIGEN)
+escribir(doble(21))
+
+# Importar dos veces no debe duplicar ni romper nada
+importar "./ayuda_importar"
+escribir(doble(1))
