@@ -1011,7 +1011,17 @@ static Nodo *sent_importar(Parser *p) {
     consumir(p, TOK_IMPORTAR, "'importar'");
     Token *nombre = consumir(p, TOK_TEXTO, "nombre del módulo entre comillas");
     Nodo *n = nodo_nuevo(NODO_IMPORTAR, p);
-    n->importar = strdup(nombre->valor);
+    n->importar.nombre = strdup(nombre->valor);
+    n->importar.alias  = NULL;
+
+    /* 'como' se reconoce aquí y no en el lexer a propósito: así no pasa a ser
+       palabra reservada y el código que ya use 'como' de nombre sigue
+       valiendo. */
+    if (coincide(p, TOK_IDENTIFICADOR) && strcmp(actual(p)->valor, "como") == 0) {
+        consumir_cualquiera(p);   /* el 'como' */
+        Token *alias = consumir(p, TOK_IDENTIFICADOR, "un nombre después de 'como'");
+        n->importar.alias = strdup(alias->valor);
+    }
     return n;
 }
 

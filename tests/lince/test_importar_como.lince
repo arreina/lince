@@ -1,0 +1,33 @@
+# TEST: importar ... como — espacio de nombres para librerías en Lince
+
+importar "./ayuda_modulo"  como tres
+importar "./ayuda_modulo2" como diez
+
+# Dos librerías con la misma función, cada una por su nombre
+escribir(tres.escala(2))
+escribir(diez.escala(2))
+
+# Constantes del módulo, también
+escribir(tres.FACTOR)
+escribir(diez.FACTOR)
+
+# Una función de la librería llamando a otra de la misma librería
+escribir(tres.escala_doble(2))
+
+# Nada se filtra al ámbito de quien importa.
+# (El 'nulo' de la primera línea es que escribir() imprime antes de que el
+# error de nombre desconocido se propague — cosa aparte, anotada.)
+intentar {
+    escribir(FACTOR)
+} capturar (error e) {
+    escribir("FACTOR no se filtra")
+}
+
+# El mismo fichero con dos alias distintos son dos espacios independientes
+importar "./ayuda_modulo" como tercero
+escribir(tercero.escala(1))
+
+# El choque de alias en el mismo ámbito da error de redefinición, igual que
+# cualquier otra definición repetida — está cubierto en test_redefinicion.
+# Aquí no se puede probar: dentro de un 'intentar' hay otro ámbito y tapar
+# ahí es legal, y al mismo nivel aborta el script.

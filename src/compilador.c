@@ -1820,7 +1820,7 @@ static void compilar_nodo(Compilador *c, Nodo *n) {
         case NODO_IMPORTAR: {
             /* Ya emitido en el pre-scan — solo un comentario */
             sangrar(c);
-            fprintf(c->salida, "/* importar \"%s\" */\n", n->importar);
+            fprintf(c->salida, "/* importar \"%s\" */\n", n->importar.nombre);
             break;
         }
 
@@ -2556,7 +2556,7 @@ int compilador_compilar(Nodo *ast, const char *ruta_c, const char *ruta_bin) {
     for (int i = 0; i < ast->bloque.cantidad; i++) {
         Nodo *n = ast->bloque.sentencias[i];
         if (n && n->tipo == NODO_IMPORTAR)
-            emitir_modulo_compilado(&c, n->importar);
+            emitir_modulo_compilado(&c, n->importar.nombre);
     }
 
     /* ── Estrategia de lambdas por intercalación ──

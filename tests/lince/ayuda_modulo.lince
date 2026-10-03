@@ -1,0 +1,14 @@
+# Librería de apoyo de test_importar_como.lince.
+# Se importa con alias, así que nada de aquí debe aparecer en el ámbito de
+# quien la importa — sólo a través del alias.
+fijo FACTOR = 3
+
+funcion escala(val numero x): numero {
+    devolver x * FACTOR
+}
+
+# Una función que llama a otra de la misma librería: tiene que verla, porque
+# el fichero corre en su propio ámbito y las funciones lo retienen.
+funcion escala_doble(val numero x): numero {
+    devolver escala(x) + escala(x)
+}

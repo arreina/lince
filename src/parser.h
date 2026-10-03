@@ -293,7 +293,10 @@ struct Nodo {
         Nodo *lanzar;
 
         /* NODO_IMPORTAR */
-        char *importar;  /* nombre del módulo */
+        struct {
+            char *nombre;  /* módulo, ./archivo o paquete:nombre */
+            char *alias;   /* 'importar "x" como alias', o NULL si no lleva */
+        } importar;
 
         /* NODO_LAMBDA */
         struct {

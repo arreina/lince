@@ -116,7 +116,8 @@ sea lista tests = [
     "test_archivos",
     "test_expresiones",
     "test_importar",
-    "test_redefinicion"
+    "test_redefinicion",
+    "test_importar_como"
 ]
 
 # ── Cabecera ───────────────────────────────────────────────────

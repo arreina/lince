@@ -1,0 +1,8 @@
+# Segunda librería con una función del MISMO nombre que ayuda_modulo.lince.
+# Sin alias esto sería un error de redefinición; con alias, cada una va por
+# su nombre.
+fijo FACTOR = 10
+
+funcion escala(val numero x): numero {
+    devolver x * FACTOR
+}

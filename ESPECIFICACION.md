@@ -619,6 +619,32 @@ Lo importado se define en el ámbito actual. Como un nombre no se puede
 definir dos veces, dos librerías que compartan el nombre de una función dan
 error en lugar de pisarse en silencio.
 
+### Con espacio de nombres: `como`
+
+```lince
+importar "./colisiones" como col
+importar "./geometria"  como geo
+
+escribir(col.colisionan(a, b))
+escribir(geo.PI)
+```
+
+Con `como`, el archivo se ejecuta en su propio ámbito y lo que define se
+alcanza sólo a través del alias: nada se vuelca donde se importa. Así dos
+librerías pueden tener funciones del mismo nombre sin estorbarse, y se ve de
+un vistazo de dónde sale cada cosa.
+
+Las funciones de la librería se ven entre ellas y leen sus propias
+constantes, porque comparten ese ámbito. El alias ocupa un nombre como
+cualquier otra definición, así que repetirlo da error.
+
+`como` no es palabra reservada: se reconoce sólo después de un `importar`, y
+sigue valiendo como nombre de variable o de parámetro.
+
+**Límite actual:** las clases de una librería no se pueden instanciar a
+través del alias (`geo.Punto(1, 2)`). Importa el archivo sin `como` para
+usarlas.
+
 ---
 
 ## Gestor de paquetes

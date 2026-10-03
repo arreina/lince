@@ -521,6 +521,21 @@ static int importado_ya(const char *ruta) {
     return 0;
 }
 
+/* Empaqueta lo definido en 'mod_e' como un diccionario-módulo, igual que los
+ * módulos estándar, para exponerlo bajo un alias: 'col.colisionan(a, b)'.
+ *
+ * No se destruye 'mod_e': las funciones que ha definido lo retienen como su
+ * closure, y es lo que les permite verse entre ellas y leer las constantes de
+ * la propia librería. Vive lo que viva el programa, como cualquier módulo. */
+static Valor *empaquetar_modulo(Entorno *mod_e) {
+    Valor *dic = valor_diccionario_crear();
+    dic->es_modulo = 1;
+    for (int i = 0; i < mod_e->cantidad; i++)
+        valor_diccionario_agregar(dic, mod_e->vars[i].nombre,
+                                  valor_retener(mod_e->vars[i].valor));
+    return dic;
+}
+
 static int ya_definido_aqui(Entorno *e, const char *nombre) {
     for (int i = 0; i < e->cantidad; i++)
         if (strcmp(e->vars[i].nombre, nombre) == 0) return 1;
@@ -863,6 +878,156 @@ static void orden_merge(Valor **src, Valor **tmp, int ini, int fin,
     orden_merge(src, tmp, ini, med, ctx);
     orden_merge(src, tmp, med, fin, ctx);
     orden_mezclar(src, tmp, ini, med, fin, ctx);
+}
+
+/* El caso NODO_IMPORTAR, fuera de ejecutar() a propósito.
+ *
+ * ejecutar() es recursiva y su marco de pila se paga en cada nodo del árbol.
+ * Este caso tiene tres buffers de ruta de 1 KB que no se usan en ningún otro
+ * sitio, y ahí dentro engordaban el marco de TODAS las llamadas: con la
+ * recursión profunda de tests/lince/test_recursion.lince eso se traducía en
+ * reventar los 8 MB de pila por defecto. Aquí sólo se pagan al importar. */
+static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
+        const char *nombre = n->importar.nombre;
+        const char *alias  = n->importar.alias;
+
+        /* ¿Es un paquete instalado? paquete:nombre */
+        if (strncmp(nombre, "paquete:", 8) == 0) {
+            const char *nom_paquete = nombre + 8;
+            char ruta[1024];
+            if (!paquetes_resolver(nom_paquete, ruta, sizeof(ruta))) {
+                char msg[256];
+                snprintf(msg, sizeof(msg),
+                    "El paquete '%s' no está instalado.\n"
+                    "   Instálalo con: lince instalar <url>",
+                    nom_paquete);
+                valor_error = valor_error_nuevo("Error", msg, n->linea);
+                hay_error = 1;
+                return valor_nulo();
+            }
+            /* Ejecutar el archivo del paquete en el entorno actual */
+            FILE *f = fopen(ruta, "r");
+            if (!f) {
+                valor_error = valor_error_nuevo("Error",
+                    "No se pudo leer el paquete.", n->linea);
+                hay_error = 1;
+                return valor_nulo();
+            }
+            if (importado_ya(ruta)) { fclose(f); return valor_nulo(); }
+
+            fseek(f, 0, SEEK_END);
+            long tam = ftell(f); rewind(f);
+            char *codigo = malloc(tam + 1);
+            size_t leido = fread(codigo, 1, tam, f);
+            codigo[leido] = '\0';
+            fclose(f);
+
+            Lexer  *lx  = lexer_crear(codigo);
+            int     cnt = 0;
+            Token  *tok = lexer_tokenizar(lx, &cnt);
+            Parser *pa  = parser_crear(tok, cnt);
+            Nodo   *ast = parser_parsear(pa);
+            valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
+            /* No destruimos el AST — las funciones definidas lo referencian */
+            parser_destruir(pa);
+            lexer_destruir(lx);
+            free(codigo);
+            return valor_nulo();
+        }
+
+        /* ¿Es un archivo local relativo? ./archivo o ../archivo */
+        if (strncmp(nombre, "./", 2) == 0 || strncmp(nombre, "../", 3) == 0) {
+            /* Se busca primero junto al fichero que importa, y sólo si ahí
+             * no está, en el directorio de trabajo. El orden importa:
+             * resolviendo sólo contra el cwd, una librería en Lince se
+             * podía usar únicamente desde la carpeta en la que vivía, lo
+             * que la deja en «fichero que se incluye» y no en librería. El
+             * respaldo contra el cwd se mantiene para no romper nada. */
+            char ruta[1024];
+            FILE *f = NULL;
+
+            if (_archivo_actual[0]) {
+                char dir[1024];
+                _directorio_de(_archivo_actual, dir, sizeof(dir));
+                if (dir[0]) {
+                    snprintf(ruta, sizeof(ruta), "%s/%s.lince", dir, nombre);
+                    f = fopen(ruta, "r");
+                }
+            }
+            if (!f) {
+                snprintf(ruta, sizeof(ruta), "%s.lince", nombre);
+                f = fopen(ruta, "r");
+            }
+            if (!f) {
+                char msg[384];
+                snprintf(msg, sizeof(msg),
+                    "No se encontró '%s.lince', ni junto a '%s' ni en el "
+                    "directorio actual.", nombre,
+                    _archivo_actual[0] ? _archivo_actual : "(sin fichero)");
+                valor_error = valor_error_nuevo("Error", msg, n->linea);
+                hay_error = 1;
+                return valor_nulo();
+            }
+            /* La idempotencia es cosa del importar SIN alias, que vuelca
+               nombres en este ámbito y por tanto chocaría consigo mismo.
+               Con alias, cada importación construye su propio ámbito y su
+               propio diccionario, así que no se salta ni se anota: si no,
+               un 'como geo' seguido de un 'como otro' no definiría 'otro',
+               y un 'como geo' dejaría muda una importación simple
+               posterior. Repetir el mismo alias lo caza el error de
+               redefinición de más abajo. */
+            if (!alias && importado_ya(ruta)) { fclose(f); return valor_nulo(); }
+
+            fseek(f, 0, SEEK_END);
+            long tam = ftell(f); rewind(f);
+            char *codigo = malloc(tam + 1);
+            size_t leido = fread(codigo, 1, tam, f);
+            codigo[leido] = '\0';
+            fclose(f);
+
+            Lexer  *lx  = lexer_crear(codigo);
+            int     cnt = 0;
+            Token  *tok = lexer_tokenizar(lx, &cnt);
+            Parser *pa  = parser_crear(tok, cnt);
+            Nodo   *ast = parser_parsear(pa);
+
+            /* Mientras corre el fichero importado, él es el fichero actual:
+               así sus propios 'importar "./x"' se resuelven junto a él. */
+            char anterior[1024];
+            snprintf(anterior, sizeof(anterior), "%s", _archivo_actual);
+            interprete_fijar_archivo(ruta);
+
+            if (alias) {
+                /* Con alias, el fichero corre en su propio ámbito y lo que
+                   defina se expone bajo ese nombre, sin volcarse aquí. El
+                   padre es el ámbito actual para que la librería alcance
+                   escribir(), los módulos estándar y demás. */
+                Entorno *mod_e = entorno_crear(e);
+                valor_destruir(ejecutar(ast, mod_e));
+                if (!hay_error) {
+                    Valor *dic = empaquetar_modulo(mod_e);
+                    if (redefinido(e, alias, "este 'importar ... como'", 0,
+                                   n->linea))
+                        valor_destruir(dic);
+                    else
+                        entorno_definir(e, alias, dic, 0);
+                }
+            } else {
+                valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
+            }
+
+            interprete_fijar_archivo(anterior);
+
+            /* No destruimos el AST — las funciones definidas lo referencian */
+            parser_destruir(pa);
+            lexer_destruir(lx);
+            free(codigo);
+            return valor_nulo();
+        }
+
+        /* Módulo estándar */
+        modulo_cargar(nombre, e);
+        return valor_nulo();
 }
 
 static Valor *ejecutar(Nodo *n, Entorno *e) {
@@ -1485,24 +1650,44 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     if (strcmp(obj->diccionario.claves[i], met) == 0) {
                         Valor *vf = obj->diccionario.valores[i];
                         if (vf->tipo != VAL_FUNCION) {
-                            fprintf(stderr,
-                                "\n❌ Error:\n"
-                                "   '%s' no es una función del módulo.\n\n", met);
+                            if (vf->tipo == VAL_CLASE)
+                                fprintf(stderr,
+                                    "\n❌ Error:\n"
+                                    "   '%s' es una clase del módulo, y todavía no se\n"
+                                    "   pueden instanciar clases a través de un alias de\n"
+                                    "   importación. Importa el archivo sin 'como' para\n"
+                                    "   usarla.\n\n", met);
+                            else
+                                fprintf(stderr,
+                                    "\n❌ Error:\n"
+                                    "   '%s' no es una función del módulo.\n\n", met);
                             exit(1);
                         }
                         FuncionLince *f = vf->funcion;
-                        /* Función nativa: cuerpo guarda el puntero */
-                        typedef Valor *(*FnNativa)(Valor**, int);
-                        FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
 
                         int nargs = n->metodo.num_argumentos;
                         Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
                         for (int j = 0; j < nargs; j++)
                             args[j] = ejecutar(n->metodo.argumentos[j], e);
 
-                        Valor *resultado = fn(args, nargs);
-                        for (int j = 0; j < nargs; j++)
-                            valor_destruir(args[j]);
+                        Valor *resultado;
+                        if (f->entorno_closure == NULL) {
+                            /* Nativa: 'cuerpo' guarda el puntero a la función C */
+                            typedef Valor *(*FnNativa)(Valor**, int);
+                            FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
+                            resultado = fn(args, nargs);
+                            for (int j = 0; j < nargs; j++)
+                                valor_destruir(args[j]);
+                        } else {
+                            /* Función Lince. Hasta ahora todos los módulos eran
+                               nativos y esto casteaba 'cuerpo' a puntero de
+                               función sin mirar; con 'importar ... como' hay
+                               módulos cuyas funciones son cierres de verdad, y
+                               ese cast ejecutaba el AST como código — segfault
+                               limpio. interprete_llamar_funcion se queda con
+                               los argumentos y valida aridad y tipos. */
+                            resultado = interprete_llamar_funcion(vf, args, nargs);
+                        }
                         free(args);
                         valor_destruir(obj);
                         return resultado ? resultado : valor_nulo();
@@ -1960,120 +2145,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_nulo();
         }
 
-        case NODO_IMPORTAR: {
-            const char *nombre = n->importar;
-
-            /* ¿Es un paquete instalado? paquete:nombre */
-            if (strncmp(nombre, "paquete:", 8) == 0) {
-                const char *nom_paquete = nombre + 8;
-                char ruta[1024];
-                if (!paquetes_resolver(nom_paquete, ruta, sizeof(ruta))) {
-                    char msg[256];
-                    snprintf(msg, sizeof(msg),
-                        "El paquete '%s' no está instalado.\n"
-                        "   Instálalo con: lince instalar <url>",
-                        nom_paquete);
-                    valor_error = valor_error_nuevo("Error", msg, n->linea);
-                    hay_error = 1;
-                    return valor_nulo();
-                }
-                /* Ejecutar el archivo del paquete en el entorno actual */
-                FILE *f = fopen(ruta, "r");
-                if (!f) {
-                    valor_error = valor_error_nuevo("Error",
-                        "No se pudo leer el paquete.", n->linea);
-                    hay_error = 1;
-                    return valor_nulo();
-                }
-                if (importado_ya(ruta)) { fclose(f); return valor_nulo(); }
-
-                fseek(f, 0, SEEK_END);
-                long tam = ftell(f); rewind(f);
-                char *codigo = malloc(tam + 1);
-                size_t leido = fread(codigo, 1, tam, f);
-                codigo[leido] = '\0';
-                fclose(f);
-
-                Lexer  *lx  = lexer_crear(codigo);
-                int     cnt = 0;
-                Token  *tok = lexer_tokenizar(lx, &cnt);
-                Parser *pa  = parser_crear(tok, cnt);
-                Nodo   *ast = parser_parsear(pa);
-                valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
-                /* No destruimos el AST — las funciones definidas lo referencian */
-                parser_destruir(pa);
-                lexer_destruir(lx);
-                free(codigo);
-                return valor_nulo();
-            }
-
-            /* ¿Es un archivo local relativo? ./archivo o ../archivo */
-            if (strncmp(nombre, "./", 2) == 0 || strncmp(nombre, "../", 3) == 0) {
-                /* Se busca primero junto al fichero que importa, y sólo si ahí
-                 * no está, en el directorio de trabajo. El orden importa:
-                 * resolviendo sólo contra el cwd, una librería en Lince se
-                 * podía usar únicamente desde la carpeta en la que vivía, lo
-                 * que la deja en «fichero que se incluye» y no en librería. El
-                 * respaldo contra el cwd se mantiene para no romper nada. */
-                char ruta[1024];
-                FILE *f = NULL;
-
-                if (_archivo_actual[0]) {
-                    char dir[1024];
-                    _directorio_de(_archivo_actual, dir, sizeof(dir));
-                    if (dir[0]) {
-                        snprintf(ruta, sizeof(ruta), "%s/%s.lince", dir, nombre);
-                        f = fopen(ruta, "r");
-                    }
-                }
-                if (!f) {
-                    snprintf(ruta, sizeof(ruta), "%s.lince", nombre);
-                    f = fopen(ruta, "r");
-                }
-                if (!f) {
-                    char msg[384];
-                    snprintf(msg, sizeof(msg),
-                        "No se encontró '%s.lince', ni junto a '%s' ni en el "
-                        "directorio actual.", nombre,
-                        _archivo_actual[0] ? _archivo_actual : "(sin fichero)");
-                    valor_error = valor_error_nuevo("Error", msg, n->linea);
-                    hay_error = 1;
-                    return valor_nulo();
-                }
-                if (importado_ya(ruta)) { fclose(f); return valor_nulo(); }
-
-                fseek(f, 0, SEEK_END);
-                long tam = ftell(f); rewind(f);
-                char *codigo = malloc(tam + 1);
-                size_t leido = fread(codigo, 1, tam, f);
-                codigo[leido] = '\0';
-                fclose(f);
-
-                Lexer  *lx  = lexer_crear(codigo);
-                int     cnt = 0;
-                Token  *tok = lexer_tokenizar(lx, &cnt);
-                Parser *pa  = parser_crear(tok, cnt);
-                Nodo   *ast = parser_parsear(pa);
-
-                /* Mientras corre el fichero importado, él es el fichero actual:
-                   así sus propios 'importar "./x"' se resuelven junto a él. */
-                char anterior[1024];
-                snprintf(anterior, sizeof(anterior), "%s", _archivo_actual);
-                interprete_fijar_archivo(ruta);
-                valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
-                interprete_fijar_archivo(anterior);
-
-                /* No destruimos el AST — las funciones definidas lo referencian */
-                parser_destruir(pa);
-                lexer_destruir(lx);
-                free(codigo);
-                return valor_nulo();
-            }
-
-            /* Módulo estándar */
-            modulo_cargar(nombre, e);
-            return valor_nulo();
-        }
+        case NODO_IMPORTAR:
+            return ejecutar_importar(n, e);
 
         case NODO_LAMBDA: {
             /* Crea una función anónima y la retorna como valor */
