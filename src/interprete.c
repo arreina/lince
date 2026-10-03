@@ -486,6 +486,67 @@ static Entorno *entorno_crear(Entorno *padre) {
     return e;
 }
 
+/* ¿Hay ya algo con ese nombre en ESTE ámbito?
+ *
+ * Mira sólo el entorno propio, no los padres: tapar un nombre de fuera dentro
+ * de un bloque o una función sigue siendo legal y útil. Lo que no puede pasar
+ * es definir dos veces en el mismo sitio, que hasta ahora se aceptaba y se
+ * quedaba callado con la PRIMERA definición — ni la última, ni un aviso. */
+/* Ficheros ya importados, por ruta canónica.
+ *
+ * Un 'importar' repetido no hace nada. Hace falta por dos razones: reejecutar
+ * el fichero volvería a definir lo suyo y, desde que redefinir es un error,
+ * chocaría consigo mismo; y es lo que se espera de un import — que dos
+ * librerías puedan depender de una tercera sin que la tercera se cargue dos
+ * veces. Se canoniza con realpath para que dos rutas relativas distintas al
+ * mismo fichero cuenten como uno. */
+#define MAX_IMPORTADOS 256
+static char *_importados[MAX_IMPORTADOS];
+static int   _num_importados = 0;
+
+/* 1 si ya estaba importado. Si no lo estaba, lo anota y devuelve 0. */
+static int importado_ya(const char *ruta) {
+    char canon[1024];
+#ifndef _WIN32
+    char *r = realpath(ruta, NULL);
+    if (r) { snprintf(canon, sizeof(canon), "%s", r); free(r); }
+    else    { snprintf(canon, sizeof(canon), "%s", ruta); }
+#else
+    snprintf(canon, sizeof(canon), "%s", ruta);
+#endif
+    for (int i = 0; i < _num_importados; i++)
+        if (strcmp(_importados[i], canon) == 0) return 1;
+    if (_num_importados < MAX_IMPORTADOS)
+        _importados[_num_importados++] = strdup(canon);
+    return 0;
+}
+
+static int ya_definido_aqui(Entorno *e, const char *nombre) {
+    for (int i = 0; i < e->cantidad; i++)
+        if (strcmp(e->vars[i].nombre, nombre) == 0) return 1;
+    return 0;
+}
+
+/* Da el error de redefinición si procede. Devuelve 1 si lo ha dado. */
+static int redefinido(Entorno *e, const char *nombre, const char *que,
+                      int es_variable, int linea) {
+    if (!ya_definido_aqui(e, nombre)) return 0;
+    char msg[320];
+    if (es_variable)
+        snprintf(msg, sizeof(msg),
+            "Ya hay algo llamado '%s' en este ámbito, así que %s no puede "
+            "volver a definirlo. Si querías cambiar su valor, usa "
+            "'%s = ...'; si no, elige otro nombre.",
+            nombre, que, nombre);
+    else
+        snprintf(msg, sizeof(msg),
+            "Ya hay algo llamado '%s' en este ámbito, así que %s no puede "
+            "volver a definirlo. Elige otro nombre.", nombre, que);
+    valor_error = valor_error_nuevo("Error", msg, linea);
+    hay_error   = 1;
+    return 1;
+}
+
 void entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante) {
     if (e->cantidad >= MAX_VARS) {
         fprintf(stderr, "\n❌ Error interno: demasiadas variables en el mismo ámbito.\n\n");
@@ -868,6 +929,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(v);
                 return valor_nulo();
             }
+            if (redefinido(e, n->declaracion.nombre,
+                           n->declaracion.constante ? "'fijo'" : "'sea'",
+                           1, n->linea)) {
+                valor_destruir(v);
+                return valor_nulo();
+            }
             entorno_definir(e, n->declaracion.nombre, v, n->declaracion.constante);
             return valor_nulo();
         }
@@ -1086,6 +1153,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             f->cuerpo           = n->funcion.cuerpo;
             f->entorno_closure  = e;
             e->refs++;  /* el closure retiene el entorno */
+            if (redefinido(e, n->funcion.nombre, "esta función", 0, n->linea))
+                return valor_nulo();
             entorno_definir(e, n->funcion.nombre, valor_funcion(f), 0);
             return valor_nulo();
         }
@@ -1813,6 +1882,10 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             /* Marcamos que es generador con tipo_retorno especial */
             Valor *vf = valor_funcion(f);
             vf->es_modulo = 99; /* marca: es generador */
+            if (redefinido(e, f->nombre, "este generador", 0, n->linea)) {
+                valor_destruir(vf);
+                return valor_nulo();
+            }
             entorno_definir(e, f->nombre, vf, 0);
             return valor_nulo();
         }
@@ -1856,6 +1929,10 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             viface->diccionario.claves[0]  = strdup("__interfaz__");
             viface->diccionario.valores[0] = valor_numero((double)(uintptr_t)iface);
             viface->diccionario.cantidad   = 1;
+            if (redefinido(e, iface->nombre, "esta interfaz", 0, n->linea)) {
+                valor_destruir(viface);
+                return valor_nulo();
+            }
             entorno_definir(e, iface->nombre, viface, 1);
             return valor_nulo();
         }
@@ -1874,6 +1951,10 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     n->enumeracion.valores[i]);
                 dic->diccionario.valores[i] = valor_texto(buf);
                 dic->diccionario.cantidad++;
+            }
+            if (redefinido(e, n->enumeracion.nombre, "esta enumeración", 0, n->linea)) {
+                valor_destruir(dic);
+                return valor_nulo();
             }
             entorno_definir(e, n->enumeracion.nombre, dic, 1); /* constante */
             return valor_nulo();
@@ -1904,6 +1985,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     hay_error = 1;
                     return valor_nulo();
                 }
+                if (importado_ya(ruta)) { fclose(f); return valor_nulo(); }
+
                 fseek(f, 0, SEEK_END);
                 long tam = ftell(f); rewind(f);
                 char *codigo = malloc(tam + 1);
@@ -1957,6 +2040,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     hay_error = 1;
                     return valor_nulo();
                 }
+                if (importado_ya(ruta)) { fclose(f); return valor_nulo(); }
+
                 fseek(f, 0, SEEK_END);
                 long tam = ftell(f); rewind(f);
                 char *codigo = malloc(tam + 1);
@@ -2271,6 +2356,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(viface);
             }
 
+            if (redefinido(e, c->nombre, "esta clase", 0, n->linea))
+                return valor_nulo();
             entorno_definir(e, c->nombre, valor_clase(c), 0);
             return valor_nulo();
         }

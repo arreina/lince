@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v0.5
+# 🐆 Lince — Especificación del Lenguaje v0.6
 
 ## Filosofía
 
@@ -67,6 +67,28 @@ fijo PI = 3.14159               # constante
 
 sea lista notas = [9, 7, 10]
 sea diccionario d = {"nombre": "Ana", "edad": 22}
+```
+
+### Un nombre se define una sola vez
+
+Definir dos veces el mismo nombre **en el mismo ámbito** es un error, con
+`sea`, `fijo`, `funcion`, `generador`, `clase`, `interfaz` o `enumeracion`:
+
+```lince
+sea x = 1
+sea x = 2        # ❌ Error: ya hay algo llamado 'x' en este ámbito
+x = 2            # ✅ así se cambia el valor
+```
+
+Tapar un nombre en un ámbito **interior** sí es legal, y es lo normal:
+
+```lince
+sea visible = "fuera"
+
+funcion f(): texto {
+    sea visible = "dentro"      # ✅ otro ámbito
+    devolver visible
+}
 ```
 
 ---
@@ -580,6 +602,22 @@ importar "matematica"           # módulo estándar
 importar "./utilidades"         # archivo local relativo
 importar "paquete:mi-paquete"   # paquete instalado
 ```
+
+Un archivo local se busca **junto al archivo que lo importa**, no en el
+directorio desde el que se lanza el programa. Así una librería se puede
+repartir en varios archivos y usarse desde cualquier sitio:
+
+```
+lib/colisiones.lince      importar "./rectangulos"   → lib/rectangulos.lince
+app/juego.lince           importar "../lib/colisiones"
+```
+
+Importar dos veces el mismo archivo no hace nada la segunda vez, así que dos
+librerías pueden depender de una tercera sin que se cargue dos veces.
+
+Lo importado se define en el ámbito actual. Como un nombre no se puede
+definir dos veces, dos librerías que compartan el nombre de una función dan
+error en lugar de pisarse en silencio.
 
 ---
 

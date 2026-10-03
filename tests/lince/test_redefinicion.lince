@@ -1,0 +1,68 @@
+# TEST: en Lince cada nombre se define una sola vez en su ámbito
+#
+# Antes, redefinir se aceptaba y se quedaba con la PRIMERA definición, sin
+# avisar: ni la última, ni un error. Dos librerías con una función del mismo
+# nombre se pisaban en silencio.
+
+# ── Variables y constantes ─────────────────────────────────────
+intentar {
+    sea a = 1
+    sea a = 2
+} capturar (error e) {
+    escribir("sea repetido avisa")
+}
+
+intentar {
+    fijo K = 1
+    fijo K = 2
+} capturar (error e) {
+    escribir("fijo repetido avisa")
+}
+
+# ── Funciones ──────────────────────────────────────────────────
+intentar {
+    funcion dup(): numero { devolver 1 }
+    funcion dup(): numero { devolver 2 }
+} capturar (error e) {
+    escribir("funcion repetida avisa")
+}
+
+# ── Clases ─────────────────────────────────────────────────────
+intentar {
+    clase Cosa { funcion crear(): nulo { } }
+    clase Cosa { funcion crear(): nulo { } }
+} capturar (error e) {
+    escribir("clase repetida avisa")
+}
+
+# ── Enumeraciones ──────────────────────────────────────────────
+intentar {
+    enumeracion Color { Rojo Verde }
+    enumeracion Color { Azul }
+} capturar (error e) {
+    escribir("enumeracion repetida avisa")
+}
+
+# ── Tapar un nombre en un ámbito interior sigue siendo legal ───
+# Esto no es redefinir: es otro ámbito, y es útil.
+sea visible = "fuera"
+
+funcion tapa(): texto {
+    sea visible = "dentro de la funcion"
+    devolver visible
+}
+
+escribir(tapa())
+escribir(visible)
+
+si verdadero {
+    sea visible = "dentro del bloque"
+    escribir(visible)
+}
+escribir(visible)
+
+# Un parámetro puede llamarse como algo de fuera
+funcion con_parametro(val texto visible): texto {
+    devolver visible
+}
+escribir(con_parametro("como parametro"))

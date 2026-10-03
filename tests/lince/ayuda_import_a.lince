@@ -1,0 +1,3 @@
+# Rama A del diamante: depende de ayuda_import_c
+importar "./ayuda_import_c"
+funcion rama_a(): texto { devolver "a sobre " + nucleo() }

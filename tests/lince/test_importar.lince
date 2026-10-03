@@ -8,6 +8,16 @@ importar "./ayuda_importar"
 escribir(ORIGEN)
 escribir(doble(21))
 
-# Importar dos veces no debe duplicar ni romper nada
+# Importar dos veces no hace nada la segunda. Hace falta que sea así: desde
+# que redefinir es un error, reejecutar el fichero chocaría con sus propias
+# definiciones.
 importar "./ayuda_importar"
 escribir(doble(1))
+
+# Dependencia en diamante: dos librerías que dependen de una tercera. Sin
+# imports idempotentes, la tercera se cargaría dos veces y la segunda vez
+# chocaría consigo misma.
+importar "./ayuda_import_a"
+importar "./ayuda_import_b"
+escribir(rama_a())
+escribir(rama_b())
