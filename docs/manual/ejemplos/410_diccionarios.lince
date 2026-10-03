@@ -1,0 +1,12 @@
+# @seccion: Diccionarios
+# @titulo: Crear, leer y recorrer
+# @nota: Las claves son texto. `para cada` sobre un diccionario recorre las claves.
+sea persona = {"nombre": "Ana", "edad": 22}
+persona["ciudad"] = "Córdoba"
+
+escribir(persona["nombre"])
+escribir(persona.longitud())
+
+para cada texto clave en persona {
+    escribir(clave + " = " + persona[clave])
+}

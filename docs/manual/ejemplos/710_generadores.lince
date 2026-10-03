@@ -1,0 +1,12 @@
+# @seccion: Generadores
+# @titulo: Producir valores de uno en uno
+# @nota: `generador` en vez de `funcion`, y `producir` en vez de `devolver`.
+generador pares(val numero hasta): numero {
+    para (i = 0; i <= hasta; i++) {
+        si i % 2 == 0 { producir i }
+    }
+}
+
+para cada numero p en pares(8) {
+    escribir(p)
+}

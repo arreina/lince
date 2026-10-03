@@ -1,0 +1,6 @@
+# @seccion: Módulos y librerías
+# @titulo: Importar un archivo tuyo
+# @nota: La ruta se resuelve junto al archivo que importa, no desde donde lanzas el programa. Importar dos veces el mismo archivo no hace nada la segunda.
+importar "./lib_geometria"
+
+escribir(area_circulo(1.0))

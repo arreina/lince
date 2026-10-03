@@ -1,0 +1,10 @@
+# @seccion: Control de flujo
+# @titulo: Elegir / caso
+# @nota: `otro` es el caso por defecto.
+sea animal = "lince"
+
+elegir animal {
+    caso "gato"  { escribir("miau") }
+    caso "lince" { escribir("es un felino ibérico") }
+    otro         { escribir("no sé qué hace") }
+}

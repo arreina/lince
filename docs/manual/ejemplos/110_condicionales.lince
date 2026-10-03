@@ -1,0 +1,16 @@
+# @seccion: Control de flujo
+# @titulo: Condicionales
+# @nota: `si`, `sino si`, `sino`. Los operadores lógicos son `y`, `o`, `no`.
+sea nota = 7
+
+si nota >= 9 {
+    escribir("sobresaliente")
+} sino si nota >= 5 {
+    escribir("aprobado")
+} sino {
+    escribir("suspenso")
+}
+
+si nota > 5 y no (nota == 10) {
+    escribir("entre 6 y 9")
+}

@@ -1,0 +1,15 @@
+# @seccion: Clases
+# @titulo: Clase, constructor y métodos
+# @nota: `mi` es la instancia actual. El constructor se llama `crear`.
+clase Rectangulo {
+    funcion crear(val numero ancho, val numero alto): nulo {
+        mi.ancho = ancho
+        mi.alto  = alto
+    }
+    funcion area(): numero {
+        devolver mi.ancho * mi.alto
+    }
+}
+
+sea r = Rectangulo(4, 3)
+escribir(r.area())

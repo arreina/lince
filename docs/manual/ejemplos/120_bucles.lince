@@ -1,0 +1,22 @@
+# @seccion: Control de flujo
+# @titulo: Las cuatro formas de repetir
+# @nota: `para` clásico, `mientras`, `hacer/mientras` y `para cada`.
+para (i = 0; i < 3; i++) {
+    escribir("para " + i)
+}
+
+sea n = 0
+mientras n < 2 {
+    escribir("mientras " + n)
+    n = n + 1
+}
+
+sea m = 0
+hacer {
+    escribir("hacer " + m)
+    m = m + 1
+} mientras (m < 2)
+
+para cada numero x en [10, 20] {
+    escribir("cada " + x)
+}

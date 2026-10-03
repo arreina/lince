@@ -1,0 +1,15 @@
+# @seccion: Errores
+# @titulo: El primer error es el que cuenta
+# @nota: Un error no se tapa con sus propias consecuencias: se informa de la causa, no del fallo que vino detrás.
+intentar {
+    escribir(noExiste())
+} capturar (error e) {
+    escribir("[" + e.tipo + "] " + e.mensaje)
+}
+
+intentar {
+    sea cinco = 5
+    escribir(cinco(1))
+} capturar (ErrorTipo e) {
+    escribir("[" + e.tipo + "] " + e.mensaje)
+}

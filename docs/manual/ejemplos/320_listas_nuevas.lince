@@ -1,0 +1,7 @@
+# @seccion: Listas
+# @titulo: Operaciones que devuelven una lista nueva
+# @nota: `ordenar`, `invertir` y `copiar` no tocan la original.
+sea original = [3, 1, 2]
+escribir(original.ordenar())
+escribir(original.invertir())
+escribir(original)

@@ -1,0 +1,11 @@
+# @seccion: Primeros pasos
+# @titulo: Dónde se declaran los tipos
+# @nota: En parámetros y retorno de función son obligatorios. En `sea` son opcionales y sólo para `lista` y `diccionario`.
+sea lista notas = [9, 7, 10]
+sea diccionario ficha = {"nombre": "Ana"}
+
+funcion presentar(val texto quien, val numero anios): texto {
+    devolver quien + " tiene " + anios + " años"
+}
+
+escribir(presentar(ficha["nombre"], notas.longitud()))

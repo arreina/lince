@@ -1,0 +1,9 @@
+# @seccion: Listas
+# @titulo: Ordenar con tu propio criterio
+# @nota: La función comparadora devuelve negativo, cero o positivo. La ordenación es estable.
+sea nums = [3, 1, 4, 1, 5]
+
+escribir(nums.ordenar())
+escribir(nums.ordenar(funcion(val numero a, val numero b): numero {
+    devolver b - a
+}))

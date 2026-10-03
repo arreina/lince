@@ -34,6 +34,12 @@ jobs:
       - name: Los ejercicios de examples/ se ejecutan
         run: make test-ejemplos
 
+      # El manual publica la salida real de cada ejemplo, así que si alguien
+      # toca uno sin regenerar —o el lenguaje cambia de comportamiento— la
+      # página quedaría mintiendo. Esto lo detecta.
+      - name: El manual está al día
+        run: make docs-check
+
   sanitizer:
     name: AddressSanitizer
     runs-on: ubuntu-latest

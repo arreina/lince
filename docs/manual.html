@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Lince</title>
+<meta name="description" content="Manual del lenguaje de programación Lince. Todos los ejemplos se ejecutan al generar la página, así que la salida que se muestra es la real.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --morado:#6A2D72; --morado-claro:#8B3D96; --amarillo:#F1BF00; --rojo:#C60B1E;
+    --bg:#0d0d0f; --bg2:#131317; --bg3:#1a1a20; --borde:#2a2a35;
+    --texto:#d4d4d8; --texto2:#8888a0; --blanco:#f4f4f6; --verde:#4ec98a;
+    --lateral:280px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--texto); line-height:1.6;
+    font-family:'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--amarillo); text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ══ Cabecera ══ */
+  header{
+    position:sticky; top:0; z-index:100; height:56px;
+    background:rgba(13,13,15,.92); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--borde);
+    display:flex; align-items:center; gap:1rem; padding:0 1.25rem;
+  }
+  .logo{display:flex; align-items:center; gap:.5rem; font-weight:700; color:var(--blanco)}
+  .logo span{font-size:1.3rem}
+  .version{
+    font-size:.7rem; color:var(--amarillo); border:1px solid var(--borde);
+    border-radius:99px; padding:.1rem .5rem;
+  }
+  header .crece{flex:1}
+  #buscar{
+    background:var(--bg3); border:1px solid var(--borde); border-radius:6px;
+    color:var(--texto); padding:.4rem .7rem; font:inherit; font-size:.8rem;
+    width:min(260px,38vw);
+  }
+  #buscar:focus{outline:none; border-color:var(--morado-claro)}
+  .menu{
+    display:none; background:none; border:1px solid var(--borde); border-radius:6px;
+    color:var(--texto); font:inherit; padding:.3rem .6rem; cursor:pointer;
+  }
+
+  /* ══ Disposición ══ */
+  .envoltorio{display:flex; align-items:flex-start}
+  nav{
+    position:sticky; top:56px; width:var(--lateral); flex:0 0 var(--lateral);
+    height:calc(100vh - 56px); overflow-y:auto;
+    border-right:1px solid var(--borde); padding:1.25rem 0 3rem;
+  }
+  .grupo{margin-bottom:.35rem}
+  nav a{display:block; padding:.3rem 1.25rem; font-size:.82rem; color:var(--texto2)}
+  nav a.sec{color:var(--blanco); font-weight:700; font-size:.88rem; margin-top:.6rem}
+  nav a.sub{padding-left:2rem; border-left:2px solid transparent}
+  nav a:hover{color:var(--amarillo); text-decoration:none}
+  nav a.sub.activo{color:var(--amarillo); border-left-color:var(--amarillo); background:var(--bg2)}
+  nav a.oculto, .ej.oculto, section.oculto{display:none}
+
+  main{flex:1; min-width:0; padding:2rem clamp(1rem,4vw,3rem) 6rem; max-width:980px}
+  .intro{
+    border:1px solid var(--borde); border-left:3px solid var(--morado-claro);
+    background:var(--bg2); border-radius:8px; padding:1rem 1.25rem; margin-bottom:2.5rem;
+  }
+  .intro h1{font-size:1.5rem; color:var(--blanco); margin-bottom:.5rem}
+  .intro p{font-size:.86rem; color:var(--texto2)}
+  .intro strong{color:var(--texto)}
+
+  section{margin-bottom:3.5rem}
+  section h2{
+    color:var(--amarillo); font-size:1.25rem; margin-bottom:1.25rem;
+    padding-bottom:.5rem; border-bottom:1px solid var(--borde);
+  }
+  .ej{margin-bottom:2.25rem}
+  .ej h3{color:var(--blanco); font-size:1rem; margin-bottom:.4rem}
+  .nota{font-size:.84rem; color:var(--texto2); margin-bottom:.75rem}
+
+  .codigo{position:relative; background:var(--bg2); border:1px solid var(--borde); border-radius:8px}
+  .codigo pre{margin:0; padding:1rem 1.1rem; overflow-x:auto; font-size:.84rem; line-height:1.65}
+  .copiar{
+    position:absolute; top:.5rem; right:.5rem; z-index:2;
+    background:var(--bg3); border:1px solid var(--borde); border-radius:5px;
+    color:var(--texto2); font:inherit; font-size:.7rem; padding:.2rem .5rem;
+    cursor:pointer; opacity:0; transition:opacity .15s;
+  }
+  .codigo:hover .copiar, .copiar:focus{opacity:1}
+  .copiar:hover{color:var(--amarillo); border-color:var(--morado-claro)}
+
+  .salida{
+    margin-top:.6rem; background:#0a0f0c; border:1px solid #1d3328;
+    border-left:3px solid var(--verde); border-radius:8px; padding:.7rem 1.1rem;
+  }
+  .etiqueta{
+    display:block; font-size:.66rem; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--verde); margin-bottom:.35rem;
+  }
+  .salida pre{margin:0; font-size:.82rem; color:#cfe8da; overflow-x:auto; white-space:pre-wrap}
+  .fuente{display:block; margin-top:.4rem; font-size:.68rem; color:#55556a}
+
+  /* Resaltado */
+  .k{color:#d98cf0} .t{color:#6fb3e0} .s{color:#e6c07b}
+  .n{color:#b5e07f} .c{color:#5f6070; font-style:italic}
+
+  #sinresultados{display:none; color:var(--texto2); font-size:.88rem}
+  #sinresultados.visible{display:block}
+
+  @media (max-width:860px){
+    .envoltorio{display:block}
+    nav{
+      position:fixed; top:56px; left:0; bottom:0; width:min(300px,86vw);
+      background:var(--bg); z-index:99; transform:translateX(-102%);
+      transition:transform .2s; height:auto;
+    }
+    nav.abierta{transform:translateX(0)}
+    main{padding:1.5rem 1rem 5rem; max-width:none}
+    .menu{display:block}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="menu" id="alternar" aria-label="Menú">☰</button>
+  <a class="logo" href="index.html"><span>🐆</span> Lince</a>
+  <span class="version">v0.6</span>
+  <div class="crece"></div>
+  <input id="buscar" type="search" placeholder="buscar en el manual…" aria-label="Buscar">
+</header>
+
+<div class="envoltorio">
+<nav id="lateral">
+<div class="grupo"><a href="#primeros-pasos" class="sec">Primeros pasos</a><a href="#primeros-pasos-0" class="sub">Hola, mundo</a><a href="#primeros-pasos-1" class="sub">Variables y constantes</a><a href="#primeros-pasos-2" class="sub">Cada nombre se define una sola vez</a><a href="#primeros-pasos-3" class="sub">Tapar un nombre en un ámbito interior</a><a href="#primeros-pasos-4" class="sub">Dónde se declaran los tipos</a></div>
+<div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-2" class="sub">Elegir / caso</a></div>
+<div class="grupo"><a href="#funciones" class="sec">Funciones</a><a href="#funciones-0" class="sub">Declarar y llamar</a><a href="#funciones-1" class="sub">Valores por defecto</a><a href="#funciones-2" class="sub">Lambdas y funciones como argumento</a><a href="#funciones-3" class="sub">Closures</a></div>
+<div class="grupo"><a href="#listas" class="sec">Listas</a><a href="#listas-0" class="sub">Crear, modificar y consultar</a><a href="#listas-1" class="sub">Operaciones que devuelven una lista nueva</a><a href="#listas-2" class="sub">Ordenar con tu propio criterio</a></div>
+<div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a></div>
+<div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a></div>
+<div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a></div>
+<div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
+<div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a></div>
+<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a></div>
+</nav>
+
+<main>
+  <div class="intro">
+    <h1>Manual de Lince</h1>
+    <p>Los <strong>26 ejemplos</strong> de esta página no están escritos a mano:
+    son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
+    el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
+    cambia de comportamiento, la página deja de cuadrar y la integración continua lo
+    detecta — así la documentación no puede quedarse mintiendo.</p>
+  </div>
+
+  <p id="sinresultados">Nada coincide con esa búsqueda.</p>
+
+<section id="primeros-pasos"><h2>Primeros pasos</h2><article class="ej" id="primeros-pasos-0"><h3>Hola, mundo</h3><p class="nota">`escribir` imprime y añade un salto de línea.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code></code></pre></div><span class="fuente">010_hola.lince</span></article><article class="ej" id="primeros-pasos-1"><h3>Variables y constantes</h3><p class="nota">`sea` crea algo que puede cambiar; `fijo`, algo que no.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nombre = <span class="s">&quot;Ana&quot;</span>
+<span class="k">fijo</span> PI = <span class="n">3.14159</span>
+
+nombre = <span class="s">&quot;Blanca&quot;</span>
+<span class="k">escribir</span>(nombre)
+<span class="k">escribir</span>(PI)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Blanca
+3.14159</pre></div><span class="fuente">020_variables.lince</span></article><article class="ej" id="primeros-pasos-2"><h3>Cada nombre se define una sola vez</h3><p class="nota">Definir dos veces en el mismo ámbito es un error, no un descarte silencioso. Para cambiar el valor, asigna.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> contador = <span class="n">1</span>
+contador = <span class="n">2</span>
+<span class="k">escribir</span>(contador)
+
+<span class="k">intentar</span> {
+    <span class="k">sea</span> contador = <span class="n">3</span>
+} <span class="k">capturar</span> (<span class="t">error</span> e) {
+    <span class="k">escribir</span>(e.mensaje)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>2</pre></div><span class="fuente">030_una_vez.lince</span></article><article class="ej" id="primeros-pasos-3"><h3>Tapar un nombre en un ámbito interior</h3><p class="nota">Esto no es redefinir: es otro ámbito. El de fuera queda intacto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> visible = <span class="s">&quot;fuera&quot;</span>
+
+<span class="k">funcion</span> dentro(): <span class="t">texto</span> {
+    <span class="k">sea</span> visible = <span class="s">&quot;dentro&quot;</span>
+    <span class="k">devolver</span> visible
+}
+
+<span class="k">escribir</span>(dentro())
+<span class="k">escribir</span>(visible)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>dentro
+fuera</pre></div><span class="fuente">040_tapar.lince</span></article><article class="ej" id="primeros-pasos-4"><h3>Dónde se declaran los tipos</h3><p class="nota">En parámetros y retorno de función son obligatorios. En `sea` son opcionales y sólo para `lista` y `diccionario`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> <span class="t">lista</span> notas = [<span class="n">9</span>, <span class="n">7</span>, <span class="n">10</span>]
+<span class="k">sea</span> <span class="t">diccionario</span> ficha = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>}
+
+<span class="k">funcion</span> presentar(<span class="k">val</span> <span class="t">texto</span> quien, <span class="k">val</span> <span class="t">numero</span> anios): <span class="t">texto</span> {
+    <span class="k">devolver</span> quien + <span class="s">&quot; tiene &quot;</span> + anios + <span class="s">&quot; años&quot;</span>
+}
+
+<span class="k">escribir</span>(presentar(ficha[<span class="s">&quot;nombre&quot;</span>], notas.longitud()))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Ana tiene 3 años</pre></div><span class="fuente">050_tipos.lince</span></article></section>
+<section id="control-de-flujo"><h2>Control de flujo</h2><article class="ej" id="control-de-flujo-0"><h3>Condicionales</h3><p class="nota">`si`, `sino si`, `sino`. Los operadores lógicos son `y`, `o`, `no`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nota = <span class="n">7</span>
+
+<span class="k">si</span> nota &gt;= <span class="n">9</span> {
+    <span class="k">escribir</span>(<span class="s">&quot;sobresaliente&quot;</span>)
+} <span class="k">sino</span> <span class="k">si</span> nota &gt;= <span class="n">5</span> {
+    <span class="k">escribir</span>(<span class="s">&quot;aprobado&quot;</span>)
+} <span class="k">sino</span> {
+    <span class="k">escribir</span>(<span class="s">&quot;suspenso&quot;</span>)
+}
+
+<span class="k">si</span> nota &gt; <span class="n">5</span> <span class="k">y</span> <span class="k">no</span> (nota == <span class="n">10</span>) {
+    <span class="k">escribir</span>(<span class="s">&quot;entre 6 y 9&quot;</span>)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>aprobado
+entre 6 y 9</pre></div><span class="fuente">110_condicionales.lince</span></article><article class="ej" id="control-de-flujo-1"><h3>Las cuatro formas de repetir</h3><p class="nota">`para` clásico, `mientras`, `hacer/mientras` y `para cada`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+    <span class="k">escribir</span>(<span class="s">&quot;para &quot;</span> + i)
+}
+
+<span class="k">sea</span> n = <span class="n">0</span>
+<span class="k">mientras</span> n &lt; <span class="n">2</span> {
+    <span class="k">escribir</span>(<span class="s">&quot;mientras &quot;</span> + n)
+    n = n + <span class="n">1</span>
+}
+
+<span class="k">sea</span> m = <span class="n">0</span>
+<span class="k">hacer</span> {
+    <span class="k">escribir</span>(<span class="s">&quot;hacer &quot;</span> + m)
+    m = m + <span class="n">1</span>
+} <span class="k">mientras</span> (m &lt; <span class="n">2</span>)
+
+<span class="k">para</span> <span class="k">cada</span> <span class="t">numero</span> x <span class="k">en</span> [<span class="n">10</span>, <span class="n">20</span>] {
+    <span class="k">escribir</span>(<span class="s">&quot;cada &quot;</span> + x)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>para 0
+para 1
+para 2
+mientras 0
+mientras 1
+hacer 0
+hacer 1
+cada 10
+cada 20</pre></div><span class="fuente">120_bucles.lince</span></article><article class="ej" id="control-de-flujo-2"><h3>Elegir / caso</h3><p class="nota">`otro` es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
+
+<span class="k">elegir</span> animal {
+    <span class="k">caso</span> <span class="s">&quot;gato&quot;</span>  { <span class="k">escribir</span>(<span class="s">&quot;miau&quot;</span>) }
+    <span class="k">caso</span> <span class="s">&quot;lince&quot;</span> { <span class="k">escribir</span>(<span class="s">&quot;es un felino ibérico&quot;</span>) }
+    <span class="k">otro</span>         { <span class="k">escribir</span>(<span class="s">&quot;no sé qué hace&quot;</span>) }
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>es un felino ibérico</pre></div><span class="fuente">130_elegir.lince</span></article></section>
+<section id="funciones"><h2>Funciones</h2><article class="ej" id="funciones-0"><h3>Declarar y llamar</h3><p class="nota">Los parámetros llevan `val` (por valor) o `ref` (por referencia), tipo y nombre.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> area(<span class="k">val</span> <span class="t">numero</span> base, <span class="k">val</span> <span class="t">numero</span> altura): <span class="t">numero</span> {
+    <span class="k">devolver</span> base * altura / <span class="n">2</span>
+}
+
+<span class="k">escribir</span>(area(<span class="n">10</span>, <span class="n">4</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>20</pre></div><span class="fuente">210_funciones.lince</span></article><article class="ej" id="funciones-1"><h3>Valores por defecto</h3><p class="nota">Los parámetros con valor por defecto van al final.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> saludo(<span class="k">val</span> <span class="t">texto</span> nombre, <span class="k">val</span> <span class="t">texto</span> trato = <span class="s">&quot;Hola&quot;</span>): <span class="t">texto</span> {
+    <span class="k">devolver</span> trato + <span class="s">&quot;, &quot;</span> + nombre
+}
+
+<span class="k">escribir</span>(saludo(<span class="s">&quot;Ana&quot;</span>))
+<span class="k">escribir</span>(saludo(<span class="s">&quot;Ana&quot;</span>, <span class="s">&quot;Buenas&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Hola, Ana
+Buenas, Ana</pre></div><span class="fuente">220_defecto.lince</span></article><article class="ej" id="funciones-2"><h3>Lambdas y funciones como argumento</h3><p class="nota">Una función sin nombre es un valor como cualquier otro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> doble = <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> x * <span class="n">2</span> }
+<span class="k">escribir</span>(doble(<span class="n">21</span>))
+
+<span class="k">sea</span> nums = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>]
+<span class="k">escribir</span>(mapear(nums, doble))
+<span class="k">escribir</span>(filtrar(nums, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> x): <span class="t">logico</span> { <span class="k">devolver</span> x % <span class="n">2</span> == <span class="n">0</span> }))
+<span class="k">escribir</span>(reducir(nums, <span class="n">0</span>, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> a, <span class="k">val</span> <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> a + x }))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>42
+[2, 4, 6, 8]
+[2, 4]
+10</pre></div><span class="fuente">230_lambdas.lince</span></article><article class="ej" id="funciones-3"><h3>Closures</h3><p class="nota">Una función recuerda el ámbito donde se creó, así que puede llevar estado.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> contador_desde(<span class="k">val</span> <span class="t">numero</span> inicio): <span class="k">funcion</span> {
+    <span class="k">sea</span> n = inicio
+    <span class="k">devolver</span> <span class="k">funcion</span>(): <span class="t">numero</span> {
+        n = n + <span class="n">1</span>
+        <span class="k">devolver</span> n
+    }
+}
+
+<span class="k">sea</span> siguiente = contador_desde(<span class="n">10</span>)
+<span class="k">escribir</span>(siguiente())
+<span class="k">escribir</span>(siguiente())
+<span class="k">escribir</span>(siguiente())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>11
+12
+13</pre></div><span class="fuente">240_closures.lince</span></article></section>
+<section id="listas"><h2>Listas</h2><article class="ej" id="listas-0"><h3>Crear, modificar y consultar</h3><p class="nota">`agregar`, `eliminar` e `insertar` cambian la lista; `longitud`, `posicion` y `contiene` sólo la leen.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> notas = [<span class="n">9</span>, <span class="n">7</span>, <span class="n">10</span>]
+notas.agregar(<span class="n">6</span>)
+<span class="k">escribir</span>(notas)
+<span class="k">escribir</span>(notas.longitud())
+<span class="k">escribir</span>(notas.posicion(<span class="n">10</span>))
+<span class="k">escribir</span>(notas.contiene(<span class="n">7</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[9, 7, 10, 6]
+4
+2
+verdadero</pre></div><span class="fuente">310_listas.lince</span></article><article class="ej" id="listas-1"><h3>Operaciones que devuelven una lista nueva</h3><p class="nota">`ordenar`, `invertir` y `copiar` no tocan la original.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> original = [<span class="n">3</span>, <span class="n">1</span>, <span class="n">2</span>]
+<span class="k">escribir</span>(original.ordenar())
+<span class="k">escribir</span>(original.invertir())
+<span class="k">escribir</span>(original)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[1, 2, 3]
+[2, 1, 3]
+[3, 1, 2]</pre></div><span class="fuente">320_listas_nuevas.lince</span></article><article class="ej" id="listas-2"><h3>Ordenar con tu propio criterio</h3><p class="nota">La función comparadora devuelve negativo, cero o positivo. La ordenación es estable.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nums = [<span class="n">3</span>, <span class="n">1</span>, <span class="n">4</span>, <span class="n">1</span>, <span class="n">5</span>]
+
+<span class="k">escribir</span>(nums.ordenar())
+<span class="k">escribir</span>(nums.ordenar(<span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> a, <span class="k">val</span> <span class="t">numero</span> b): <span class="t">numero</span> {
+    <span class="k">devolver</span> b - a
+}))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[1, 1, 3, 4, 5]
+[5, 4, 3, 1, 1]</pre></div><span class="fuente">330_ordenar_con.lince</span></article></section>
+<section id="diccionarios"><h2>Diccionarios</h2><article class="ej" id="diccionarios-0"><h3>Crear, leer y recorrer</h3><p class="nota">Las claves son texto. `para cada` sobre un diccionario recorre las claves.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> persona = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>, <span class="s">&quot;edad&quot;</span>: <span class="n">22</span>}
+persona[<span class="s">&quot;ciudad&quot;</span>] = <span class="s">&quot;Córdoba&quot;</span>
+
+<span class="k">escribir</span>(persona[<span class="s">&quot;nombre&quot;</span>])
+<span class="k">escribir</span>(persona.longitud())
+
+<span class="k">para</span> <span class="k">cada</span> <span class="t">texto</span> clave <span class="k">en</span> persona {
+    <span class="k">escribir</span>(clave + <span class="s">&quot; = &quot;</span> + persona[clave])
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Ana
+3
+nombre = Ana
+edad = 22
+ciudad = Córdoba</pre></div><span class="fuente">410_diccionarios.lince</span></article></section>
+<section id="texto"><h2>Texto</h2><article class="ej" id="texto-0"><h3>Métodos de texto</h3><p class="nota">La longitud cuenta caracteres, no bytes: las tildes y la eñe cuentan como uno.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
+
+<span class="k">sea</span> frase = <span class="s">&quot;año de la cigüeña&quot;</span>
+<span class="k">escribir</span>(frase.longitud())
+<span class="k">escribir</span>(frase.mayusculas())
+<span class="k">escribir</span>(<span class="t">texto</span>.dividir(<span class="s">&quot;a,b,c&quot;</span>, <span class="s">&quot;,&quot;</span>))
+<span class="k">escribir</span>(<span class="t">texto</span>.repetir(<span class="s">&quot;ab&quot;</span>, <span class="n">3</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>17
+AÑO DE LA CIGÜEÑA
+[&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]
+ababab</pre></div><span class="fuente">510_texto.lince</span></article></section>
+<section id="clases"><h2>Clases</h2><article class="ej" id="clases-0"><h3>Clase, constructor y métodos</h3><p class="nota">`mi` es la instancia actual. El constructor se llama `crear`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Rectangulo {
+    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> ancho, <span class="k">val</span> <span class="t">numero</span> alto): <span class="k">nulo</span> {
+        <span class="k">mi</span>.ancho = ancho
+        <span class="k">mi</span>.alto  = alto
+    }
+    <span class="k">funcion</span> area(): <span class="t">numero</span> {
+        <span class="k">devolver</span> <span class="k">mi</span>.ancho * <span class="k">mi</span>.alto
+    }
+}
+
+<span class="k">sea</span> r = Rectangulo(<span class="n">4</span>, <span class="n">3</span>)
+<span class="k">escribir</span>(r.area())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>12</pre></div><span class="fuente">610_clases.lince</span></article><article class="ej" id="clases-1"><h3>Herencia</h3><p class="nota">`extiende` hereda; `padre(...)` llama al constructor de arriba.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Figura {
+    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">texto</span> nombre): <span class="k">nulo</span> { <span class="k">mi</span>.nombre = nombre }
+    <span class="k">funcion</span> describir(): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;soy un &quot;</span> + <span class="k">mi</span>.nombre }
+}
+
+<span class="k">clase</span> Cuadrado <span class="k">extiende</span> Figura {
+    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> lado): <span class="k">nulo</span> {
+        <span class="k">padre</span>(<span class="s">&quot;cuadrado&quot;</span>)
+        <span class="k">mi</span>.lado = lado
+    }
+    <span class="k">funcion</span> area(): <span class="t">numero</span> { <span class="k">devolver</span> <span class="k">mi</span>.lado * <span class="k">mi</span>.lado }
+}
+
+<span class="k">sea</span> c = Cuadrado(<span class="n">5</span>)
+<span class="k">escribir</span>(c.describir())
+<span class="k">escribir</span>(c.area())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>soy un cuadrado
+25</pre></div><span class="fuente">620_herencia.lince</span></article></section>
+<section id="generadores"><h2>Generadores</h2><article class="ej" id="generadores-0"><h3>Producir valores de uno en uno</h3><p class="nota">`generador` en vez de `funcion`, y `producir` en vez de `devolver`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">generador</span> pares(<span class="k">val</span> <span class="t">numero</span> hasta): <span class="t">numero</span> {
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt;= hasta; i++) {
+        <span class="k">si</span> i % <span class="n">2</span> == <span class="n">0</span> { <span class="k">producir</span> i }
+    }
+}
+
+<span class="k">para</span> <span class="k">cada</span> <span class="t">numero</span> p <span class="k">en</span> pares(<span class="n">8</span>) {
+    <span class="k">escribir</span>(p)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>0
+2
+4
+6
+8</pre></div><span class="fuente">710_generadores.lince</span></article></section>
+<section id="errores"><h2>Errores</h2><article class="ej" id="errores-0"><h3>Intentar, capturar, finalmente</h3><p class="nota">`capturar (error e)` atrapa cualquier tipo; con un tipo concreto, sólo ese.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">intentar</span> {
+    <span class="k">sea</span> <span class="t">lista</span> nums = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]
+    <span class="k">escribir</span>(nums[<span class="n">99</span>])
+} <span class="k">capturar</span> (ErrorRango e) {
+    <span class="k">escribir</span>(<span class="s">&quot;fuera de rango: &quot;</span> + e.mensaje)
+} <span class="k">capturar</span> (<span class="t">error</span> e) {
+    <span class="k">escribir</span>(<span class="s">&quot;otro error&quot;</span>)
+} <span class="k">finalmente</span> {
+    <span class="k">escribir</span>(<span class="s">&quot;esto se ejecuta siempre&quot;</span>)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>fuera de rango: Índice 99 fuera de rango. La lista tiene 3 elementos.
+esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span></article><article class="ej" id="errores-1"><h3>Lanzar errores propios</h3><p class="nota">Tipos predefinidos: Error, ErrorTipo, ErrorRango, ErrorNulo, ErrorMatematico, ErrorArgumento.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> raiz_entera(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">numero</span> {
+    <span class="k">si</span> n &lt; <span class="n">0</span> {
+        <span class="k">lanzar</span> ErrorArgumento(<span class="s">&quot;no hay raíz real de un número negativo&quot;</span>)
+    }
+    <span class="k">devolver</span> n
+}
+
+<span class="k">intentar</span> {
+    <span class="k">escribir</span>(raiz_entera(-<span class="n">1</span>))
+} <span class="k">capturar</span> (ErrorArgumento e) {
+    <span class="k">escribir</span>(<span class="s">&quot;[&quot;</span> + e.tipo + <span class="s">&quot;] &quot;</span> + e.mensaje)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[ErrorArgumento] no hay raíz real de un número negativo</pre></div><span class="fuente">820_lanzar.lince</span></article><article class="ej" id="errores-2"><h3>El primer error es el que cuenta</h3><p class="nota">Un error no se tapa con sus propias consecuencias: se informa de la causa, no del fallo que vino detrás.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">intentar</span> {
+    <span class="k">escribir</span>(noExiste())
+} <span class="k">capturar</span> (<span class="t">error</span> e) {
+    <span class="k">escribir</span>(<span class="s">&quot;[&quot;</span> + e.tipo + <span class="s">&quot;] &quot;</span> + e.mensaje)
+}
+
+<span class="k">intentar</span> {
+    <span class="k">sea</span> cinco = <span class="n">5</span>
+    <span class="k">escribir</span>(cinco(<span class="n">1</span>))
+} <span class="k">capturar</span> (ErrorTipo e) {
+    <span class="k">escribir</span>(<span class="s">&quot;[&quot;</span> + e.tipo + <span class="s">&quot;] &quot;</span> + e.mensaje)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[Error] La variable &#x27;noExiste&#x27; no está definida.
+[ErrorTipo] &#x27;cinco&#x27; no es una función, así que no se puede llamar.</pre></div><span class="fuente">830_primer_error.lince</span></article></section>
+<section id="modulos-y-librerias"><h2>Módulos y librerías</h2><article class="ej" id="modulos-y-librerias-0"><h3>Importar un módulo estándar</h3><p class="nota">Hay diez: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red y expresiones.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;json&quot;</span>
+
+<span class="k">escribir</span>(matematica.raiz(<span class="n">144</span>))
+<span class="k">escribir</span>(json.<span class="t">texto</span>({<span class="s">&quot;vivo&quot;</span>: <span class="k">verdadero</span>}))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>12
+{&quot;vivo&quot;: true}</pre></div><span class="fuente">910_importar.lince</span></article><article class="ej" id="modulos-y-librerias-1"><h3>Importar un archivo tuyo</h3><p class="nota">La ruta se resuelve junto al archivo que importa, no desde donde lanzas el programa. Importar dos veces el mismo archivo no hace nada la segunda.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;./lib_geometria&quot;</span>
+
+<span class="k">escribir</span>(area_circulo(<span class="n">1.0</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>3.14159</pre></div><span class="fuente">920_libreria.lince</span></article><article class="ej" id="modulos-y-librerias-2"><h3>Con espacio de nombres: `como`</h3><p class="nota">Con `como`, el archivo corre en su propio ámbito y sólo se alcanza por el alias. Así dos librerías pueden tener funciones del mismo nombre.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;./lib_metros&quot;</span> <span class="k">como</span> metros
+<span class="k">importar</span> <span class="s">&quot;./lib_pies&quot;</span>   <span class="k">como</span> pies
+
+<span class="k">escribir</span>(metros.convertir(<span class="n">100</span>))
+<span class="k">escribir</span>(pies.convertir(<span class="n">100</span>))
+<span class="k">escribir</span>(metros.UNIDAD)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>100
+328.084
+m</pre></div><span class="fuente">930_como.lince</span></article></section>
+</main>
+</div>
+
+<script>
+// ── Copiar al portapapeles ────────────────────────────────────
+document.querySelectorAll('.copiar').forEach(function (boton) {
+  boton.addEventListener('click', function () {
+    var codigo = boton.parentElement.querySelector('code').innerText;
+    navigator.clipboard.writeText(codigo).then(function () {
+      boton.textContent = 'copiado';
+      setTimeout(function () { boton.textContent = 'copiar'; }, 1200);
+    }, function () {
+      boton.textContent = 'no se pudo';
+      setTimeout(function () { boton.textContent = 'copiar'; }, 1200);
+    });
+  });
+});
+
+// ── Buscador ──────────────────────────────────────────────────
+var buscar = document.getElementById('buscar');
+var sin = document.getElementById('sinresultados');
+
+buscar.addEventListener('input', function () {
+  var q = buscar.value.trim().toLowerCase();
+  var visibles = 0;
+
+  document.querySelectorAll('main section').forEach(function (sec) {
+    var algunoVisible = false;
+    sec.querySelectorAll('.ej').forEach(function (ej) {
+      var coincide = !q || ej.innerText.toLowerCase().indexOf(q) !== -1;
+      ej.classList.toggle('oculto', !coincide);
+      if (coincide) { algunoVisible = true; visibles++; }
+    });
+    sec.classList.toggle('oculto', !algunoVisible);
+    var enlace = document.querySelector('nav a[href="#' + sec.id + '"]');
+    if (enlace) enlace.parentElement.classList.toggle('oculto', !algunoVisible);
+  });
+
+  // Los subenlaces siguen a su ejemplo
+  document.querySelectorAll('nav a.sub').forEach(function (a) {
+    var destino = document.querySelector(a.getAttribute('href'));
+    a.classList.toggle('oculto', destino ? destino.classList.contains('oculto') : false);
+  });
+
+  sin.classList.toggle('visible', visibles === 0);
+});
+
+// ── Resaltar en el índice el ejemplo que se está leyendo ──────
+var observador = new IntersectionObserver(function (entradas) {
+  entradas.forEach(function (entrada) {
+    if (!entrada.isIntersecting) return;
+    document.querySelectorAll('nav a.sub.activo').forEach(function (a) {
+      a.classList.remove('activo');
+    });
+    var a = document.querySelector('nav a[href="#' + entrada.target.id + '"]');
+    if (a) a.classList.add('activo');
+  });
+}, { rootMargin: '-80px 0px -70% 0px' });
+document.querySelectorAll('.ej').forEach(function (ej) { observador.observe(ej); });
+
+// ── Menú lateral en pantallas estrechas ───────────────────────
+var lateral = document.getElementById('lateral');
+document.getElementById('alternar').addEventListener('click', function () {
+  lateral.classList.toggle('abierta');
+});
+lateral.addEventListener('click', function (ev) {
+  if (ev.target.tagName === 'A') lateral.classList.remove('abierta');
+});
+</script>
+</body>
+</html>

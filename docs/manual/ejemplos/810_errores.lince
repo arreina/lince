@@ -1,0 +1,13 @@
+# @seccion: Errores
+# @titulo: Intentar, capturar, finalmente
+# @nota: `capturar (error e)` atrapa cualquier tipo; con un tipo concreto, sólo ese.
+intentar {
+    sea lista nums = [1, 2, 3]
+    escribir(nums[99])
+} capturar (ErrorRango e) {
+    escribir("fuera de rango: " + e.mensaje)
+} capturar (error e) {
+    escribir("otro error")
+} finalmente {
+    escribir("esto se ejecuta siempre")
+}

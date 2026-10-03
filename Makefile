@@ -82,6 +82,18 @@ test-asan: debug
 # Todo lo que corre la integración continua.
 test-todo: test test-compilador test-servidor test-ejemplos test-asan
 
+# ── Manual ────────────────────────────────
+# docs/manual.html se genera: los ejemplos son .lince de verdad y la salida
+# que se publica es la que produce este intérprete al construir la página.
+docs: $(BIN)
+	@python3 docs/generar_manual.py ./$(BIN)
+
+# Guardián: si alguien toca un ejemplo —o el lenguaje cambia de
+# comportamiento— y no regenera, esto falla. Es lo que impide que el manual
+# se quede mintiendo.
+docs-check: $(BIN)
+	@python3 docs/generar_manual.py ./$(BIN) --comprobar
+
 # ── Limpiar ───────────────────────────────
 clean:
 	$(RM) $(BIN) lince_debug lince.exe lince_debug.exe
@@ -107,5 +119,5 @@ else
 endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-todo clean install uninstall
+        test-asan test-todo clean install uninstall docs docs-check
 

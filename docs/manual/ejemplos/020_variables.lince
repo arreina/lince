@@ -1,0 +1,9 @@
+# @seccion: Primeros pasos
+# @titulo: Variables y constantes
+# @nota: `sea` crea algo que puede cambiar; `fijo`, algo que no.
+sea nombre = "Ana"
+fijo PI = 3.14159
+
+nombre = "Blanca"
+escribir(nombre)
+escribir(PI)

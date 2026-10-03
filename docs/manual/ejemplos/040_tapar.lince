@@ -1,0 +1,12 @@
+# @seccion: Primeros pasos
+# @titulo: Tapar un nombre en un ámbito interior
+# @nota: Esto no es redefinir: es otro ámbito. El de fuera queda intacto.
+sea visible = "fuera"
+
+funcion dentro(): texto {
+    sea visible = "dentro"
+    devolver visible
+}
+
+escribir(dentro())
+escribir(visible)

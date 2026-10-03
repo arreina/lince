@@ -1,0 +1,9 @@
+# @seccion: Módulos y librerías
+# @titulo: Con espacio de nombres: `como`
+# @nota: Con `como`, el archivo corre en su propio ámbito y sólo se alcanza por el alias. Así dos librerías pueden tener funciones del mismo nombre.
+importar "./lib_metros" como metros
+importar "./lib_pies"   como pies
+
+escribir(metros.convertir(100))
+escribir(pies.convertir(100))
+escribir(metros.UNIDAD)

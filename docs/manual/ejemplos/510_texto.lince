@@ -1,0 +1,10 @@
+# @seccion: Texto
+# @titulo: Métodos de texto
+# @nota: La longitud cuenta caracteres, no bytes: las tildes y la eñe cuentan como uno.
+importar "texto"
+
+sea frase = "año de la cigüeña"
+escribir(frase.longitud())
+escribir(frase.mayusculas())
+escribir(texto.dividir("a,b,c", ","))
+escribir(texto.repetir("ab", 3))

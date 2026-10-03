@@ -1,0 +1,12 @@
+# @seccion: Primeros pasos
+# @titulo: Cada nombre se define una sola vez
+# @nota: Definir dos veces en el mismo ámbito es un error, no un descarte silencioso. Para cambiar el valor, asigna.
+sea contador = 1
+contador = 2
+escribir(contador)
+
+intentar {
+    sea contador = 3
+} capturar (error e) {
+    escribir(e.mensaje)
+}

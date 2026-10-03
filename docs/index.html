@@ -486,6 +486,7 @@
   <ul class="nav-links">
     <li><a href="#codigo">Código</a></li>
     <li><a href="#modulos">Módulos</a></li>
+    <li><a href="manual.html">Manual</a></li>
     <li><a href="#instalar">Instalar</a></li>
     <li><a href="https://github.com/arreina/lince/blob/main/ESPECIFICACION.md">Docs</a></li>
   </ul>
@@ -749,6 +750,14 @@ archivos.<span class="fn">escribir</span>(<span class="s">"log.txt"</span>, <spa
       </div>
       <div class="feature-card">
         <div class="feature-icon">🔁</div>
+        <h3>Librerías en Lince</h3>
+        <p>Reparte tu código en archivos y dale un espacio de nombres con
+        <code style="color:var(--amarillo)">importar "./x" como x</code>. Las rutas se
+        resuelven junto al archivo que importa, así que una librería funciona desde
+        cualquier sitio.</p>
+      </div>
+
+      <div class="feature">
         <h3>REPL interactivo</h3>
         <p>Ejecuta <code style="color:var(--amarillo)">lince</code> sin argumentos para entrar al REPL con historial persistente. Ideal para explorar y probar.</p>
       </div>
@@ -822,6 +831,20 @@ archivos.<span class="fn">escribir</span>(<span class="s">"log.txt"</span>, <spa
 <hr class="sep">
 
 <!-- ══ INSTALACIÓN ══ -->
+<section class="section" id="manual-destacado" style="background:var(--bg2);">
+  <div class="container">
+    <h2>Manual con ejemplos que no mienten</h2>
+    <p>Los ejemplos del manual no están escritos a mano: son archivos
+    <code style="color:var(--amarillo)">.lince</code> del repositorio que se ejecutan al
+    generar la página, y lo que se publica debajo de cada uno es su salida real. Si el
+    lenguaje cambia de comportamiento, la integración continua lo detecta, así que la
+    página no puede quedarse obsoleta en silencio.</p>
+    <p style="margin-top:1.5rem;">
+      <a class="btn btn-primary" href="manual.html">Abrir el manual</a>
+    </p>
+  </div>
+</section>
+
 <section class="section install-section" id="instalar">
   <div class="section-inner">
     <div class="section-label">Instalación</div>
@@ -905,7 +928,7 @@ archivos.<span class="fn">escribir</span>(<span class="s">"log.txt"</span>, <spa
 <!-- ══ FOOTER ══ -->
 <footer>
   <p>
-    <strong style="color:var(--texto)">Lince v0.5</strong> &nbsp;·&nbsp;
+    <strong style="color:var(--texto)">Lince v0.6</strong> &nbsp;·&nbsp;
     Licencia <a href="https://github.com/arreina/lince/blob/main/LICENSE">MIT</a> &nbsp;·&nbsp;
     <a href="https://github.com/arreina/lince">GitHub</a> &nbsp;·&nbsp;
     <a href="https://github.com/arreina/lince/blob/main/ESPECIFICACION.md">Especificación</a>

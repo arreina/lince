@@ -1,0 +1,9 @@
+# @seccion: Listas
+# @titulo: Crear, modificar y consultar
+# @nota: `agregar`, `eliminar` e `insertar` cambian la lista; `longitud`, `posicion` y `contiene` sólo la leen.
+sea notas = [9, 7, 10]
+notas.agregar(6)
+escribir(notas)
+escribir(notas.longitud())
+escribir(notas.posicion(10))
+escribir(notas.contiene(7))

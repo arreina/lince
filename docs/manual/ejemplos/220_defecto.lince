@@ -1,0 +1,9 @@
+# @seccion: Funciones
+# @titulo: Valores por defecto
+# @nota: Los parámetros con valor por defecto van al final.
+funcion saludo(val texto nombre, val texto trato = "Hola"): texto {
+    devolver trato + ", " + nombre
+}
+
+escribir(saludo("Ana"))
+escribir(saludo("Ana", "Buenas"))

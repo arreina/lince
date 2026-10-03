@@ -1,0 +1,6 @@
+# @oculto: si
+fijo RADIO_PI = 3.14159
+
+funcion area_circulo(val numero r): numero {
+    devolver RADIO_PI * r * r
+}

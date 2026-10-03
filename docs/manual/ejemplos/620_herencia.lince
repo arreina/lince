@@ -1,0 +1,19 @@
+# @seccion: Clases
+# @titulo: Herencia
+# @nota: `extiende` hereda; `padre(...)` llama al constructor de arriba.
+clase Figura {
+    funcion crear(val texto nombre): nulo { mi.nombre = nombre }
+    funcion describir(): texto { devolver "soy un " + mi.nombre }
+}
+
+clase Cuadrado extiende Figura {
+    funcion crear(val numero lado): nulo {
+        padre("cuadrado")
+        mi.lado = lado
+    }
+    funcion area(): numero { devolver mi.lado * mi.lado }
+}
+
+sea c = Cuadrado(5)
+escribir(c.describir())
+escribir(c.area())

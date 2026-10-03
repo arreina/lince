@@ -1,0 +1,3 @@
+# @oculto: si
+fijo UNIDAD = "m"
+funcion convertir(val numero x): numero { devolver x }

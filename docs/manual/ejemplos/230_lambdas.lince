@@ -1,0 +1,10 @@
+# @seccion: Funciones
+# @titulo: Lambdas y funciones como argumento
+# @nota: Una función sin nombre es un valor como cualquier otro.
+sea doble = funcion(val numero x): numero { devolver x * 2 }
+escribir(doble(21))
+
+sea nums = [1, 2, 3, 4]
+escribir(mapear(nums, doble))
+escribir(filtrar(nums, funcion(val numero x): logico { devolver x % 2 == 0 }))
+escribir(reducir(nums, 0, funcion(val numero a, val numero x): numero { devolver a + x }))

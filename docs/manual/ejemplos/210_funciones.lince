@@ -1,0 +1,8 @@
+# @seccion: Funciones
+# @titulo: Declarar y llamar
+# @nota: Los parámetros llevan `val` (por valor) o `ref` (por referencia), tipo y nombre.
+funcion area(val numero base, val numero altura): numero {
+    devolver base * altura / 2
+}
+
+escribir(area(10, 4))

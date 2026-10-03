@@ -1,0 +1,15 @@
+# @seccion: Funciones
+# @titulo: Closures
+# @nota: Una función recuerda el ámbito donde se creó, así que puede llevar estado.
+funcion contador_desde(val numero inicio): funcion {
+    sea n = inicio
+    devolver funcion(): numero {
+        n = n + 1
+        devolver n
+    }
+}
+
+sea siguiente = contador_desde(10)
+escribir(siguiente())
+escribir(siguiente())
+escribir(siguiente())

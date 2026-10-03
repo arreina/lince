@@ -1,0 +1,8 @@
+# @seccion: Módulos y librerías
+# @titulo: Importar un módulo estándar
+# @nota: Hay diez: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red y expresiones.
+importar "matematica"
+importar "json"
+
+escribir(matematica.raiz(144))
+escribir(json.texto({"vivo": verdadero}))
