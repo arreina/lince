@@ -33,6 +33,20 @@ $(BIN): $(SRC)
 # el módulo `motor` existe. Este target enlaza libmotor.a de lince-motor
 # (repo hermano, hay que compilarlo antes con `cmake --build build` ahí)
 # más SDL2 y SDL2_image, y produce un binario distinto: lince-motor.
+#
+# Revisión del repo hermano contra la que está verificado el binding:
+#
+#   github.com/arreina/lince-motor (privado)
+#   main @ edffe157719aa97923b7ad7ddfa50d2d32bcef71
+#
+# Queda anotada porque la dependencia es un directorio hermano, sin versión
+# en ninguna parte: si lince-motor avanza y include/motor.h cambia de
+# semántica, esto compila igual y falla en ejecución sin pista de cuál era
+# la pareja buena. Es el mismo SHA que fija MOTOR_REV en
+# .github/workflows/ci.yml, y se suben los dos en el mismo commit tras
+# comprobar en local con:
+#
+#   make test-motor LINCE_MOTOR_DIR=/ruta/al/lince-motor
 LINCE_MOTOR_DIR ?= ../lince-motor
 MOTOR_BIN        = lince-motor
 MOTOR_SRC        = $(SRC) src/modulo_motor.c
