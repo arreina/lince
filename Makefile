@@ -27,65 +27,6 @@ $(BIN): $(SRC)
 	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
 	@echo "✅ Lince compilado — usa: ./$(BIN) archivo.lince"
 
-# ── Lince Motor (fase A3, opt-in) ─────────
-#
-# Build aparte: el `lince` normal (arriba) no depende de SDL2 ni sabe que
-# el módulo `motor` existe. Este target enlaza libmotor.a de lince-motor
-# (repo hermano, hay que compilarlo antes con `cmake --build build` ahí)
-# más SDL2 y SDL2_image, y produce un binario distinto: lince-motor.
-#
-# Revisión del repo hermano contra la que está verificado el binding:
-#
-#   github.com/arreina/lince-motor (privado)
-#   main @ edffe157719aa97923b7ad7ddfa50d2d32bcef71
-#
-# Queda anotada porque la dependencia es un directorio hermano, sin versión
-# en ninguna parte: si lince-motor avanza y include/motor.h cambia de
-# semántica, esto compila igual y falla en ejecución sin pista de cuál era
-# la pareja buena. Es el mismo SHA que fija MOTOR_REV en
-# .github/workflows/ci.yml, y se suben los dos en el mismo commit tras
-# comprobar en local con:
-#
-#   make test-motor LINCE_MOTOR_DIR=/ruta/al/lince-motor
-LINCE_MOTOR_DIR ?= ../lince-motor
-MOTOR_BIN        = lince-motor
-MOTOR_SRC        = $(SRC) src/modulo_motor.c
-MOTOR_LIB        = $(LINCE_MOTOR_DIR)/build/libmotor.a
-# Las flags propias del build del motor, en un solo sitio: las comparten
-# 'motor' y 'motor-debug'. Duplicadas, añadir un -D o mover el include de
-# lince-motor arreglaba uno y dejaba el otro fallando con un "no such file"
-# que no parece tener nada que ver.
-MOTOR_BASE_FLAGS = -DLINCE_MOTOR -I$(LINCE_MOTOR_DIR)/include \
-                    $(shell pkg-config --cflags sdl2 SDL2_image)
-MOTOR_CFLAGS     = $(CFLAGS) $(MOTOR_BASE_FLAGS)
-MOTOR_LDFLAGS    = $(MOTOR_LIB) $(shell pkg-config --libs sdl2 SDL2_image) $(LDFLAGS)
-
-motor: $(MOTOR_LIB)
-	$(CC) $(MOTOR_CFLAGS) -o $(MOTOR_BIN) $(MOTOR_SRC) $(MOTOR_LDFLAGS)
-	@echo "✅ Lince Motor compilado — usa: ./$(MOTOR_BIN) juego.lince"
-
-$(MOTOR_LIB):
-	@echo "❌ No encuentro $(MOTOR_LIB)"
-	@echo "   Compila primero lince-motor: cd $(LINCE_MOTOR_DIR) && cmake -B build && cmake --build build -j"
-	@exit 1
-
-# El mismo binario con AddressSanitizer, que es el que corre el test de humo:
-# los fallos del binding son de memoria y sin instrumentar no se ven.
-MOTOR_BIN_DEBUG  = lince-motor-debug
-
-# Mismos avisos que el build normal: si el binario instrumentado usara otras
-# flags, la CI leería warnings que el release silencia a propósito (o al revés).
-motor-debug: $(MOTOR_LIB)
-	$(CC) $(CFLAGS) -O0 -g -fsanitize=address $(MOTOR_BASE_FLAGS) \
-	    -o $(MOTOR_BIN_DEBUG) $(MOTOR_SRC) $(MOTOR_LDFLAGS)
-	@echo "✅ Lince Motor debug compilado"
-
-# Test de humo del motor: recorre el binding entero sin pantalla (SDL con el
-# driver 'dummy'). Es opt-in como el propio target 'motor' — necesita SDL2 y
-# lince-motor ya compilado — así que no entra en 'test-todo'.
-test-motor: motor-debug
-	@tests/motor/smoke.sh ./$(MOTOR_BIN_DEBUG) $(LINCE_MOTOR_DIR)
-
 # ── Modo debug ────────────────────────────
 debug: $(SRC)
 	$(CC) -Wall -g -fsanitize=address -o lince_debug $(SRC) $(LDFLAGS)
@@ -143,7 +84,7 @@ test-todo: test test-compilador test-servidor test-ejemplos test-asan
 
 # ── Limpiar ───────────────────────────────
 clean:
-	$(RM) $(BIN) lince_debug lince.exe lince_debug.exe $(MOTOR_BIN) $(MOTOR_BIN_DEBUG)
+	$(RM) $(BIN) lince_debug lince.exe lince_debug.exe
 	@echo "🧹 Limpiado"
 
 # ── Instalar en el sistema ────────────────
@@ -166,5 +107,5 @@ else
 endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-todo clean install uninstall motor motor-debug test-motor
+        test-asan test-todo clean install uninstall
 

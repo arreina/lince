@@ -1,8 +1,6 @@
 # Binarios compilados
 /lince
 /lince_debug
-/lince-motor
-/lince-motor-debug
 *.o
 *.a
 
