@@ -29,7 +29,6 @@
 /* Crea un valor número — necesitamos acceso a la API interna */
 
 /* Macro para definir una función nativa en un módulo */
-typedef Valor *(*FnNativa)(Valor **args, int num_args);
 
 typedef struct {
     const char *nombre;
@@ -1892,11 +1891,11 @@ static Valor *fn_red_eliminar(Valor **a, int n) {
     Valor *cabeceras = (n >= 2) ? a[1] : NULL;
     return hacer_peticion("DELETE", a[0]->texto, "", cabeceras);
 }
-typedef struct {
-    char     *nombre;
-    FnNativa  fn;
-    int       num_args;
-} FuncionNativa;
+
+/* Gancho de anfitrión — ver modulos.h */
+static ModuloExterno _modulo_externo = NULL;
+
+void modulo_fijar_externo(ModuloExterno fn) { _modulo_externo = fn; }
 
 /* Registra un módulo como diccionario en el entorno */
 static void registrar_modulo_diccionario(Entorno *entorno,
@@ -2092,6 +2091,11 @@ static Valor *fn_exp_reemplazar(Valor **a, int n) {
 }
 #endif /* LINCE_WINDOWS */
 
+void modulo_registrar(Entorno *entorno, const char *nombre,
+                      FuncionNativa *fns, int num_fns) {
+    registrar_modulo_diccionario(entorno, nombre, fns, num_fns, NULL, NULL, 0);
+}
+
 void modulo_cargar(const char *nombre, Entorno *entorno) {
     srand((unsigned)time(NULL));
 
@@ -2275,6 +2279,10 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
         return;
     }
 
+
+    /* ¿Lo trae el anfitrión? */
+    if (_modulo_externo && _modulo_externo(nombre, entorno))
+        return;
 
     /* Módulo desconocido */
     hay_error = 1;
