@@ -1,0 +1,305 @@
+# TEST: los fallos de uso del lenguaje son errores capturables
+#
+# Hasta ahora unos cuarenta de ellos hacían fprintf + exit(1): mataban el
+# proceso, así que un intentar/capturar no podía recuperarse, y el REPL se
+# cerraba entero. Cada caso provoca uno y comprueba el tipo con el que llega.
+
+importar "texto"
+
+clase Caja {
+    funcion crear(val numero v): nulo { mi.v = v }
+    funcion dime(): numero { devolver mi.v }
+}
+
+funcion doble(val numero x): numero { devolver x * 2 }
+
+generador cuenta(val numero hasta): numero {
+    para (i = 0; i < hasta; i++) { producir i }
+}
+
+intentar {
+    sea l = [1, 2, 3]
+    l[9] = 1
+    escribir("indice-asignar: NO dio error")
+} capturar (error e) {
+    escribir("indice-asignar: " + e.tipo)
+}
+
+intentar {
+    sea d = {"a": 1}
+    d[1] = 2
+    escribir("clave-no-texto: NO dio error")
+} capturar (error e) {
+    escribir("clave-no-texto: " + e.tipo)
+}
+
+intentar {
+    sea n = 5
+    n[0] = 1
+    escribir("indice-en-numero: NO dio error")
+} capturar (error e) {
+    escribir("indice-en-numero: " + e.tipo)
+}
+
+intentar {
+    sea r = texto.nada()
+    escribir("modulo-sin-funcion: NO dio error")
+} capturar (error e) {
+    escribir("modulo-sin-funcion: " + e.tipo)
+}
+
+intentar {
+    escribir(texto.nada)
+    escribir("modulo-sin-campo: NO dio error")
+} capturar (error e) {
+    escribir("modulo-sin-campo: " + e.tipo)
+}
+
+intentar {
+    sea c = Caja(1)
+    c.nada()
+    escribir("metodo-no-existe: NO dio error")
+} capturar (error e) {
+    escribir("metodo-no-existe: " + e.tipo)
+}
+
+intentar {
+    sea c = Caja(1)
+    c.dime(1, 2)
+    escribir("metodo-aridad: NO dio error")
+} capturar (error e) {
+    escribir("metodo-aridad: " + e.tipo)
+}
+
+intentar {
+    sea c = Caja(1)
+    escribir(c.nada)
+    escribir("campo-no-existe: NO dio error")
+} capturar (error e) {
+    escribir("campo-no-existe: " + e.tipo)
+}
+
+intentar {
+    sea c = Caja(1, 2)
+    escribir("crear-aridad: NO dio error")
+} capturar (error e) {
+    escribir("crear-aridad: " + e.tipo)
+}
+
+intentar {
+    sea n = 5
+    escribir(n.x)
+    escribir("campo-en-numero: NO dio error")
+} capturar (error e) {
+    escribir("campo-en-numero: " + e.tipo)
+}
+
+intentar {
+    sea n = 5
+    n.x = 1
+    escribir("asignar-campo-num: NO dio error")
+} capturar (error e) {
+    escribir("asignar-campo-num: " + e.tipo)
+}
+
+intentar {
+    sea l = [1]
+    l.agregar()
+    escribir("lista-agregar: NO dio error")
+} capturar (error e) {
+    escribir("lista-agregar: " + e.tipo)
+}
+
+intentar {
+    sea l = [1]
+    l.eliminar()
+    escribir("lista-eliminar-0: NO dio error")
+} capturar (error e) {
+    escribir("lista-eliminar-0: " + e.tipo)
+}
+
+intentar {
+    sea l = [1]
+    l.eliminar(9)
+    escribir("lista-eliminar-rng: NO dio error")
+} capturar (error e) {
+    escribir("lista-eliminar-rng: " + e.tipo)
+}
+
+intentar {
+    sea l = [1]
+    l.contiene()
+    escribir("lista-contiene: NO dio error")
+} capturar (error e) {
+    escribir("lista-contiene: " + e.tipo)
+}
+
+intentar {
+    sea l = [1]
+    l.posicion()
+    escribir("lista-posicion: NO dio error")
+} capturar (error e) {
+    escribir("lista-posicion: " + e.tipo)
+}
+
+intentar {
+    sea l = [1]
+    l.insertar(1)
+    escribir("lista-insertar: NO dio error")
+} capturar (error e) {
+    escribir("lista-insertar: " + e.tipo)
+}
+
+intentar {
+    sea l = [1]
+    l.nada()
+    escribir("lista-metodo: NO dio error")
+} capturar (error e) {
+    escribir("lista-metodo: " + e.tipo)
+}
+
+intentar {
+    sea t = "abc"
+    t.contiene()
+    escribir("texto-contiene: NO dio error")
+} capturar (error e) {
+    escribir("texto-contiene: " + e.tipo)
+}
+
+intentar {
+    sea t = "abc"
+    t.reemplazar("a")
+    escribir("texto-reemplazar: NO dio error")
+} capturar (error e) {
+    escribir("texto-reemplazar: " + e.tipo)
+}
+
+intentar {
+    sea t = "abc"
+    t.nada()
+    escribir("texto-metodo: NO dio error")
+} capturar (error e) {
+    escribir("texto-metodo: " + e.tipo)
+}
+
+intentar {
+    sea d = {"a": 1}
+    d.contiene()
+    escribir("dic-contiene: NO dio error")
+} capturar (error e) {
+    escribir("dic-contiene: " + e.tipo)
+}
+
+intentar {
+    sea d = {"a": 1}
+    d.eliminar()
+    escribir("dic-eliminar: NO dio error")
+} capturar (error e) {
+    escribir("dic-eliminar: " + e.tipo)
+}
+
+intentar {
+    sea d = {"a": 1}
+    d.nada()
+    escribir("dic-metodo: NO dio error")
+} capturar (error e) {
+    escribir("dic-metodo: " + e.tipo)
+}
+
+intentar {
+    sea n = 5
+    n.nada()
+    escribir("numero-metodo: NO dio error")
+} capturar (error e) {
+    escribir("numero-metodo: " + e.tipo)
+}
+
+intentar {
+    padre(1)
+    escribir("padre-fuera: NO dio error")
+} capturar (error e) {
+    escribir("padre-fuera: " + e.tipo)
+}
+
+intentar {
+    sea t = "a"
+    t++
+    escribir("incremento-texto: NO dio error")
+} capturar (error e) {
+    escribir("incremento-texto: " + e.tipo)
+}
+
+intentar {
+    sin_definir++
+    escribir("incremento-nodef: NO dio error")
+} capturar (error e) {
+    escribir("incremento-nodef: " + e.tipo)
+}
+
+intentar {
+    para cada numero x en 5 { escribir(x) }
+    escribir("para-cada-numero: NO dio error")
+} capturar (error e) {
+    escribir("para-cada-numero: " + e.tipo)
+}
+
+intentar {
+    doble()
+    escribir("funcion-aridad: NO dio error")
+} capturar (error e) {
+    escribir("funcion-aridad: " + e.tipo)
+}
+
+intentar {
+    para cada numero x en cuenta() { escribir(x) }
+    escribir("generador-aridad: NO dio error")
+} capturar (error e) {
+    escribir("generador-aridad: " + e.tipo)
+}
+
+intentar {
+    fijo K = 1
+    K = 2
+    escribir("constante: NO dio error")
+} capturar (error e) {
+    escribir("constante: " + e.tipo)
+}
+
+intentar {
+    nunca_definida = 1
+    escribir("asignar-nodef: NO dio error")
+} capturar (error e) {
+    escribir("asignar-nodef: " + e.tipo)
+}
+
+intentar {
+    para (i = 0; i < 2; j++) { }
+    escribir("para-incremento: NO dio error")
+} capturar (error e) {
+    escribir("para-incremento: " + e.tipo)
+}
+
+intentar {
+    sea Q = 1
+    sea inst = Q(1)
+    escribir("instanciar-no-clase: NO dio error")
+} capturar (error e) {
+    escribir("instanciar-no-clase: " + e.tipo)
+}
+
+intentar {
+    sea cinco = 5
+    cinco(1)
+    escribir("no-es-funcion: NO dio error")
+} capturar (error e) {
+    escribir("no-es-funcion: " + e.tipo)
+}
+
+intentar {
+    escribir("a" - 1)
+    escribir("operacion: NO dio error")
+} capturar (error e) {
+    escribir("operacion: " + e.tipo)
+}
+
+escribir("sigo vivo")

@@ -1,0 +1,27 @@
+# @seccion: Errores
+# @titulo: Los fallos de uso también se pueden capturar
+# @nota: Un método con los argumentos mal, un índice fuera de rango, un campo que no existe… llegan como errores con su tipo y se pueden capturar. Sin capturar, el mensaje dice la línea.
+sea lista notas = [9, 7]
+
+intentar {
+    notas.agregar()
+} capturar (ErrorArgumento e) {
+    escribir("[" + e.tipo + "] " + e.mensaje)
+}
+
+intentar {
+    notas[5] = 1
+} capturar (ErrorRango e) {
+    escribir("[" + e.tipo + "] " + e.mensaje)
+}
+
+clase Caja {
+    funcion crear(val numero v): nulo { mi.v = v }
+}
+
+intentar {
+    sea c = Caja(1)
+    escribir(c.contenido)
+} capturar (error e) {
+    escribir("[" + e.tipo + "] " + e.mensaje)
+}

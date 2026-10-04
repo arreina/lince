@@ -146,14 +146,14 @@
 <div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a></div>
 <div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
-<div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a></div>
+<div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
 <div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a></div>
 </nav>
 
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>26 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>27 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -389,7 +389,32 @@ esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span>
 } <span class="k">capturar</span> (ErrorTipo e) {
     <span class="k">escribir</span>(<span class="s">&quot;[&quot;</span> + e.tipo + <span class="s">&quot;] &quot;</span> + e.mensaje)
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[Error] La variable &#x27;noExiste&#x27; no está definida.
-[ErrorTipo] &#x27;cinco&#x27; no es una función, así que no se puede llamar.</pre></div><span class="fuente">830_primer_error.lince</span></article></section>
+[ErrorTipo] &#x27;cinco&#x27; no es una función, así que no se puede llamar.</pre></div><span class="fuente">830_primer_error.lince</span></article><article class="ej" id="errores-3"><h3>Los fallos de uso también se pueden capturar</h3><p class="nota">Un método con los argumentos mal, un índice fuera de rango, un campo que no existe… llegan como errores con su tipo y se pueden capturar. Sin capturar, el mensaje dice la línea.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> <span class="t">lista</span> notas = [<span class="n">9</span>, <span class="n">7</span>]
+
+<span class="k">intentar</span> {
+    notas.agregar()
+} <span class="k">capturar</span> (ErrorArgumento e) {
+    <span class="k">escribir</span>(<span class="s">&quot;[&quot;</span> + e.tipo + <span class="s">&quot;] &quot;</span> + e.mensaje)
+}
+
+<span class="k">intentar</span> {
+    notas[<span class="n">5</span>] = <span class="n">1</span>
+} <span class="k">capturar</span> (ErrorRango e) {
+    <span class="k">escribir</span>(<span class="s">&quot;[&quot;</span> + e.tipo + <span class="s">&quot;] &quot;</span> + e.mensaje)
+}
+
+<span class="k">clase</span> Caja {
+    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> v): <span class="k">nulo</span> { <span class="k">mi</span>.v = v }
+}
+
+<span class="k">intentar</span> {
+    <span class="k">sea</span> c = Caja(<span class="n">1</span>)
+    <span class="k">escribir</span>(c.contenido)
+} <span class="k">capturar</span> (<span class="t">error</span> e) {
+    <span class="k">escribir</span>(<span class="s">&quot;[&quot;</span> + e.tipo + <span class="s">&quot;] &quot;</span> + e.mensaje)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[ErrorArgumento] &#x27;agregar&#x27; necesita exactamente 1 argumento.
+[ErrorRango] Índice 5 fuera de rango. La lista tiene 2 elementos.
+[Error] El objeto no tiene el campo &#x27;contenido&#x27;.</pre></div><span class="fuente">840_errores_de_uso.lince</span></article></section>
 <section id="modulos-y-librerias"><h2>Módulos y librerías</h2><article class="ej" id="modulos-y-librerias-0"><h3>Importar un módulo estándar</h3><p class="nota">Hay diez: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red y expresiones.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
 <span class="k">importar</span> <span class="s">&quot;json&quot;</span>
 

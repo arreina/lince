@@ -163,11 +163,19 @@ static void evaluar(const char *codigo, Interprete *interp) {
 
 fin:
     if (hay_error && valor_error) {
-        fprintf(stdout, "%s❌ %s: %s%s\n",
-               C(ROJO),
-               valor_error->error->tipo,
-               valor_error->error->mensaje,
-               C(RESET));
+        if (valor_error->error->linea > 0)
+            fprintf(stdout, "%s❌ %s en línea %d: %s%s\n",
+                   C(ROJO),
+                   valor_error->error->tipo,
+                   valor_error->error->linea,
+                   valor_error->error->mensaje,
+                   C(RESET));
+        else
+            fprintf(stdout, "%s❌ %s: %s%s\n",
+                   C(ROJO),
+                   valor_error->error->tipo,
+                   valor_error->error->mensaje,
+                   C(RESET));
         valor_destruir(valor_error);
         valor_error = NULL;
         hay_error   = 0;

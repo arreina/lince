@@ -9,6 +9,7 @@
 #include <math.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include "interprete.h"
 #include "modulos.h"
 #include "paquetes.h"
@@ -140,6 +141,47 @@ Valor *valor_error_nuevo(const char *tipo, const char *mensaje, int linea) {
     valor_destruir(valor_error);
     valor_error = NULL;
     return valor_crear_error(tipo, mensaje, linea);
+}
+
+/* Error de ejecución capturable, con número de línea.
+ *
+ * Antes, unos cuarenta fallos de uso del lenguaje —un método de lista con
+ * mal número de argumentos, un índice fuera de rango, un campo que no existe,
+ * llamar a algo que no es una función...— hacían fprintf + exit(1): mataban el
+ * proceso, así que un intentar/capturar no podía recuperarse y el REPL se
+ * cerraba entero. Y casi ninguno decía la línea. Ahora pasan por aquí.
+ *
+ * Quien lo llama sigue siendo dueño de lo que tuviera vivo: tiene que soltarlo
+ * ANTES de volver, que con exit() no hacía falta y ahora sí. */
+#if defined(__GNUC__)
+#  define FORMATO_PRINTF(a, b) __attribute__((format(printf, a, b)))
+#else
+#  define FORMATO_PRINTF(a, b)
+#endif
+
+static void poner_error(const char *tipo, int linea, const char *fmt, ...)
+    FORMATO_PRINTF(3, 4);
+static void poner_error(const char *tipo, int linea, const char *fmt, ...) {
+    char msg[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+    valor_error = valor_error_nuevo(tipo, msg, linea);
+    hay_error   = 1;
+}
+
+static Valor *error_rt(const char *tipo, int linea, const char *fmt, ...)
+    FORMATO_PRINTF(3, 4);
+static Valor *error_rt(const char *tipo, int linea, const char *fmt, ...) {
+    char msg[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+    valor_error = valor_error_nuevo(tipo, msg, linea);
+    hay_error   = 1;
+    return valor_nulo();
 }
 
 /* Incrementa referencias */
@@ -572,8 +614,13 @@ static int redefinido(Entorno *e, const char *nombre, const char *que,
 
 void entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante) {
     if (e->cantidad >= MAX_VARS) {
-        fprintf(stderr, "\n❌ Error interno: demasiadas variables en el mismo ámbito.\n\n");
-        exit(1);
+        /* Alcanzable por un programa normal (256 variables en un ámbito), no
+           un fallo interno: error capturable y se suelta el valor, que quien
+           llama da por entregado. */
+        valor_destruir(valor);
+        poner_error("Error", 0,
+            "Demasiadas variables en el mismo ámbito (el máximo es %d).", MAX_VARS);
+        return;
     }
     e->vars[e->cantidad].nombre    = strdup(nombre);
     e->vars[e->cantidad].valor     = valor;
@@ -610,33 +657,24 @@ static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
             return valor_copiar(e->vars[i].valor);
     }
     if (e->padre) return entorno_obtener(e->padre, nombre, linea);
-    /* Lanzar como error capturable si hay línea */
-    char msg[256];
-    if (linea > 0) {
-        snprintf(msg, sizeof(msg),
-            "La variable '%s' no está definida.", nombre);
-        valor_error = valor_error_nuevo("Error", msg, linea);
-        hay_error = 1;
-        return valor_nulo();
-    }
-    fprintf(stderr,
-        "\n❌ Error en línea %d:\n"
-        "   Estás usando la variable '%s', pero nunca la definiste.\n"
-        "   ¿Querías escribir 'sea %s = ...' antes de usarla?\n\n",
-        linea, nombre, nombre);
-    exit(1);
+    /* Siempre capturable. Antes, sin número de línea (linea == 0 — la
+       llamaba el incremento de un 'para') caía a un fprintf y exit(1), y un
+       'para (i = 0; i < 3; j++)' con 'j' sin definir mataba el proceso. */
+    poner_error("Error", linea, "La variable '%s' no está definida.", nombre);
+    return valor_nulo();
 }
 
 static void entorno_asignar(Entorno *e, const char *nombre, Valor *nuevo, int linea) {
     for (int i = 0; i < e->cantidad; i++) {
         if (strcmp(e->vars[i].nombre, nombre) == 0) {
             if (e->vars[i].constante) {
-                fprintf(stderr,
-                    "\n❌ Error en línea %d:\n"
-                    "   '%s' es una constante definida con 'fijo' y no puede cambiar.\n"
-                    "   Si necesitas que cambie, usa 'sea' en lugar de 'fijo'.\n\n",
-                    linea, nombre);
-                exit(1);
+                /* 'nuevo' se entregó a esta función: si no se asigna, hay que
+                   soltarlo o se fuga. */
+                valor_destruir(nuevo);
+                poner_error("Error", linea,
+                    "'%s' es una constante definida con 'fijo' y no puede cambiar. "
+                    "Si necesitas que cambie, usa 'sea' en lugar de 'fijo'.", nombre);
+                return;
             }
             valor_destruir(e->vars[i].valor);
             e->vars[i].valor = nuevo;
@@ -644,12 +682,10 @@ static void entorno_asignar(Entorno *e, const char *nombre, Valor *nuevo, int li
         }
     }
     if (e->padre) { entorno_asignar(e->padre, nombre, nuevo, linea); return; }
-    fprintf(stderr,
-        "\n❌ Error en línea %d:\n"
-        "   Intentas asignar un valor a '%s', pero nunca la definiste.\n"
-        "   ¿Querías escribir 'sea %s = ...' primero?\n\n",
-        linea, nombre, nombre);
-    exit(1);
+    valor_destruir(nuevo);
+    poner_error("Error", linea,
+        "Intentas asignar un valor a '%s', pero nunca la definiste. "
+        "¿Querías escribir 'sea %s = ...' primero?", nombre, nombre);
 }
 
 /* ─────────────────────────────────────────
@@ -1133,19 +1169,24 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_INCREMENTO: {
             Valor *v = entorno_obtener(e, n->incremento.nombre, n->linea);
+            /* Si la variable no existe, entorno_obtener ya ha puesto ese
+               error: se propaga, no se le añade encima uno de "no contiene un
+               número" que sería la consecuencia y no la causa. */
+            if (hay_error) { valor_destruir(v); return valor_nulo(); }
             if (v->tipo != VAL_NUMERO) {
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   Solo puedes usar '++' o '--' con variables numéricas.\n"
-                    "   '%s' no contiene un número.\n\n",
-                    n->incremento.nombre);
-                exit(1);
+                valor_destruir(v);
+                return error_rt("ErrorTipo", n->linea,
+                    "Solo puedes usar '++' o '--' con variables numéricas. "
+                    "'%s' no contiene un número.", n->incremento.nombre);
             }
             Valor *nuevo;
             if (strcmp(n->incremento.operador, "++") == 0)
                 nuevo = valor_numero(v->numero + 1);
             else
                 nuevo = valor_numero(v->numero - 1);
+            /* 'v' es una copia hecha por entorno_obtener y nadie la soltaba:
+               cada 'x++' suelto fugaba una asignación. */
+            valor_destruir(v);
             entorno_asignar(e, n->incremento.nombre, nuevo, n->linea);
             return valor_nulo();
         }
@@ -1253,14 +1294,15 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(r);
                 entorno_destruir(cuerpo_e);
 
-                Valor *vactual = entorno_obtener(bucle, n->para.var_incremento, 0);
+                Valor *vactual = entorno_obtener(bucle, n->para.var_incremento, n->linea);
+                if (hay_error) { valor_destruir(vactual); break; }
                 Valor *vnuevo;
                 if (strcmp(n->para.op_incremento, "++") == 0)
                     vnuevo = valor_numero(vactual->numero + 1);
                 else
                     vnuevo = valor_numero(vactual->numero - 1);
                 valor_destruir(vactual);
-                entorno_asignar(bucle, n->para.var_incremento, vnuevo, 0);
+                entorno_asignar(bucle, n->para.var_incremento, vnuevo, n->linea);
             }
             entorno_destruir(bucle);
             return valor_nulo();
@@ -1331,10 +1373,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 return valor_nulo();
             }
 
-            fprintf(stderr,
-                "\n❌ Error:\n"
-                "   'para cada' solo funciona con listas, diccionarios o texto.\n\n");
-            exit(1);
+            valor_destruir(col);
+            return error_rt("ErrorTipo", n->linea,
+                "'para cada' solo funciona con listas, diccionarios o texto.");
         }
 
         case NODO_FUNCION: {
@@ -1399,11 +1440,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     if (!f->parametros[i].valor_defecto) params_req++;
 
                 if (args_dados < params_req || args_dados > params_total) {
-                    fprintf(stderr,
-                        "\n❌ Error en línea %d:\n"
-                        "   El generador '%s' espera entre %d y %d argumento(s).\n\n",
-                        n->linea, f->nombre, params_req, params_total);
-                    exit(1);
+                    Valor *err = error_rt("ErrorArgumento", n->linea,
+                        "El generador '%s' espera entre %d y %d argumento(s).",
+                        f->nombre, params_req, params_total);
+                    valor_destruir(vfun);
+                    profundidad--;
+                    return err;
                 }
 
                 Entorno *fn_e = entorno_crear(f->entorno_closure);
@@ -1458,11 +1500,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 if (!f->parametros[i].valor_defecto) params_req++;
 
             if (args_dados < params_req || args_dados > params_total) {
-                fprintf(stderr,
-                    "\n❌ Error en línea %d:\n"
-                    "   La función '%s' espera entre %d y %d argumento(s) pero recibió %d.\n\n",
-                    n->linea, f->nombre, params_req, params_total, args_dados);
-                exit(1);
+                Valor *err = error_rt("ErrorArgumento", n->linea,
+                    "La función '%s' espera entre %d y %d argumento(s) pero recibió %d.",
+                    f->nombre, params_req, params_total, args_dados);
+                valor_destruir(vfun);
+                profundidad--;
+                return err;
             }
 
             Entorno *fn_e = entorno_crear(f->entorno_closure);
@@ -1641,8 +1684,11 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 int i = (int)idx->numero;
                 if (i < 0) i = obj->lista.cantidad + i;
                 if (i < 0 || i >= obj->lista.cantidad) {
-                    fprintf(stderr, "\n❌ Error:\n   Índice fuera de rango.\n\n");
-                    exit(1);
+                    int cant = obj->lista.cantidad;
+                    double pedido = idx->numero;
+                    valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+                    return error_rt("ErrorRango", n->linea,
+                        "Índice %.0f fuera de rango. La lista tiene %d elementos.", pedido, cant);
                 }
                 valor_destruir(obj->lista.elementos[i]);
                 obj->lista.elementos[i] = val;
@@ -1655,8 +1701,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             }
             if (obj->tipo == VAL_DICCIONARIO) {
                 if (idx->tipo != VAL_TEXTO) {
-                    fprintf(stderr, "\n❌ Error:\n   La clave debe ser texto.\n\n");
-                    exit(1);
+                    valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+                    return error_rt("ErrorTipo", n->linea, "La clave de un diccionario debe ser texto.");
                 }
                 for (int i = 0; i < obj->diccionario.cantidad; i++) {
                     if (strcmp(obj->diccionario.claves[i], idx->texto) == 0) {
@@ -1679,8 +1725,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(idx);
                 return valor_nulo();
             }
-            fprintf(stderr, "\n❌ Error:\n   Solo puedes asignar por índice en listas o diccionarios.\n\n");
-            exit(1);
+            valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+            return error_rt("ErrorTipo", n->linea,
+                "Solo puedes asignar por índice en listas o diccionarios.");
         }
 
         case NODO_METODO: {
@@ -1694,18 +1741,15 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     if (strcmp(obj->diccionario.claves[i], met) == 0) {
                         Valor *vf = obj->diccionario.valores[i];
                         if (vf->tipo != VAL_FUNCION) {
-                            if (vf->tipo == VAL_CLASE)
-                                fprintf(stderr,
-                                    "\n❌ Error:\n"
-                                    "   '%s' es una clase del módulo, y todavía no se\n"
-                                    "   pueden instanciar clases a través de un alias de\n"
-                                    "   importación. Importa el archivo sin 'como' para\n"
-                                    "   usarla.\n\n", met);
-                            else
-                                fprintf(stderr,
-                                    "\n❌ Error:\n"
-                                    "   '%s' no es una función del módulo.\n\n", met);
-                            exit(1);
+                            int es_clase = (vf->tipo == VAL_CLASE);
+                            valor_destruir(obj);
+                            if (es_clase)
+                                return error_rt("ErrorTipo", n->linea,
+                                    "'%s' es una clase del módulo, y todavía no se pueden "
+                                    "instanciar clases a través de un alias de importación. "
+                                    "Importa el archivo sin 'como' para usarla.", met);
+                            return error_rt("ErrorTipo", n->linea,
+                                "'%s' no es una función del módulo.", met);
                         }
                         FuncionLince *f = vf->funcion;
 
@@ -1737,10 +1781,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                         return resultado ? resultado : valor_nulo();
                     }
                 }
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   El módulo no tiene la función '%s'.\n\n", met);
-                exit(1);
+                valor_destruir(obj);
+                return error_rt("Error", n->linea, "El módulo no tiene la función '%s'.", met);
             }
 
             /* ── Métodos de OBJETO ── */
@@ -1750,19 +1792,18 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 FuncionLince *f          = buscar_metodo(cls, met_nombre);
 
                 if (!f) {
-                    fprintf(stderr,
-                        "\n❌ Error en línea %d:\n"
-                        "   La clase '%s' no tiene el método '%s'.\n\n",
-                        n->linea, cls->nombre, met_nombre);
-                    exit(1);
+                    Valor *err = error_rt("Error", n->linea,
+                        "La clase '%s' no tiene el método '%s'.", cls->nombre, met_nombre);
+                    valor_destruir(obj);
+                    return err;
                 }
 
                 if (n->metodo.num_argumentos != f->num_parametros) {
-                    fprintf(stderr,
-                        "\n❌ Error en línea %d:\n"
-                        "   El método '%s' espera %d argumento(s), recibió %d.\n\n",
-                        n->linea, met_nombre, f->num_parametros, n->metodo.num_argumentos);
-                    exit(1);
+                    Valor *err = error_rt("ErrorArgumento", n->linea,
+                        "El método '%s' espera %d argumento(s), recibió %d.",
+                        met_nombre, f->num_parametros, n->metodo.num_argumentos);
+                    valor_destruir(obj);
+                    return err;
                 }
 
                 if (++profundidad > MAX_PROFUNDIDAD) {
@@ -1804,8 +1845,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "agregar") == 0) {
                     if (n->metodo.num_argumentos != 1) {
-                        fprintf(stderr, "\n❌ Error:\n   'agregar' necesita exactamente 1 argumento.\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea, "'agregar' necesita exactamente 1 argumento.");
                     }
                     Valor *elem = ejecutar(n->metodo.argumentos[0], e);
                     lista_agregar(obj, elem);
@@ -1816,15 +1857,18 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "eliminar") == 0) {
                     if (n->metodo.num_argumentos != 1) {
-                        fprintf(stderr, "\n❌ Error:\n   'eliminar' necesita exactamente 1 argumento (índice).\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea,
+                            "'eliminar' necesita exactamente 1 argumento (índice).");
                     }
                     Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
                     int idx = (int)vidx->numero;
                     valor_destruir(vidx);
                     if (idx < 0 || idx >= obj->lista.cantidad) {
-                        fprintf(stderr, "\n❌ Error:\n   Índice fuera de rango en 'eliminar'.\n\n");
-                        exit(1);
+                        int cant = obj->lista.cantidad;
+                        valor_destruir(obj);
+                        return error_rt("ErrorRango", n->linea,
+                            "Índice %d fuera de rango. La lista tiene %d elementos.", idx, cant);
                     }
                     valor_destruir(obj->lista.elementos[idx]);
                     for (int i = idx; i < obj->lista.cantidad - 1; i++)
@@ -1837,8 +1881,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "contiene") == 0) {
                     if (n->metodo.num_argumentos != 1) {
-                        fprintf(stderr, "\n❌ Error:\n   'contiene' necesita exactamente 1 argumento.\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
                     }
                     Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
                     int encontrado = 0;
@@ -1900,8 +1944,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "posicion") == 0) {
                     if (n->metodo.num_argumentos != 1) {
-                        fprintf(stderr, "\n❌ Error:\n   'posicion' necesita exactamente 1 argumento.\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea, "'posicion' necesita exactamente 1 argumento.");
                     }
                     Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
                     int donde = -1;
@@ -1915,8 +1959,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "insertar") == 0) {
                     if (n->metodo.num_argumentos != 2) {
-                        fprintf(stderr, "\n❌ Error:\n   'insertar' necesita 2 argumentos (índice y valor).\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea,
+                            "'insertar' necesita 2 argumentos (índice y valor).");
                     }
                     Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
                     Valor *elem = ejecutar(n->metodo.argumentos[1], e);
@@ -1941,8 +1986,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     else valor_destruir(obj);
                     return valor_nulo();
                 }
-                fprintf(stderr, "\n❌ Error:\n   Las listas no tienen el método '%s'.\n\n", met);
-                exit(1);
+                valor_destruir(obj);
+                return error_rt("Error", n->linea, "Las listas no tienen el método '%s'.", met);
             }
 
             /* ── Métodos de TEXTO ── */
@@ -1965,8 +2010,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "contiene") == 0) {
                     if (n->metodo.num_argumentos != 1) {
-                        fprintf(stderr, "\n❌ Error:\n   'contiene' necesita exactamente 1 argumento.\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
                     }
                     Valor *sub = ejecutar(n->metodo.argumentos[0], e);
                     int ok = strstr(obj->texto, sub->texto) != NULL;
@@ -1975,8 +2020,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "reemplazar") == 0) {
                     if (n->metodo.num_argumentos != 2) {
-                        fprintf(stderr, "\n❌ Error:\n   'reemplazar' necesita 2 argumentos: buscar y reemplazo.\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea,
+                            "'reemplazar' necesita 2 argumentos: buscar y reemplazo.");
                     }
                     Valor *buscar = ejecutar(n->metodo.argumentos[0], e);
                     Valor *repla  = ejecutar(n->metodo.argumentos[1], e);
@@ -2002,16 +2048,16 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     Valor *r = valor_texto(s + i); free(s); valor_destruir(obj);
                     return r;
                 }
-                fprintf(stderr, "\n❌ Error:\n   El texto no tiene el método '%s'.\n\n", met);
-                exit(1);
+                valor_destruir(obj);
+                return error_rt("Error", n->linea, "El texto no tiene el método '%s'.", met);
             }
 
             /* ── Métodos de DICCIONARIO ── */
             if (obj->tipo == VAL_DICCIONARIO) {
                 if (strcmp(met, "contiene") == 0) {
                     if (n->metodo.num_argumentos != 1) {
-                        fprintf(stderr, "\n❌ Error:\n   'contiene' necesita exactamente 1 argumento.\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
                     }
                     Valor *clave = ejecutar(n->metodo.argumentos[0], e);
                     int ok = 0;
@@ -2027,8 +2073,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 }
                 if (strcmp(met, "eliminar") == 0) {
                     if (n->metodo.num_argumentos != 1) {
-                        fprintf(stderr, "\n❌ Error:\n   'eliminar' necesita exactamente 1 argumento (clave).\n\n");
-                        exit(1);
+                        valor_destruir(obj);
+                        return error_rt("ErrorArgumento", n->linea,
+                            "'eliminar' necesita exactamente 1 argumento (clave).");
                     }
                     Valor *clave = ejecutar(n->metodo.argumentos[0], e);
                     for (int i = 0; i < obj->diccionario.cantidad; i++) {
@@ -2048,12 +2095,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                     valor_destruir(clave);
                     return valor_nulo();
                 }
-                fprintf(stderr, "\n❌ Error:\n   Los diccionarios no tienen el método '%s'.\n\n", met);
-                exit(1);
+                valor_destruir(obj);
+                return error_rt("Error", n->linea, "Los diccionarios no tienen el método '%s'.", met);
             }
 
-            fprintf(stderr, "\n❌ Error:\n   El tipo actual no tiene el método '%s'.\n\n", met);
-            exit(1);
+            valor_destruir(obj);
+            return error_rt("Error", n->linea, "El tipo actual no tiene el método '%s'.", met);
         }
 
         case NODO_ELEGIR: {
@@ -2207,27 +2254,21 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_PADRE: {
             if (!esto_actual || !clase_actual) {
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   'padre()' solo se puede usar dentro del método 'crear' de una clase.\n\n");
-                exit(1);
+                return error_rt("Error", n->linea,
+                    "'padre()' solo se puede usar dentro del método 'crear' de una clase.");
             }
             ClaseLince *cls_padre = clase_actual->padre;
             if (!cls_padre) {
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   Esta clase no extiende ninguna otra — no hay 'padre' al que llamar.\n\n");
-                exit(1);
+                return error_rt("Error", n->linea,
+                    "Esta clase no extiende ninguna otra — no hay 'padre' al que llamar.");
             }
             FuncionLince *f = buscar_metodo(cls_padre, "crear");
             if (!f) return valor_nulo(); /* padre sin crear — ok */
 
             if (n->padre.num_argumentos != f->num_parametros) {
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   'padre()' espera %d argumento(s), recibió %d.\n\n",
+                return error_rt("ErrorArgumento", n->linea,
+                    "'padre()' espera %d argumento(s), recibió %d.",
                     f->num_parametros, n->padre.num_argumentos);
-                exit(1);
             }
 
             Entorno *fn_e = entorno_crear(f->entorno_closure);
@@ -2377,10 +2418,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                         return r;
                     }
                 }
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   El módulo no tiene el campo '%s'.\n\n", campo);
-                exit(1);
+                valor_destruir(obj);
+                return error_rt("Error", n->linea, "El módulo no tiene el campo '%s'.", campo);
             }
             if (obj->tipo == VAL_OBJETO) {
                 const char *campo = n->acceso.campo;
@@ -2391,21 +2430,17 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                         return r;
                     }
                 }
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   El objeto no tiene el campo '%s'.\n\n", campo);
-                exit(1);
+                valor_destruir(obj);
+                return error_rt("Error", n->linea, "El objeto no tiene el campo '%s'.", campo);
             }
-            fprintf(stderr, "\n❌ Error:\n   Acceso a campo en un tipo que no es objeto.\n\n");
-            exit(1);
+            valor_destruir(obj);
+            return error_rt("ErrorTipo", n->linea, "Acceso a campo en un tipo que no es objeto.");
         }
 
         case NODO_ESTO: {
             if (!esto_actual) {
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   'esto' solo se puede usar dentro de un método de una clase.\n\n");
-                exit(1);
+                return error_rt("Error", n->linea,
+                    "'esto' solo se puede usar dentro de un método de una clase.");
             }
             return valor_retener(esto_actual);
         }
@@ -2423,11 +2458,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             if (n->clase.padre) {
                 Valor *vpadre = entorno_obtener(e, n->clase.padre, n->linea);
                 if (vpadre->tipo != VAL_CLASE) {
-                    fprintf(stderr,
-                        "\n❌ Error:\n"
-                        "   '%s' no es una clase — no se puede extender.\n\n",
-                        n->clase.padre);
-                    exit(1);
+                    valor_destruir(vpadre);
+                    return error_rt("ErrorTipo", n->linea,
+                        "'%s' no es una clase — no se puede extender.", n->clase.padre);
                 }
                 c->padre = vpadre->clase;
                 valor_destruir(vpadre);
@@ -2450,11 +2483,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             for (int i = 0; i < n->clase.num_interfaces; i++) {
                 Valor *viface = entorno_obtener(e, n->clase.interfaces[i], n->linea);
                 if (!viface || viface->tipo != VAL_DICCIONARIO || viface->es_modulo != 2) {
-                    fprintf(stderr,
-                        "\n❌ Error en línea %d:\n"
-                        "   '%s' no es una interfaz.\n\n",
-                        n->linea, n->clase.interfaces[i]);
-                    exit(1);
+                    valor_destruir(viface);
+                    return error_rt("ErrorTipo", n->linea,
+                        "'%s' no es una interfaz.", n->clase.interfaces[i]);
                 }
                 InterfazLince *iface = (InterfazLince*)(uintptr_t)
                     (long long)viface->diccionario.valores[0]->numero;
@@ -2462,12 +2493,11 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
                 for (int j = 0; j < iface->num_metodos; j++) {
                     if (!buscar_metodo(c, iface->metodos[j])) {
-                        fprintf(stderr,
-                            "\n❌ Error en línea %d:\n"
-                            "   La clase '%s' dice implementar '%s'\n"
-                            "   pero le falta el método '%s'.\n\n",
-                            n->linea, c->nombre, iface->nombre, iface->metodos[j]);
-                        exit(1);
+                        Valor *err = error_rt("Error", n->linea,
+                            "La clase '%s' dice implementar '%s' pero le falta el método '%s'.",
+                            c->nombre, iface->nombre, iface->metodos[j]);
+                        valor_destruir(viface);
+                        return err;
                     }
                 }
                 valor_destruir(viface);
@@ -2482,10 +2512,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         case NODO_INSTANCIA: {
             Valor *vcls = entorno_obtener(e, n->instancia.clase, n->linea);
             if (vcls->tipo != VAL_CLASE) {
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   '%s' no es una clase.\n\n", n->instancia.clase);
-                exit(1);
+                valor_destruir(vcls);
+                return error_rt("ErrorTipo", n->linea,
+                    "'%s' no es una clase.", n->instancia.clase);
             }
             ClaseLince *cls = vcls->clase;
 
@@ -2517,11 +2546,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             FuncionLince *f = buscar_metodo(cls, "crear");
             if (f) {
                 if (n->instancia.num_argumentos != f->num_parametros) {
-                    fprintf(stderr,
-                        "\n❌ Error:\n"
-                        "   '%s' espera %d argumento(s) en 'crear', recibió %d.\n\n",
+                    Valor *err = error_rt("ErrorArgumento", n->linea,
+                        "'%s' espera %d argumento(s) en 'crear', recibió %d.",
                         cls->nombre, f->num_parametros, n->instancia.num_argumentos);
-                    exit(1);
+                    valor_destruir(vobj);
+                    valor_destruir(vcls);
+                    return err;
                 }
                 Entorno *fn_e = entorno_crear(f->entorno_closure);
                 for (int j = 0; j < f->num_parametros; j++) {
@@ -2556,10 +2586,10 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             }
 
             if (!obj || obj->tipo != VAL_OBJETO) {
-                fprintf(stderr,
-                    "\n❌ Error:\n"
-                    "   Solo puedes asignar campos a objetos.\n\n");
-                exit(1);
+                valor_destruir(val);
+                if (obj && n->asignacion_campo.objeto->tipo != NODO_ESTO)
+                    valor_destruir(obj);
+                return error_rt("ErrorTipo", n->linea, "Solo puedes asignar campos a objetos.");
             }
 
             const char *campo = n->asignacion_campo.campo;
@@ -2905,10 +2935,16 @@ void interprete_destruir(Interprete *interp) {
 void interprete_ejecutar(Interprete *interp, Nodo *programa) {
     valor_destruir(ejecutar(programa, interp->global));   /* ver la nota de NODO_LLAMADA */
     if (hay_error && valor_error) {
-        fprintf(stderr,
-            "\n❌ %s: %s\n\n",
-            valor_error->error->tipo,
-            valor_error->error->mensaje);
+        /* Con el número de línea cuando se conoce: el pilar del lenguaje es
+           "errores literales", y los fallos que antes morían con su propio
+           fprintf ya lo decían; no puede perderse al pasar a ser capturables. */
+        if (valor_error->error->linea > 0)
+            fprintf(stderr, "\n❌ %s en línea %d: %s\n\n",
+                valor_error->error->tipo, valor_error->error->linea,
+                valor_error->error->mensaje);
+        else
+            fprintf(stderr, "\n❌ %s: %s\n\n",
+                valor_error->error->tipo, valor_error->error->mensaje);
         exit(1);
     }
 }

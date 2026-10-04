@@ -469,6 +469,24 @@ intentar {
 | `ErrorArgumento` | argumentos incorrectos |
 | `ErrorRecursion` | recursión demasiado profunda |
 
+### Todos los errores se pueden capturar
+
+Lo que el lenguaje detecta por su cuenta llega igual que un `lanzar`: un método
+con los argumentos mal, un índice fuera de rango, un campo o método que no
+existe, llamar a algo que no es una función, asignar a una constante… Cada uno
+trae su tipo (`ErrorArgumento`, `ErrorRango`, `Error`…) y se captura con
+`intentar/capturar`. Ninguno cierra el programa por su cuenta.
+
+Un error que nadie captura termina el programa y dice **la línea**:
+
+```
+❌ ErrorArgumento en línea 5: 'agregar' necesita exactamente 1 argumento.
+```
+
+En el REPL el error se muestra y la sesión sigue. Si hay varios errores en
+cadena, se informa del primero, que es la causa, y no de los que vienen detrás
+como consecuencia suya.
+
 El objeto error tiene: `e.mensaje`, `e.tipo`, `e.linea`
 
 ---
