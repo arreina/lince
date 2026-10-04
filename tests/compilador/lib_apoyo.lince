@@ -1,0 +1,11 @@
+# Librería de apoyo de test_importar.lince — se importa, no se compila sola.
+fijo FACTOR = 10
+
+funcion escalar(val numero x): numero {
+    devolver x * FACTOR
+}
+
+clase Bolsa {
+    funcion crear(val numero v): nulo { mi.v = v }
+    funcion total(): numero { devolver escalar(mi.v) }
+}

@@ -670,6 +670,11 @@ lince compilar programa.lince -o nombre # nombre personalizado
 
 Transpila a C y compila con `gcc -O2`. Requiere `gcc` instalado.
 
+Los `importar` de archivos locales se resuelven al compilar: el archivo
+importado se inserta en el programa, así que el binario no necesita nada
+alrededor. Lo que no está hecho todavía es el alias (`como`), que pediría un
+espacio de nombres en el C generado.
+
 ### Soporte del compilador
 
 | Característica | Compilador |
@@ -686,6 +691,9 @@ Transpila a C y compila con `gcc -O2`. Requiere `gcc` instalado.
 | intentar/capturar/finalmente | ✅ |
 | Generadores y rango() | ✅ |
 | Todos los módulos estándar | ✅ |
+| Variables de nivel superior usadas en funciones | ✅ |
+| `importar "./archivo"` de un archivo local | ✅ |
+| `importar "./archivo" como alias` | ❌ — usa el intérprete |
 
 ### Rendimiento
 

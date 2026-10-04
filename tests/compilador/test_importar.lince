@@ -1,0 +1,26 @@
+# TEST (compilador): importar un archivo local, y que las constantes de
+# nivel superior las alcancen las funciones.
+#
+# Dos fallos que cubre:
+#  - el compilador dejaba el importar en un comentario y luego llamaba a
+#    funciones que nadie había declarado;
+#  - las declaraciones de nivel superior se emitían como locales de main(),
+#    así que una función que leyera un 'fijo' no compilaba — con o sin
+#    importar de por medio.
+importar "./lib_apoyo"
+
+fijo PROPIO = 5
+
+funcion suma_con_propio(val numero x): numero {
+    devolver x + PROPIO
+}
+
+escribir(escalar(3))
+escribir(suma_con_propio(2))
+
+sea b = Bolsa(4)
+escribir(b.total())
+
+# Importar dos veces no debe duplicar nada
+importar "./lib_apoyo"
+escribir(escalar(1))

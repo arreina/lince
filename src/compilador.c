@@ -30,6 +30,12 @@ typedef struct {
     int   num_funciones;
     int   aridad[128];           /* número de parámetros requeridos */
     int   aridad_total[128];     /* número total de parámetros */
+    /* Variables y constantes de nivel superior. Se emiten como globales del
+       archivo C, no como locales de main(): si no, ninguna función emitida
+       las alcanza — un 'fijo BASE = 10' usado dentro de una función daba un
+       '_l_BASE undeclared' de gcc aunque el intérprete lo ejecutara bien. */
+    char  globales[128][64];
+    int   num_globales;
     /* Módulos ya emitidos (para no duplicar) */
     char  modulos_emitidos[16][32];
     int   num_modulos;
@@ -604,6 +610,13 @@ static void compilar_expr_lambda(Compilador *c, Nodo *n);
 static void compilar_expr_instancia(Compilador *c, Nodo *n);
 static void compilar_expr_unario(Compilador *c, Nodo *n);
 static void emitir_modulo_compilado(Compilador *c, const char *nombre);
+
+/* ¿Es 'nombre' una variable de nivel superior, ya emitida como global? */
+static int es_global(Compilador *c, const char *nombre) {
+    for (int i = 0; i < c->num_globales; i++)
+        if (strcmp(c->globales[i], nombre) == 0) return 1;
+    return 0;
+}
 
 static int es_numerico(Nodo *n) {
     if (!n) return 0;
@@ -1225,7 +1238,13 @@ static void compilar_nodo(Compilador *c, Nodo *n) {
 
         case NODO_DECLARACION: {
             sangrar(c);
-            fprintf(c->salida, "LValor *_l_%s = ", n->declaracion.nombre);
+            /* Si ya está declarada como global del archivo, aquí sólo se le
+               asigna: volver a poner 'LValor *' crearía una local de main()
+               que taparía la global, y las funciones seguirían sin verla. */
+            if (es_global(c, n->declaracion.nombre))
+                fprintf(c->salida, "_l_%s = ", n->declaracion.nombre);
+            else
+                fprintf(c->salida, "LValor *_l_%s = ", n->declaracion.nombre);
             if (n->declaracion.valor)
                 compilar_expr(c, n->declaracion.valor);
             else
@@ -2705,6 +2724,22 @@ int compilador_compilar(Nodo *ast, const char *ruta_c, const char *ruta_bin) {
         Nodo *n = ast->bloque.sentencias[i];
         if (n && n->tipo == NODO_IMPORTAR)
             emitir_modulo_compilado(&c, n->importar.nombre);
+    }
+
+    /* Variables y constantes de nivel superior, como globales del archivo.
+       Tienen que salir ANTES de las funciones para que éstas las alcancen; el
+       valor se les asigna luego, dentro de main(), en el orden del programa.
+       Sin esto, una función que leyera un 'fijo' de nivel superior no
+       compilaba — y eso incluye lo que llega de un archivo importado, cuyas
+       funciones leen sus propias constantes. */
+    fprintf(f, "\n/* ── Variables de nivel superior ── */\n");
+    for (int i = 0; i < ast->bloque.cantidad; i++) {
+        Nodo *n = ast->bloque.sentencias[i];
+        if (!n || n->tipo != NODO_DECLARACION) continue;
+        if (es_global(&c, n->declaracion.nombre)) continue;   /* redeclarada */
+        if (c.num_globales >= 128) break;
+        snprintf(c.globales[c.num_globales++], 64, "%s", n->declaracion.nombre);
+        fprintf(f, "static LValor *_l_%s = NULL;\n", n->declaracion.nombre);
     }
 
     /* ── Estrategia de lambdas por intercalación ──
