@@ -87,11 +87,11 @@
     },
     "palabras_clave_errores": {
       "name": "support.class.error.lince",
-      "match": "\\b(Error|ErrorAcceso|ErrorArgumento|ErrorMatematico|ErrorNulo|ErrorRango|ErrorRecursion|ErrorTipo)\\b"
+      "match": "\\b(Error|ErrorAcceso|ErrorArgumento|ErrorBD|ErrorMatematico|ErrorNulo|ErrorRango|ErrorRecursion|ErrorTarea|ErrorTipo)\\b"
     },
     "palabras_clave_modulos": {
       "name": "support.class.module.lince",
-      "match": "\\b(matematica|texto|archivos|tiempo|sistema|json|red|expresiones|servidor|terminal|pruebas|sqlite|cripto)(?=\\.)"
+      "match": "\\b(matematica|texto|archivos|tiempo|sistema|json|red|expresiones|servidor|terminal|pruebas|sqlite|cripto|tareas)(?=\\.)"
     },
     "literales": {
       "patterns": [

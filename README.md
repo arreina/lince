@@ -191,7 +191,7 @@ sea r = red.obtener("https://api.com/datos")
 sea nums = expresiones.todos("a1 b2 c3", "[0-9]+")
 ```
 
-**Módulos disponibles:** `matematica` · `texto` · `archivos` · `tiempo` · `sistema` · `json` · `red` · `expresiones` · `terminal` · `servidor` · `pruebas` · `sqlite` · `cripto`
+**Módulos disponibles:** `matematica` · `texto` · `archivos` · `tiempo` · `sistema` · `json` · `red` · `expresiones` · `terminal` · `servidor` · `pruebas` · `sqlite` · `cripto` · `tareas`
 
 ## Ejecutables autónomos
 

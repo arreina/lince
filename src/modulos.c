@@ -2608,6 +2608,352 @@ static void cargar_cripto(Entorno *entorno) {
         fns, 8, NULL, NULL, 0);
 }
 
+/* ─────────────────────────────────────────
+   MÓDULO: tareas
+   Concurrencia real con procesos: cada tarea corre una función en un proceso
+   hijo (fork) y devuelve su resultado por una tubería. No comparten memoria,
+   así que no hay carreras: los datos viajan copiados. Solo POSIX.
+   Se pueden enviar números, textos, lógicos, nulo, listas y diccionarios.
+───────────────────────────────────────── */
+static inline Valor *valor_retener_pub(Valor *v) { if (v) v->refs++; return v; }
+
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <signal.h>
+#include <poll.h>
+#include <errno.h>
+
+typedef struct { unsigned char *d; size_t n, cap; } TBuf;
+
+static void tb_poner(TBuf *b, const void *p, size_t k) {
+    if (b->n + k > b->cap) {
+        b->cap = (b->n + k) * 2 + 64;
+        b->d = realloc(b->d, b->cap);
+    }
+    memcpy(b->d + b->n, p, k);
+    b->n += k;
+}
+static void tb_u32(TBuf *b, uint32_t v) { tb_poner(b, &v, 4); }
+
+/* Serializa un valor; 0 si contiene algo que no se puede enviar */
+static int tarea_ser(Valor *v, TBuf *b) {
+    unsigned char t;
+    switch (v ? v->tipo : VAL_NULO) {
+        case VAL_NULO:     t = 'Z'; tb_poner(b, &t, 1); return 1;
+        case VAL_NUMERO:   t = 'N'; tb_poner(b, &t, 1); tb_poner(b, &v->numero, sizeof(double)); return 1;
+        case VAL_BOOLEANO: t = v->booleano ? 'V' : 'F'; tb_poner(b, &t, 1); return 1;
+        case VAL_TEXTO: {
+            t = 'T'; tb_poner(b, &t, 1);
+            uint32_t k = (uint32_t)strlen(v->texto);
+            tb_u32(b, k); tb_poner(b, v->texto, k);
+            return 1;
+        }
+        case VAL_LISTA:
+            t = 'L'; tb_poner(b, &t, 1); tb_u32(b, (uint32_t)v->lista.cantidad);
+            for (int i = 0; i < v->lista.cantidad; i++)
+                if (!tarea_ser(v->lista.elementos[i], b)) return 0;
+            return 1;
+        case VAL_DICCIONARIO:
+            if (v->es_modulo) return 0;
+            t = 'D'; tb_poner(b, &t, 1); tb_u32(b, (uint32_t)v->diccionario.cantidad);
+            for (int i = 0; i < v->diccionario.cantidad; i++) {
+                uint32_t k = (uint32_t)strlen(v->diccionario.claves[i]);
+                tb_u32(b, k); tb_poner(b, v->diccionario.claves[i], k);
+                if (!tarea_ser(v->diccionario.valores[i], b)) return 0;
+            }
+            return 1;
+        default: return 0;
+    }
+}
+
+static Valor *tarea_deser(const unsigned char *d, size_t n, size_t *p) {
+    if (*p >= n) return NULL;
+    unsigned char t = d[(*p)++];
+    switch (t) {
+        case 'Z': return valor_nulo();
+        case 'V': return valor_booleano(1);
+        case 'F': return valor_booleano(0);
+        case 'N': {
+            double x;
+            if (*p + sizeof x > n) return NULL;
+            memcpy(&x, d + *p, sizeof x); *p += sizeof x;
+            return valor_numero(x);
+        }
+        case 'T': {
+            uint32_t k;
+            if (*p + 4 > n) return NULL;
+            memcpy(&k, d + *p, 4); *p += 4;
+            if (*p + k > n) return NULL;
+            char *s = malloc(k + 1);
+            memcpy(s, d + *p, k); s[k] = '\0'; *p += k;
+            Valor *r = valor_texto(s);
+            free(s);
+            return r;
+        }
+        case 'L': {
+            uint32_t c;
+            if (*p + 4 > n) return NULL;
+            memcpy(&c, d + *p, 4); *p += 4;
+            Valor *l = valor_lista_crear();
+            for (uint32_t i = 0; i < c; i++) {
+                Valor *e = tarea_deser(d, n, p);
+                if (!e) { valor_destruir(l); return NULL; }
+                lista_agregar(l, e);
+            }
+            return l;
+        }
+        case 'D': {
+            uint32_t c;
+            if (*p + 4 > n) return NULL;
+            memcpy(&c, d + *p, 4); *p += 4;
+            Valor *dic = valor_diccionario_crear();
+            for (uint32_t i = 0; i < c; i++) {
+                uint32_t k;
+                if (*p + 4 > n) { valor_destruir(dic); return NULL; }
+                memcpy(&k, d + *p, 4); *p += 4;
+                if (*p + k > n) { valor_destruir(dic); return NULL; }
+                char *clave = malloc(k + 1);
+                memcpy(clave, d + *p, k); clave[k] = '\0'; *p += k;
+                Valor *e = tarea_deser(d, n, p);
+                if (!e) { free(clave); valor_destruir(dic); return NULL; }
+                valor_diccionario_agregar(dic, clave, e);
+                free(clave);
+            }
+            return dic;
+        }
+        default: return NULL;
+    }
+}
+
+#define MAX_TAREAS 256
+typedef struct {
+    int     usada;
+    pid_t   pid;
+    int     fd;            /* extremo de lectura de la tubería */
+    int     fin;           /* ya se leyó todo (EOF) */
+    int     estado;        /* estado de waitpid, cuando se recogió */
+    TBuf    datos;
+} Tarea;
+static Tarea _tareas[MAX_TAREAS];
+
+static Valor *tarea_error(const char *msg) {
+    hay_error = 1;
+    valor_error = valor_error_nuevo("ErrorTarea", msg, 0);
+    return valor_nulo();
+}
+
+static Tarea *tarea_de(Valor **a, int n, int i) {
+    if (i >= n || a[i]->tipo != VAL_NUMERO) { tarea_error("se esperaba una tarea"); return NULL; }
+    int k = (int)a[i]->numero;
+    if (k < 0 || k >= MAX_TAREAS || !_tareas[k].usada) { tarea_error("la tarea no existe o ya se recogió su resultado"); return NULL; }
+    return &_tareas[k];
+}
+
+/* Lee lo que haya en la tubería. bloquear: hasta el EOF */
+static void tarea_leer(Tarea *t, int bloquear) {
+    while (!t->fin) {
+        if (!bloquear) {
+            struct pollfd pf = { t->fd, POLLIN, 0 };
+            if (poll(&pf, 1, 0) <= 0) return;
+        }
+        unsigned char tmp[65536];
+        ssize_t r = read(t->fd, tmp, sizeof tmp);
+        if (r > 0) tb_poner(&t->datos, tmp, (size_t)r);
+        else if (r == 0) t->fin = 1;
+        else if (errno != EINTR) t->fin = 1;
+    }
+}
+
+static void tarea_liberar(Tarea *t) {
+    if (t->fd >= 0) close(t->fd);
+    free(t->datos.d);
+    memset(t, 0, sizeof *t);
+}
+
+static Valor *fn_tar_iniciar(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_FUNCION) return tarea_error("iniciar() espera una función");
+    int nargs = 0;
+    if (n > 1) {
+        if (a[1]->tipo != VAL_LISTA) return tarea_error("los argumentos de iniciar() van en una lista");
+        nargs = a[1]->lista.cantidad;
+    }
+    int k = 0;
+    while (k < MAX_TAREAS && _tareas[k].usada) k++;
+    if (k == MAX_TAREAS) return tarea_error("demasiadas tareas a la vez");
+    int fds[2];
+    if (pipe(fds) != 0) return tarea_error("no se pudo crear la tubería");
+    fflush(NULL);
+    pid_t pid = fork();
+    if (pid < 0) { close(fds[0]); close(fds[1]); return tarea_error("no se pudo crear el proceso"); }
+    if (pid == 0) {
+        close(fds[0]);
+        for (int i = 0; i < MAX_TAREAS; i++) if (_tareas[i].usada) close(_tareas[i].fd);
+        signal(SIGPIPE, SIG_DFL);
+        Valor **args = malloc(sizeof(Valor *) * (size_t)(nargs + 1));
+        for (int i = 0; i < nargs; i++) args[i] = valor_retener_pub(a[1]->lista.elementos[i]);
+        hay_error = 0;
+        Valor *r = interprete_llamar_funcion(a[0], args, nargs);
+        TBuf b = {0};
+        unsigned char marca = 'R';
+        if (hay_error) {
+            marca = 'E';
+            tb_poner(&b, &marca, 1);
+            if (valor_error && valor_error->tipo == VAL_ERROR) {
+                tb_poner(&b, valor_error->error->tipo, strlen(valor_error->error->tipo));
+                tb_poner(&b, ": ", 2);
+                tb_poner(&b, valor_error->error->mensaje, strlen(valor_error->error->mensaje));
+            } else {
+                const char *m = "error desconocido";
+                tb_poner(&b, m, strlen(m));
+            }
+        } else {
+            tb_poner(&b, &marca, 1);
+            if (!tarea_ser(r, &b)) {
+                b.n = 0; marca = 'E';
+                tb_poner(&b, &marca, 1);
+                const char *m = "el resultado de la tarea no se puede enviar (solo números, textos, lógicos, nulo, listas y diccionarios)";
+                tb_poner(&b, m, strlen(m));
+            }
+        }
+        size_t off = 0;
+        while (off < b.n) {
+            ssize_t w = write(fds[1], b.d + off, b.n - off);
+            if (w <= 0) break;
+            off += (size_t)w;
+        }
+        fflush(stdout);
+        _exit(0);
+    }
+    close(fds[1]);
+    Tarea *t = &_tareas[k];
+    memset(t, 0, sizeof *t);
+    t->usada = 1; t->pid = pid; t->fd = fds[0];
+    return valor_numero(k);
+}
+
+static Valor *fn_tar_listo(Valor **a, int n) {
+    Tarea *t = tarea_de(a, n, 0);
+    if (!t) return valor_nulo();
+    tarea_leer(t, 0);
+    return valor_booleano(t->fin);
+}
+
+/* Recoge el resultado de la tarea (bloqueando) y la libera */
+static Valor *tarea_recoger(Tarea *t) {
+    tarea_leer(t, 1);
+    int estado = 0;
+    waitpid(t->pid, &estado, 0);
+    Valor *res;
+    if (t->datos.n == 0) {
+        res = tarea_error("la tarea terminó sin dar resultado (¿se cayó el proceso?)");
+    } else if (t->datos.d[0] == 'E') {
+        char *m = malloc(t->datos.n);
+        memcpy(m, t->datos.d + 1, t->datos.n - 1); m[t->datos.n - 1] = '\0';
+        res = tarea_error(m);
+        free(m);
+    } else {
+        size_t p = 1;
+        res = tarea_deser(t->datos.d, t->datos.n, &p);
+        if (!res) res = tarea_error("resultado de la tarea dañado");
+    }
+    tarea_liberar(t);
+    return res;
+}
+
+static Valor *fn_tar_esperar(Valor **a, int n) {
+    Tarea *t = tarea_de(a, n, 0);
+    if (!t) return valor_nulo();
+    return tarea_recoger(t);
+}
+
+static Valor *fn_tar_cancelar(Valor **a, int n) {
+    Tarea *t = tarea_de(a, n, 0);
+    if (!t) return valor_nulo();
+    kill(t->pid, SIGKILL);
+    int estado;
+    waitpid(t->pid, &estado, 0);
+    tarea_liberar(t);
+    return valor_nulo();
+}
+
+static Valor *fn_tar_cpus(Valor **a, int n) {
+    (void)a; (void)n;
+    long c = sysconf(_SC_NPROCESSORS_ONLN);
+    return valor_numero(c > 0 ? (double)c : 1);
+}
+
+/* mapear(lista, funcion[, maximo]): aplica la función a cada elemento en
+   paralelo (como mucho 'maximo' a la vez; por defecto, las CPUs) y devuelve
+   los resultados en el mismo orden. */
+static Valor *fn_tar_mapear(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_FUNCION)
+        return tarea_error("mapear() espera (lista, función[, máximo])");
+    int total = a[0]->lista.cantidad;
+    int maximo = (n > 2 && a[2]->tipo == VAL_NUMERO && a[2]->numero >= 1) ? (int)a[2]->numero : 0;
+    if (!maximo) { long c = sysconf(_SC_NPROCESSORS_ONLN); maximo = c > 0 ? (int)c : 1; }
+    if (maximo > MAX_TAREAS - 8) maximo = MAX_TAREAS - 8;
+    int *ids = malloc(sizeof(int) * (size_t)(total + 1));
+    Valor **res = calloc((size_t)total + 1, sizeof(Valor *));
+    int hecho = 0, lanzadas = 0;
+    int fallo = 0;
+    while (hecho < total && !fallo) {
+        while (lanzadas < total && lanzadas - hecho < maximo) {
+            Valor *argl = valor_lista_crear();
+            lista_agregar(argl, valor_retener_pub(a[0]->lista.elementos[lanzadas]));
+            Valor *par[2] = { a[1], argl };
+            Valor *id = fn_tar_iniciar(par, 2);
+            valor_destruir(argl);
+            if (hay_error) { fallo = 1; break; }
+            ids[lanzadas++] = (int)id->numero;
+            valor_destruir(id);
+        }
+        if (fallo) break;
+        res[hecho] = tarea_recoger(&_tareas[ids[hecho]]);
+        if (hay_error) { fallo = 1; hecho++; break; }
+        hecho++;
+    }
+    if (fallo) {
+        for (int i = hecho; i < lanzadas; i++) {
+            Tarea *t = &_tareas[ids[i]];
+            if (t->usada) { kill(t->pid, SIGKILL); int st; waitpid(t->pid, &st, 0); tarea_liberar(t); }
+        }
+        for (int i = 0; i < total; i++) if (res[i]) valor_destruir(res[i]);
+        free(ids); free(res);
+        return valor_nulo();
+    }
+    Valor *lista = valor_lista_crear();
+    for (int i = 0; i < total; i++) lista_agregar(lista, res[i]);
+    free(ids); free(res);
+    return lista;
+}
+#else
+static Valor *tarea_no_disponible(Valor **a, int n) {
+    (void)a; (void)n;
+    hay_error = 1;
+    valor_error = valor_error_nuevo("ErrorTarea", "el módulo tareas no está disponible en Windows", 0);
+    return valor_nulo();
+}
+#define fn_tar_iniciar   tarea_no_disponible
+#define fn_tar_esperar   tarea_no_disponible
+#define fn_tar_listo     tarea_no_disponible
+#define fn_tar_cancelar  tarea_no_disponible
+#define fn_tar_mapear    tarea_no_disponible
+#define fn_tar_cpus      tarea_no_disponible
+#endif
+
+static void cargar_tareas(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"iniciar",  fn_tar_iniciar,  -1},
+        {"esperar",  fn_tar_esperar,   1},
+        {"listo",    fn_tar_listo,     1},
+        {"cancelar", fn_tar_cancelar,  1},
+        {"mapear",   fn_tar_mapear,   -1},
+        {"cpus",     fn_tar_cpus,      0},
+    };
+    registrar_modulo_diccionario(entorno, "tareas",
+        fns, 6, NULL, NULL, 0);
+}
+
 static void cargar_matematica(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"raiz",       fn_mat_raiz,       1},
@@ -2801,6 +3147,7 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"pruebas", cargar_pruebas},
     {"sqlite", cargar_sqlite},
     {"cripto", cargar_cripto},
+    {"tareas", cargar_tareas},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -2827,7 +3174,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite, cripto",
+        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite, cripto, tareas",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }

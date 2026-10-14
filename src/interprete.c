@@ -3622,6 +3622,8 @@ Interprete *interprete_crear(void) {
     registrar_error_predefinido(interp->global, "ErrorMatematico");
     registrar_error_predefinido(interp->global, "ErrorArgumento");
     registrar_error_predefinido(interp->global, "ErrorAcceso");
+    registrar_error_predefinido(interp->global, "ErrorBD");
+    registrar_error_predefinido(interp->global, "ErrorTarea");
 
     /* Registrar funciones de conversión de tipos */
     registrar_fn_nativa(interp->global, "a_numero", fn_conv_numero, 1);

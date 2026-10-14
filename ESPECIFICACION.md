@@ -787,6 +787,28 @@ Trabajan con texto, así que no admiten datos binarios con bytes nulos.
 comprobación o por compatibilidad. Para guardar contraseñas, no basta un hash
 rápido.
 
+### `tareas`
+
+Concurrencia real con procesos (solo POSIX; no disponible en Windows).
+
+```lince
+importar "tareas"
+sea t = tareas.iniciar(trabajo, [arg1, arg2])   # lanza trabajo(arg1, arg2) en otro proceso
+tareas.listo(t)                                  # ¿ha terminado? (no bloquea)
+sea r = tareas.esperar(t)                        # espera y devuelve su resultado
+tareas.cancelar(t)                               # mata la tarea
+tareas.mapear(lista, funcion)                    # f(x) para cada x en paralelo, en orden
+tareas.mapear(lista, funcion, 4)                 # como mucho 4 a la vez
+tareas.cpus()                                    # núcleos disponibles
+```
+
+Cada tarea es un proceso hijo: no comparte memoria con el programa, así que no
+hay carreras de datos; los argumentos y el resultado viajan **copiados**. Solo
+se pueden enviar números, textos, lógicos, `nulo`, listas y diccionarios (no
+funciones ni objetos). Lo que la tarea escriba en pantalla sale directamente. Si
+la función falla, `esperar` lanza `ErrorTarea` con el mensaje. Cada tarea se
+recoge una sola vez con `esperar` o `cancelar`.
+
 ### `sqlite`
 
 ```lince
