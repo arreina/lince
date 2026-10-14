@@ -2305,6 +2305,232 @@ static void cargar_pruebas(Entorno *entorno) {
         fns, 5, NULL, NULL, 0);
 }
 
+/* ─────────────────────────────────────────
+   MÓDULO: sqlite
+   Carga libsqlite3 en tiempo de ejecución (dlopen / LoadLibrary): Lince no la
+   necesita para compilarse, y si no está instalada solo falla 'importar "sqlite"'.
+   Las conexiones se manejan como números.
+───────────────────────────────────────── */
+#ifdef _WIN32
+#define SQL_ABRIR_LIB()      ((void *)LoadLibraryA("sqlite3.dll"))
+#define SQL_SIMBOLO(h, n)    ((void *)GetProcAddress((HMODULE)(h), n))
+#else
+#include <dlfcn.h>
+static void *sql_abrir_lib(void) {
+    static const char *const nombres[] = {
+        "libsqlite3.so.0", "libsqlite3.so", "libsqlite3.dylib", NULL };
+    for (int i = 0; nombres[i]; i++) {
+        void *h = dlopen(nombres[i], RTLD_NOW);
+        if (h) return h;
+    }
+    return NULL;
+}
+#define SQL_ABRIR_LIB()      sql_abrir_lib()
+#define SQL_SIMBOLO(h, n)    dlsym(h, n)
+#endif
+
+#define SQL_ROW  100
+#define SQL_DONE 101
+#define SQL_MAX_CONEXIONES 32
+
+static struct {
+    int (*open)(const char *, void **);
+    int (*close)(void *);
+    int (*prepare)(void *, const char *, int, void **, const char **);
+    int (*step)(void *);
+    int (*finalize)(void *);
+    int (*bind_double)(void *, int, double);
+    int (*bind_text)(void *, int, const char *, int, void *);
+    int (*bind_null)(void *, int);
+    int (*column_count)(void *);
+    const char *(*column_name)(void *, int);
+    int (*column_type)(void *, int);
+    double (*column_double)(void *, int);
+    const unsigned char *(*column_text)(void *, int);
+    const char *(*errmsg)(void *);
+    int (*changes)(void *);
+    long long (*last_id)(void *);
+} _sql;
+static int   _sql_cargada = 0;
+static void *_sql_bd[SQL_MAX_CONEXIONES];
+
+static int sql_cargar(void) {
+    if (_sql_cargada) return 1;
+    void *h = SQL_ABRIR_LIB();
+    if (!h) return 0;
+#define SQL_FN(campo, nombre) \
+    *(void **)(&_sql.campo) = SQL_SIMBOLO(h, nombre); if (!_sql.campo) return 0;
+    SQL_FN(open, "sqlite3_open")
+    SQL_FN(close, "sqlite3_close")
+    SQL_FN(prepare, "sqlite3_prepare_v2")
+    SQL_FN(step, "sqlite3_step")
+    SQL_FN(finalize, "sqlite3_finalize")
+    SQL_FN(bind_double, "sqlite3_bind_double")
+    SQL_FN(bind_text, "sqlite3_bind_text")
+    SQL_FN(bind_null, "sqlite3_bind_null")
+    SQL_FN(column_count, "sqlite3_column_count")
+    SQL_FN(column_name, "sqlite3_column_name")
+    SQL_FN(column_type, "sqlite3_column_type")
+    SQL_FN(column_double, "sqlite3_column_double")
+    SQL_FN(column_text, "sqlite3_column_text")
+    SQL_FN(errmsg, "sqlite3_errmsg")
+    SQL_FN(changes, "sqlite3_changes")
+    SQL_FN(last_id, "sqlite3_last_insert_rowid")
+#undef SQL_FN
+    _sql_cargada = 1;
+    return 1;
+}
+
+static Valor *sql_error(const char *tipo, const char *msg) {
+    hay_error = 1;
+    valor_error = valor_error_nuevo(tipo, msg, 0);
+    return valor_nulo();
+}
+
+/* Conexión indicada por el argumento i, o NULL (con el error ya puesto) */
+static void *sql_conexion(Valor **a, int n, int i) {
+    if (i >= n || a[i]->tipo != VAL_NUMERO) { sql_error("ErrorTipo", "se esperaba una conexión de base de datos"); return NULL; }
+    int k = (int)a[i]->numero;
+    if (k < 0 || k >= SQL_MAX_CONEXIONES || !_sql_bd[k]) { sql_error("ErrorBD", "la conexión está cerrada o no existe"); return NULL; }
+    return _sql_bd[k];
+}
+
+static Valor *fn_sql_abrir(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return sql_error("ErrorTipo", "abrir() espera la ruta del archivo");
+    if (!sql_cargar())
+        return sql_error("ErrorBD", "no se encuentra libsqlite3: instálala (por ejemplo 'sudo apt install libsqlite3-0')");
+    int k = 0;
+    while (k < SQL_MAX_CONEXIONES && _sql_bd[k]) k++;
+    if (k == SQL_MAX_CONEXIONES) return sql_error("ErrorBD", "demasiadas conexiones abiertas");
+    const char *ruta = strcmp(a[0]->texto, ":memoria:") == 0 ? ":memory:" : a[0]->texto;
+    void *db = NULL;
+    if (_sql.open(ruta, &db) != 0) {
+        char msg[600];
+        snprintf(msg, sizeof(msg), "no se pudo abrir '%s': %s", a[0]->texto, db ? _sql.errmsg(db) : "sin memoria");
+        if (db) _sql.close(db);
+        return sql_error("ErrorBD", msg);
+    }
+    _sql_bd[k] = db;
+    return valor_numero(k);
+}
+
+static Valor *fn_sql_cerrar(Valor **a, int n) {
+    void *db = sql_conexion(a, n, 0);
+    if (!db) return valor_nulo();
+    _sql.close(db);
+    _sql_bd[(int)a[0]->numero] = NULL;
+    return valor_nulo();
+}
+
+/* Prepara 'sql' y le liga los parámetros (lista opcional en a[2]) */
+static void *sql_preparar(void *db, const char *sql, const char **resto, Valor **a, int n) {
+    void *st = NULL;
+    if (_sql.prepare(db, sql, -1, &st, resto) != 0) {
+        sql_error("ErrorBD", _sql.errmsg(db));
+        return NULL;
+    }
+    if (!st) return NULL;                              /* texto vacío o solo comentarios */
+    if (n > 2 && a[2]->tipo == VAL_LISTA) {
+        for (int i = 0; i < a[2]->lista.cantidad; i++) {
+            Valor *p = a[2]->lista.elementos[i];
+            switch (p->tipo) {
+                case VAL_NUMERO:   _sql.bind_double(st, i + 1, p->numero); break;
+                case VAL_BOOLEANO: _sql.bind_double(st, i + 1, p->booleano ? 1 : 0); break;
+                case VAL_TEXTO:    _sql.bind_text(st, i + 1, p->texto, -1, (void *)-1); break;
+                case VAL_NULO:     _sql.bind_null(st, i + 1); break;
+                default:
+                    _sql.finalize(st);
+                    sql_error("ErrorTipo", "los parámetros solo pueden ser número, texto, lógico o nulo");
+                    return NULL;
+            }
+        }
+    }
+    return st;
+}
+
+/* ejecutar(bd, sql[, parametros]): una o varias sentencias; devuelve las filas afectadas por la última */
+static Valor *fn_sql_ejecutar(Valor **a, int n) {
+    void *db = sql_conexion(a, n, 0);
+    if (!db) return valor_nulo();
+    if (n < 2 || a[1]->tipo != VAL_TEXTO) return sql_error("ErrorTipo", "ejecutar() espera (conexión, sql[, parámetros])");
+    const char *sql = a[1]->texto;
+    int afectadas = 0;
+    while (sql && *sql) {
+        const char *resto = NULL;
+        void *st = sql_preparar(db, sql, &resto, a, n);
+        if (hay_error) return valor_nulo();
+        if (st) {
+            int r;
+            while ((r = _sql.step(st)) == SQL_ROW) { }
+            if (r != SQL_DONE) {
+                char msg[600];
+                snprintf(msg, sizeof(msg), "%s", _sql.errmsg(db));
+                _sql.finalize(st);
+                return sql_error("ErrorBD", msg);
+            }
+            afectadas = _sql.changes(db);
+            _sql.finalize(st);
+        }
+        sql = resto;
+    }
+    return valor_numero(afectadas);
+}
+
+/* consultar(bd, sql[, parametros]): lista de diccionarios, uno por fila */
+static Valor *fn_sql_consultar(Valor **a, int n) {
+    void *db = sql_conexion(a, n, 0);
+    if (!db) return valor_nulo();
+    if (n < 2 || a[1]->tipo != VAL_TEXTO) return sql_error("ErrorTipo", "consultar() espera (conexión, sql[, parámetros])");
+    void *st = sql_preparar(db, a[1]->texto, NULL, a, n);
+    if (hay_error) return valor_nulo();
+    Valor *filas = valor_lista_crear();
+    if (!st) return filas;
+    int r, cols = _sql.column_count(st);
+    while ((r = _sql.step(st)) == SQL_ROW) {
+        Valor *fila = valor_diccionario_crear();
+        for (int c = 0; c < cols; c++) {
+            Valor *v;
+            switch (_sql.column_type(st, c)) {
+                case 1: case 2: v = valor_numero(_sql.column_double(st, c)); break;
+                case 5:         v = valor_nulo(); break;
+                default: {
+                    const unsigned char *t = _sql.column_text(st, c);
+                    v = valor_texto(t ? (const char *)t : "");
+                }
+            }
+            valor_diccionario_agregar(fila, _sql.column_name(st, c), v);
+        }
+        lista_agregar(filas, fila);
+    }
+    if (r != SQL_DONE) {
+        char msg[600];
+        snprintf(msg, sizeof(msg), "%s", _sql.errmsg(db));
+        _sql.finalize(st);
+        valor_destruir(filas);
+        return sql_error("ErrorBD", msg);
+    }
+    _sql.finalize(st);
+    return filas;
+}
+
+static Valor *fn_sql_ultimo_id(Valor **a, int n) {
+    void *db = sql_conexion(a, n, 0);
+    if (!db) return valor_nulo();
+    return valor_numero((double)_sql.last_id(db));
+}
+
+static void cargar_sqlite(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"abrir",     fn_sql_abrir,     1},
+        {"cerrar",    fn_sql_cerrar,    1},
+        {"ejecutar",  fn_sql_ejecutar, -1},
+        {"consultar", fn_sql_consultar, -1},
+        {"ultimo_id", fn_sql_ultimo_id, 1},
+    };
+    registrar_modulo_diccionario(entorno, "sqlite",
+        fns, 5, NULL, NULL, 0);
+}
+
 static void cargar_matematica(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"raiz",       fn_mat_raiz,       1},
@@ -2496,6 +2722,7 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"servidor", cargar_servidor},
     {"terminal", cargar_terminal},
     {"pruebas", cargar_pruebas},
+    {"sqlite", cargar_sqlite},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -2522,7 +2749,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas",
+        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }

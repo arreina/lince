@@ -34,7 +34,7 @@
 
       <!-- Módulos estándar -->
       <Keywords name="Keywords6">
-        a_logico a_numero a_texto argumentos escribir filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json red expresiones servidor terminal pruebas
+        a_logico a_numero a_texto argumentos escribir filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json red expresiones servidor terminal pruebas sqlite
       </Keywords>
 
       <!-- Operadores -->

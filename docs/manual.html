@@ -147,13 +147,13 @@
 <div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
-<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-9" class="sub">Fechas con `tiempo`</a></div>
+<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-9" class="sub">Fechas con `tiempo`</a><a href="#modulos-y-librerias-10" class="sub">Bases de datos con `sqlite`</a></div>
 </nav>
 
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>41 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>42 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -677,7 +677,27 @@ pruebas.resumen()</code></pre></div><div class="salida"><span class="etiqueta">s
 2024
 60
 verdadero
-nulo</pre></div><span class="fuente">985_fechas.lince</span></article></section>
+nulo</pre></div><span class="fuente">985_fechas.lince</span></article><article class="ej" id="modulos-y-librerias-10"><h3>Bases de datos con `sqlite`</h3><p class="nota">Necesita la biblioteca `libsqlite3` instalada en el sistema (Lince la carga al importar el módulo; si falta, da un `ErrorBD` claro). La conexión es un número; `consultar` devuelve una lista de diccionarios y los `?` se rellenan con la lista de parámetros, sin riesgo de inyección SQL. `&quot;:memoria:&quot;` crea una base temporal.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;sqlite&quot;</span>
+
+<span class="k">sea</span> bd = sqlite.abrir(<span class="s">&quot;:memoria:&quot;</span>)
+sqlite.ejecutar(bd, <span class="s">&quot;CREATE TABLE personas (id INTEGER PRIMARY KEY, nombre TEXT, edad INTEGER)&quot;</span>)
+sqlite.ejecutar(bd, <span class="s">&quot;INSERT INTO personas (nombre, edad) VALUES (?, ?)&quot;</span>, [<span class="s">&quot;Ana&quot;</span>, <span class="n">31</span>])
+sqlite.ejecutar(bd, <span class="s">&quot;INSERT INTO personas (nombre, edad) VALUES (?, ?)&quot;</span>, [<span class="s">&quot;Luis&quot;</span>, <span class="n">25</span>])
+<span class="k">escribir</span>(sqlite.ultimo_id(bd))
+
+<span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> fila <span class="k">en</span> sqlite.consultar(bd, <span class="s">&quot;SELECT nombre, edad FROM personas WHERE edad &gt; ? ORDER BY edad&quot;</span>, [<span class="n">20</span>]) {
+    <span class="k">escribir</span>(fila[<span class="s">&quot;nombre&quot;</span>] + <span class="s">&quot; tiene &quot;</span> + fila[<span class="s">&quot;edad&quot;</span>])
+}
+
+<span class="k">intentar</span> {
+    sqlite.consultar(bd, <span class="s">&quot;SELECT * FROM no_existe&quot;</span>)
+} <span class="k">capturar</span> (ErrorBD e) {
+    <span class="k">escribir</span>(<span class="s">&quot;error: &quot;</span> + e.mensaje)
+}
+sqlite.cerrar(bd)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>2
+Luis tiene 25
+Ana tiene 31
+error: no such table: no_existe</pre></div><span class="fuente">990_sqlite.lince</span></article></section>
 </main>
 </div>
 

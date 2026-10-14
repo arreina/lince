@@ -180,6 +180,7 @@
     "servidor",
     "terminal",
     "pruebas",
+    "sqlite",
     "Error",
     "ErrorAcceso",
     "ErrorArgumento",

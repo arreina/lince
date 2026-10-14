@@ -769,6 +769,23 @@ tiempo.analizar_utc("2024-02-29", "%Y-%m-%d")            # marca de tiempo, o nu
 `_utc` no dependen de la zona horaria. `dia_semana` va de 0 (domingo) a 6. Los
 formatos son los de `strftime`. `analizar` no está disponible en Windows.
 
+### `sqlite`
+
+```lince
+importar "sqlite"
+sea bd = sqlite.abrir("datos.db")                      # ":memoria:" para una base temporal
+sqlite.ejecutar(bd, "CREATE TABLE t (id INTEGER PRIMARY KEY, nombre TEXT)")
+sqlite.ejecutar(bd, "INSERT INTO t (nombre) VALUES (?)", ["Ana"])   # devuelve las filas afectadas
+sqlite.ultimo_id(bd)                                   # id de la última fila insertada
+sqlite.consultar(bd, "SELECT * FROM t WHERE id = ?", [1])  # lista de diccionarios
+sqlite.cerrar(bd)
+```
+
+La conexión es un número. `ejecutar` admite varias sentencias separadas por `;` (sin
+parámetros). Los parámetros `?` pueden ser número, texto, lógico o `nulo`. Los errores
+son de tipo `ErrorBD`. El módulo carga `libsqlite3` al importarse: no hace falta para
+compilar Lince, pero sí en la máquina donde se ejecute el programa.
+
 ### `pruebas`
 
 ```lince

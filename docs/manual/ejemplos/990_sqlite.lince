@@ -1,0 +1,21 @@
+# @seccion: Módulos y librerías
+# @titulo: Bases de datos con `sqlite`
+# @nota: Necesita la biblioteca `libsqlite3` instalada en el sistema (Lince la carga al importar el módulo; si falta, da un `ErrorBD` claro). La conexión es un número; `consultar` devuelve una lista de diccionarios y los `?` se rellenan con la lista de parámetros, sin riesgo de inyección SQL. `":memoria:"` crea una base temporal.
+importar "sqlite"
+
+sea bd = sqlite.abrir(":memoria:")
+sqlite.ejecutar(bd, "CREATE TABLE personas (id INTEGER PRIMARY KEY, nombre TEXT, edad INTEGER)")
+sqlite.ejecutar(bd, "INSERT INTO personas (nombre, edad) VALUES (?, ?)", ["Ana", 31])
+sqlite.ejecutar(bd, "INSERT INTO personas (nombre, edad) VALUES (?, ?)", ["Luis", 25])
+escribir(sqlite.ultimo_id(bd))
+
+para cada diccionario fila en sqlite.consultar(bd, "SELECT nombre, edad FROM personas WHERE edad > ? ORDER BY edad", [20]) {
+    escribir(fila["nombre"] + " tiene " + fila["edad"])
+}
+
+intentar {
+    sqlite.consultar(bd, "SELECT * FROM no_existe")
+} capturar (ErrorBD e) {
+    escribir("error: " + e.mensaje)
+}
+sqlite.cerrar(bd)

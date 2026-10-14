@@ -14,7 +14,8 @@ sea lista tests = [
     "test_importar_como",
     "test_pruebas",
     "test_fechas",
-    "test_division_cero"
+    "test_division_cero",
+    "test_sqlite"
 ]
 
 sea dir_tests = "tests/compilador"
