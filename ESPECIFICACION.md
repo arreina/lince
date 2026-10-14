@@ -755,6 +755,20 @@ expresiones.reemplazar("hola mundo", "mundo", "Lince")  # "hola Lince"
 
 En Linux/Mac usa regex POSIX completo. En Windows usa búsqueda de subcadena.
 
+### Fechas (`tiempo`)
+
+```lince
+importar "tiempo"
+sea t = tiempo.crear_utc(2024, 2, 29, 13, 5, 9)         # marca de tiempo (segundos desde 1970)
+tiempo.formatear_utc(t, "%d/%m/%Y %H:%M")                # "29/02/2024 13:05"
+tiempo.partes_utc(t)                                     # {"anio":..., "mes":..., "dia":..., "hora":..., "minuto":..., "segundo":..., "dia_semana":..., "dia_anio":...}
+tiempo.analizar_utc("2024-02-29", "%Y-%m-%d")            # marca de tiempo, o nulo si no encaja
+```
+
+`crear`, `formatear`, `partes` y `analizar` usan la hora local; las versiones
+`_utc` no dependen de la zona horaria. `dia_semana` va de 0 (domingo) a 6. Los
+formatos son los de `strftime`. `analizar` no está disponible en Windows.
+
 ### `pruebas`
 
 ```lince

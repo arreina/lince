@@ -1,0 +1,15 @@
+# @seccion: Módulos y librerías
+# @titulo: Fechas con `tiempo`
+# @nota: Una fecha es una marca de tiempo: segundos desde 1970, como `tiempo.ahora()`. `crear`, `formatear`, `partes` y `analizar` trabajan en hora local; sus versiones `_utc` no dependen de la zona horaria. `analizar` devuelve `nulo` si el texto no encaja con el formato.
+importar "tiempo"
+
+sea t = tiempo.crear_utc(2024, 2, 29, 13, 5, 9)
+escribir(tiempo.formatear_utc(t, "%d/%m/%Y %H:%M"))
+escribir(tiempo.formatear_utc(t + 86400, "%Y-%m-%d"))
+
+sea p = tiempo.partes_utc(t)
+escribir(p["anio"])
+escribir(p["dia_anio"])
+
+escribir(tiempo.analizar_utc("2024-02-29 13:05:09", "%Y-%m-%d %H:%M:%S") == t)
+escribir(tiempo.analizar_utc("no es una fecha", "%Y-%m-%d"))

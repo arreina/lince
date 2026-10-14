@@ -3,6 +3,9 @@
  * Módulos estándar: matematica, texto, archivos, tiempo
  */
 
+#ifndef _WIN32
+#define _GNU_SOURCE      /* strptime, timegm */
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -737,6 +740,105 @@ static Valor *fn_tpo_fecha(Valor **a, int n) {
     strftime(buf, sizeof(buf), "%Y-%m-%d", tm);
     return valor_texto(buf);
 }
+
+/* ── Fechas: formatear, descomponer, crear y analizar ──
+   Las marcas de tiempo son segundos desde 1970 (como tiempo.ahora()). Cada
+   función tiene su versión local y su versión _utc. */
+#ifdef _WIN32
+#define lince_timegm _mkgmtime
+#else
+#define lince_timegm timegm
+#endif
+
+static int tpo_num(Valor **a, int n, int i, double *out) {
+    if (i >= n || a[i]->tipo != VAL_NUMERO) return 0;
+    *out = a[i]->numero;
+    return 1;
+}
+
+static Valor *tpo_formatear(Valor **a, int n, int utc) {
+    double ts;
+    if (!tpo_num(a, n, 0, &ts) || n < 2 || a[1]->tipo != VAL_TEXTO) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo", "formatear() espera (marca de tiempo, formato)", 0);
+        return valor_nulo();
+    }
+    time_t t = (time_t)ts;
+    struct tm tmv;
+    if (utc) { struct tm *p = gmtime(&t); if (p) tmv = *p; else memset(&tmv, 0, sizeof tmv); }
+    else     { struct tm *p = localtime(&t); if (p) tmv = *p; else memset(&tmv, 0, sizeof tmv); }
+    char buf[512];
+    size_t k = strftime(buf, sizeof(buf), a[1]->texto, &tmv);
+    buf[k] = '\0';
+    return valor_texto(buf);
+}
+static Valor *fn_tpo_formatear(Valor **a, int n)     { return tpo_formatear(a, n, 0); }
+static Valor *fn_tpo_formatear_utc(Valor **a, int n) { return tpo_formatear(a, n, 1); }
+
+static Valor *tpo_partes(Valor **a, int n, int utc) {
+    double ts;
+    if (!tpo_num(a, n, 0, &ts)) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo", "partes() espera una marca de tiempo", 0);
+        return valor_nulo();
+    }
+    time_t t = (time_t)ts;
+    struct tm *p = utc ? gmtime(&t) : localtime(&t);
+    Valor *d = valor_diccionario_crear();
+    if (!p) return d;
+    valor_diccionario_agregar(d, "anio",       valor_numero(p->tm_year + 1900));
+    valor_diccionario_agregar(d, "mes",        valor_numero(p->tm_mon + 1));
+    valor_diccionario_agregar(d, "dia",        valor_numero(p->tm_mday));
+    valor_diccionario_agregar(d, "hora",       valor_numero(p->tm_hour));
+    valor_diccionario_agregar(d, "minuto",     valor_numero(p->tm_min));
+    valor_diccionario_agregar(d, "segundo",    valor_numero(p->tm_sec));
+    valor_diccionario_agregar(d, "dia_semana", valor_numero(p->tm_wday));   /* 0 = domingo */
+    valor_diccionario_agregar(d, "dia_anio",   valor_numero(p->tm_yday + 1));
+    return d;
+}
+static Valor *fn_tpo_partes(Valor **a, int n)     { return tpo_partes(a, n, 0); }
+static Valor *fn_tpo_partes_utc(Valor **a, int n) { return tpo_partes(a, n, 1); }
+
+static Valor *tpo_crear(Valor **a, int n, int utc) {
+    double v[6] = {0, 1, 1, 0, 0, 0};
+    if (n < 3 || n > 6) goto mal;
+    for (int i = 0; i < n; i++) if (!tpo_num(a, n, i, &v[i])) goto mal;
+    struct tm tmv;
+    memset(&tmv, 0, sizeof tmv);
+    tmv.tm_year = (int)v[0] - 1900; tmv.tm_mon = (int)v[1] - 1; tmv.tm_mday = (int)v[2];
+    tmv.tm_hour = (int)v[3]; tmv.tm_min = (int)v[4]; tmv.tm_sec = (int)v[5];
+    tmv.tm_isdst = -1;
+    return valor_numero((double)(utc ? lince_timegm(&tmv) : mktime(&tmv)));
+mal:
+    hay_error = 1;
+    valor_error = valor_error_nuevo("ErrorTipo", "crear() espera (anio, mes, dia[, hora, minuto, segundo])", 0);
+    return valor_nulo();
+}
+static Valor *fn_tpo_crear(Valor **a, int n)     { return tpo_crear(a, n, 0); }
+static Valor *fn_tpo_crear_utc(Valor **a, int n) { return tpo_crear(a, n, 1); }
+
+static Valor *tpo_analizar(Valor **a, int n, int utc) {
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo", "analizar() espera (texto, formato)", 0);
+        return valor_nulo();
+    }
+#ifdef _WIN32
+    (void)utc;
+    hay_error = 1;
+    valor_error = valor_error_nuevo("Error", "analizar() no está disponible en Windows", 0);
+    return valor_nulo();
+#else
+    struct tm tmv;
+    memset(&tmv, 0, sizeof tmv);
+    tmv.tm_isdst = -1;
+    char *fin = strptime(a[0]->texto, a[1]->texto, &tmv);
+    if (!fin || *fin) return valor_nulo();          /* no encaja con el formato */
+    return valor_numero((double)(utc ? lince_timegm(&tmv) : mktime(&tmv)));
+#endif
+}
+static Valor *fn_tpo_analizar(Valor **a, int n)     { return tpo_analizar(a, n, 0); }
+static Valor *fn_tpo_analizar_utc(Valor **a, int n) { return tpo_analizar(a, n, 1); }
 
 static Valor *fn_tpo_hora(Valor **a, int n) {
     (void)a; (void)n;
@@ -2280,9 +2382,17 @@ static void cargar_tiempo(Entorno *entorno) {
         {"esperar", fn_tpo_esperar, 1},
         {"fecha",   fn_tpo_fecha,   0},
         {"hora",    fn_tpo_hora,    0},
+        {"formatear",     fn_tpo_formatear,     2},
+        {"formatear_utc", fn_tpo_formatear_utc, 2},
+        {"partes",        fn_tpo_partes,        1},
+        {"partes_utc",    fn_tpo_partes_utc,    1},
+        {"crear",         fn_tpo_crear,        -1},
+        {"crear_utc",     fn_tpo_crear_utc,    -1},
+        {"analizar",      fn_tpo_analizar,      2},
+        {"analizar_utc",  fn_tpo_analizar_utc,  2},
     };
     registrar_modulo_diccionario(entorno, "tiempo",
-        fns, 4, NULL, NULL, 0);
+        fns, 12, NULL, NULL, 0);
 }
 
 static void cargar_sistema(Entorno *entorno) {

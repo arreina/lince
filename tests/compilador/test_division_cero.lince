@@ -1,0 +1,6 @@
+intentar {
+    sea x = 1 / 0
+    escribir(x)
+} capturar (ErrorMatematico e) {
+    escribir("división capturada")
+}

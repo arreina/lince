@@ -1,0 +1,11 @@
+importar "pruebas"
+
+funcion doble(val numero n): numero {
+    devolver n * 2
+}
+
+pruebas.suite("doble")
+pruebas.afirmar("doble de 4 es 8", doble(4) == 8)
+pruebas.igual("una lista de dobles", [doble(1), doble(2)], [2, 4])
+pruebas.lanza("dividir por cero da error", funcion(): nulo { sea x = 1 / 0 })
+pruebas.resumen()

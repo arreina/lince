@@ -108,6 +108,7 @@ sea lista tests = [
     "test_sistema",
     "test_enumeraciones",
     "test_pruebas",
+    "test_fechas",
     "test_interfaces",
     "test_closures",
     "test_recursion",
