@@ -118,6 +118,7 @@ sea lista tests = [
     "test_importar",
     "test_redefinicion",
     "test_importar_como",
+    "test_importar_clase_alias",
     "test_errores_capturables"
 ]
 

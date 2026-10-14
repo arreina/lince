@@ -1,0 +1,14 @@
+# TEST: clases a través de un alias de importación
+
+importar "./ayuda_clases" como geo
+
+sea p = geo.Punto(1, 2)
+escribir(p.suma())
+escribir(p.a)
+
+# Aridad incorrecta: error capturable
+intentar {
+    sea q = geo.Punto(1)
+} capturar (error e) {
+    escribir("aridad: " + e.tipo)
+}

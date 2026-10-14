@@ -1087,6 +1087,68 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
         return valor_nulo();
 }
 
+/* Instancia la clase 'vcls' (la consume) con los argumentos 'argn', que se
+   evalúan en 'e'. Lo comparten 'Clase(...)' y 'modulo.Clase(...)'. */
+static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, int linea) {
+    ClaseLince *cls = vcls->clase;
+
+    /* ¿Es un tipo de error predefinido o sin constructor? */
+    int es_error_pred = (cls->num_metodos == 0 &&
+        (strncmp(cls->nombre, "Error", 5) == 0));
+
+    if (es_error_pred) {
+        /* Error("mensaje") — el primer argumento es el mensaje */
+        char *msg = strdup("sin mensaje");
+        if (nargs >= 1) {
+            Valor *varg = ejecutar(argn[0], e);
+            free(msg);
+            msg = valor_a_texto(varg);
+            valor_destruir(varg);
+        }
+        Valor *verr = valor_crear_error(cls->nombre, msg, 0);
+        free(msg);
+        valor_destruir(vcls);
+        return verr;
+    }
+
+    ObjetoLince *obj = calloc(1, sizeof(ObjetoLince));
+    obj->clase      = cls;
+    obj->num_campos = 0;
+    Valor *vobj = valor_objeto(obj);
+
+    /* Buscar y llamar 'crear' en la jerarquía */
+    FuncionLince *f = buscar_metodo(cls, "crear");
+    if (f) {
+        if (nargs != f->num_parametros) {
+            Valor *err = error_rt("ErrorArgumento", linea,
+                "'%s' espera %d argumento(s) en 'crear', recibió %d.",
+                cls->nombre, f->num_parametros, nargs);
+            valor_destruir(vobj);
+            valor_destruir(vcls);
+            return err;
+        }
+        Entorno *fn_e = entorno_crear(f->entorno_closure);
+        for (int j = 0; j < f->num_parametros; j++) {
+            Valor *arg = ejecutar(argn[j], e);
+            validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, linea);
+            entorno_definir(fn_e, f->parametros[j].nombre, arg, 0);
+        }
+        Valor *esto_anterior   = esto_actual;
+        ClaseLince *cls_ant    = clase_actual;
+        esto_actual  = vobj;
+        clase_actual = cls;
+        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+        esto_actual  = esto_anterior;
+        clase_actual = cls_ant;
+        if (hay_retorno) valor_destruir(valor_retorno);
+        hay_retorno   = 0;
+        valor_retorno = NULL;
+        entorno_destruir(fn_e);
+    }
+    valor_destruir(vcls);
+    return vobj;
+}
+
 static Valor *ejecutar(Nodo *n, Entorno *e) {
     if (!n || hay_retorno || hay_error) return valor_nulo();
 
@@ -1740,14 +1802,14 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 for (int i = 0; i < obj->diccionario.cantidad; i++) {
                     if (strcmp(obj->diccionario.claves[i], met) == 0) {
                         Valor *vf = obj->diccionario.valores[i];
-                        if (vf->tipo != VAL_FUNCION) {
-                            int es_clase = (vf->tipo == VAL_CLASE);
+                        if (vf->tipo == VAL_CLASE) {
+                            Valor *cls = valor_retener(vf);
                             valor_destruir(obj);
-                            if (es_clase)
-                                return error_rt("ErrorTipo", n->linea,
-                                    "'%s' es una clase del módulo, y todavía no se pueden "
-                                    "instanciar clases a través de un alias de importación. "
-                                    "Importa el archivo sin 'como' para usarla.", met);
+                            return instanciar_clase(cls, n->metodo.argumentos,
+                                                    n->metodo.num_argumentos, e, n->linea);
+                        }
+                        if (vf->tipo != VAL_FUNCION) {
+                            valor_destruir(obj);
                             return error_rt("ErrorTipo", n->linea,
                                 "'%s' no es una función del módulo.", met);
                         }
@@ -2516,63 +2578,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 return error_rt("ErrorTipo", n->linea,
                     "'%s' no es una clase.", n->instancia.clase);
             }
-            ClaseLince *cls = vcls->clase;
-
-            /* ¿Es un tipo de error predefinido o sin constructor? */
-            int es_error_pred = (cls->num_metodos == 0 &&
-                (strncmp(cls->nombre, "Error", 5) == 0));
-
-            if (es_error_pred) {
-                /* Error("mensaje") — el primer argumento es el mensaje */
-                char *msg = strdup("sin mensaje");
-                if (n->instancia.num_argumentos >= 1) {
-                    Valor *varg = ejecutar(n->instancia.argumentos[0], e);
-                    free(msg);
-                    msg = valor_a_texto(varg);
-                    valor_destruir(varg);
-                }
-                Valor *verr = valor_crear_error(cls->nombre, msg, 0);
-                free(msg);
-                valor_destruir(vcls);
-                return verr;
-            }
-
-            ObjetoLince *obj = calloc(1, sizeof(ObjetoLince));
-            obj->clase      = cls;
-            obj->num_campos = 0;
-            Valor *vobj = valor_objeto(obj);
-
-            /* Buscar y llamar 'crear' en la jerarquía */
-            FuncionLince *f = buscar_metodo(cls, "crear");
-            if (f) {
-                if (n->instancia.num_argumentos != f->num_parametros) {
-                    Valor *err = error_rt("ErrorArgumento", n->linea,
-                        "'%s' espera %d argumento(s) en 'crear', recibió %d.",
-                        cls->nombre, f->num_parametros, n->instancia.num_argumentos);
-                    valor_destruir(vobj);
-                    valor_destruir(vcls);
-                    return err;
-                }
-                Entorno *fn_e = entorno_crear(f->entorno_closure);
-                for (int j = 0; j < f->num_parametros; j++) {
-                    Valor *arg = ejecutar(n->instancia.argumentos[j], e);
-                    validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, n->linea);
-                    entorno_definir(fn_e, f->parametros[j].nombre, arg, 0);
-                }
-                Valor *esto_anterior   = esto_actual;
-                ClaseLince *cls_ant    = clase_actual;
-                esto_actual  = vobj;
-                clase_actual = cls;
-                valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
-                esto_actual  = esto_anterior;
-                clase_actual = cls_ant;
-                if (hay_retorno) valor_destruir(valor_retorno);
-                hay_retorno   = 0;
-                valor_retorno = NULL;
-                entorno_destruir(fn_e);
-            }
-            valor_destruir(vcls);
-            return vobj;
+            return instanciar_clase(vcls, n->instancia.argumentos,
+                                    n->instancia.num_argumentos, e, n->linea);
         }
 
         case NODO_ASIGNACION_CAMPO: {
