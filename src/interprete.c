@@ -59,9 +59,36 @@ Valor *valor_error   = NULL;
 /* ─────────────────────────────────────────
    VALORES — creación
 ───────────────────────────────────────── */
+/* Los valores se crean y destruyen sin parar (cada lectura de una variable
+   copia un número). Reutilizar los bloques liberados evita un malloc/free por
+   operación. Son bloques sueltos: se pueden mezclar con malloc/free sin riesgo. */
+#define MAX_VALORES_LIBRES 4096
+static Valor *_val_libres = NULL;
+static int    _val_libres_num = 0;
+
+static inline Valor *valor_alloc(void) {
+    if (_val_libres) {
+        Valor *v = _val_libres;
+        _val_libres = *(Valor **)v;
+        _val_libres_num--;
+        return v;
+    }
+    return malloc(sizeof(Valor));
+}
+
+static inline void valor_soltar(Valor *v) {
+    if (_val_libres_num < MAX_VALORES_LIBRES) {
+        *(Valor **)v = _val_libres;
+        _val_libres = v;
+        _val_libres_num++;
+    } else {
+        free(v);
+    }
+}
+
 static void entorno_destruir(Entorno *e); /* declaración anticipada */
 Valor *valor_numero(double n) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo   = VAL_NUMERO;
     v->refs   = 1; v->es_modulo = 0;
     v->numero = n;
@@ -69,15 +96,26 @@ Valor *valor_numero(double n) {
 }
 
 Valor *valor_texto(const char *s) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo  = VAL_TEXTO;
     v->refs  = 1; v->es_modulo = 0;
+    v->ascii = -1; v->nchars = -1;
     v->texto = strdup(s);
     return v;
 }
 
+/* Como valor_texto, pero se queda con 's' (reservada con malloc) sin copiarla */
+static Valor *valor_texto_propio(char *s) {
+    Valor *v = valor_alloc();
+    v->tipo  = VAL_TEXTO;
+    v->refs  = 1; v->es_modulo = 0;
+    v->ascii = -1; v->nchars = -1;
+    v->texto = s;
+    return v;
+}
+
 Valor *valor_booleano(int b) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo     = VAL_BOOLEANO;
     v->refs     = 1; v->es_modulo = 0;
     v->booleano = b;
@@ -85,14 +123,14 @@ Valor *valor_booleano(int b) {
 }
 
 Valor *valor_nulo(void) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo = VAL_NULO;
     v->refs = 1; v->es_modulo = 0;
     return v;
 }
 
 static Valor *valor_funcion(FuncionLince *f) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo    = VAL_FUNCION;
     v->refs    = 1; v->es_modulo = 0;
     v->funcion = f;
@@ -100,7 +138,7 @@ static Valor *valor_funcion(FuncionLince *f) {
 }
 
 static Valor *valor_clase(ClaseLince *c) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo  = VAL_CLASE;
     v->refs  = 1; v->es_modulo = 0;
     v->clase = c;
@@ -108,7 +146,7 @@ static Valor *valor_clase(ClaseLince *c) {
 }
 
 static Valor *valor_objeto(ObjetoLince *o) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo   = VAL_OBJETO;
     v->refs   = 1; v->es_modulo = 0;
     v->objeto = o;
@@ -120,7 +158,7 @@ Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea) {
     e->tipo    = strdup(tipo);
     e->mensaje = strdup(mensaje);
     e->linea   = linea;
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo  = VAL_ERROR;
     v->refs  = 1; v->es_modulo = 0;
     v->error = e;
@@ -212,6 +250,7 @@ static void valor_liberar(Valor *v) {
         }
         free(v->diccionario.claves);
         free(v->diccionario.valores);
+        free(v->diccionario.indice);
     }
     if (v->tipo == VAL_OBJETO) {
         for (int i = 0; i < v->objeto->num_campos; i++) {
@@ -237,14 +276,14 @@ static void valor_liberar(Valor *v) {
         free(v->error->mensaje);
         free(v->error);
     }
-    free(v);
+    valor_soltar(v);
 }
 
 /* Alias para claridad — función real para que sea linkeable */
 void valor_destruir(Valor *v) { valor_liberar(v); }
 
 Valor *valor_lista_crear(void) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo             = VAL_LISTA;
     v->refs             = 1; v->es_modulo = 0;
     v->lista.capacidad  = 8;
@@ -349,11 +388,12 @@ int utf8_es_letra(const char *s) {
 }
 
 Valor *valor_diccionario_crear(void) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo                  = VAL_DICCIONARIO;
     v->refs                  = 1; v->es_modulo = 0;
     v->es_modulo             = 0;
     v->diccionario.cantidad  = 0;
+    v->diccionario.indice = NULL; v->diccionario.indice_cap = 0; v->diccionario.indice_n = 0;
     v->diccionario.capacidad = DIC_CAP_INICIAL;
     v->diccionario.claves    = malloc(sizeof(char*)  * DIC_CAP_INICIAL);
     v->diccionario.valores   = malloc(sizeof(Valor*) * DIC_CAP_INICIAL);
@@ -387,8 +427,50 @@ void valor_diccionario_agregar(Valor *dic, const char *clave, Valor *valor) {
     dic->diccionario.cantidad++;
 }
 
+static unsigned hash_cadena(const char *s) {
+    unsigned h = 2166136261u;
+    for (; *s; s++) h = (h ^ (unsigned char)*s) * 16777619u;
+    return h;
+}
+
+/* Posición de la clave 'k' en el diccionario, o -1. Hasta 8 entradas se busca
+   en línea recta; con más, con una tabla hash que se construye al primer uso
+   y crece con las entradas nuevas (las entradas solo se añaden al final, salvo
+   'eliminar', que invalida la tabla con indice_n = -1). */
+int valor_diccionario_buscar(Valor *d, const char *k) {
+    int n = d->diccionario.cantidad;
+    if (n <= 8) {
+        for (int i = 0; i < n; i++)
+            if (strcmp(d->diccionario.claves[i], k) == 0) return i;
+        return -1;
+    }
+    if (!d->diccionario.indice || d->diccionario.indice_n < 0 ||
+        d->diccionario.indice_n > n || d->diccionario.indice_cap < 2 * n) {
+        int cap = 32;
+        while (cap < 4 * n) cap *= 2;
+        free(d->diccionario.indice);
+        d->diccionario.indice = malloc(sizeof(int) * cap);
+        memset(d->diccionario.indice, 0xFF, sizeof(int) * cap);
+        d->diccionario.indice_cap = cap;
+        d->diccionario.indice_n = 0;
+    }
+    int *tab = d->diccionario.indice, mascara = d->diccionario.indice_cap - 1;
+    while (d->diccionario.indice_n < n) {
+        int pos = d->diccionario.indice_n++;
+        unsigned h = hash_cadena(d->diccionario.claves[pos]) & (unsigned)mascara;
+        while (tab[h] != -1) h = (h + 1) & (unsigned)mascara;
+        tab[h] = pos;
+    }
+    unsigned h = hash_cadena(k) & (unsigned)mascara;
+    while (tab[h] != -1) {
+        if (strcmp(d->diccionario.claves[tab[h]], k) == 0) return tab[h];
+        h = (h + 1) & (unsigned)mascara;
+    }
+    return -1;
+}
+
 static Valor *valor_generador_crear(void) {
-    Valor *v = malloc(sizeof(Valor));
+    Valor *v = valor_alloc();
     v->tipo              = VAL_GENERADOR;
     v->refs              = 1;
     v->es_modulo         = 0;
@@ -407,11 +489,23 @@ static void generador_agregar(Valor *gen, Valor *elem) {
     gen->generador.elementos[gen->generador.cantidad++] = elem;
 }
 
+/* Un texto se comparte entre variables (nunca se modifica), así que la
+   longitud y si es ASCII se calculan una vez y se guardan en el propio valor:
+   indexar un texto largo en un bucle deja de ser cuadrático. */
+static void texto_medir(Valor *v) {
+    if (v->nchars >= 0) return;
+    int ascii = 1;
+    for (const unsigned char *p = (const unsigned char *)v->texto; *p; p++)
+        if (*p >= 0x80) { ascii = 0; break; }
+    v->ascii  = ascii;
+    v->nchars = utf8_longitud(v->texto);
+}
+
 static Valor *valor_copiar(Valor *v) {
     if (!v) return valor_nulo();
     switch (v->tipo) {
         case VAL_NUMERO:      return valor_numero(v->numero);
-        case VAL_TEXTO:       return valor_texto(v->texto);
+        case VAL_TEXTO:       return valor_retener(v);   /* los textos no se modifican: se comparten */
         case VAL_BOOLEANO:    return valor_booleano(v->booleano);
         case VAL_NULO:        return valor_nulo();
         case VAL_FUNCION:
@@ -603,7 +697,7 @@ static Valor *empaquetar_modulo(Entorno *mod_e) {
 
 static int ya_definido_aqui(Entorno *e, const char *nombre) {
     for (int i = 0; i < e->cantidad; i++)
-        if (strcmp(e->vars[i].nombre, nombre) == 0) return 1;
+        if (e->vars[i].nombre[0] == nombre[0] && strcmp(e->vars[i].nombre, nombre) == 0) return 1;
     return 0;
 }
 
@@ -668,7 +762,7 @@ static void entorno_liberar(Entorno *e) { entorno_destruir(e); }
 
 static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
     for (int i = 0; i < e->cantidad; i++) {
-        if (strcmp(e->vars[i].nombre, nombre) == 0)
+        if (e->vars[i].nombre[0] == nombre[0] && strcmp(e->vars[i].nombre, nombre) == 0)
             return valor_copiar(e->vars[i].valor);
     }
     if (e->padre) return entorno_obtener(e->padre, nombre, linea);
@@ -681,7 +775,7 @@ static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
 
 static void entorno_asignar(Entorno *e, const char *nombre, Valor *nuevo, int linea) {
     for (int i = 0; i < e->cantidad; i++) {
-        if (strcmp(e->vars[i].nombre, nombre) == 0) {
+        if (e->vars[i].nombre[0] == nombre[0] && strcmp(e->vars[i].nombre, nombre) == 0) {
             if (e->vars[i].constante) {
                 /* 'nuevo' se entregó a esta función: si no se asigna, hay que
                    soltarlo o se fuga. */
@@ -912,13 +1006,15 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
     }
 
     /* Concatenación de texto */
-    if (strcmp(op, "+") == 0 && (izq->tipo == VAL_TEXTO || der->tipo == VAL_TEXTO)) {
-        char *si = valor_a_texto(izq);
-        char *sd = valor_a_texto(der);
-        char *buf = malloc(strlen(si) + strlen(sd) + 1);
-        strcpy(buf, si); strcat(buf, sd);
-        resultado = valor_texto(buf);
-        free(si); free(sd); free(buf);
+    if (op[0] == '+' && !op[1] && (izq->tipo == VAL_TEXTO || der->tipo == VAL_TEXTO)) {
+        char *si = izq->tipo == VAL_TEXTO ? izq->texto : valor_a_texto(izq);
+        char *sd = der->tipo == VAL_TEXTO ? der->texto : valor_a_texto(der);
+        size_t li = strlen(si), ld = strlen(sd);
+        char *buf = malloc(li + ld + 1);
+        memcpy(buf, si, li); memcpy(buf + li, sd, ld + 1);
+        resultado = valor_texto_propio(buf);
+        if (izq->tipo != VAL_TEXTO) free(si);
+        if (der->tipo != VAL_TEXTO) free(sd);
         valor_destruir(izq); valor_destruir(der);
         return resultado;
     }
@@ -926,26 +1022,34 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
     /* Operaciones numéricas */
     if (izq->tipo == VAL_NUMERO && der->tipo == VAL_NUMERO) {
         double a = izq->numero, b = der->numero;
-        if (strcmp(op, "+")  == 0) resultado = valor_numero(a + b);
-        else if (strcmp(op, "-")  == 0) resultado = valor_numero(a - b);
-        else if (strcmp(op, "*")  == 0) resultado = valor_numero(a * b);
-        else if (strcmp(op, "/")  == 0) {
-            if (b == 0) {
-                valor_error = valor_error_nuevo("ErrorMatematico", "División por cero.", 0);
-                hay_error = 1;
-                valor_destruir(izq);
-                valor_destruir(der);
-                return valor_nulo();
+        char o0 = op[0], o1 = op[1];
+        if (!o1) {
+            switch (o0) {
+                case '+': resultado = valor_numero(a + b); break;
+                case '-': resultado = valor_numero(a - b); break;
+                case '*': resultado = valor_numero(a * b); break;
+                case '/':
+                    if (b == 0) {
+                        valor_error = valor_error_nuevo("ErrorMatematico", "División por cero.", 0);
+                        hay_error = 1;
+                        valor_destruir(izq);
+                        valor_destruir(der);
+                        return valor_nulo();
+                    }
+                    resultado = valor_numero(a / b);
+                    break;
+                case '%': resultado = valor_numero(fmod(a, b)); break;
+                case '<': resultado = valor_booleano(a < b); break;
+                case '>': resultado = valor_booleano(a > b); break;
             }
-            resultado = valor_numero(a / b);
+        } else if (o1 == '=' && !op[2]) {
+            switch (o0) {
+                case '<': resultado = valor_booleano(a <= b); break;
+                case '>': resultado = valor_booleano(a >= b); break;
+                case '=': resultado = valor_booleano(a == b); break;
+                case '!': resultado = valor_booleano(a != b); break;
+            }
         }
-        else if (strcmp(op, "%")  == 0) resultado = valor_numero(fmod(a, b));
-        else if (strcmp(op, "<")  == 0) resultado = valor_booleano(a < b);
-        else if (strcmp(op, ">")  == 0) resultado = valor_booleano(a > b);
-        else if (strcmp(op, "<=") == 0) resultado = valor_booleano(a <= b);
-        else if (strcmp(op, ">=") == 0) resultado = valor_booleano(a >= b);
-        else if (strcmp(op, "==") == 0) resultado = valor_booleano(a == b);
-        else if (strcmp(op, "!=") == 0) resultado = valor_booleano(a != b);
     }
 
     /* Comparaciones entre texto */
@@ -1816,8 +1920,9 @@ static Valor *exec_indice(Nodo *n, Entorno *e) {
             valor_destruir(obj); valor_destruir(idx);
             return valor_nulo();
         }
-        for (int i = 0; i < obj->diccionario.cantidad; i++) {
-            if (strcmp(obj->diccionario.claves[i], idx->texto) == 0) {
+        {
+            int i = valor_diccionario_buscar(obj, idx->texto);
+            if (i >= 0) {
                 Valor *res = valor_copiar(obj->diccionario.valores[i]);
                 valor_destruir(obj); valor_destruir(idx);
                 return res;
@@ -1840,7 +1945,8 @@ static Valor *exec_indice(Nodo *n, Entorno *e) {
             return valor_nulo();
         }
         int i = (int)idx->numero;
-        int len = utf8_longitud(obj->texto);
+        texto_medir(obj);
+        int len = obj->nchars;
         if (i < 0) i = len + i;
         if (i < 0 || i >= len) {
             char msg[128];
@@ -1853,8 +1959,8 @@ static Valor *exec_indice(Nodo *n, Entorno *e) {
         }
         /* El carácter puede ocupar varios bytes, así que se copia
            entero en vez de quedarse con el primero. */
-        int off = utf8_desplazamiento(obj->texto, i);
-        int tam = utf8_tam(obj->texto + off);
+        int off = obj->ascii ? i : utf8_desplazamiento(obj->texto, i);
+        int tam = obj->ascii ? 1 : utf8_tam(obj->texto + off);
         char tmp[5] = {0};
         for (int k = 0; k < tam && k < 4; k++) tmp[k] = obj->texto[off + k];
         Valor *res = valor_texto(tmp);
@@ -1897,8 +2003,9 @@ static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
             valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
             return error_rt("ErrorTipo", n->linea, "La clave de un diccionario debe ser texto.");
         }
-        for (int i = 0; i < obj->diccionario.cantidad; i++) {
-            if (strcmp(obj->diccionario.claves[i], idx->texto) == 0) {
+        {
+            int i = valor_diccionario_buscar(obj, idx->texto);
+            if (i >= 0) {
                 valor_destruir(obj->diccionario.valores[i]);
                 obj->diccionario.valores[i] = val;
                 if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR)
@@ -1930,8 +2037,9 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
     /* ── Módulo (diccionario con funciones nativas) ── */
     if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
         const char *met = n->metodo.metodo;
-        for (int i = 0; i < obj->diccionario.cantidad; i++) {
-            if (strcmp(obj->diccionario.claves[i], met) == 0) {
+        {
+            int i = valor_diccionario_buscar(obj, met);
+            if (i >= 0) {
                 Valor *vf = obj->diccionario.valores[i];
                 if (vf->tipo == VAL_CLASE) {
                     Valor *cls = valor_retener(vf);
@@ -2226,7 +2334,8 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
     if (obj->tipo == VAL_TEXTO) {
         if (strcmp(met, "longitud") == 0) {
             /* Caracteres, no bytes: "niño" mide 4. */
-            int len = utf8_longitud(obj->texto);
+            texto_medir(obj);
+            int len = obj->nchars;
             valor_destruir(obj);
             return valor_numero(len);
         }
@@ -2293,8 +2402,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
             }
             Valor *clave = ejecutar(n->metodo.argumentos[0], e);
             int ok = 0;
-            for (int i = 0; i < obj->diccionario.cantidad; i++)
-                if (strcmp(obj->diccionario.claves[i], clave->texto) == 0) { ok = 1; break; }
+            ok = valor_diccionario_buscar(obj, clave->texto) >= 0;
             valor_destruir(clave); valor_destruir(obj);
             return valor_booleano(ok);
         }
@@ -2310,8 +2418,9 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                     "'eliminar' necesita exactamente 1 argumento (clave).");
             }
             Valor *clave = ejecutar(n->metodo.argumentos[0], e);
-            for (int i = 0; i < obj->diccionario.cantidad; i++) {
-                if (strcmp(obj->diccionario.claves[i], clave->texto) == 0) {
+            {
+                int i = valor_diccionario_buscar(obj, clave->texto);
+                if (i >= 0) {
                     free(obj->diccionario.claves[i]);
                     valor_destruir(obj->diccionario.valores[i]);
                     for (int j = i; j < obj->diccionario.cantidad - 1; j++) {
@@ -2319,7 +2428,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                         obj->diccionario.valores[j] = obj->diccionario.valores[j+1];
                     }
                     obj->diccionario.cantidad--;
-                    break;
+                    obj->diccionario.indice_n = -1;     /* las posiciones cambiaron */
                 }
             }
             if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
@@ -2507,8 +2616,9 @@ static Valor *exec_acceso(Nodo *n, Entorno *e) {
     /* Acceso a constante de módulo */
     if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
         const char *campo = n->acceso.campo;
-        for (int i = 0; i < obj->diccionario.cantidad; i++) {
-            if (strcmp(obj->diccionario.claves[i], campo) == 0) {
+        {
+            int i = valor_diccionario_buscar(obj, campo);
+            if (i >= 0) {
                 Valor *r = valor_copiar(obj->diccionario.valores[i]);
                 valor_destruir(obj);
                 return r;

@@ -2021,6 +2021,7 @@ static void registrar_modulo_diccionario(Entorno *entorno,
     modulo->refs      = 1;
     modulo->es_modulo = 1;
     modulo->diccionario.cantidad  = 0;
+    modulo->diccionario.indice = NULL; modulo->diccionario.indice_cap = 0; modulo->diccionario.indice_n = 0;
     modulo->diccionario.capacidad = num_fns + num_c + 8;
     modulo->diccionario.claves   = malloc(sizeof(char*)  * modulo->diccionario.capacidad);
     modulo->diccionario.valores  = malloc(sizeof(Valor*) * modulo->diccionario.capacidad);

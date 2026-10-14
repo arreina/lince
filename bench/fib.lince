@@ -1,0 +1,5 @@
+funcion fib(val numero n): numero {
+    si n < 2 { devolver n }
+    devolver fib(n - 1) + fib(n - 2)
+}
+escribir(fib(30))

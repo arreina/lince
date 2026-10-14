@@ -1,0 +1,11 @@
+sea total = 0
+sea i = 0
+para (i = 0; i < 3000000; i++) {
+    total = total + i % 7
+}
+escribir(total)
+sea j = 0
+mientras j < 2000000 {
+    j = j + 1
+}
+escribir(j)

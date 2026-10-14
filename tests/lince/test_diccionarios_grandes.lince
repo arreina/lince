@@ -1,0 +1,43 @@
+# TEST: diccionarios con muchas claves (índice hash), borrado y reinserción
+sea diccionario d = {}
+sea i = 0
+para (i = 0; i < 200; i++) {
+    d["k" + i] = i
+}
+escribir(d["k0"])
+escribir(d["k199"])
+escribir(d.contiene("k100"))
+escribir(d.contiene("k200"))
+
+# Sobrescribir no duplica
+d["k50"] = 5000
+escribir(d["k50"])
+escribir(d.longitud())
+
+# Borrar y volver a añadir: las posiciones cambian
+d.eliminar("k10")
+d.eliminar("k150")
+escribir(d.contiene("k10"))
+escribir(d.contiene("k150"))
+escribir(d["k11"])
+escribir(d["k199"])
+d["nuevo1"] = 1
+d["nuevo2"] = 2
+escribir(d["nuevo1"] + d["nuevo2"])
+escribir(d.longitud())
+
+# Una clave que no existe da error
+intentar {
+    escribir(d["no_existe"])
+} capturar (ErrorRango e) {
+    escribir("sin clave")
+}
+
+# Todas siguen accesibles tras los cambios
+sea suma = 0
+para (i = 0; i < 200; i++) {
+    si d.contiene("k" + i) {
+        suma = suma + d["k" + i]
+    }
+}
+escribir(suma)

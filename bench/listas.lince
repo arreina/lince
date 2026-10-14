@@ -1,0 +1,13 @@
+sea lista datos = []
+sea i = 0
+para (i = 0; i < 200000; i++) {
+    datos.agregar(i * 2)
+}
+sea suma = 0
+para cada numero x en datos {
+    suma = suma + x
+}
+escribir(suma)
+datos.ordenar()
+datos.invertir()
+escribir(datos.contiene(777))

@@ -115,6 +115,10 @@ editores:
 editores-check:
 	@python3 editores/generar.py --comprobar
 
+# Medidas de rendimiento del intérprete (bench/*.lince): tiempo y memoria de cada una
+bench: all
+	@for f in bench/*.lince; do /usr/bin/time -f "$$(basename $$f) %es %MKB" ./lince $$f >/dev/null; done
+
 # El compilador pega src/cripto.h dentro de los programas que genera, a partir
 # de src/cripto_embebido.h (generado). 'embebidos-check' falla en la CI si se
 # tocó cripto.h sin regenerar.
@@ -154,6 +158,6 @@ else
 endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-lsp test-editores editores editores-check embebidos embebidos-check vsix \
+        test-asan test-lsp test-editores editores editores-check embebidos embebidos-check bench vsix \
         test-todo clean install uninstall docs docs-check
 

@@ -99,6 +99,8 @@ struct Valor {
     TipoValor tipo;
     int       refs;
     int       es_modulo;  /* 1 si es un módulo importado */
+    int       ascii;      /* texto: 1 si solo tiene ASCII, 0 si no, -1 sin calcular */
+    int       nchars;     /* texto: número de caracteres, o -1 sin calcular */
     union {
         double        numero;
         char         *texto;
@@ -114,6 +116,9 @@ struct Valor {
             struct Valor **valores;
             int            cantidad;
             int            capacidad;
+            int           *indice;      /* tabla hash de posiciones (ver valor_diccionario_buscar) */
+            int            indice_cap;
+            int            indice_n;    /* cuántas entradas están indexadas; -1 = invalidada */
         } diccionario;
         ClaseLince  *clase;
         ObjetoLince *objeto;
@@ -170,6 +175,8 @@ Valor *valor_diccionario_crear(void);
 void   valor_diccionario_asegurar(Valor *dic, int n);
 /* Añade clave/valor al final del diccionario, creciendo si hace falta. */
 void   valor_diccionario_agregar(Valor *dic, const char *clave, Valor *valor);
+/* Posición de la clave en el diccionario, o -1 */
+int    valor_diccionario_buscar(Valor *dic, const char *clave);
 void   lista_agregar(Valor *lista, Valor *elem);
 Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea);
 void   entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante);

@@ -1,0 +1,10 @@
+sea diccionario d = {}
+sea i = 0
+para (i = 0; i < 50000; i++) {
+    d["clave" + i] = i
+}
+sea suma = 0
+para (i = 0; i < 50000; i++) {
+    suma = suma + d["clave" + i]
+}
+escribir(suma)

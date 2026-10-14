@@ -107,6 +107,7 @@ sea lista tests = [
     "test_json",
     "test_sistema",
     "test_enumeraciones",
+    "test_diccionarios_grandes",
     "test_cripto",
     "test_sqlite",
     "test_pruebas",

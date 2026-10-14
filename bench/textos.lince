@@ -1,0 +1,11 @@
+sea s = ""
+sea i = 0
+para (i = 0; i < 20000; i++) {
+    s = s + "x"
+}
+escribir(s.longitud())
+sea n = 0
+para (i = 0; i < 200000; i++) {
+    n = n + ("abc" + i).longitud()
+}
+escribir(n)

@@ -1,0 +1,16 @@
+clase Punto {
+    funcion crear(val numero a, val numero b): nulo {
+        mi.x = a
+        mi.v = b
+    }
+    funcion suma(): numero {
+        devolver mi.x + mi.v
+    }
+}
+sea total = 0
+sea i = 0
+para (i = 0; i < 200000; i++) {
+    sea p = Punto(i, 1)
+    total = total + p.suma()
+}
+escribir(total)
