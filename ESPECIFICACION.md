@@ -690,8 +690,10 @@ Transpila a C y compila con `gcc -O2`. Requiere `gcc` instalado.
 
 Los `importar` de archivos locales se resuelven al compilar: el archivo
 importado se inserta en el programa, así que el binario no necesita nada
-alrededor. Lo que no está hecho todavía es el alias (`como`), que pediría un
-espacio de nombres en el C generado.
+alrededor. El alias (`como`) también funciona: las definiciones de la
+librería se renombran (`nombre__alias`) y `alias.nombre` se reescribe a ese
+nombre. Dentro de un binario, el alias sólo se puede usar como `alias.nombre`
+(no como valor suelto).
 
 ### Soporte del compilador
 

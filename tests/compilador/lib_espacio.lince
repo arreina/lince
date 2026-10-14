@@ -1,0 +1,48 @@
+fijo FACTOR = 10
+sea contador = 0
+
+enumeracion Modo { Suma Resta }
+
+funcion escala(val numero x): numero {
+    devolver x * FACTOR
+}
+
+funcion doble_escala(val numero x): numero {
+    devolver escala(escala(x))
+}
+
+funcion subir(): numero {
+    contador = contador + 1
+    devolver contador
+}
+
+# Un parámetro llamado igual que una global la tapa
+funcion tapado(val numero FACTOR): numero {
+    devolver FACTOR + 1
+}
+
+clase Caja {
+    funcion crear(val numero v): nulo {
+        mi.v = v
+    }
+    funcion grande(): numero {
+        devolver escala(mi.v)
+    }
+}
+
+clase CajaPlus extiende Caja {
+    funcion crear(val numero v): nulo {
+        padre(v)
+    }
+    funcion doble(): numero {
+        devolver doble_escala(mi.v)
+    }
+}
+
+funcion nombre_modo(val texto m): texto {
+    elegir m {
+        caso Modo.Suma { devolver "suma" }
+        otro           { devolver "resta" }
+    }
+    devolver ""
+}

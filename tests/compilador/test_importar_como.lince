@@ -1,0 +1,38 @@
+# TEST (compilador): importar ... como — espacio de nombres en el binario.
+importar "./lib_espacio"  como uno
+importar "./lib_espacio2" como dos
+
+# Dos librerías con el mismo nombre de función y de constante
+escribir(uno.escala(2))
+escribir(dos.escala(2))
+escribir(uno.FACTOR)
+escribir(dos.FACTOR)
+
+# Una función de la librería llamando a otra de la misma
+escribir(uno.doble_escala(2))
+
+# Estado de la librería, compartido entre llamadas
+escribir(uno.subir())
+escribir(uno.subir())
+
+# Lo local tapa a lo global dentro de la librería
+escribir(uno.tapado(5))
+
+# Clases y herencia por el alias
+sea c = uno.Caja(4)
+escribir(c.grande())
+sea p = uno.CajaPlus(2)
+escribir(p.doble())
+escribir(p.grande())
+
+# Enumeración de la librería
+escribir(uno.nombre_modo(uno.Modo.Suma))
+escribir(uno.nombre_modo(uno.Modo.Resta))
+
+# Los nombres propios no chocan con los de la librería
+fijo FACTOR = 99
+funcion escala(val numero x): numero {
+    devolver x + FACTOR
+}
+escribir(escala(1))
+escribir(uno.escala(1))

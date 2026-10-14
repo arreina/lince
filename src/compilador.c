@@ -34,7 +34,7 @@ typedef struct {
        archivo C, no como locales de main(): si no, ninguna función emitida
        las alcanza — un 'fijo BASE = 10' usado dentro de una función daba un
        '_l_BASE undeclared' de gcc aunque el intérprete lo ejecutara bien. */
-    char  globales[128][64];
+    char  globales[512][96];
     int   num_globales;
     /* Módulos ya emitidos (para no duplicar) */
     char  modulos_emitidos[16][32];
@@ -1771,7 +1771,9 @@ static void compilar_nodo(Compilador *c, Nodo *n) {
             sangrar(c);
             fprintf(c->salida, "/* enumeracion %s */\n", n->enumeracion.nombre);
             sangrar(c);
-            fprintf(c->salida, "LValor *_l_%s = lince_dic();\n", n->enumeracion.nombre);
+            fprintf(c->salida, "%s_l_%s = lince_dic();\n",
+                    es_global(c, n->enumeracion.nombre) ? "" : "LValor *",
+                    n->enumeracion.nombre);
             for (int i = 0; i < n->enumeracion.num_valores; i++) {
                 char buf[256];
                 snprintf(buf, sizeof(buf), "%s.%s",
@@ -2446,6 +2448,291 @@ static char *leer_todo(const char *ruta) {
 
 static int expandir(Nodo *ast, const char *ruta_fuente, ImportsVistos *vistos);
 
+/* ─────────────────────────────────────────
+   'importar "./x" como alias'
+
+   El C generado no tiene espacios de nombres, así que se simulan renombrando:
+   toda definición de nivel superior de la librería pasa a llamarse
+   'nombre__alias' (con la inicial intacta: el compilador distingue clases por
+   la mayúscula), y en quien importa, 'alias.nombre(...)' se reescribe como
+   una llamada, una instancia o un identificador de ese nombre. Lo local —
+   parámetros, variables de bloque, capturas— tapa a lo global como en el
+   intérprete, así que no se toca.
+───────────────────────────────────────── */
+
+typedef struct { char *nombre; int es_clase; } NombreMod;
+
+typedef struct {
+    /* Renombrado de la librería */
+    NombreMod *mod;  int nmod;  const char *sufijo;
+    int        renombrar;   /* 1: renombrando la librería; 0: reescribiendo quien importa */
+    char     **loc;  int nloc,  cloc;
+    int        prof;
+    /* Reescritura en quien importa */
+    const char *alias;
+    int         error;
+} CtxNs;
+
+static char *nombre_mangled(const char *n, const char *sufijo) {
+    size_t t = strlen(n) + strlen(sufijo) + 3;
+    char *r = malloc(t);
+    snprintf(r, t, "%s__%s", n, sufijo);
+    return r;
+}
+
+static NombreMod *ns_buscar(NombreMod *m, int n, const char *nombre) {
+    for (int i = 0; i < n; i++) if (strcmp(m[i].nombre, nombre) == 0) return &m[i];
+    return NULL;
+}
+
+static int ns_es_local(CtxNs *c, const char *n) {
+    for (int i = c->nloc - 1; i >= 0; i--) if (strcmp(c->loc[i], n) == 0) return 1;
+    return 0;
+}
+static void ns_push(CtxNs *c, const char *n) {
+    if (c->nloc == c->cloc) {
+        c->cloc = c->cloc ? c->cloc * 2 : 32;
+        c->loc  = realloc(c->loc, sizeof(char *) * c->cloc);
+    }
+    c->loc[c->nloc++] = (char *)n;
+}
+
+/* Renombra *s si es un nombre global de la librería no tapado por un local. */
+static void ns_ren(CtxNs *c, char **s) {
+    if (!c->renombrar || !*s || ns_es_local(c, *s)) return;
+    if (ns_buscar(c->mod, c->nmod, *s)) *s = nombre_mangled(*s, c->sufijo);
+}
+/* Para nombres de clase usados como tipo: no los tapa una variable. */
+static void ns_ren_clase(CtxNs *c, char **s) {
+    if (!c->renombrar || !*s) return;
+    NombreMod *m = ns_buscar(c->mod, c->nmod, *s);
+    if (m && m->es_clase) *s = nombre_mangled(*s, c->sufijo);
+}
+
+static void ns_nodo(CtxNs *c, Nodo *n);
+static void ns_params(CtxNs *c, Parametro *p, int np) {
+    for (int i = 0; i < np; i++) {
+        if (p[i].valor_defecto) ns_nodo(c, p[i].valor_defecto);
+        if (p[i].tipo == TIPO_CLASE) ns_ren_clase(c, &p[i].tipo_clase);
+    }
+    for (int i = 0; i < np; i++) ns_push(c, p[i].nombre);
+}
+static void ns_lista(CtxNs *c, Nodo **v, int n) {
+    for (int i = 0; i < n; i++) ns_nodo(c, v[i]);
+}
+
+/* Cuerpo y parámetros de una función, lambda, generador o método. */
+static void ns_funcion(CtxNs *c, Parametro *p, int np, Nodo *cuerpo, char **ret_clase) {
+    int marca = c->nloc;
+    if (ret_clase) ns_ren_clase(c, ret_clase);
+    ns_params(c, p, np);
+    c->prof++;
+    ns_nodo(c, cuerpo);
+    c->prof--;
+    c->nloc = marca;
+}
+
+/* alias.algo en quien importa: devuelve el nombre mangled, o NULL. */
+static NombreMod *ns_miembro(CtxNs *c, Nodo *objeto, const char *miembro,
+                             int linea, char **mangled) {
+    if (!c->alias || !objeto || objeto->tipo != NODO_IDENTIFICADOR ||
+        strcmp(objeto->identificador, c->alias) != 0) return NULL;
+    NombreMod *m = ns_buscar(c->mod, c->nmod, miembro);
+    if (!m) {
+        fprintf(stderr, "\n❌ Error en línea %d: la librería '%s' no define '%s'.\n\n",
+                linea, c->alias, miembro);
+        c->error = 1;
+        return NULL;
+    }
+    *mangled = nombre_mangled(miembro, c->sufijo);
+    return m;
+}
+
+static void ns_nodo(CtxNs *c, Nodo *n) {
+    if (!n) return;
+    switch (n->tipo) {
+        case NODO_IDENTIFICADOR:
+            if (c->alias && strcmp(n->identificador, c->alias) == 0) {
+                fprintf(stderr,
+                    "\n❌ Error en línea %d: '%s' es una librería importada con 'como'; "
+                    "al compilar sólo se puede usar como '%s.nombre'.\n\n",
+                    n->linea, c->alias, c->alias);
+                c->error = 1;
+            } else ns_ren(c, &n->identificador);
+            break;
+        case NODO_BINARIO:  ns_nodo(c, n->binario.izquierda); ns_nodo(c, n->binario.derecha); break;
+        case NODO_UNARIO:   ns_nodo(c, n->unario.operando); break;
+        case NODO_DECLARACION:
+            ns_nodo(c, n->declaracion.valor);
+            if (c->prof == 0) ns_ren(c, &n->declaracion.nombre);
+            else ns_push(c, n->declaracion.nombre);
+            break;
+        case NODO_ASIGNACION:
+            ns_nodo(c, n->asignacion.valor);
+            ns_ren(c, &n->asignacion.nombre);
+            break;
+        case NODO_INCREMENTO: ns_ren(c, &n->incremento.nombre); break;
+        case NODO_ESCRIBIR:   ns_nodo(c, n->escribir); break;
+        case NODO_BLOQUE: {
+            int marca = c->nloc;
+            c->prof++;
+            ns_lista(c, n->bloque.sentencias, n->bloque.cantidad);
+            c->prof--;
+            c->nloc = marca;
+            break;
+        }
+        case NODO_SI:
+            ns_nodo(c, n->si.condicion);
+            ns_nodo(c, n->si.entonces);
+            for (int i = 0; i < n->si.cantidad_sino_si; i++) {
+                ns_nodo(c, n->si.condiciones_sino_si[i]);
+                ns_nodo(c, n->si.bloques_sino_si[i]);
+            }
+            ns_nodo(c, n->si.sino);
+            break;
+        case NODO_MIENTRAS: ns_nodo(c, n->mientras.condicion); ns_nodo(c, n->mientras.cuerpo); break;
+        case NODO_HACER:    ns_nodo(c, n->hacer.cuerpo); ns_nodo(c, n->hacer.condicion); break;
+        case NODO_PARA: {
+            int marca = c->nloc;
+            ns_nodo(c, n->para.val_inicio);
+            ns_push(c, n->para.var_inicio);
+            ns_nodo(c, n->para.condicion);
+            ns_ren(c, &n->para.var_incremento);
+            ns_nodo(c, n->para.cuerpo);
+            c->nloc = marca;
+            break;
+        }
+        case NODO_PARA_CADA: {
+            int marca = c->nloc;
+            if (n->para_cada.tipo == TIPO_CLASE) ns_ren_clase(c, &n->para_cada.tipo_clase);
+            ns_nodo(c, n->para_cada.coleccion);
+            ns_push(c, n->para_cada.variable);
+            ns_nodo(c, n->para_cada.cuerpo);
+            c->nloc = marca;
+            break;
+        }
+        case NODO_FUNCION:
+            if (c->prof == 0) ns_ren(c, &n->funcion.nombre);
+            else ns_push(c, n->funcion.nombre);
+            ns_funcion(c, n->funcion.parametros, n->funcion.num_parametros,
+                       n->funcion.cuerpo, &n->funcion.tipo_retorno_clase);
+            break;
+        case NODO_GENERADOR:
+            if (c->prof == 0) ns_ren(c, &n->generador.nombre);
+            else ns_push(c, n->generador.nombre);
+            ns_funcion(c, n->generador.parametros, n->generador.num_parametros,
+                       n->generador.cuerpo, NULL);
+            break;
+        case NODO_LAMBDA:
+            ns_funcion(c, n->lambda.parametros, n->lambda.num_parametros,
+                       n->lambda.cuerpo, &n->lambda.tipo_retorno_clase);
+            break;
+        case NODO_LLAMADA:
+            ns_ren(c, &n->llamada.nombre);
+            ns_lista(c, n->llamada.argumentos, n->llamada.num_argumentos);
+            break;
+        case NODO_DEVOLVER: ns_nodo(c, n->devolver); break;
+        case NODO_LISTA:    ns_lista(c, n->lista.elementos, n->lista.cantidad); break;
+        case NODO_DICCIONARIO: ns_lista(c, n->diccionario.valores, n->diccionario.cantidad); break;
+        case NODO_INDICE:   ns_nodo(c, n->acceso_indice.objeto); ns_nodo(c, n->acceso_indice.indice); break;
+        case NODO_ASIGNACION_INDICE:
+            ns_nodo(c, n->asignacion_indice.objeto);
+            ns_nodo(c, n->asignacion_indice.indice);
+            ns_nodo(c, n->asignacion_indice.valor);
+            break;
+        case NODO_METODO: {
+            char *m = NULL;
+            NombreMod *e = ns_miembro(c, n->metodo.objeto, n->metodo.metodo, n->linea, &m);
+            ns_lista(c, n->metodo.argumentos, n->metodo.num_argumentos);
+            if (e) {
+                Nodo **args = n->metodo.argumentos;
+                int    na   = n->metodo.num_argumentos;
+                if (e->es_clase) {
+                    n->tipo = NODO_INSTANCIA;
+                    n->instancia.clase = m;
+                    n->instancia.argumentos = args;
+                    n->instancia.num_argumentos = na;
+                } else {
+                    n->tipo = NODO_LLAMADA;
+                    n->llamada.nombre = m;
+                    n->llamada.argumentos = args;
+                    n->llamada.num_argumentos = na;
+                }
+            } else if (!c->error) {
+                ns_nodo(c, n->metodo.objeto);
+            }
+            break;
+        }
+        case NODO_ACCESO: {
+            char *m = NULL;
+            if (ns_miembro(c, n->acceso.objeto, n->acceso.campo, n->linea, &m)) {
+                n->tipo = NODO_IDENTIFICADOR;
+                n->identificador = m;
+            } else if (!c->error) {
+                ns_nodo(c, n->acceso.objeto);
+            }
+            break;
+        }
+        case NODO_ASIGNACION_CAMPO: {
+            char *m = NULL;
+            ns_nodo(c, n->asignacion_campo.valor);
+            if (ns_miembro(c, n->asignacion_campo.objeto, n->asignacion_campo.campo, n->linea, &m)) {
+                Nodo *v = n->asignacion_campo.valor;
+                n->tipo = NODO_ASIGNACION;
+                n->asignacion.nombre = m;
+                n->asignacion.valor  = v;
+            } else if (!c->error) {
+                ns_nodo(c, n->asignacion_campo.objeto);
+            }
+            break;
+        }
+        case NODO_CLASE:
+            if (c->prof == 0) {
+                ns_ren_clase(c, &n->clase.nombre);
+            } else ns_push(c, n->clase.nombre);
+            ns_ren_clase(c, &n->clase.padre);
+            for (int i = 0; i < n->clase.num_interfaces; i++) ns_ren_clase(c, &n->clase.interfaces[i]);
+            for (int i = 0; i < n->clase.num_metodos; i++) {
+                Nodo *f = n->clase.metodos[i];
+                if (f) ns_funcion(c, f->funcion.parametros, f->funcion.num_parametros,
+                                  f->funcion.cuerpo, &f->funcion.tipo_retorno_clase);
+            }
+            break;
+        case NODO_INSTANCIA:
+            ns_ren_clase(c, &n->instancia.clase);
+            ns_lista(c, n->instancia.argumentos, n->instancia.num_argumentos);
+            break;
+        case NODO_PADRE: ns_lista(c, n->padre.argumentos, n->padre.num_argumentos); break;
+        case NODO_INTERFAZ:
+            if (c->prof == 0) ns_ren_clase(c, &n->interfaz.nombre);
+            break;
+        case NODO_ENUMERACION:
+            if (c->prof == 0) ns_ren_clase(c, &n->enumeracion.nombre);
+            break;
+        case NODO_INTENTAR:
+            ns_nodo(c, n->intentar.cuerpo);
+            for (int i = 0; i < n->intentar.num_capturas; i++) {
+                int marca = c->nloc;
+                ns_ren_clase(c, &n->intentar.tipos_captura[i]);
+                ns_push(c, n->intentar.vars_captura[i]);
+                ns_nodo(c, n->intentar.cuerpos_captura[i]);
+                c->nloc = marca;
+            }
+            ns_nodo(c, n->intentar.finalmente);
+            break;
+        case NODO_LANZAR:   ns_nodo(c, n->lanzar); break;
+        case NODO_PRODUCIR: ns_nodo(c, n->producir); break;
+        case NODO_ELEGIR:
+            ns_nodo(c, n->elegir.sujeto);
+            ns_lista(c, n->elegir.valores, n->elegir.num_casos);
+            ns_lista(c, n->elegir.cuerpos, n->elegir.num_casos);
+            ns_nodo(c, n->elegir.otro);
+            break;
+        default: break;
+    }
+}
+
+
 /* Resuelve y parsea un import local. Devuelve su bloque, o NULL con el error
    ya impreso. Deja *ya_estaba a 1 si el archivo se había importado antes. */
 static Nodo *cargar_import(const char *nombre, const char *ruta_fuente,
@@ -2487,39 +2774,111 @@ static Nodo *cargar_import(const char *nombre, const char *ruta_fuente,
     return imp;
 }
 
+/* Carga "./x" como una librería con espacio de nombres: la parsea con su
+   propio registro de importados (sus dependencias son suyas y se renombran con
+   ella) y le pone el sufijo 'alias' a cada definición de nivel superior.
+   Rellena la tabla de nombres para reescribir después a quien importa. */
+static Nodo *cargar_con_alias(const char *nombre, const char *alias, const char *ruta_fuente,
+                              NombreMod **tabla, int *ntabla) {
+    ImportsVistos *propios = calloc(1, sizeof(ImportsVistos));
+    int ya = 0;
+    Nodo *imp = cargar_import(nombre, ruta_fuente, propios, &ya);
+    free(propios);
+    if (!imp) return NULL;
+
+    NombreMod *t = calloc(imp->bloque.cantidad + 1, sizeof(NombreMod));
+    int nt = 0;
+    for (int i = 0; i < imp->bloque.cantidad; i++) {
+        Nodo *s = imp->bloque.sentencias[i];
+        if (!s) continue;
+        char *nom = NULL; int cl = 0;
+        switch (s->tipo) {
+            case NODO_FUNCION:     nom = s->funcion.nombre; break;
+            case NODO_GENERADOR:   nom = s->generador.nombre; break;
+            case NODO_DECLARACION: nom = s->declaracion.nombre; break;
+            case NODO_CLASE:       nom = s->clase.nombre; cl = 1; break;
+            case NODO_INTERFAZ:    nom = s->interfaz.nombre; cl = 1; break;
+            case NODO_ENUMERACION: nom = s->enumeracion.nombre; cl = 1; break;
+            default: break;
+        }
+        if (nom && !ns_buscar(t, nt, nom)) { t[nt].nombre = nom; t[nt].es_clase = cl; nt++; }
+    }
+
+    CtxNs c = { .mod = t, .nmod = nt, .sufijo = alias, .renombrar = 1 };
+    for (int i = 0; i < imp->bloque.cantidad; i++) ns_nodo(&c, imp->bloque.sentencias[i]);
+    free(c.loc);
+
+    /* La tabla guarda los nombres originales (los de las definiciones ya se
+       han sustituido por copias, pero el original sigue vivo en la tabla). */
+    *tabla = t; *ntabla = nt;
+    return imp;
+}
+
+static int es_import_local(Nodo *s) {
+    if (!s || s->tipo != NODO_IMPORTAR) return 0;
+    const char *nom = s->importar.nombre;
+    return strncmp(nom, "./", 2) == 0 || strncmp(nom, "../", 3) == 0;
+}
+
 /* Sustituye en 'ast' (un bloque) cada importar local por las sentencias del
    archivo importado. */
 static int expandir(Nodo *ast, const char *ruta_fuente, ImportsVistos *vistos) {
     if (!ast || ast->tipo != NODO_BLOQUE) return 0;
 
-    Nodo **nuevas = NULL;
-    int    n = 0, cap = 0;
-    int    fallo = 0;
+    int     total = ast->bloque.cantidad;
+    Nodo  **nuevas = NULL;
+    int     n = 0, cap = 0;
+    int     fallo = 0;
 
-    for (int i = 0; i < ast->bloque.cantidad; i++) {
+    /* 1. Las librerías con alias, cargadas y renombradas de antemano. */
+    Nodo      **con_alias = calloc(total + 1, sizeof(Nodo *));
+    NombreMod **tablas    = calloc(total + 1, sizeof(NombreMod *));
+    int        *ntablas   = calloc(total + 1, sizeof(int));
+    for (int i = 0; i < total; i++) {
         Nodo *s = ast->bloque.sentencias[i];
-        const char *nom = (s && s->tipo == NODO_IMPORTAR) ? s->importar.nombre : NULL;
-        int local = nom && (strncmp(nom, "./", 2) == 0 || strncmp(nom, "../", 3) == 0);
+        if (es_import_local(s) && s->importar.alias) {
+            con_alias[i] = cargar_con_alias(s->importar.nombre, s->importar.alias,
+                                            ruta_fuente, &tablas[i], &ntablas[i]);
+            if (!con_alias[i]) fallo = 1;
+        }
+    }
 
+    /* 2. En el resto de sentencias, 'alias.nombre' pasa a ser el nombre
+       renombrado de la librería. */
+    for (int i = 0; i < total; i++) {
+        Nodo *s = ast->bloque.sentencias[i];
+        if (s && s->tipo == NODO_IMPORTAR) continue;
+        for (int j = 0; j < total; j++) {
+            if (!con_alias[j]) continue;
+            CtxNs c = { .mod = tablas[j], .nmod = ntablas[j],
+                        .sufijo = ast->bloque.sentencias[j]->importar.alias,
+                        .alias  = ast->bloque.sentencias[j]->importar.alias };
+            ns_nodo(&c, s);
+            free(c.loc);
+            if (c.error) fallo = 1;
+        }
+    }
+
+    /* 3. Empalmar. */
+    for (int i = 0; i < total; i++) {
+        Nodo *s = ast->bloque.sentencias[i];
         Nodo **añadir = &s;
         int    cuantas = 1;
         Nodo  *imp = NULL;
 
-        if (local && s->importar.alias) {
-            fprintf(stderr,
-                "\n❌ 'importar \"%s\" como %s' todavía no se puede compilar a "
-                "binario nativo.\n"
-                "   El alias necesita un espacio de nombres en el C generado, y\n"
-                "   eso no está hecho. Usa el intérprete, o importa sin 'como'.\n\n",
-                nom, s->importar.alias);
-            fallo = 1;
-        } else if (local) {
-            int ya = 0;
-            imp = cargar_import(nom, ruta_fuente, vistos, &ya);
-            if (!imp) {
-                if (!ya) fallo = 1;
-                cuantas = 0;          /* repetido: no se emite nada */
+        if (es_import_local(s)) {
+            if (s->importar.alias) {
+                imp = con_alias[i];
+                if (!imp) cuantas = 0;
             } else {
+                int ya = 0;
+                imp = cargar_import(s->importar.nombre, ruta_fuente, vistos, &ya);
+                if (!imp) {
+                    if (!ya) fallo = 1;
+                    cuantas = 0;          /* repetido: no se emite nada */
+                }
+            }
+            if (imp) {
                 añadir  = imp->bloque.sentencias;
                 cuantas = imp->bloque.cantidad;
             }
@@ -2533,6 +2892,7 @@ static int expandir(Nodo *ast, const char *ruta_fuente, ImportsVistos *vistos) {
         for (int j = 0; j < cuantas; j++) nuevas[n++] = añadir[j];
     }
 
+    free(con_alias); free(tablas); free(ntablas);
     free(ast->bloque.sentencias);
     ast->bloque.sentencias = nuevas;
     ast->bloque.cantidad   = n;
@@ -2735,11 +3095,15 @@ int compilador_compilar(Nodo *ast, const char *ruta_c, const char *ruta_bin) {
     fprintf(f, "\n/* ── Variables de nivel superior ── */\n");
     for (int i = 0; i < ast->bloque.cantidad; i++) {
         Nodo *n = ast->bloque.sentencias[i];
-        if (!n || n->tipo != NODO_DECLARACION) continue;
-        if (es_global(&c, n->declaracion.nombre)) continue;   /* redeclarada */
-        if (c.num_globales >= 128) break;
-        snprintf(c.globales[c.num_globales++], 64, "%s", n->declaracion.nombre);
-        fprintf(f, "static LValor *_l_%s = NULL;\n", n->declaracion.nombre);
+        if (!n || (n->tipo != NODO_DECLARACION && n->tipo != NODO_ENUMERACION)) continue;
+        /* Una enumeración es un objeto con nombre, igual que una variable:
+           si fuera local de main(), las funciones no la verían. */
+        const char *nombre = n->tipo == NODO_DECLARACION ? n->declaracion.nombre
+                                                         : n->enumeracion.nombre;
+        if (es_global(&c, nombre)) continue;   /* redeclarada */
+        if (c.num_globales >= 512) break;
+        snprintf(c.globales[c.num_globales++], 96, "%s", nombre);
+        fprintf(f, "static LValor *_l_%s = NULL;\n", nombre);
     }
 
     /* ── Estrategia de lambdas por intercalación ──

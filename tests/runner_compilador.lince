@@ -10,7 +10,8 @@ sea lista tests = [
     "test_generadores",
     "test_errores",
     "test_modulos",
-    "test_importar"
+    "test_importar",
+    "test_importar_como"
 ]
 
 sea dir_tests = "tests/compilador"
