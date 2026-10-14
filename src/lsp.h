@@ -12,6 +12,8 @@ int lsp_servir(void);
 /* Parsea 'texto' sin ejecutarlo. Devuelve 0 si es correcto; si no, 1 y deja
    en *linea y en 'mensaje' lo que dijo el parser. Se hace en un proceso hijo:
    el parser termina el proceso al primer error. */
+/* Léxico + sintaxis de un texto; si hay un error, termina el proceso con él. */
+void lsp_analizar(const char *texto);
 int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max);
 
 #endif

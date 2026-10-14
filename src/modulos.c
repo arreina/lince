@@ -2096,197 +2096,203 @@ void modulo_registrar(Entorno *entorno, const char *nombre,
     registrar_modulo_diccionario(entorno, nombre, fns, num_fns, NULL, NULL, 0);
 }
 
-static const char *const MODULOS_ESTANDAR[] = {
-    "matematica", "texto", "archivos", "tiempo", "sistema",
-    "json", "red", "expresiones", "servidor", "terminal", NULL,
+static void cargar_matematica(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"raiz",       fn_mat_raiz,       1},
+        {"potencia",   fn_mat_potencia,   2},
+        {"abs",        fn_mat_abs,        1},
+        {"redondear",  fn_mat_redondear,  1},
+        {"piso",       fn_mat_piso,       1},
+        {"techo",      fn_mat_techo,      1},
+        {"seno",       fn_mat_seno,       1},
+        {"coseno",     fn_mat_coseno,     1},
+        {"tangente",   fn_mat_tangente,   1},
+        {"logaritmo",  fn_mat_logaritmo,  1},
+        {"maximo",     fn_mat_maximo,     2},
+        {"minimo",     fn_mat_minimo,     2},
+        {"aleatorio",      fn_mat_aleatorio,    -1},
+        {"truncar",        fn_mat_truncar,       1},
+        {"es_entero",      fn_mat_es_entero,     1},
+        {"factorial",      fn_mat_factorial,     1},
+        {"combinaciones",  fn_mat_combinaciones, 2},
+        {"log2",           fn_mat_log2,          1},
+        {"log10",          fn_mat_log10,         1},
+    };
+    const char *cnames[] = {"PI", "E", "TAU"};
+    double      cvals[]  = {M_PI, M_E, M_PI * 2};
+    registrar_modulo_diccionario(entorno, "matematica",
+        fns, 19, cnames, cvals, 3);
+}
+
+static void cargar_texto(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"dividir",       fn_txt_dividir,       2},
+        {"unir",          fn_txt_unir,          2},
+        {"repetir",       fn_txt_repetir,       2},
+        {"invertir",      fn_txt_invertir,      1},
+        {"formato",       fn_txt_formato,       2},
+        {"a_numero",      fn_txt_a_numero,      1},
+        {"de_numero",     fn_txt_de_numero,     1},
+        {"a_lista",       fn_txt_a_lista,       1},
+        {"posicion",      fn_txt_posicion,      2},
+        {"contar",        fn_txt_contar,        2},
+        {"extraer",       fn_txt_extraer,       3},
+        {"es_numero",     fn_txt_es_numero,     1},
+        {"es_letra",      fn_txt_es_letra,      1},
+        {"es_vacio",      fn_txt_es_vacio,      1},
+        {"empieza_con",   fn_txt_empieza_con,   2},
+        {"termina_con",   fn_txt_termina_con,   2},
+        {"rellenar_izq",  fn_txt_rellenar_izq,  3},
+        {"rellenar_der",  fn_txt_rellenar_der,  3},
+        {"centrar",       fn_txt_centrar,       3},
+    };
+    registrar_modulo_diccionario(entorno, "texto",
+        fns, 19, NULL, NULL, 0);
+}
+
+static void cargar_archivos(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"leer",              fn_arc_leer,              1},
+        {"escribir",          fn_arc_escribir,          2},
+        {"agregar",           fn_arc_agregar,           2},
+        {"existe",            fn_arc_existe,            1},
+        {"eliminar",          fn_arc_eliminar,          1},
+        {"crear_directorio",  fn_arc_crear_directorio,  1},
+        {"es_directorio",     fn_arc_es_directorio,     1},
+        {"copiar",            fn_arc_copiar,            2},
+        {"mover",             fn_arc_mover,             2},
+        {"listar",            fn_arc_listar,            1},
+    };
+    registrar_modulo_diccionario(entorno, "archivos",
+        fns, 10, NULL, NULL, 0);
+}
+
+static void cargar_tiempo(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"ahora",   fn_tpo_ahora,   0},
+        {"esperar", fn_tpo_esperar, 1},
+        {"fecha",   fn_tpo_fecha,   0},
+        {"hora",    fn_tpo_hora,    0},
+    };
+    registrar_modulo_diccionario(entorno, "tiempo",
+        fns, 4, NULL, NULL, 0);
+}
+
+static void cargar_sistema(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"ejecutar",           fn_sis_ejecutar,           1},
+        {"proceso",            fn_sis_proceso,            1},
+        {"entorno",            fn_sis_entorno,           -1},
+        {"establecer_entorno", fn_sis_establecer_entorno,  2},
+        {"plataforma",         fn_sis_plataforma,          0},
+        {"pid",                fn_sis_pid,                 0},
+        {"existe",             fn_sis_existe,              1},
+        {"salir",              fn_sis_salir,               1},
+    };
+    registrar_modulo_diccionario(entorno, "sistema",
+        fns, 8, NULL, NULL, 0);
+}
+
+static void cargar_json(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"parsear", fn_json_parsear, 1},
+        {"texto",   fn_json_texto,   1},
+    };
+    registrar_modulo_diccionario(entorno, "json",
+        fns, 2, NULL, NULL, 0);
+}
+
+static void cargar_red(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"obtener",    fn_red_obtener,    -1},
+        {"enviar",     fn_red_enviar,     -1},
+        {"actualizar", fn_red_actualizar, -1},
+        {"eliminar",   fn_red_eliminar,   -1},
+    };
+    registrar_modulo_diccionario(entorno, "red",
+        fns, 4, NULL, NULL, 0);
+}
+
+static void cargar_expresiones(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"coincidir",  fn_exp_coincidir,  2},
+        {"buscar",     fn_exp_buscar,     2},
+        {"todos",      fn_exp_todos,      2},
+        {"reemplazar", fn_exp_reemplazar, 3},
+    };
+    registrar_modulo_diccionario(entorno, "expresiones",
+        fns, 4, NULL, NULL, 0);
+}
+
+static void cargar_servidor(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"ruta",       fn_srv_ruta,           2},
+        {"obtener",    fn_srv_obtener,         2},
+        {"enviar",     fn_srv_enviar,          2},
+        {"borrar",     fn_srv_borrar,          2},
+        {"actualizar", fn_srv_actualizar,      2},
+        {"estaticos",  fn_srv_estaticos,       1},
+        {"html",       fn_srv_html,           -1},
+        {"json",       fn_srv_json,           -1},
+        {"texto",      fn_srv_texto,          -1},
+        {"redirigir",  fn_srv_redirigir,       1},
+        {"escuchar",   fn_srv_escuchar,       -1},
+    };
+    registrar_modulo_diccionario(entorno, "servidor",
+        fns, 11, NULL, NULL, 0);
+}
+
+static void cargar_terminal(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"negro",      fn_ter_negro,      1},
+        {"rojo",       fn_ter_rojo,       1},
+        {"verde",      fn_ter_verde,      1},
+        {"amarillo",   fn_ter_amarillo,   1},
+        {"azul",       fn_ter_azul,       1},
+        {"magenta",    fn_ter_magenta,    1},
+        {"cian",       fn_ter_cian,       1},
+        {"blanco",     fn_ter_blanco,     1},
+        {"negrita",    fn_ter_negrita,    1},
+        {"cursiva",    fn_ter_cursiva,    1},
+        {"subrayado",  fn_ter_subrayado,  1},
+        {"limpiar",    fn_ter_limpiar,    0},
+        {"mover",      fn_ter_mover,      2},
+        {"ancho",      fn_ter_ancho,      0},
+        {"alto",       fn_ter_alto,       0},
+        {"barra",      fn_ter_barra,      3},
+        {"tabla",      fn_ter_tabla,      1},
+    };
+    registrar_modulo_diccionario(entorno, "terminal",
+        fns, 17, NULL, NULL, 0);
+}
+
+/* Única lista de módulos estándar: cargador y nombre van juntos. */
+static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_ESTANDAR[] = {
+    {"matematica", cargar_matematica},
+    {"texto", cargar_texto},
+    {"archivos", cargar_archivos},
+    {"tiempo", cargar_tiempo},
+    {"sistema", cargar_sistema},
+    {"json", cargar_json},
+    {"red", cargar_red},
+    {"expresiones", cargar_expresiones},
+    {"servidor", cargar_servidor},
+    {"terminal", cargar_terminal},
 };
+#define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
 const char *modulo_estandar(int i) {
-    int n = (int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])) - 1;
-    return (i >= 0 && i < n) ? MODULOS_ESTANDAR[i] : NULL;
+    return (i >= 0 && i < NUM_MODULOS_ESTANDAR) ? MODULOS_ESTANDAR[i].nombre : NULL;
 }
 
 void modulo_cargar(const char *nombre, Entorno *entorno) {
     srand((unsigned)time(NULL));
 
-    if (strcmp(nombre, "matematica") == 0) {
-        FuncionNativa fns[] = {
-            {"raiz",       fn_mat_raiz,       1},
-            {"potencia",   fn_mat_potencia,   2},
-            {"abs",        fn_mat_abs,        1},
-            {"redondear",  fn_mat_redondear,  1},
-            {"piso",       fn_mat_piso,       1},
-            {"techo",      fn_mat_techo,      1},
-            {"seno",       fn_mat_seno,       1},
-            {"coseno",     fn_mat_coseno,     1},
-            {"tangente",   fn_mat_tangente,   1},
-            {"logaritmo",  fn_mat_logaritmo,  1},
-            {"maximo",     fn_mat_maximo,     2},
-            {"minimo",     fn_mat_minimo,     2},
-            {"aleatorio",      fn_mat_aleatorio,    -1},
-            {"truncar",        fn_mat_truncar,       1},
-            {"es_entero",      fn_mat_es_entero,     1},
-            {"factorial",      fn_mat_factorial,     1},
-            {"combinaciones",  fn_mat_combinaciones, 2},
-            {"log2",           fn_mat_log2,          1},
-            {"log10",          fn_mat_log10,         1},
-        };
-        const char *cnames[] = {"PI", "E", "TAU"};
-        double      cvals[]  = {M_PI, M_E, M_PI * 2};
-        registrar_modulo_diccionario(entorno, "matematica",
-            fns, 19, cnames, cvals, 3);
-        return;
-    }
-
-    if (strcmp(nombre, "texto") == 0) {
-        FuncionNativa fns[] = {
-            {"dividir",       fn_txt_dividir,       2},
-            {"unir",          fn_txt_unir,          2},
-            {"repetir",       fn_txt_repetir,       2},
-            {"invertir",      fn_txt_invertir,      1},
-            {"formato",       fn_txt_formato,       2},
-            {"a_numero",      fn_txt_a_numero,      1},
-            {"de_numero",     fn_txt_de_numero,     1},
-            {"a_lista",       fn_txt_a_lista,       1},
-            {"posicion",      fn_txt_posicion,      2},
-            {"contar",        fn_txt_contar,        2},
-            {"extraer",       fn_txt_extraer,       3},
-            {"es_numero",     fn_txt_es_numero,     1},
-            {"es_letra",      fn_txt_es_letra,      1},
-            {"es_vacio",      fn_txt_es_vacio,      1},
-            {"empieza_con",   fn_txt_empieza_con,   2},
-            {"termina_con",   fn_txt_termina_con,   2},
-            {"rellenar_izq",  fn_txt_rellenar_izq,  3},
-            {"rellenar_der",  fn_txt_rellenar_der,  3},
-            {"centrar",       fn_txt_centrar,       3},
-        };
-        registrar_modulo_diccionario(entorno, "texto",
-            fns, 19, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "archivos") == 0) {
-        FuncionNativa fns[] = {
-            {"leer",              fn_arc_leer,              1},
-            {"escribir",          fn_arc_escribir,          2},
-            {"agregar",           fn_arc_agregar,           2},
-            {"existe",            fn_arc_existe,            1},
-            {"eliminar",          fn_arc_eliminar,          1},
-            {"crear_directorio",  fn_arc_crear_directorio,  1},
-            {"es_directorio",     fn_arc_es_directorio,     1},
-            {"copiar",            fn_arc_copiar,            2},
-            {"mover",             fn_arc_mover,             2},
-            {"listar",            fn_arc_listar,            1},
-        };
-        registrar_modulo_diccionario(entorno, "archivos",
-            fns, 10, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "tiempo") == 0) {
-        FuncionNativa fns[] = {
-            {"ahora",   fn_tpo_ahora,   0},
-            {"esperar", fn_tpo_esperar, 1},
-            {"fecha",   fn_tpo_fecha,   0},
-            {"hora",    fn_tpo_hora,    0},
-        };
-        registrar_modulo_diccionario(entorno, "tiempo",
-            fns, 4, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "sistema") == 0) {
-        FuncionNativa fns[] = {
-            {"ejecutar",           fn_sis_ejecutar,           1},
-            {"proceso",            fn_sis_proceso,            1},
-            {"entorno",            fn_sis_entorno,           -1},
-            {"establecer_entorno", fn_sis_establecer_entorno,  2},
-            {"plataforma",         fn_sis_plataforma,          0},
-            {"pid",                fn_sis_pid,                 0},
-            {"existe",             fn_sis_existe,              1},
-            {"salir",              fn_sis_salir,               1},
-        };
-        registrar_modulo_diccionario(entorno, "sistema",
-            fns, 8, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "json") == 0) {
-        FuncionNativa fns[] = {
-            {"parsear", fn_json_parsear, 1},
-            {"texto",   fn_json_texto,   1},
-        };
-        registrar_modulo_diccionario(entorno, "json",
-            fns, 2, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "red") == 0) {
-        FuncionNativa fns[] = {
-            {"obtener",    fn_red_obtener,    -1},
-            {"enviar",     fn_red_enviar,     -1},
-            {"actualizar", fn_red_actualizar, -1},
-            {"eliminar",   fn_red_eliminar,   -1},
-        };
-        registrar_modulo_diccionario(entorno, "red",
-            fns, 4, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "expresiones") == 0) {
-        FuncionNativa fns[] = {
-            {"coincidir",  fn_exp_coincidir,  2},
-            {"buscar",     fn_exp_buscar,     2},
-            {"todos",      fn_exp_todos,      2},
-            {"reemplazar", fn_exp_reemplazar, 3},
-        };
-        registrar_modulo_diccionario(entorno, "expresiones",
-            fns, 4, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "servidor") == 0) {
-        FuncionNativa fns[] = {
-            {"ruta",       fn_srv_ruta,           2},
-            {"obtener",    fn_srv_obtener,         2},
-            {"enviar",     fn_srv_enviar,          2},
-            {"borrar",     fn_srv_borrar,          2},
-            {"actualizar", fn_srv_actualizar,      2},
-            {"estaticos",  fn_srv_estaticos,       1},
-            {"html",       fn_srv_html,           -1},
-            {"json",       fn_srv_json,           -1},
-            {"texto",      fn_srv_texto,          -1},
-            {"redirigir",  fn_srv_redirigir,       1},
-            {"escuchar",   fn_srv_escuchar,       -1},
-        };
-        registrar_modulo_diccionario(entorno, "servidor",
-            fns, 11, NULL, NULL, 0);
-        return;
-    }
-
-    if (strcmp(nombre, "terminal") == 0) {
-        FuncionNativa fns[] = {
-            {"negro",      fn_ter_negro,      1},
-            {"rojo",       fn_ter_rojo,       1},
-            {"verde",      fn_ter_verde,      1},
-            {"amarillo",   fn_ter_amarillo,   1},
-            {"azul",       fn_ter_azul,       1},
-            {"magenta",    fn_ter_magenta,    1},
-            {"cian",       fn_ter_cian,       1},
-            {"blanco",     fn_ter_blanco,     1},
-            {"negrita",    fn_ter_negrita,    1},
-            {"cursiva",    fn_ter_cursiva,    1},
-            {"subrayado",  fn_ter_subrayado,  1},
-            {"limpiar",    fn_ter_limpiar,    0},
-            {"mover",      fn_ter_mover,      2},
-            {"ancho",      fn_ter_ancho,      0},
-            {"alto",       fn_ter_alto,       0},
-            {"barra",      fn_ter_barra,      3},
-            {"tabla",      fn_ter_tabla,      1},
-        };
-        registrar_modulo_diccionario(entorno, "terminal",
-            fns, 17, NULL, NULL, 0);
-        return;
+    for (int i = 0; i < NUM_MODULOS_ESTANDAR; i++) {
+        if (strcmp(nombre, MODULOS_ESTANDAR[i].nombre) == 0) {
+            MODULOS_ESTANDAR[i].cargar(entorno);
+            return;
+        }
     }
 
 

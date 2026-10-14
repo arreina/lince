@@ -72,11 +72,7 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         char   *codigo = leer_archivo(argv[2]);
-        Lexer  *lexer  = lexer_crear(codigo);
-        int     cant   = 0;
-        Token  *toks   = lexer_tokenizar(lexer, &cant);
-        Parser *parser = parser_crear(toks, cant);
-        parser_parsear(parser);          /* termina el proceso si hay un error */
+        lsp_analizar(codigo);            /* termina el proceso si hay un error */
         printf("✅ Sintaxis correcta: %s\n", argv[2]);
         return 0;
     }

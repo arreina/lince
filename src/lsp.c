@@ -18,6 +18,16 @@
 #include <string.h>
 #include <ctype.h>
 #include "lsp.h"
+#include "lexer.h"
+#include "parser.h"
+
+void lsp_analizar(const char *texto) {
+    Lexer  *l = lexer_crear(texto);
+    int     n = 0;
+    Token  *t = lexer_tokenizar(l, &n);
+    Parser *p = parser_crear(t, n);
+    parser_parsear(p);         /* termina el proceso si hay un error */
+}
 
 #ifdef _WIN32
 
@@ -52,11 +62,7 @@ int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max
         close(fds[0]);
         dup2(fds[1], 2);
         alarm(3);                         /* un parser colgado no cuelga al servidor */
-        Lexer  *l = lexer_crear(texto);
-        int     n = 0;
-        Token  *t = lexer_tokenizar(l, &n);
-        Parser *p = parser_crear(t, n);
-        parser_parsear(p);
+        lsp_analizar(texto);
         _exit(0);
     }
     close(fds[1]);
@@ -159,18 +165,32 @@ static const char *saltar_ws(const char *p) {
     return p;
 }
 
-/* Valor que sigue a "clave": en el JSON (primera aparición), o NULL. Basta
-   para los pocos campos que leemos: sus nombres no se repiten con otro sentido. */
-static const char *json_valor(const char *json, const char *clave) {
-    char pat[64];
-    snprintf(pat, sizeof(pat), "\"%s\"", clave);
+/* Valor que sigue a la clave "clave" (un objeto de JSON), o NULL. Recorre el JSON
+   saltando cadenas enteras, así que el texto del usuario nunca se toma por una
+   clave. 'prof' es la profundidad exigida (1 = el objeto raíz) o -1 si da igual. */
+static const char *json_buscar(const char *json, const char *clave, int prof) {
+    size_t kl = strlen(clave);
+    int d = 0;
     const char *p = json;
-    while ((p = strstr(p, pat)) != NULL) {
-        const char *q = saltar_ws(p + strlen(pat));
-        if (*q == ':') return saltar_ws(q + 1);
-        p += strlen(pat);
+    while (*p) {
+        if (*p == '{' || *p == '[') { d++; p++; }
+        else if (*p == '}' || *p == ']') { d--; p++; }
+        else if (*p == '"') {
+            const char *s = ++p;
+            while (*p && *p != '"') { if (*p == '\\' && p[1]) p++; p++; }
+            if (!*p) return NULL;
+            size_t n = (size_t)(p - s);
+            p++;
+            if (n == kl && strncmp(s, clave, kl) == 0) {
+                const char *q = saltar_ws(p);
+                if (*q == ':' && (prof < 0 || d == prof)) return saltar_ws(q + 1);
+            }
+        } else p++;
     }
     return NULL;
+}
+static const char *json_valor(const char *json, const char *clave) {
+    return json_buscar(json, clave, -1);
 }
 
 static int hex4(const char *p) {
@@ -355,12 +375,20 @@ static int escanear_simbolos(const char *texto, Simbolo *out, int max) {
 enum { CK_FUNCION = 3, CK_CAMPO = 5, CK_VARIABLE = 6, CK_CLASE = 7, CK_MODULO = 9,
        CK_PROPIEDAD = 10, CK_PALABRA = 14, CK_CONSTANTE = 21 };
 
+/* Etiquetas ya emitidas en este completado (se vacía en completar()) */
+#define MAX_VISTOS 4096
+static char *vistos[MAX_VISTOS];
+static int   num_vistos;
+
+static void vistos_vaciar(void) {
+    for (int i = 0; i < num_vistos; i++) free(vistos[i]);
+    num_vistos = 0;
+}
+
 static void item(Buf *b, int *primero, const char *label, int kind) {
-    if (b->d) {
-        char pat[160];
-        snprintf(pat, sizeof(pat), "{\"label\":\"%s\",", label);
-        if (strstr(b->d, pat)) return;          /* ya está */
-    }
+    for (int i = 0; i < num_vistos; i++)
+        if (strcmp(vistos[i], label) == 0) return;       /* ya está */
+    if (num_vistos < MAX_VISTOS) vistos[num_vistos++] = strdup(label);
     if (!*primero) buf_str(b, ",");
     *primero = 0;
     buf_str(b, "{\"label\":");
@@ -490,6 +518,7 @@ static char *import_con_alias(const char *texto, const char *alias) {
 
 static void completar(Buf *out, Doc *d, int linea, int caracter) {
     int primero = 1;
+    vistos_vaciar();
     buf_str(out, "[");
 
     size_t off = offset_posicion(d->texto, linea, caracter);
@@ -631,9 +660,9 @@ static void leer_posicion(const char *msg, int *linea, int *car) {
 }
 
 static void atender(const char *msg, int *salir, int *apagado) {
-    char *metodo = json_cadena(json_valor(msg, "method"));
+    char *metodo = json_cadena(json_buscar(msg, "method", 1));
     if (!metodo) return;
-    const char *idp = json_valor(msg, "id");
+    const char *idp = json_buscar(msg, "id", 1);
     char id[64] = "";
     if (idp) {
         size_t k = 0;
