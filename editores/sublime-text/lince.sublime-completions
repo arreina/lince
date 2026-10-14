@@ -1,37 +1,200 @@
 {
   "scope": "source.lince",
   "completions": [
-    { "trigger": "sea\tVariable", "contents": "sea ${1:nombre} = ${2:valor}" },
-    { "trigger": "fijo\tConstante", "contents": "fijo ${1:NOMBRE} = ${2:valor}" },
-    { "trigger": "lista\tLista", "contents": "sea lista ${1:nombre} = [${2}]" },
-    { "trigger": "dic\tDiccionario", "contents": "sea diccionario ${1:nombre} = {\"${2:clave}\": ${3:valor}}" },
-
-    { "trigger": "fun\tFunción", "contents": "funcion ${1:nombre}(val ${2:tipo} ${3:param}): ${4:nulo} {\n\t$0\n}" },
-    { "trigger": "fun0\tFunción sin params", "contents": "funcion ${1:nombre}(): ${2:nulo} {\n\t$0\n}" },
-
-    { "trigger": "si\tCondicional", "contents": "si ${1:condicion} {\n\t$0\n}" },
-    { "trigger": "sino\tSi/Sino", "contents": "si ${1:condicion} {\n\t$2\n} sino {\n\t$0\n}" },
-
-    { "trigger": "para\tBucle para", "contents": "para (${1:i} = 0; ${1:i} < ${2:10}; ${1:i}++) {\n\t$0\n}" },
-    { "trigger": "cada\tPara cada", "contents": "para cada ${1:numero} ${2:elem} en ${3:lista} {\n\t$0\n}" },
-    { "trigger": "mientras\tMientras", "contents": "mientras ${1:condicion} {\n\t$0\n}" },
-    { "trigger": "hacer\tHacer...mientras", "contents": "hacer {\n\t$0\n} mientras (${1:condicion})" },
-
-    { "trigger": "clase\tClase", "contents": "clase ${1:NombreClase} {\n\tfuncion crear(val ${2:tipo} ${3:param}): nulo {\n\t\tmi.${3:param} = ${3:param}\n\t}\n\n\t$0\n}" },
-    { "trigger": "clasex\tClase con herencia", "contents": "clase ${1:NombreClase} extiende ${2:ClasePadre} {\n\tfuncion crear(val ${3:tipo} ${4:param}): nulo {\n\t\tpadre(${4:param})\n\t\t$0\n\t}\n}" },
-
-    { "trigger": "intentar\tIntentar/Capturar", "contents": "intentar {\n\t$1\n} capturar (error ${2:e}) {\n\tescribir(${2:e}.mensaje)\n}" },
-    { "trigger": "lanzar\tLanzar error", "contents": "lanzar Error(\"${1:mensaje}\")" },
-
-    { "trigger": "importar\tImportar módulo", "contents": "importar \"${1:matematica}\"" },
-    { "trigger": "esc\tEscribir", "contents": "escribir(${1:\"mensaje\"})" },
-
-    "sea", "fijo", "funcion", "clase", "extiende", "mi", "padre", "importar", "abstracta", "abstracto", "estatico", "privado", "protegido", "publico", "sobrescribe", "obtener", "fijar", "es",
-    "si", "sino", "para", "cada", "en", "mientras", "hacer", "devolver",
-    "intentar", "capturar", "finalmente", "lanzar",
-    "val", "ref", "numero", "texto", "logico", "lista", "diccionario", "nulo",
-    "verdadero", "falso", "y", "o", "no", "escribir",
-    "Error", "ErrorTipo", "ErrorRango", "ErrorNulo", "ErrorMatematico", "ErrorArgumento", "ErrorRecursion",
-    "matematica", "archivos", "tiempo"
+    {
+      "trigger": "sea\tDeclara una variable",
+      "contents": "sea ${1:nombre} = ${2:valor}"
+    },
+    {
+      "trigger": "fijo\tDeclara una constante",
+      "contents": "fijo ${1:NOMBRE} = ${2:valor}"
+    },
+    {
+      "trigger": "lista\tDeclara una lista",
+      "contents": "sea lista ${1:nombre} = [${2:1, 2, 3}]"
+    },
+    {
+      "trigger": "dic\tDeclara un diccionario",
+      "contents": "sea diccionario ${1:nombre} = {\"${2:clave}\": ${3:valor}}"
+    },
+    {
+      "trigger": "fun\tDefine una función",
+      "contents": "funcion ${1:nombre}(val ${2:numero} ${3:param}): ${4:nulo} {\n\t$0\n}"
+    },
+    {
+      "trigger": "fun0\tDefine una función sin parámetros",
+      "contents": "funcion ${1:nombre}(): ${2:nulo} {\n\t$0\n}"
+    },
+    {
+      "trigger": "lambda\tFunción anónima",
+      "contents": "sea ${1:f} = funcion(val ${2:numero} ${3:x}): ${4:numero} {\n\tdevolver ${5:x}\n}"
+    },
+    {
+      "trigger": "generador\tFunción generadora",
+      "contents": "generador ${1:contar}(val numero ${2:n}): numero {\n\tpara (${3:i} = 0; ${3:i} < ${2:n}; ${3:i}++) {\n\t\tproducir ${3:i}\n\t}\n}"
+    },
+    {
+      "trigger": "si\tCondicional",
+      "contents": "si ${1:condicion} {\n\t$0\n}"
+    },
+    {
+      "trigger": "sino\tCondicional con alternativa",
+      "contents": "si ${1:condicion} {\n\t$2\n} sino {\n\t$0\n}"
+    },
+    {
+      "trigger": "elegir\tSelección múltiple",
+      "contents": "elegir ${1:valor} {\n\tcaso ${2:1} {\n\t\t$3\n\t}\n\totro {\n\t\t$0\n\t}\n}"
+    },
+    {
+      "trigger": "para\tBucle con contador",
+      "contents": "para (${1:i} = 0; ${1:i} < ${2:10}; ${1:i}++) {\n\t$0\n}"
+    },
+    {
+      "trigger": "cada\tRecorre una colección",
+      "contents": "para cada ${1:numero} ${2:x} en ${3:[1, 2, 3]} {\n\t$0\n}"
+    },
+    {
+      "trigger": "mientras\tBucle mientras",
+      "contents": "mientras ${1:condicion} {\n\t$0\n}"
+    },
+    {
+      "trigger": "hacer\tBucle que se ejecuta al menos una vez",
+      "contents": "hacer {\n\t$0\n} mientras (${1:condicion})"
+    },
+    {
+      "trigger": "clase\tDefine una clase",
+      "contents": "clase ${1:Nombre} {\n\tfuncion crear(val ${2:numero} ${3:param}): nulo {\n\t\tmi.${3:param} = ${3:param}\n\t}\n\t$0\n}"
+    },
+    {
+      "trigger": "clasex\tClase que extiende a otra",
+      "contents": "clase ${1:Nombre} extiende ${2:Padre} {\n\tfuncion crear(val ${3:numero} ${4:param}): nulo {\n\t\tpadre(${4:param})\n\t}\n\t$0\n}"
+    },
+    {
+      "trigger": "abstracta\tClase que no se instancia",
+      "contents": "abstracta clase ${1:Figura} {\n\tabstracto funcion ${2:area}(): ${3:numero}\n\t$0\n}"
+    },
+    {
+      "trigger": "estatico\tMétodo de la clase",
+      "contents": "estatico funcion ${1:nombre}(): ${2:nulo} {\n\t$0\n}"
+    },
+    {
+      "trigger": "privado\tCampo con visibilidad privada",
+      "contents": "privado sea ${1:nombre} = ${2:0}"
+    },
+    {
+      "trigger": "propiedad\tPareja obtener / fijar",
+      "contents": "obtener ${1:valor}(): ${2:numero} {\n\tdevolver mi._${1:valor}\n}\nfijar ${1:valor}(val ${2:numero} ${3:v}): nulo {\n\tmi._${1:valor} = ${3:v}\n}"
+    },
+    {
+      "trigger": "interfaz\tDefine una interfaz",
+      "contents": "interfaz ${1:Forma} {\n\tfuncion ${2:area}(): ${3:numero}\n}"
+    },
+    {
+      "trigger": "enumeracion\tDefine una enumeración",
+      "contents": "enumeracion ${1:Color} {\n\t${2:Rojo}\n\t${3:Verde}\n}"
+    },
+    {
+      "trigger": "intentar\tCaptura errores",
+      "contents": "intentar {\n\t$1\n} capturar (${2:error} ${3:e}) {\n\tescribir(${3:e}.mensaje)\n}"
+    },
+    {
+      "trigger": "finalmente\tCaptura errores y siempre limpia",
+      "contents": "intentar {\n\t$1\n} capturar (${2:error} ${3:e}) {\n\tescribir(${3:e}.mensaje)\n} finalmente {\n\t$0\n}"
+    },
+    {
+      "trigger": "lanzar\tLanza un error",
+      "contents": "lanzar Error(\"${1:mensaje}\")"
+    },
+    {
+      "trigger": "importar\tImporta un módulo estándar",
+      "contents": "importar \"${1:matematica}\""
+    },
+    {
+      "trigger": "importarc\tImporta un archivo con espacio de nombres",
+      "contents": "importar \"./${1:libreria}\" como ${2:lib}"
+    },
+    {
+      "trigger": "esc\tEscribe en pantalla",
+      "contents": "escribir(${1:\"mensaje\"})"
+    },
+    "sea",
+    "fijo",
+    "lista",
+    "diccionario",
+    "funcion",
+    "generador",
+    "producir",
+    "devolver",
+    "si",
+    "sino",
+    "mientras",
+    "hacer",
+    "para",
+    "cada",
+    "clase",
+    "mi",
+    "extiende",
+    "padre",
+    "enumeracion",
+    "interfaz",
+    "implementa",
+    "verdadero",
+    "falso",
+    "nulo",
+    "escribir",
+    "intentar",
+    "capturar",
+    "finalmente",
+    "lanzar",
+    "elegir",
+    "caso",
+    "otro",
+    "importar",
+    "val",
+    "ref",
+    "numero",
+    "texto",
+    "logico",
+    "y",
+    "o",
+    "no",
+    "abstracta",
+    "abstracto",
+    "estatico",
+    "privado",
+    "protegido",
+    "publico",
+    "sobrescribe",
+    "obtener",
+    "fijar",
+    "es",
+    "como",
+    "en",
+    "matematica",
+    "archivos",
+    "tiempo",
+    "sistema",
+    "json",
+    "red",
+    "expresiones",
+    "servidor",
+    "terminal",
+    "Error",
+    "ErrorAcceso",
+    "ErrorArgumento",
+    "ErrorMatematico",
+    "ErrorNulo",
+    "ErrorRango",
+    "ErrorRecursion",
+    "ErrorTipo",
+    "a_logico",
+    "a_numero",
+    "a_texto",
+    "argumentos",
+    "filtrar",
+    "leer",
+    "mapear",
+    "rango",
+    "reducir"
   ]
 }

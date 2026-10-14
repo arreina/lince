@@ -9,12 +9,12 @@
     <KeywordLists>
       <!-- Control de flujo -->
       <Keywords name="Keywords1">
-        si sino para cada en mientras hacer devolver intentar capturar finalmente lanzar
+        si sino para cada mientras hacer devolver producir intentar capturar finalmente lanzar elegir caso otro en
       </Keywords>
 
       <!-- Declaraciones -->
       <Keywords name="Keywords2">
-        sea fijo funcion clase extiende mi padre importar val ref abstracta abstracto estatico privado protegido publico sobrescribe obtener fijar es
+        sea fijo funcion generador clase extiende implementa interfaz enumeracion mi padre importar val ref abstracta abstracto estatico privado protegido publico sobrescribe obtener fijar es como
       </Keywords>
 
       <!-- Tipos de dato -->
@@ -29,12 +29,12 @@
 
       <!-- Tipos de error predefinidos -->
       <Keywords name="Keywords5">
-        Error ErrorTipo ErrorRango ErrorNulo ErrorMatematico ErrorArgumento ErrorRecursion
+        Error ErrorAcceso ErrorArgumento ErrorMatematico ErrorNulo ErrorRango ErrorRecursion ErrorTipo
       </Keywords>
 
       <!-- Módulos estándar -->
       <Keywords name="Keywords6">
-        escribir matematica texto archivos tiempo
+        a_logico a_numero a_texto argumentos escribir filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json red expresiones servidor terminal
       </Keywords>
 
       <!-- Operadores -->

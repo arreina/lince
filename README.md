@@ -74,6 +74,8 @@ cd lince && make
 ```bash
 lince programa.lince              # ejecutar
 lince compilar programa.lince     # compilar a binario nativo
+lince comprobar programa.lince    # sólo comprobar la sintaxis
+lince lsp                         # servidor de lenguaje para tu editor
 lince                             # REPL interactivo
 lince instalar https://github.com/usuario/paquete
 lince ayuda

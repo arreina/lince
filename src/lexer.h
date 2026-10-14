@@ -138,4 +138,8 @@ void         lexer_destruir(Lexer *l);
 Token       *lexer_tokenizar(Lexer *l, int *cantidad);
 const char  *nombre_token(TipoToken tipo);
 
+/* i-ésima palabra reservada / contextual, o NULL al acabar. */
+const char  *lexer_palabra_clave(int i);
+const char  *lexer_palabra_contextual(int i);
+
 #endif /* LINCE_LEXER_H */

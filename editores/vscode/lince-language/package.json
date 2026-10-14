@@ -1,22 +1,31 @@
 {
   "name": "lince-language",
   "displayName": "Lince",
-  "description": "Soporte de lenguaje para Lince — el lenguaje de programación en español",
-  "version": "0.3.0",
-  "publisher": "lince-lang",
-  "engines": { "vscode": "^1.70.0" },
-  "categories": ["Programming Languages"],
+  "description": "Lince, el lenguaje de programación en español: resaltado, snippets, errores en vivo y autocompletado",
+  "version": "0.6.0",
+  "publisher": "arreina",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tu-usuario/lince"
+    "url": "https://github.com/arreina/lince"
   },
   "contributes": {
     "languages": [
       {
         "id": "lince",
-        "aliases": ["Lince", "lince"],
-        "extensions": [".lince"],
+        "aliases": [
+          "Lince",
+          "lince"
+        ],
+        "extensions": [
+          ".lince"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -33,6 +42,20 @@
         "language": "lince",
         "path": "./snippets.json"
       }
-    ]
-  }
+    ],
+    "configuration": {
+      "title": "Lince",
+      "properties": {
+        "lince.ruta": {
+          "type": "string",
+          "default": "lince",
+          "description": "Ruta del ejecutable de Lince (se usa como «lince lsp»)."
+        }
+      }
+    }
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:lince"
+  ]
 }

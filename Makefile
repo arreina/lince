@@ -3,7 +3,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -Wno-maybe-uninitialized -Wno-format-truncation -Wno-stringop-truncation
 LDFLAGS = -lm
-SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/compilador.c
+SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/compilador.c src/lsp.c
 
 # ── Detección de plataforma ───────────────
 UNAME := $(shell uname 2>/dev/null || echo Windows)
@@ -78,9 +78,20 @@ test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner.lince'
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner_compilador.lince'
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) tests/servidor/smoke.sh ./lince_debug 8124'
+	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
+
+# Servidor de lenguaje ('lince lsp'): habla el protocolo de verdad.
+test-lsp: $(BIN)
+	@python3 tests/lsp/smoke.py ./$(BIN)
+
+# Soporte de editores: cada snippet es Lince válido, y la extensión de VS Code
+# (con un 'vscode' de mentira) habla bien con el servidor.
+test-editores: $(BIN)
+	@python3 tests/editores/comprobar_snippets.py ./$(BIN)
+	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-servidor test-ejemplos test-asan
+test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-asan
 
 # ── Manual ────────────────────────────────
 # docs/manual.html se genera: los ejemplos son .lince de verdad y la salida
@@ -93,6 +104,21 @@ docs: $(BIN)
 # se quede mintiendo.
 docs-check: $(BIN)
 	@python3 docs/generar_manual.py ./$(BIN) --comprobar
+
+# ── Soporte de editores ───────────────────
+# Gramática, snippets y listas de palabras se generan del propio lenguaje
+# (lexer, módulos, integradas), así que no se desfasan: 'editores-check' falla
+# en la CI si alguien cambia el lenguaje sin regenerar.
+editores:
+	@python3 editores/generar.py
+
+editores-check:
+	@python3 editores/generar.py --comprobar
+
+# Extensión de VS Code empaquetada (.vsix) en build/
+vsix:
+	@mkdir -p build
+	@python3 editores/vscode/empaquetar.py build
 
 # ── Limpiar ───────────────────────────────
 clean:
@@ -119,5 +145,6 @@ else
 endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-todo clean install uninstall docs docs-check
+        test-asan test-lsp test-editores editores editores-check vsix \
+        test-todo clean install uninstall docs docs-check
 

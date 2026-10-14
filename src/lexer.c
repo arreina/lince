@@ -62,6 +62,25 @@ static PalabraClave PALABRAS_CLAVE[] = {
     { NULL,          TOK_EOF              },
 };
 
+/* Palabras que sólo significan algo en cierto sitio (dentro de una clase, tras
+   una expresión...) y fuera siguen siendo identificadores. El parser las
+   reconoce por su texto; esta lista existe para que los editores y el
+   servidor de lenguaje sepan resaltarlas y sugerirlas. */
+static const char *const PALABRAS_CONTEXTUALES[] = {
+    "abstracta", "abstracto", "estatico", "privado", "protegido", "publico",
+    "sobrescribe", "obtener", "fijar", "es", "como", NULL,
+};
+
+const char *lexer_palabra_clave(int i) {
+    int n = (int)(sizeof(PALABRAS_CLAVE) / sizeof(PALABRAS_CLAVE[0])) - 1;
+    return (i >= 0 && i < n) ? PALABRAS_CLAVE[i].palabra : NULL;
+}
+
+const char *lexer_palabra_contextual(int i) {
+    int n = (int)(sizeof(PALABRAS_CONTEXTUALES) / sizeof(PALABRAS_CONTEXTUALES[0])) - 1;
+    return (i >= 0 && i < n) ? PALABRAS_CONTEXTUALES[i] : NULL;
+}
+
 static TipoToken buscar_palabra_clave(const char *palabra) {
     for (int i = 0; PALABRAS_CLAVE[i].palabra != NULL; i++) {
         if (strcmp(PALABRAS_CLAVE[i].palabra, palabra) == 0)

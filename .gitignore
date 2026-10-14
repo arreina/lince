@@ -17,3 +17,4 @@ agenda.json
 *.swp
 *~
 .DS_Store
+/build/

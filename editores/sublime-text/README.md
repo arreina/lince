@@ -12,6 +12,10 @@
 
 Los archivos `.lince` tendrán resaltado automático.
 
+## Errores en vivo y autocompletado
+
+Instala el paquete **LSP** y añade el cliente de Lince: mira `editores/README.md`.
+
 ## Activar manualmente
 
 Si el resaltado no se activa solo:

@@ -2096,6 +2096,16 @@ void modulo_registrar(Entorno *entorno, const char *nombre,
     registrar_modulo_diccionario(entorno, nombre, fns, num_fns, NULL, NULL, 0);
 }
 
+static const char *const MODULOS_ESTANDAR[] = {
+    "matematica", "texto", "archivos", "tiempo", "sistema",
+    "json", "red", "expresiones", "servidor", "terminal", NULL,
+};
+
+const char *modulo_estandar(int i) {
+    int n = (int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])) - 1;
+    return (i >= 0 && i < n) ? MODULOS_ESTANDAR[i] : NULL;
+}
+
 void modulo_cargar(const char *nombre, Entorno *entorno) {
     srand((unsigned)time(NULL));
 

@@ -10,6 +10,9 @@
 
 void modulo_cargar(const char *nombre, Entorno *entorno);
 
+/* i-ésimo módulo estándar, o NULL al acabar (lo usan los editores). */
+const char *modulo_estandar(int i);
+
 /* ─────────────────────────────────────────
    Módulos de anfitrión
 

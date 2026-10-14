@@ -12,6 +12,7 @@
 #include "repl.h"
 #include "paquetes.h"
 #include "compilador.h"
+#include "lsp.h"
 
 static char *leer_archivo(const char *ruta) {
     FILE *f = fopen(ruta, "r");
@@ -33,11 +34,13 @@ static char *leer_archivo(const char *ruta) {
 }
 
 static void mostrar_ayuda(void) {
-    printf("\n🐆 Lince v0.5\n\n");
+    printf("\n🐆 Lince v0.6\n\n");
     printf("Uso:\n");
     printf("  lince <archivo.lince>                    Ejecuta un programa\n");
     printf("  lince compilar <archivo.lince>           Compila a binario nativo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
+    printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
+    printf("  lince lsp                                Servidor de lenguaje para editores\n");
     printf("  lince                                    Abre el REPL interactivo\n");
     printf("  lince instalar <url>                     Instala un paquete\n");
     printf("  lince desinstalar <nombre>               Desinstala un paquete\n");
@@ -58,6 +61,25 @@ int main(int argc, char *argv[]) {
     }
 
     const char *cmd = argv[1];
+
+    /* Servidor de lenguaje para editores: 'lince lsp' */
+    if (strcmp(cmd, "lsp") == 0) return lsp_servir();
+
+    /* Comprobar la sintaxis sin ejecutar: 'lince comprobar archivo.lince' */
+    if (strcmp(cmd, "comprobar") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "\n❌ Uso: lince comprobar <archivo.lince>\n\n");
+            return 1;
+        }
+        char   *codigo = leer_archivo(argv[2]);
+        Lexer  *lexer  = lexer_crear(codigo);
+        int     cant   = 0;
+        Token  *toks   = lexer_tokenizar(lexer, &cant);
+        Parser *parser = parser_crear(toks, cant);
+        parser_parsear(parser);          /* termina el proceso si hay un error */
+        printf("✅ Sintaxis correcta: %s\n", argv[2]);
+        return 0;
+    }
 
     /* Subcomando compilar */
     if (strcmp(cmd, "compilar") == 0) {

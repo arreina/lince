@@ -2,30 +2,58 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Lince",
   "scopeName": "source.lince",
-  "fileTypes": ["lince"],
+  "fileTypes": [
+    "lince"
+  ],
   "patterns": [
-    { "include": "#comentarios" },
-    { "include": "#cadenas" },
-    { "include": "#numeros" },
-    { "include": "#palabras_clave_control" },
-    { "include": "#palabras_clave_declaracion" },
-    { "include": "#palabras_clave_tipos" },
-    { "include": "#palabras_clave_logicas" },
-    { "include": "#palabras_clave_errores" },
-    { "include": "#palabras_clave_modulos" },
-    { "include": "#literales" },
-    { "include": "#clases" },
-    { "include": "#funciones" },
-    { "include": "#operadores" },
-    { "include": "#identificadores" }
+    {
+      "include": "#comentarios"
+    },
+    {
+      "include": "#cadenas"
+    },
+    {
+      "include": "#numeros"
+    },
+    {
+      "include": "#palabras_clave_control"
+    },
+    {
+      "include": "#palabras_clave_declaracion"
+    },
+    {
+      "include": "#palabras_clave_tipos"
+    },
+    {
+      "include": "#palabras_clave_logicas"
+    },
+    {
+      "include": "#palabras_clave_errores"
+    },
+    {
+      "include": "#palabras_clave_modulos"
+    },
+    {
+      "include": "#literales"
+    },
+    {
+      "include": "#clases"
+    },
+    {
+      "include": "#funciones"
+    },
+    {
+      "include": "#operadores"
+    },
+    {
+      "include": "#identificadores"
+    }
   ],
   "repository": {
-
     "comentarios": {
       "name": "comment.line.number-sign.lince",
       "match": "#.*$"
     },
-
     "cadenas": {
       "name": "string.quoted.double.lince",
       "begin": "\"",
@@ -37,42 +65,34 @@
         }
       ]
     },
-
     "numeros": {
       "name": "constant.numeric.lince",
       "match": "\\b([0-9]+\\.?[0-9]*)\\b"
     },
-
     "palabras_clave_control": {
       "name": "keyword.control.lince",
-      "match": "\\b(si|sino|para|cada|en|mientras|hacer|devolver|intentar|capturar|finalmente|lanzar)\\b"
+      "match": "\\b(si|sino|para|cada|mientras|hacer|devolver|producir|intentar|capturar|finalmente|lanzar|elegir|caso|otro|en)\\b"
     },
-
     "palabras_clave_declaracion": {
       "name": "keyword.declaration.lince",
-      "match": "\\b(sea|fijo|funcion|clase|extiende|mi|padre|importar|val|ref|abstracta|abstracto|estatico|privado|protegido|publico|sobrescribe|obtener|fijar|es)\\b"
+      "match": "\\b(sea|fijo|funcion|generador|clase|extiende|implementa|interfaz|enumeracion|mi|padre|importar|val|ref|abstracta|abstracto|estatico|privado|protegido|publico|sobrescribe|obtener|fijar|es|como)\\b"
     },
-
     "palabras_clave_tipos": {
       "name": "storage.type.lince",
-      "match": "\\b(numero|texto|logico|lista|diccionario|nulo)\\b"
+      "match": "\\b(numero|texto|logico|lista|diccionario)\\b"
     },
-
     "palabras_clave_logicas": {
       "name": "keyword.operator.logical.lince",
       "match": "\\b(y|o|no)\\b"
     },
-
     "palabras_clave_errores": {
       "name": "support.class.error.lince",
-      "match": "\\b(Error|ErrorTipo|ErrorRango|ErrorNulo|ErrorMatematico|ErrorArgumento|ErrorRecursion)\\b"
+      "match": "\\b(Error|ErrorAcceso|ErrorArgumento|ErrorMatematico|ErrorNulo|ErrorRango|ErrorRecursion|ErrorTipo)\\b"
     },
-
     "palabras_clave_modulos": {
       "name": "support.class.module.lince",
-      "match": "\\b(matematica|texto|archivos|tiempo)(?=\\.)"
+      "match": "\\b(matematica|texto|archivos|tiempo|sistema|json|red|expresiones|servidor|terminal)(?=\\.)"
     },
-
     "literales": {
       "patterns": [
         {
@@ -89,21 +109,19 @@
         }
       ]
     },
-
     "clases": {
       "name": "entity.name.type.class.lince",
       "match": "\\b([A-Z][a-zA-Z0-9_]*)\\b"
     },
-
     "funciones": {
       "patterns": [
         {
           "name": "entity.name.function.lince",
-          "match": "(?<=funcion\\s)([a-z_][a-zA-Z0-9_]*)"
+          "match": "(?<=funcion\\s|generador\\s)([a-z_][a-zA-Z0-9_]*)"
         },
         {
           "name": "support.function.builtin.lince",
-          "match": "\\b(escribir)\\b"
+          "match": "\\b(a_logico|a_numero|a_texto|argumentos|escribir|filtrar|leer|mapear|rango|reducir)\\b"
         },
         {
           "name": "entity.name.function.call.lince",
@@ -111,7 +129,6 @@
         }
       ]
     },
-
     "operadores": {
       "patterns": [
         {
@@ -132,7 +149,6 @@
         }
       ]
     },
-
     "identificadores": {
       "name": "variable.other.lince",
       "match": "\\b([a-z_][a-zA-Z0-9_]*)\\b"

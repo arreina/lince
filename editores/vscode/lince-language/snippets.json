@@ -1,12 +1,40 @@
 {
+  "Variable": {
+    "prefix": "sea",
+    "body": [
+      "sea ${1:nombre} = ${2:valor}"
+    ],
+    "description": "Declara una variable"
+  },
+  "Constante": {
+    "prefix": "fijo",
+    "body": [
+      "fijo ${1:NOMBRE} = ${2:valor}"
+    ],
+    "description": "Declara una constante"
+  },
+  "Lista": {
+    "prefix": "lista",
+    "body": [
+      "sea lista ${1:nombre} = [${2:1, 2, 3}]"
+    ],
+    "description": "Declara una lista"
+  },
+  "Diccionario": {
+    "prefix": "dic",
+    "body": [
+      "sea diccionario ${1:nombre} = {\"${2:clave}\": ${3:valor}}"
+    ],
+    "description": "Declara un diccionario"
+  },
   "Función": {
     "prefix": "fun",
     "body": [
-      "funcion ${1:nombre}(val ${2:tipo} ${3:param}): ${4:nulo} {",
+      "funcion ${1:nombre}(val ${2:numero} ${3:param}): ${4:nulo} {",
       "\t$0",
       "}"
     ],
-    "description": "Define una función en Lince"
+    "description": "Define una función"
   },
   "Función sin parámetros": {
     "prefix": "fun0",
@@ -17,25 +45,25 @@
     ],
     "description": "Define una función sin parámetros"
   },
-  "Variable": {
-    "prefix": "sea",
-    "body": ["sea ${1:nombre} = ${2:valor}"],
-    "description": "Declara una variable mutable"
+  "Lambda": {
+    "prefix": "lambda",
+    "body": [
+      "sea ${1:f} = funcion(val ${2:numero} ${3:x}): ${4:numero} {",
+      "\tdevolver ${5:x}",
+      "}"
+    ],
+    "description": "Función anónima"
   },
-  "Constante": {
-    "prefix": "fijo",
-    "body": ["fijo ${1:NOMBRE} = ${2:valor}"],
-    "description": "Declara una constante"
-  },
-  "Lista": {
-    "prefix": "lista",
-    "body": ["sea lista ${1:nombre} = [${2}]"],
-    "description": "Declara una lista tipada"
-  },
-  "Diccionario": {
-    "prefix": "dic",
-    "body": ["sea diccionario ${1:nombre} = {\"${2:clave}\": ${3:valor}}"],
-    "description": "Declara un diccionario tipado"
+  "Generador": {
+    "prefix": "generador",
+    "body": [
+      "generador ${1:contar}(val numero ${2:n}): numero {",
+      "\tpara (${3:i} = 0; ${3:i} < ${2:n}; ${3:i}++) {",
+      "\t\tproducir ${3:i}",
+      "\t}",
+      "}"
+    ],
+    "description": "Función generadora"
   },
   "Si": {
     "prefix": "si",
@@ -44,9 +72,9 @@
       "\t$0",
       "}"
     ],
-    "description": "Condicional si"
+    "description": "Condicional"
   },
-  "Si / Sino": {
+  "Si / sino": {
     "prefix": "sino",
     "body": [
       "si ${1:condicion} {",
@@ -55,7 +83,21 @@
       "\t$0",
       "}"
     ],
-    "description": "Condicional si/sino"
+    "description": "Condicional con alternativa"
+  },
+  "Elegir": {
+    "prefix": "elegir",
+    "body": [
+      "elegir ${1:valor} {",
+      "\tcaso ${2:1} {",
+      "\t\t$3",
+      "\t}",
+      "\totro {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Selección múltiple"
   },
   "Para clásico": {
     "prefix": "para",
@@ -64,16 +106,16 @@
       "\t$0",
       "}"
     ],
-    "description": "Bucle para clásico"
+    "description": "Bucle con contador"
   },
   "Para cada": {
     "prefix": "cada",
     "body": [
-      "para cada ${1:numero} ${2:elem} en ${3:lista} {",
+      "para cada ${1:numero} ${2:x} en ${3:[1, 2, 3]} {",
       "\t$0",
       "}"
     ],
-    "description": "Bucle para cada"
+    "description": "Recorre una colección"
   },
   "Mientras": {
     "prefix": "mientras",
@@ -84,23 +126,22 @@
     ],
     "description": "Bucle mientras"
   },
-  "Hacer...mientras": {
+  "Hacer mientras": {
     "prefix": "hacer",
     "body": [
       "hacer {",
       "\t$0",
       "} mientras (${1:condicion})"
     ],
-    "description": "Bucle hacer...mientras"
+    "description": "Bucle que se ejecuta al menos una vez"
   },
   "Clase": {
     "prefix": "clase",
     "body": [
-      "clase ${1:NombreClase} {",
-      "\tfuncion crear(val ${2:tipo} ${3:param}): nulo {",
+      "clase ${1:Nombre} {",
+      "\tfuncion crear(val ${2:numero} ${3:param}): nulo {",
       "\t\tmi.${3:param} = ${3:param}",
       "\t}",
-      "",
       "\t$0",
       "}"
     ],
@@ -109,34 +150,122 @@
   "Clase con herencia": {
     "prefix": "clasex",
     "body": [
-      "clase ${1:NombreClase} extiende ${2:ClasePadre} {",
-      "\tfuncion crear(val ${3:tipo} ${4:param}): nulo {",
+      "clase ${1:Nombre} extiende ${2:Padre} {",
+      "\tfuncion crear(val ${3:numero} ${4:param}): nulo {",
       "\t\tpadre(${4:param})",
-      "\t\t$0",
       "\t}",
+      "\t$0",
       "}"
     ],
-    "description": "Define una clase con herencia"
+    "description": "Clase que extiende a otra"
   },
-  "Intentar/Capturar": {
+  "Clase abstracta": {
+    "prefix": "abstracta",
+    "body": [
+      "abstracta clase ${1:Figura} {",
+      "\tabstracto funcion ${2:area}(): ${3:numero}",
+      "\t$0",
+      "}"
+    ],
+    "description": "Clase que no se instancia"
+  },
+  "Método estático": {
+    "prefix": "estatico",
+    "body": [
+      "estatico funcion ${1:nombre}(): ${2:nulo} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Método de la clase"
+  },
+  "Campo privado": {
+    "prefix": "privado",
+    "body": [
+      "privado sea ${1:nombre} = ${2:0}"
+    ],
+    "description": "Campo con visibilidad privada"
+  },
+  "Propiedad": {
+    "prefix": "propiedad",
+    "body": [
+      "obtener ${1:valor}(): ${2:numero} {",
+      "\tdevolver mi._${1:valor}",
+      "}",
+      "fijar ${1:valor}(val ${2:numero} ${3:v}): nulo {",
+      "\tmi._${1:valor} = ${3:v}",
+      "}"
+    ],
+    "description": "Pareja obtener / fijar"
+  },
+  "Interfaz": {
+    "prefix": "interfaz",
+    "body": [
+      "interfaz ${1:Forma} {",
+      "\tfuncion ${2:area}(): ${3:numero}",
+      "}"
+    ],
+    "description": "Define una interfaz"
+  },
+  "Enumeración": {
+    "prefix": "enumeracion",
+    "body": [
+      "enumeracion ${1:Color} {",
+      "\t${2:Rojo}",
+      "\t${3:Verde}",
+      "}"
+    ],
+    "description": "Define una enumeración"
+  },
+  "Intentar": {
     "prefix": "intentar",
     "body": [
       "intentar {",
       "\t$1",
-      "} capturar (error ${2:e}) {",
-      "\tescribir(${2:e}.mensaje)",
+      "} capturar (${2:error} ${3:e}) {",
+      "\tescribir(${3:e}.mensaje)",
       "}"
     ],
-    "description": "Bloque intentar/capturar"
+    "description": "Captura errores"
+  },
+  "Intentar con finalmente": {
+    "prefix": "finalmente",
+    "body": [
+      "intentar {",
+      "\t$1",
+      "} capturar (${2:error} ${3:e}) {",
+      "\tescribir(${3:e}.mensaje)",
+      "} finalmente {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Captura errores y siempre limpia"
+  },
+  "Lanzar": {
+    "prefix": "lanzar",
+    "body": [
+      "lanzar Error(\"${1:mensaje}\")"
+    ],
+    "description": "Lanza un error"
   },
   "Importar módulo": {
     "prefix": "importar",
-    "body": ["importar \"${1|matematica,texto,archivos,tiempo|}\""],
+    "body": [
+      "importar \"${1:matematica}\""
+    ],
     "description": "Importa un módulo estándar"
+  },
+  "Importar con alias": {
+    "prefix": "importarc",
+    "body": [
+      "importar \"./${1:libreria}\" como ${2:lib}"
+    ],
+    "description": "Importa un archivo con espacio de nombres"
   },
   "Escribir": {
     "prefix": "esc",
-    "body": ["escribir(${1:\"mensaje\"})"],
-    "description": "Imprime en pantalla"
+    "body": [
+      "escribir(${1:\"mensaje\"})"
+    ],
+    "description": "Escribe en pantalla"
   }
 }
