@@ -1,0 +1,20 @@
+# @seccion: Clases
+# @titulo: Miembros estáticos
+# @nota: `estatico` hace que un campo o método pertenezca a la clase y no a cada objeto. Se usan con el nombre de la clase. Un método estático no tiene `mi`.
+clase Pedido {
+    estatico sea creados = 0
+    estatico fijo IVA = 21
+
+    funcion crear(val numero base): nulo {
+        mi.base = base
+        Pedido.creados = Pedido.creados + 1
+    }
+    estatico funcion con_iva(val numero base): numero {
+        devolver base + base * Pedido.IVA / 100
+    }
+}
+
+Pedido(10)
+Pedido(20)
+escribir(Pedido.creados)
+escribir(Pedido.con_iva(100))

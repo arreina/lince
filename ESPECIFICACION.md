@@ -31,6 +31,10 @@ Lince es un lenguaje de programación de **propósito general en español**, imp
 | `clase` / `extiende` / `implementa` | class / extends / implements |
 | `interfaz` | define una interfaz |
 | `enumeracion` | define una enumeración |
+| `abstracta` / `abstracto` / `estatico` / `sobrescribe` | modificadores de clase y miembro |
+| `privado` / `protegido` / `publico` | visibilidad |
+| `obtener` / `fijar` | propiedades |
+| `es` | operador de comprobación de tipo |
 | `mi` | self / this |
 | `padre` | llamada al constructor padre |
 | `verdadero` / `falso` | true / false |
@@ -353,6 +357,133 @@ clase Empleado extiende Persona {
 - Los métodos del padre se heredan y pueden sobreescribirse
 - Se puede heredar en cadena
 
+### Campos declarados
+
+Además de crearlos con `mi.x = ...`, una clase puede declarar sus campos con
+`sea` / `fijo`, con valor inicial opcional. Se inicializan antes de `crear`.
+
+```lince
+clase Cuenta {
+    sea titular = "anónimo"
+    fijo MONEDA = "EUR"        # constante: no se puede reasignar
+    sea saldo                  # sin valor inicial: empieza en nulo
+}
+```
+
+Los campos que no se declaran siguen funcionando, y son públicos.
+
+### Visibilidad
+
+Delante de un método o de un campo se escribe `publico` (por defecto),
+`privado` o `protegido`:
+
+```lince
+clase Cuenta {
+    privado sea saldo = 0
+    protegido funcion auditar(): nulo { ... }
+    privado funcion crear(): nulo { ... }      # constructor privado
+}
+```
+
+- **`privado`**: sólo lo ve el código escrito dentro de la propia clase.
+- **`protegido`**: lo ve también el código de sus subclases.
+- Saltarse la visibilidad lanza un **`ErrorAcceso`**, capturable como cualquier error.
+- La visibilidad es de **clase**, no de instancia: un método puede leer el
+  campo privado de *otro* objeto de su misma clase.
+- Una lambda definida dentro de un método conserva su visibilidad, aunque se
+  llame más tarde desde fuera.
+- Un constructor privado sólo se puede llamar desde la propia clase: sirve
+  para el patrón *singleton* o para obligar a usar un método estático.
+
+### Miembros estáticos
+
+`estatico` los hace de la clase y no de cada objeto. Se usan con el nombre de
+la clase:
+
+```lince
+clase Contador {
+    estatico sea cuenta = 0
+    estatico fijo LIMITE = 100
+    estatico funcion subir(): numero {
+        Contador.cuenta = Contador.cuenta + 1
+        devolver Contador.cuenta
+    }
+}
+escribir(Contador.subir())
+```
+
+- Un método estático no tiene `mi`.
+- Las subclases heredan los estáticos: `SubContador.subir()` funciona.
+- Un método estático se llama con `Clase.metodo()`, no sobre un objeto.
+
+### Clases y métodos abstractos
+
+```lince
+abstracta clase Figura {
+    abstracto funcion area(): numero          # sin cuerpo
+    funcion describir(): texto { devolver "área " + mi.area() }
+}
+```
+
+- Una clase `abstracta` no se puede instanciar.
+- Un método `abstracto` no tiene cuerpo, y toda subclase **concreta** está
+  obligada a implementarlo (error al declararla si no lo hace).
+
+### `sobrescribe`
+
+`sobrescribe funcion area()` declara que el método reemplaza uno del padre.
+Es opcional, pero si el padre no tiene ese método, Lince da error al declarar
+la clase: así una errata en el nombre no crea un método nuevo en silencio.
+
+### Propiedades
+
+`obtener` y `fijar` dan acceso con sintaxis de campo y permiten validar:
+
+```lince
+clase Persona {
+    privado sea _edad = 0
+    obtener edad(): numero { devolver mi._edad }
+    fijar edad(val numero v): nulo {
+        si v < 0 { lanzar Error("edad negativa") }
+        mi._edad = v
+    }
+}
+sea p = Persona()
+p.edad = 30            # llama a 'fijar edad'
+escribir(p.edad)       # llama a 'obtener edad'
+```
+
+Una propiedad con `obtener` y sin `fijar` es de sólo lectura. No pongas a
+un campo el mismo nombre que a una propiedad: el campo gana.
+
+### Operadores y `a_texto`
+
+Una clase decide qué significan los operadores con métodos de estos nombres
+(los de un argumento):
+
+| Operador | Método |
+|----------|--------|
+| `+` `-` `*` `/` `%` | `sumar` `restar` `multiplicar` `dividir` `modulo` |
+| `==` / `!=` | `igual` (sin él, dos referencias al mismo objeto son iguales) |
+| `<` | `menor` |
+| `>` | `mayor`, o derivado de `menor` e `igual` |
+| `<=` | `menor_igual`, o `menor` o `igual` |
+| `>=` | `mayor_igual`, o no `menor` |
+
+El método `a_texto()` (sin argumentos) decide cómo se escribe el objeto con
+`escribir` y al concatenarlo con un texto.
+
+### Comprobar el tipo: `es`
+
+```lince
+si figura es Cuadrado { ... }       # clase (o subclase)
+si figura es Forma { ... }          # interfaz implementada
+si x es numero { ... }              # numero, texto, logico, lista, diccionario, nulo, funcion
+si error es ErrorTipo { ... }
+```
+
+Se escribe `no (x es Tipo)` para negarlo: `no x es Tipo` se lee como `(no x) es Tipo`.
+
 ---
 
 ## Interfaces
@@ -385,6 +516,19 @@ clase Cuadrado implementa Forma, Serializable { ... }
 - Si falta algún método, Lince lanza un error al definir la clase
 - Una clase puede `extiende` y `implementa` a la vez
 - Permiten polimorfismo sin herencia
+
+### Métodos por defecto
+
+Una interfaz puede dar el cuerpo de un método. La clase que la implementa lo
+recibe si no tiene uno propio (ni heredado), lo que permite compartir código
+entre clases sin herencia múltiple:
+
+```lince
+interfaz Saludable {
+    funcion nombre(): texto
+    funcion saludar(): texto { devolver "hola " + mi.nombre() }
+}
+```
 
 ---
 

@@ -46,6 +46,9 @@ static Valor *valor_retorno  = NULL;
 static Valor *esto_actual    = NULL;
 static ClaseLince *clase_actual = NULL;
 static int    profundidad    = 0;
+static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
+                            Valor **args, int nargs, int linea);
+static FuncionLince *buscar_metodo(ClaseLince *cls, const char *nombre);
 #define MAX_PROFUNDIDAD 500
 #define MAX_GENERADOR   10000  /* límite de seguridad para generadores */
 static int    hay_producir   = 0;
@@ -443,6 +446,17 @@ static char *valor_a_texto(Valor *v) {
             snprintf(buf, sizeof(buf), "<clase %s>", v->clase->nombre);
             return strdup(buf);
         case VAL_OBJETO: {
+            /* Un método 'a_texto()' de la clase decide cómo se escribe */
+            FuncionLince *ft = buscar_metodo(v->objeto->clase, "a_texto");
+            if (ft && !ft->estatico && ft->num_parametros == 0 && !hay_error) {
+                Valor *r = llamar_metodo(v, v->objeto->clase, ft, NULL, 0, 0);
+                if (r && r->tipo == VAL_TEXTO) {
+                    char *t = strdup(r->texto);
+                    valor_destruir(r);
+                    return t;
+                }
+                if (r) valor_destruir(r);
+            }
             char tmp[4096];
             snprintf(tmp, sizeof(tmp), "%s{", v->objeto->clase->nombre);
             for (int i = 0; i < v->objeto->num_campos; i++) {
@@ -530,6 +544,7 @@ static Entorno *entorno_crear(Entorno *padre) {
         e = malloc(sizeof(Entorno));
     }
     e->padre    = padre;
+    e->dueno    = padre ? padre->dueno : NULL;
     e->cantidad = 0;
     e->refs     = 1;
     if (padre) padre->refs++;
@@ -705,11 +720,196 @@ static FuncionLince *buscar_metodo(ClaseLince *cls, const char *nombre) {
     return NULL;
 }
 
+/* ─────────────────────────────────────────
+   Programación orientada a objetos: ayudas
+───────────────────────────────────────── */
+
+/* ¿'c' es 'base' o desciende de ella? */
+static int clase_deriva(ClaseLince *c, ClaseLince *base) {
+    for (; c; c = c->padre) if (c == base) return 1;
+    return 0;
+}
+
+/* ¿La clase (o una antecesora) declara 'implementa' esa interfaz? */
+static int clase_implementa(ClaseLince *c, InterfazLince *iface) {
+    for (; c; c = c->padre)
+        for (int i = 0; i < c->num_interfaces; i++)
+            if (c->interfaces[i] == iface) return 1;
+    return 0;
+}
+
+/* Visibilidad: lo privado sólo lo ve el código escrito dentro de la clase que
+   lo declara; lo protegido, también el de sus subclases. 'e' es el ámbito desde
+   el que se accede: lleva anotada la clase en cuyo cuerpo se escribió el código
+   (también las lambdas definidas dentro de un método). */
+static int acceso_permitido(int vis, ClaseLince *duena, Entorno *e) {
+    if (vis == VIS_PUBLICO) return 1;
+    ClaseLince *d = e ? e->dueno : NULL;
+    if (!d) return 0;
+    if (vis == VIS_PRIVADO) return d == duena;
+    return clase_deriva(d, duena);
+}
+
+static const char *nombre_vis(int vis) {
+    return vis == VIS_PRIVADO ? "privado" : "protegido";
+}
+
+/* Campo declarado con 'sea' / 'fijo' en la clase o en una antecesora. */
+static CampoClase *buscar_campo(ClaseLince *c, const char *nombre, int estatico) {
+    for (; c; c = c->padre)
+        for (int i = 0; i < c->num_campos; i++)
+            if (c->campos[i].estatico == estatico &&
+                strcmp(c->campos[i].nombre, nombre) == 0)
+                return &c->campos[i];
+    return NULL;
+}
+
+/* x es Tipo — clase, interfaz o tipo básico. */
+static Valor *exec_es(Nodo *n, Entorno *e) {
+    Valor *v = ejecutar(n->binario.izquierda, e);
+    const char *nm = n->binario.derecha->identificador;
+    int r = 0;
+
+    if      (strcmp(nm, "numero") == 0)      r = v->tipo == VAL_NUMERO;
+    else if (strcmp(nm, "texto") == 0)       r = v->tipo == VAL_TEXTO;
+    else if (strcmp(nm, "logico") == 0)      r = v->tipo == VAL_BOOLEANO;
+    else if (strcmp(nm, "lista") == 0)       r = v->tipo == VAL_LISTA;
+    else if (strcmp(nm, "diccionario") == 0) r = v->tipo == VAL_DICCIONARIO && !v->es_modulo;
+    else if (strcmp(nm, "nulo") == 0)        r = v->tipo == VAL_NULO;
+    else if (strcmp(nm, "funcion") == 0)     r = v->tipo == VAL_FUNCION;
+    else {
+        Valor *t = entorno_obtener(e, nm, n->linea);
+        if (hay_error) { valor_destruir(v); valor_destruir(t); return valor_nulo(); }
+        if (t->tipo == VAL_CLASE) {
+            if (v->tipo == VAL_OBJETO && !v->objeto->clase) {
+                /* El error que recibe un 'capturar' es un objeto sin clase,
+                   con los campos mensaje / tipo / linea */
+                for (int i = 0; i < v->objeto->num_campos; i++)
+                    if (strcmp(v->objeto->campos_nombres[i], "tipo") == 0 &&
+                        v->objeto->campos_valores[i]->tipo == VAL_TEXTO)
+                        r = strcmp(v->objeto->campos_valores[i]->texto, nm) == 0 ||
+                            strcmp(nm, "Error") == 0;
+            }
+            else if (v->tipo == VAL_OBJETO) r = clase_deriva(v->objeto->clase, t->clase);
+            else if (v->tipo == VAL_ERROR)
+                r = strcmp(v->error->tipo, nm) == 0 || strcmp(nm, "Error") == 0;
+        } else if (t->tipo == VAL_DICCIONARIO && t->es_modulo == 2) {
+            InterfazLince *iface = (InterfazLince*)(uintptr_t)
+                (long long)t->diccionario.valores[0]->numero;
+            r = v->tipo == VAL_OBJETO && clase_implementa(v->objeto->clase, iface);
+        } else {
+            valor_destruir(v); valor_destruir(t);
+            return error_rt("ErrorTipo", n->linea,
+                "'%s' no es una clase, una interfaz ni un tipo; no se puede usar con 'es'.", nm);
+        }
+        valor_destruir(t);
+    }
+    valor_destruir(v);
+    return valor_booleano(r);
+}
+
+/* Llama al método 'nombre' de 'izq' con 'der' de argumento; *ok = 0 si no
+   existe (o no es de instancia con un parámetro). Consume una referencia de 'der'
+   solo si lo llama; 'izq' siempre queda a cargo de quien llama. */
+static Valor *llamar_operador(Valor *izq, const char *nombre, Valor *der, int *ok, int linea) {
+    ClaseLince *cls = izq->objeto->clase;
+    FuncionLince *f = buscar_metodo(cls, nombre);
+    if (!f || f->estatico || f->abstracto || f->num_parametros != 1) { *ok = 0; return NULL; }
+    *ok = 1;
+    Valor *args[1] = { valor_retener(der) };
+    return llamar_metodo(izq, cls, f, args, 1, linea);
+}
+
+/* Operadores sobre objetos: se resuelven con métodos de la clase
+   (sumar, restar, multiplicar, dividir, modulo, igual, menor, mayor,
+   menor_igual, mayor_igual). Devuelve NULL si 'op' no tiene método. Si lo
+   resuelve, se hace cargo de 'izq' y 'der'. */
+static Valor *operador_objeto(Valor *izq, Valor *der, const char *op, int linea) {
+    static const char *const directos[][2] = {
+        {"+", "sumar"}, {"-", "restar"}, {"*", "multiplicar"},
+        {"/", "dividir"}, {"%", "modulo"},
+    };
+    int ok = 0;
+    Valor *r = NULL;
+
+    for (size_t i = 0; i < sizeof(directos) / sizeof(directos[0]); i++) {
+        if (strcmp(op, directos[i][0]) == 0) {
+            r = llamar_operador(izq, directos[i][1], der, &ok, linea);
+            if (ok) { valor_destruir(izq); valor_destruir(der); return r ? r : valor_nulo(); }
+            return NULL;
+        }
+    }
+
+    int igual = -1, menor = -1;     /* -1 = desconocido */
+    #define CONSULTA(var, nombre) do { \
+        Valor *q = llamar_operador(izq, nombre, der, &ok, linea); \
+        if (ok) { var = q ? es_verdadero(q) : 0; if (q) valor_destruir(q); } } while (0)
+
+    if (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0) {
+        CONSULTA(igual, "igual");
+        if (igual < 0) {
+            /* Sin 'igual': dos referencias al mismo objeto son iguales */
+            if (der->tipo != VAL_OBJETO) return NULL;
+            igual = izq->objeto == der->objeto;
+        }
+        int res = op[0] == '=' ? igual : !igual;
+        valor_destruir(izq); valor_destruir(der);
+        return valor_booleano(res);
+    }
+
+    int res;
+    if (strcmp(op, "<") == 0) {
+        CONSULTA(menor, "menor");
+        if (menor < 0) return NULL;
+        res = menor;
+    } else if (strcmp(op, ">") == 0) {
+        int mayor = -1;
+        CONSULTA(mayor, "mayor");
+        if (mayor >= 0) res = mayor;
+        else {
+            CONSULTA(menor, "menor"); CONSULTA(igual, "igual");
+            if (menor < 0 || igual < 0) return NULL;
+            res = !menor && !igual;
+        }
+    } else if (strcmp(op, "<=") == 0) {
+        int me = -1;
+        CONSULTA(me, "menor_igual");
+        if (me >= 0) res = me;
+        else {
+            CONSULTA(menor, "menor"); CONSULTA(igual, "igual");
+            if (menor < 0 || igual < 0) return NULL;
+            res = menor || igual;
+        }
+    } else if (strcmp(op, ">=") == 0) {
+        int ma = -1;
+        CONSULTA(ma, "mayor_igual");
+        if (ma >= 0) res = ma;
+        else {
+            CONSULTA(menor, "menor");
+            if (menor < 0) return NULL;
+            res = !menor;
+        }
+    } else {
+        return NULL;
+    }
+    #undef CONSULTA
+    valor_destruir(izq); valor_destruir(der);
+    return valor_booleano(res);
+}
+
 static Valor *exec_binario(Nodo *n, Entorno *e) {
+    if (n->binario.operador[0] == 'e' && n->binario.operador[1] == 's' && !n->binario.operador[2])
+        return exec_es(n, e);
     Valor *izq = ejecutar(n->binario.izquierda, e);
     Valor *der = ejecutar(n->binario.derecha,   e);
     const char *op = n->binario.operador;
     Valor *resultado = NULL;
+
+    /* Un objeto a la izquierda: los operadores los define su clase */
+    if (izq->tipo == VAL_OBJETO && op[0] != 'y' && op[0] != 'o') {
+        Valor *r = operador_objeto(izq, der, op, n->linea);
+        if (r) return r;
+    }
 
     /* Concatenación de texto */
     if (strcmp(op, "+") == 0 && (izq->tipo == VAL_TEXTO || der->tipo == VAL_TEXTO)) {
@@ -1087,6 +1287,87 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
         return valor_nulo();
 }
 
+/* Ejecuta el método 'f' de 'cls' sobre 'obj' (NULL en uno estático) con los
+   argumentos ya evaluados, de los que se hace cargo. */
+static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
+                            Valor **args, int nargs, int linea) {
+    if (nargs != f->num_parametros) {
+        for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
+        return error_rt("ErrorArgumento", linea,
+            "El método '%s' espera %d argumento(s), recibió %d.",
+            f->nombre, f->num_parametros, nargs);
+    }
+    if (++profundidad > MAX_PROFUNDIDAD) {
+        profundidad = 0;
+        char msg[128];
+        snprintf(msg, sizeof(msg), "Demasiadas llamadas anidadas en método '%s'.", f->nombre);
+        valor_error = valor_error_nuevo("ErrorRecursion", msg, linea);
+        hay_error   = 1;
+        for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
+        return valor_nulo();
+    }
+    Entorno *fn_e = entorno_crear(f->entorno_closure);
+    for (int j = 0; j < f->num_parametros; j++) {
+        validar_tipo(args[j], f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, linea);
+        entorno_definir(fn_e, f->parametros[j].nombre, args[j], 0);
+    }
+    Valor *esto_anterior = esto_actual;
+    ClaseLince *cls_ant  = clase_actual;
+    esto_actual  = obj;
+    clase_actual = cls;
+    valor_destruir(ejecutar(f->cuerpo, fn_e));
+    Valor *retorno = tomar_retorno();
+    esto_actual  = esto_anterior;
+    clase_actual = cls_ant;
+    entorno_destruir(fn_e);
+    profundidad--;
+    return retorno;
+}
+
+/* Pone un campo en el objeto (o lo sustituye). Devuelve 0 si no cabe. */
+static int objeto_poner_campo(ObjetoLince *o, const char *nombre, Valor *v) {
+    for (int i = 0; i < o->num_campos; i++)
+        if (strcmp(o->campos_nombres[i], nombre) == 0) {
+            valor_destruir(o->campos_valores[i]);
+            o->campos_valores[i] = v;
+            return 1;
+        }
+    if (o->num_campos >= MAX_CAMPOS) return 0;
+    o->campos_nombres[o->num_campos] = strdup(nombre);
+    o->campos_valores[o->num_campos] = v;
+    o->num_campos++;
+    return 1;
+}
+
+/* Campos declarados con 'sea' / 'fijo' en la clase y sus antecesoras (las de
+   arriba primero), con su valor inicial. Devuelve 0 si falla. */
+static int inicializar_campos(Valor *vobj, ClaseLince *c, int linea) {
+    if (!c) return 1;
+    if (!inicializar_campos(vobj, c->padre, linea)) return 0;
+    for (int i = 0; i < c->num_campos; i++) {
+        CampoClase *cd = &c->campos[i];
+        if (cd->estatico) continue;
+        Valor *v;
+        if (cd->inicial) {
+            Valor *esto_ant = esto_actual; ClaseLince *cls_ant = clase_actual;
+            esto_actual = vobj; clase_actual = c;
+            Entorno *ie = entorno_crear(c->entorno);
+            v = ejecutar(cd->inicial, ie);
+            entorno_destruir(ie);
+            esto_actual = esto_ant; clase_actual = cls_ant;
+            if (hay_error) { valor_destruir(v); return 0; }
+        } else {
+            v = valor_nulo();
+        }
+        if (!objeto_poner_campo(vobj->objeto, cd->nombre, v)) {
+            valor_destruir(v);
+            valor_destruir(error_rt("Error", linea, "Un objeto no puede tener más de %d campos.", MAX_CAMPOS));
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /* Instancia la clase 'vcls' (la consume) con los argumentos 'argn', que se
    evalúan en 'e'. Lo comparten 'Clase(...)' y 'modulo.Clase(...)'. */
 static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, int linea) {
@@ -1111,13 +1392,34 @@ static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, 
         return verr;
     }
 
+    if (cls->abstracta) {
+        Valor *err = error_rt("ErrorTipo", linea,
+            "'%s' es una clase abstracta y no se puede instanciar.", cls->nombre);
+        valor_destruir(vcls);
+        return err;
+    }
+
+    FuncionLince *f = buscar_metodo(cls, "crear");
+    if (f && f->vis != VIS_PUBLICO && !acceso_permitido(f->vis, f->duena, e)) {
+        Valor *err = error_rt("ErrorAcceso", linea,
+            "El constructor de '%s' es %s: no se puede instanciar desde aquí.",
+            cls->nombre, nombre_vis(f->vis));
+        valor_destruir(vcls);
+        return err;
+    }
+
     ObjetoLince *obj = calloc(1, sizeof(ObjetoLince));
     obj->clase      = cls;
     obj->num_campos = 0;
     Valor *vobj = valor_objeto(obj);
 
-    /* Buscar y llamar 'crear' en la jerarquía */
-    FuncionLince *f = buscar_metodo(cls, "crear");
+    if (!inicializar_campos(vobj, cls, linea)) {
+        valor_destruir(vobj);
+        valor_destruir(vcls);
+        return valor_nulo();
+    }
+
+    /* Llamar a 'crear' (buscado en la jerarquía) */
     if (f) {
         if (nargs != f->num_parametros) {
             Valor *err = error_rt("ErrorArgumento", linea,
@@ -1676,6 +1978,31 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         return error_rt("Error", n->linea, "El módulo no tiene la función '%s'.", met);
     }
 
+    /* ── Métodos ESTÁTICOS: Clase.metodo(...) ── */
+    if (obj->tipo == VAL_CLASE) {
+        ClaseLince   *cls = obj->clase;
+        FuncionLince *f   = buscar_metodo(cls, met);
+        Valor *err = NULL;
+        if (!f)
+            err = error_rt("Error", n->linea,
+                "La clase '%s' no tiene el método '%s'.", cls->nombre, met);
+        else if (!f->estatico)
+            err = error_rt("ErrorTipo", n->linea,
+                "'%s' es un método de instancia de '%s': llámalo sobre un objeto.", met, cls->nombre);
+        else if (!acceso_permitido(f->vis, f->duena, e))
+            err = error_rt("ErrorAcceso", n->linea,
+                "El método estático '%s' de '%s' es %s.", met, cls->nombre, nombre_vis(f->vis));
+        if (err) { valor_destruir(obj); return err; }
+
+        int nargs = n->metodo.num_argumentos;
+        Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
+        for (int j = 0; j < nargs; j++) args[j] = ejecutar(n->metodo.argumentos[j], e);
+        Valor *r = llamar_metodo(NULL, cls, f, args, nargs, n->linea);
+        free(args);
+        valor_destruir(obj);
+        return r;
+    }
+
     /* ── Métodos de OBJETO ── */
     if (obj->tipo == VAL_OBJETO) {
         ClaseLince   *cls       = obj->objeto->clase;
@@ -1685,6 +2012,20 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         if (!f) {
             Valor *err = error_rt("Error", n->linea,
                 "La clase '%s' no tiene el método '%s'.", cls->nombre, met_nombre);
+            valor_destruir(obj);
+            return err;
+        }
+        if (f->estatico) {
+            Valor *err = error_rt("ErrorTipo", n->linea,
+                "'%s' es un método estático: llámalo como %s.%s(...).",
+                met_nombre, cls->nombre, met_nombre);
+            valor_destruir(obj);
+            return err;
+        }
+        if (f->vis != VIS_PUBLICO && !acceso_permitido(f->vis, f->duena, e)) {
+            Valor *err = error_rt("ErrorAcceso", n->linea,
+                "El método '%s' de '%s' es %s: no se puede llamar desde aquí.",
+                met_nombre, f->duena ? f->duena->nombre : cls->nombre, nombre_vis(f->vis));
             valor_destruir(obj);
             return err;
         }
@@ -2180,26 +2521,89 @@ static Valor *exec_acceso(Nodo *n, Entorno *e) {
         const char *campo = n->acceso.campo;
         for (int i = 0; i < obj->objeto->num_campos; i++) {
             if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
+                CampoClase *cd = buscar_campo(obj->objeto->clase, campo, 0);
+                if (cd && cd->vis != VIS_PUBLICO && !acceso_permitido(cd->vis, cd->duena, e)) {
+                    Valor *err = error_rt("ErrorAcceso", n->linea,
+                        "El campo '%s' de '%s' es %s: no se puede leer desde aquí.",
+                        campo, cd->duena->nombre, nombre_vis(cd->vis));
+                    valor_destruir(obj);
+                    return err;
+                }
                 Valor *r = valor_copiar(obj->objeto->campos_valores[i]);
                 valor_destruir(obj);
                 return r;
             }
         }
+        /* Sin campo con ese nombre: ¿una propiedad 'obtener'? */
+        char pn[256];
+        snprintf(pn, sizeof(pn), "obtener %s", campo);
+        FuncionLince *g = buscar_metodo(obj->objeto->clase, pn);
+        if (g) {
+            if (g->vis != VIS_PUBLICO && !acceso_permitido(g->vis, g->duena, e)) {
+                Valor *err = error_rt("ErrorAcceso", n->linea,
+                    "La propiedad '%s' de '%s' es %s.", campo, g->duena->nombre, nombre_vis(g->vis));
+                valor_destruir(obj);
+                return err;
+            }
+            Valor *r = llamar_metodo(obj, obj->objeto->clase, g, NULL, 0, n->linea);
+            valor_destruir(obj);
+            return r;
+        }
         valor_destruir(obj);
         return error_rt("Error", n->linea, "El objeto no tiene el campo '%s'.", campo);
+    }
+    /* Campo estático: Clase.campo */
+    if (obj->tipo == VAL_CLASE) {
+        const char *campo = n->acceso.campo;
+        CampoClase *cd = buscar_campo(obj->clase, campo, 1);
+        Valor *err = NULL;
+        if (!cd)
+            err = error_rt("Error", n->linea,
+                "La clase '%s' no tiene el campo estático '%s'.", obj->clase->nombre, campo);
+        else if (!acceso_permitido(cd->vis, cd->duena, e))
+            err = error_rt("ErrorAcceso", n->linea,
+                "El campo estático '%s' de '%s' es %s: no se puede leer desde aquí.",
+                campo, cd->duena->nombre, nombre_vis(cd->vis));
+        if (err) { valor_destruir(obj); return err; }
+        Valor *r = valor_copiar(cd->valor);
+        valor_destruir(obj);
+        return r;
     }
     valor_destruir(obj);
     return error_rt("ErrorTipo", n->linea, "Acceso a campo en un tipo que no es objeto.");
 }
 
+/* Crea el FuncionLince de un método de clase a partir de su nodo. */
+static FuncionLince *metodo_desde_nodo(Nodo *mn, ClaseLince *c, Entorno *ce) {
+    FuncionLince *f = calloc(1, sizeof(FuncionLince));
+    f->nombre           = strdup(mn->funcion.nombre);
+    f->parametros       = mn->funcion.parametros;
+    f->num_parametros   = mn->funcion.num_parametros;
+    f->tipo_retorno     = mn->funcion.tipo_retorno;
+    f->cuerpo           = mn->funcion.cuerpo;
+    f->entorno_closure  = ce;
+    f->vis              = mn->funcion.vis;
+    f->estatico         = mn->funcion.estatico;
+    f->abstracto        = mn->funcion.abstracto;
+    f->prop             = mn->funcion.prop;
+    f->duena            = c;
+    return f;
+}
+
+static void clase_agregar_metodo(ClaseLince *c, FuncionLince *f) {
+    c->metodos = realloc(c->metodos, sizeof(FuncionLince*) * (c->num_metodos + 1));
+    c->metodos[c->num_metodos++] = f;
+}
+
 static Valor *exec_clase(Nodo *n, Entorno *e) {
-    ClaseLince *c = malloc(sizeof(ClaseLince));
+    ClaseLince *c = calloc(1, sizeof(ClaseLince));
     c->nombre         = strdup(n->clase.nombre);
     c->num_metodos    = n->clase.num_metodos;
-    c->metodos        = malloc(sizeof(FuncionLince*) * c->num_metodos);
+    c->metodos        = malloc(sizeof(FuncionLince*) * (c->num_metodos + 1));
     c->padre          = NULL;
     c->interfaces     = malloc(sizeof(InterfazLince*) * 16);
     c->num_interfaces = 0;
+    c->abstracta      = n->clase.abstracta;
 
     /* Resolver clase padre */
     if (n->clase.padre) {
@@ -2213,17 +2617,39 @@ static Valor *exec_clase(Nodo *n, Entorno *e) {
         valor_destruir(vpadre);
     }
 
+    /* Ámbito de la clase: el código de sus métodos (y de las lambdas que
+       contengan) lleva anotado a qué clase pertenece, y de ahí sale la
+       visibilidad privada / protegida. */
+    Entorno *ce = entorno_crear(e);
+    ce->dueno = c;
+    c->entorno = ce;
+
     /* Registrar métodos */
+    for (int i = 0; i < c->num_metodos; i++)
+        c->metodos[i] = metodo_desde_nodo(n->clase.metodos[i], c, ce);
+
+    /* 'sobrescribe' tiene que sobrescribir algo */
     for (int i = 0; i < c->num_metodos; i++) {
-        Nodo *mn = n->clase.metodos[i];
-        FuncionLince *f = malloc(sizeof(FuncionLince));
-        f->nombre           = strdup(mn->funcion.nombre);
-        f->parametros       = mn->funcion.parametros;
-        f->num_parametros   = mn->funcion.num_parametros;
-        f->tipo_retorno     = mn->funcion.tipo_retorno;
-        f->cuerpo           = mn->funcion.cuerpo;
-        f->entorno_closure  = e;
-        c->metodos[i] = f;
+        if (!n->clase.metodos[i]->funcion.sobrescribe) continue;
+        if (!c->padre || !buscar_metodo(c->padre, c->metodos[i]->nombre))
+            return error_rt("Error", n->linea,
+                "'%s.%s' dice 'sobrescribe', pero ninguna clase padre tiene un método '%s'.",
+                c->nombre, c->metodos[i]->nombre, c->metodos[i]->nombre);
+    }
+
+    /* Campos declarados */
+    c->num_campos = n->clase.num_campos;
+    c->campos     = calloc(c->num_campos + 1, sizeof(CampoClase));
+    for (int i = 0; i < c->num_campos; i++) {
+        Nodo *cn = n->clase.campos[i];
+        CampoClase *cd = &c->campos[i];
+        cd->nombre    = strdup(cn->declaracion.nombre);
+        cd->vis       = cn->declaracion.vis;
+        cd->estatico  = cn->declaracion.estatico;
+        cd->constante = cn->declaracion.constante;
+        cd->inicial   = cn->declaracion.valor;
+        cd->duena     = c;
+        cd->valor     = valor_nulo();
     }
 
     /* Verificar interfaces */
@@ -2239,7 +2665,14 @@ static Valor *exec_clase(Nodo *n, Entorno *e) {
         c->interfaces[c->num_interfaces++] = iface;
 
         for (int j = 0; j < iface->num_metodos; j++) {
-            if (!buscar_metodo(c, iface->metodos[j])) {
+            /* Un método con cuerpo en la interfaz es el de por defecto: lo
+               recibe la clase si no trae uno propio (ni heredado). */
+            if (iface->funciones && iface->funciones[j]) {
+                if (!buscar_metodo(c, iface->metodos[j]))
+                    clase_agregar_metodo(c, metodo_desde_nodo(iface->funciones[j], c, ce));
+                continue;
+            }
+            if (!c->abstracta && !buscar_metodo(c, iface->metodos[j])) {
                 Valor *err = error_rt("Error", n->linea,
                     "La clase '%s' dice implementar '%s' pero le falta el método '%s'.",
                     c->nombre, iface->nombre, iface->metodos[j]);
@@ -2250,47 +2683,139 @@ static Valor *exec_clase(Nodo *n, Entorno *e) {
         valor_destruir(viface);
     }
 
+    /* Una clase concreta tiene que implementar todo lo abstracto que hereda */
+    if (!c->abstracta) {
+        for (ClaseLince *a = c->padre; a; a = a->padre) {
+            for (int i = 0; i < a->num_metodos; i++) {
+                if (!a->metodos[i]->abstracto) continue;
+                FuncionLince *real = buscar_metodo(c, a->metodos[i]->nombre);
+                if (!real || real->abstracto)
+                    return error_rt("Error", n->linea,
+                        "La clase '%s' no es abstracta pero no implementa '%s', abstracto en '%s'.",
+                        c->nombre, a->metodos[i]->nombre, a->nombre);
+            }
+            for (int k = 0; k < a->num_interfaces; k++) {
+                InterfazLince *ia = a->interfaces[k];
+                for (int j = 0; j < ia->num_metodos; j++) {
+                    if (ia->funciones && ia->funciones[j]) continue;
+                    FuncionLince *real = buscar_metodo(c, ia->metodos[j]);
+                    if (!real || real->abstracto)
+                        return error_rt("Error", n->linea,
+                            "La clase '%s' no implementa '%s', que exige la interfaz '%s'.",
+                            c->nombre, ia->metodos[j], ia->nombre);
+                }
+            }
+        }
+    }
+
     if (redefinido(e, c->nombre, "esta clase", 0, n->linea))
         return valor_nulo();
     entorno_definir(e, c->nombre, valor_clase(c), 0);
+
+    /* Campos estáticos: se inicializan al declarar la clase, ya visible por su nombre */
+    for (int i = 0; i < c->num_campos; i++) {
+        CampoClase *cd = &c->campos[i];
+        if (!cd->estatico || !cd->inicial) continue;
+        Entorno *ie = entorno_crear(ce);
+        valor_destruir(cd->valor);
+        cd->valor = ejecutar(cd->inicial, ie);
+        entorno_destruir(ie);
+        if (hay_error) return valor_nulo();
+    }
     return valor_nulo();
 }
 
 static Valor *exec_asignacion_campo(Nodo *n, Entorno *e) {
     Valor *val = ejecutar(n->asignacion_campo.valor, e);
     Valor *obj;
+    int propio = n->asignacion_campo.objeto->tipo != NODO_ESTO;   /* ¿hay que soltar obj? */
 
-    if (n->asignacion_campo.objeto->tipo == NODO_ESTO) {
+    if (!propio) {
         obj = esto_actual;
     } else {
         obj = ejecutar(n->asignacion_campo.objeto, e);
     }
+    const char *campo = n->asignacion_campo.campo;
+
+    /* Campo estático: Clase.campo = valor */
+    if (obj && obj->tipo == VAL_CLASE) {
+        CampoClase *cd = buscar_campo(obj->clase, campo, 1);
+        Valor *err = NULL;
+        if (!cd)
+            err = error_rt("Error", n->linea,
+                "La clase '%s' no tiene el campo estático '%s'.", obj->clase->nombre, campo);
+        else if (!acceso_permitido(cd->vis, cd->duena, e))
+            err = error_rt("ErrorAcceso", n->linea,
+                "El campo estático '%s' de '%s' es %s: no se puede modificar desde aquí.",
+                campo, cd->duena->nombre, nombre_vis(cd->vis));
+        else if (cd->constante)
+            err = error_rt("ErrorTipo", n->linea,
+                "'%s.%s' es constante ('fijo'): no se puede modificar.", cd->duena->nombre, campo);
+        if (err) { valor_destruir(val); if (propio) valor_destruir(obj); return err; }
+        valor_destruir(cd->valor);
+        cd->valor = val;
+        if (propio) valor_destruir(obj);
+        return valor_nulo();
+    }
 
     if (!obj || obj->tipo != VAL_OBJETO) {
         valor_destruir(val);
-        if (obj && n->asignacion_campo.objeto->tipo != NODO_ESTO)
-            valor_destruir(obj);
+        if (obj && propio) valor_destruir(obj);
         return error_rt("ErrorTipo", n->linea, "Solo puedes asignar campos a objetos.");
     }
 
-    const char *campo = n->asignacion_campo.campo;
     /* Buscar si el campo ya existe */
     for (int i = 0; i < obj->objeto->num_campos; i++) {
         if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
+            CampoClase *cd = buscar_campo(obj->objeto->clase, campo, 0);
+            Valor *err = NULL;
+            if (cd && cd->vis != VIS_PUBLICO && !acceso_permitido(cd->vis, cd->duena, e))
+                err = error_rt("ErrorAcceso", n->linea,
+                    "El campo '%s' de '%s' es %s: no se puede modificar desde aquí.",
+                    campo, cd->duena->nombre, nombre_vis(cd->vis));
+            else if (cd && cd->constante && cd->inicial)
+                err = error_rt("ErrorTipo", n->linea,
+                    "El campo '%s' es constante ('fijo'): no se puede modificar.", campo);
+            if (err) { valor_destruir(val); if (propio) valor_destruir(obj); return err; }
             valor_destruir(obj->objeto->campos_valores[i]);
             obj->objeto->campos_valores[i] = val;
-            if (n->asignacion_campo.objeto->tipo != NODO_ESTO)
-                valor_destruir(obj);
+            if (propio) valor_destruir(obj);
             return valor_nulo();
         }
     }
+
+    /* Sin campo con ese nombre: ¿una propiedad 'fijar'? */
+    char pn[256];
+    snprintf(pn, sizeof(pn), "fijar %s", campo);
+    FuncionLince *st = buscar_metodo(obj->objeto->clase, pn);
+    if (st) {
+        Valor *err = NULL;
+        if (st->vis != VIS_PUBLICO && !acceso_permitido(st->vis, st->duena, e))
+            err = error_rt("ErrorAcceso", n->linea,
+                "La propiedad '%s' de '%s' es %s: no se puede modificar desde aquí.",
+                campo, st->duena->nombre, nombre_vis(st->vis));
+        if (err) { valor_destruir(val); if (propio) valor_destruir(obj); return err; }
+        Valor *args[1] = { val };
+        Valor *r = llamar_metodo(obj, obj->objeto->clase, st, args, 1, n->linea);
+        valor_destruir(r);
+        if (propio) valor_destruir(obj);
+        return valor_nulo();
+    }
+    snprintf(pn, sizeof(pn), "obtener %s", campo);
+    if (buscar_metodo(obj->objeto->clase, pn)) {
+        valor_destruir(val);
+        if (propio) valor_destruir(obj);
+        return error_rt("ErrorTipo", n->linea,
+            "La propiedad '%s' es de solo lectura (tiene 'obtener' pero no 'fijar').", campo);
+    }
+
     /* Campo nuevo */
-    int idx = obj->objeto->num_campos;
-    obj->objeto->campos_nombres[idx] = strdup(campo);
-    obj->objeto->campos_valores[idx] = val;
-    obj->objeto->num_campos++;
-    if (n->asignacion_campo.objeto->tipo != NODO_ESTO)
-        valor_destruir(obj);
+    if (!objeto_poner_campo(obj->objeto, campo, val)) {
+        valor_destruir(val);
+        if (propio) valor_destruir(obj);
+        return error_rt("Error", n->linea, "Un objeto no puede tener más de %d campos.", MAX_CAMPOS);
+    }
+    if (propio) valor_destruir(obj);
     return valor_nulo();
 }
 
@@ -2434,7 +2959,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
 
         case NODO_FUNCION: {
-            FuncionLince *f = malloc(sizeof(FuncionLince));
+            FuncionLince *f = calloc(1, sizeof(FuncionLince));
             f->nombre           = strdup(n->funcion.nombre);
             f->parametros       = n->funcion.parametros;
             f->num_parametros   = n->funcion.num_parametros;
@@ -2503,7 +3028,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_GENERADOR: {
             /* Registra el generador como función especial en el entorno */
-            FuncionLince *f = malloc(sizeof(FuncionLince));
+            FuncionLince *f = calloc(1, sizeof(FuncionLince));
             f->nombre           = strdup(n->generador.nombre);
             f->parametros       = n->generador.parametros;
             f->num_parametros   = n->generador.num_parametros;
@@ -2549,6 +3074,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             iface->num_metodos = n->interfaz.num_metodos;
             iface->metodos     = malloc(sizeof(char*) * n->interfaz.num_metodos);
             iface->tipos_retorno = malloc(sizeof(char*) * n->interfaz.num_metodos);
+            iface->funciones   = n->interfaz.funciones;
             for (int i = 0; i < n->interfaz.num_metodos; i++) {
                 iface->metodos[i]      = strdup(n->interfaz.metodos[i]);
                 iface->tipos_retorno[i] = strdup(n->interfaz.tipos_retorno[i]);
@@ -2597,7 +3123,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_LAMBDA: {
             /* Crea una función anónima y la retorna como valor */
-            FuncionLince *f = malloc(sizeof(FuncionLince));
+            FuncionLince *f = calloc(1, sizeof(FuncionLince));
             f->nombre           = strdup("<lambda>");
             f->parametros       = n->lambda.parametros;
             f->num_parametros   = n->lambda.num_parametros;
@@ -2945,7 +3471,7 @@ static void registrar_fn_nativa(Entorno *e, const char *nombre,
 }
 
 static void registrar_error_predefinido(Entorno *e, const char *nombre) {
-    ClaseLince *c = malloc(sizeof(ClaseLince));
+    ClaseLince *c = calloc(1, sizeof(ClaseLince));
     c->nombre      = strdup(nombre);
     c->num_metodos = 0;
     c->metodos     = NULL;
@@ -2964,6 +3490,7 @@ Interprete *interprete_crear(void) {
     registrar_error_predefinido(interp->global, "ErrorNulo");
     registrar_error_predefinido(interp->global, "ErrorMatematico");
     registrar_error_predefinido(interp->global, "ErrorArgumento");
+    registrar_error_predefinido(interp->global, "ErrorAcceso");
 
     /* Registrar funciones de conversión de tipos */
     registrar_fn_nativa(interp->global, "a_numero", fn_conv_numero, 1);

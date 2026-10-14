@@ -1,0 +1,93 @@
+# TEST: POO — visibilidad, estáticos, propiedades, operadores, a_texto
+clase Cuenta {
+    estatico sea total = 0
+    estatico fijo MAX = 1000
+    privado sea saldo = 0
+    sea titular = "anon"
+
+    funcion crear(val texto t, val numero s): nulo {
+        mi.titular = t
+        mi.saldo = s
+        Cuenta.total = Cuenta.total + 1
+    }
+    privado funcion secreto(): numero { devolver mi.saldo * 2 }
+    funcion doble(): numero { devolver mi.secreto() }
+    estatico funcion cuantas(): numero { devolver Cuenta.total }
+    estatico funcion nueva(val texto t): Cuenta { devolver Cuenta(t, 10) }
+    obtener dinero(): numero { devolver mi.saldo }
+    fijar dinero(val numero v): nulo {
+        si v < 0 { lanzar Error("negativo") }
+        mi.saldo = v
+    }
+    funcion a_texto(): texto { devolver "Cuenta(" + mi.titular + ")" }
+    funcion sumar(val Cuenta otra): numero { devolver mi.saldo + otra.dinero }
+    funcion igual(val Cuenta otra): logico { devolver mi.saldo == otra.dinero }
+    funcion menor(val Cuenta otra): logico { devolver mi.saldo < otra.dinero }
+}
+sea a = Cuenta("ana", 5)
+sea b = Cuenta.nueva("luis")
+escribir(Cuenta.cuantas())
+escribir(Cuenta.MAX)
+escribir(a.doble())
+escribir(a.dinero)
+a.dinero = 50
+escribir(a.dinero)
+escribir(a)
+escribir("hola " + a)
+escribir(a + b)
+escribir(a == b)
+escribir(a < b)
+escribir(a > b)
+escribir(a es Cuenta)
+escribir(a es numero)
+escribir(5 es numero)
+intentar { escribir(a.saldo) } capturar (ErrorAcceso e) { escribir("1 " + e.mensaje) }
+intentar { a.saldo = 3 } capturar (ErrorAcceso e) { escribir("2 " + e.mensaje) }
+intentar { a.secreto() } capturar (ErrorAcceso e) { escribir("3 " + e.mensaje) }
+intentar { Cuenta.MAX = 3 } capturar (ErrorTipo e) { escribir("4 " + e.mensaje) }
+intentar { a.dinero = -1 } capturar (Error e) { escribir("5 " + e.mensaje) }
+
+# Lo privado no se hereda en visibilidad: una subclase no lo ve
+clase Base {
+    privado sea clave = 7
+    protegido sea abierto = 8
+    privado funcion interno(): numero { devolver 1 }
+    funcion leer_clave(): numero { devolver mi.clave }
+}
+clase Hija extiende Base {
+    funcion probar_privado(): numero { devolver mi.clave }
+    funcion probar_protegido(): numero { devolver mi.abierto }
+    funcion probar_metodo(): numero { devolver mi.interno() }
+}
+sea h = Hija()
+escribir(h.leer_clave())
+escribir(h.probar_protegido())
+intentar { h.probar_privado() } capturar (ErrorAcceso e) { escribir("6 " + e.mensaje) }
+intentar { h.probar_metodo() } capturar (ErrorAcceso e) { escribir("7 " + e.mensaje) }
+
+# Una lambda guardada conserva la visibilidad de donde se escribió
+clase Guarda {
+    privado sea secreto = 42
+    funcion lector(): funcion {
+        sea yo = mi
+        devolver funcion(): numero { devolver yo.secreto }
+    }
+}
+sea lee = Guarda().lector()
+escribir(lee())
+
+# Estáticos heredados
+clase Contador {
+    estatico sea n = 0
+    estatico funcion subir(): numero { Contador.n = Contador.n + 1
+        devolver Contador.n }
+}
+clase SubContador extiende Contador { }
+escribir(SubContador.subir())
+escribir(Contador.subir())
+
+# es con tipos básicos y errores
+escribir("x" es texto)
+escribir([1] es lista)
+escribir(nulo es nulo)
+intentar { lanzar ErrorTipo("t") } capturar (ErrorTipo e) { escribir(e es ErrorTipo) }

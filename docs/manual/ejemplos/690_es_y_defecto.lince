@@ -1,0 +1,21 @@
+# @seccion: Clases
+# @titulo: Métodos por defecto y el operador `es`
+# @nota: Una interfaz puede dar el cuerpo de un método: las clases que la implementan lo reciben sin repetirlo. `x es Tipo` comprueba la clase, la interfaz o el tipo básico de un valor.
+interfaz Saludable {
+    funcion nombre(): texto
+    funcion saludar(): texto {
+        devolver "Hola, soy " + mi.nombre()
+    }
+}
+
+clase Persona implementa Saludable {
+    funcion nombre(): texto { devolver "Ana" }
+}
+clase Robot { }
+
+sea p = Persona()
+escribir(p.saludar())
+escribir(p es Saludable)
+escribir(Robot() es Saludable)
+escribir(p es Persona)
+escribir(5 es numero)

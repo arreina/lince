@@ -144,7 +144,7 @@
 <div class="grupo"><a href="#listas" class="sec">Listas</a><a href="#listas-0" class="sub">Crear, modificar y consultar</a><a href="#listas-1" class="sub">Operaciones que devuelven una lista nueva</a><a href="#listas-2" class="sub">Ordenar con tu propio criterio</a></div>
 <div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a></div>
 <div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a></div>
-<div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a></div>
+<div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
 <div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a></div>
@@ -153,7 +153,7 @@
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>34 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>39 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -398,7 +398,121 @@ Cuadrado de lado 5 → 25</pre></div><span class="fuente">630_interfaces.lince</
 <span class="k">escribir</span>(accion(Semaforo.Verde))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero
 parar
 precaución
-avanzar</pre></div><span class="fuente">640_enumeraciones.lince</span></article></section>
+avanzar</pre></div><span class="fuente">640_enumeraciones.lince</span></article><article class="ej" id="clases-4"><h3>Visibilidad: `privado` y `protegido`</h3><p class="nota">Lo `privado` sólo se ve desde dentro de la clase; lo `protegido`, también desde sus subclases. Saltárselo lanza un `ErrorAcceso`, que se captura como cualquier error.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Cuenta {
+    privado <span class="k">sea</span> saldo = <span class="n">0</span>
+
+    <span class="k">funcion</span> ingresar(<span class="k">val</span> <span class="t">numero</span> cantidad): <span class="k">nulo</span> {
+        <span class="k">mi</span>.saldo = <span class="k">mi</span>.saldo + cantidad
+    }
+    <span class="k">funcion</span> consultar(): <span class="t">numero</span> {
+        <span class="k">devolver</span> <span class="k">mi</span>.saldo
+    }
+}
+
+<span class="k">sea</span> c = Cuenta()
+c.ingresar(<span class="n">50</span>)
+<span class="k">escribir</span>(c.consultar())
+
+<span class="k">intentar</span> {
+    <span class="k">escribir</span>(c.saldo)
+} <span class="k">capturar</span> (ErrorAcceso e) {
+    <span class="k">escribir</span>(<span class="s">&quot;No se puede: &quot;</span> + e.mensaje)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>50
+No se puede: El campo &#x27;saldo&#x27; de &#x27;Cuenta&#x27; es privado: no se puede leer desde aquí.</pre></div><span class="fuente">650_visibilidad.lince</span></article><article class="ej" id="clases-5"><h3>Miembros estáticos</h3><p class="nota">`estatico` hace que un campo o método pertenezca a la clase y no a cada objeto. Se usan con el nombre de la clase. Un método estático no tiene `mi`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Pedido {
+    estatico <span class="k">sea</span> creados = <span class="n">0</span>
+    estatico <span class="k">fijo</span> IVA = <span class="n">21</span>
+
+    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> base): <span class="k">nulo</span> {
+        <span class="k">mi</span>.base = base
+        Pedido.creados = Pedido.creados + <span class="n">1</span>
+    }
+    estatico <span class="k">funcion</span> con_iva(<span class="k">val</span> <span class="t">numero</span> base): <span class="t">numero</span> {
+        <span class="k">devolver</span> base + base * Pedido.IVA / <span class="n">100</span>
+    }
+}
+
+Pedido(<span class="n">10</span>)
+Pedido(<span class="n">20</span>)
+<span class="k">escribir</span>(Pedido.creados)
+<span class="k">escribir</span>(Pedido.con_iva(<span class="n">100</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>2
+121</pre></div><span class="fuente">660_estaticos.lince</span></article><article class="ej" id="clases-6"><h3>Clases abstractas y `sobrescribe`</h3><p class="nota">Una clase `abstracta` no se instancia y puede exigir métodos `abstracto` a sus subclases. `sobrescribe` avisa si el padre no tiene ese método, en vez de crear uno nuevo por una errata.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>abstracta <span class="k">clase</span> Figura {
+    abstracto <span class="k">funcion</span> area(): <span class="t">numero</span>
+
+    <span class="k">funcion</span> describir(): <span class="t">texto</span> {
+        <span class="k">devolver</span> <span class="s">&quot;área &quot;</span> + <span class="k">mi</span>.area()
+    }
+}
+
+<span class="k">clase</span> Cuadrado <span class="k">extiende</span> Figura {
+    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> lado): <span class="k">nulo</span> {
+        <span class="k">mi</span>.lado = lado
+    }
+    sobrescribe <span class="k">funcion</span> area(): <span class="t">numero</span> {
+        <span class="k">devolver</span> <span class="k">mi</span>.lado * <span class="k">mi</span>.lado
+    }
+}
+
+<span class="k">escribir</span>(Cuadrado(<span class="n">3</span>).describir())
+
+<span class="k">intentar</span> {
+    Figura()
+} <span class="k">capturar</span> (ErrorTipo e) {
+    <span class="k">escribir</span>(e.mensaje)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>área 9
+&#x27;Figura&#x27; es una clase abstracta y no se puede instanciar.</pre></div><span class="fuente">670_abstractas.lince</span></article><article class="ej" id="clases-7"><h3>Propiedades, operadores y `a_texto`</h3><p class="nota">`obtener` y `fijar` se usan como un campo pero ejecutan código, así que pueden validar. Los métodos `sumar`, `igual`, `menor`... dan sentido a los operadores, y `a_texto` decide cómo se escribe el objeto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Vector {
+    privado <span class="k">sea</span> _x = <span class="n">0</span>
+    obtener x(): <span class="t">numero</span> { <span class="k">devolver</span> <span class="k">mi</span>._x }
+    fijar x(<span class="k">val</span> <span class="t">numero</span> v): <span class="k">nulo</span> {
+        <span class="k">si</span> v &lt; <span class="n">0</span> { <span class="k">lanzar</span> Error(<span class="s">&quot;x no puede ser negativa&quot;</span>) }
+        <span class="k">mi</span>._x = v
+    }
+    <span class="k">funcion</span> sumar(<span class="k">val</span> Vector b): Vector {
+        <span class="k">sea</span> r = Vector()
+        r.x = <span class="k">mi</span>.x + b.x
+        <span class="k">devolver</span> r
+    }
+    <span class="k">funcion</span> menor(<span class="k">val</span> Vector b): <span class="t">logico</span> { <span class="k">devolver</span> <span class="k">mi</span>.x &lt; b.x }
+    <span class="k">funcion</span> igual(<span class="k">val</span> Vector b): <span class="t">logico</span> { <span class="k">devolver</span> <span class="k">mi</span>.x == b.x }
+    <span class="k">funcion</span> a_texto(): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;Vector(&quot;</span> + <span class="k">mi</span>.x + <span class="s">&quot;)&quot;</span> }
+}
+
+<span class="k">sea</span> a = Vector()
+a.x = <span class="n">2</span>
+<span class="k">sea</span> b = Vector()
+b.x = <span class="n">5</span>
+<span class="k">escribir</span>(a + b)
+<span class="k">escribir</span>(a &lt; b)
+<span class="k">escribir</span>(a == b)
+
+<span class="k">intentar</span> {
+    a.x = -<span class="n">1</span>
+} <span class="k">capturar</span> (Error e) {
+    <span class="k">escribir</span>(e.mensaje)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Vector(7)
+verdadero
+falso
+x no puede ser negativa</pre></div><span class="fuente">680_propiedades.lince</span></article><article class="ej" id="clases-8"><h3>Métodos por defecto y el operador `es`</h3><p class="nota">Una interfaz puede dar el cuerpo de un método: las clases que la implementan lo reciben sin repetirlo. `x es Tipo` comprueba la clase, la interfaz o el tipo básico de un valor.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">interfaz</span> Saludable {
+    <span class="k">funcion</span> nombre(): <span class="t">texto</span>
+    <span class="k">funcion</span> saludar(): <span class="t">texto</span> {
+        <span class="k">devolver</span> <span class="s">&quot;Hola, soy &quot;</span> + <span class="k">mi</span>.nombre()
+    }
+}
+
+<span class="k">clase</span> Persona <span class="k">implementa</span> Saludable {
+    <span class="k">funcion</span> nombre(): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;Ana&quot;</span> }
+}
+<span class="k">clase</span> Robot { }
+
+<span class="k">sea</span> p = Persona()
+<span class="k">escribir</span>(p.saludar())
+<span class="k">escribir</span>(p es Saludable)
+<span class="k">escribir</span>(Robot() es Saludable)
+<span class="k">escribir</span>(p es Persona)
+<span class="k">escribir</span>(<span class="n">5</span> es <span class="t">numero</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Hola, soy Ana
+verdadero
+falso
+verdadero
+verdadero</pre></div><span class="fuente">690_es_y_defecto.lince</span></article></section>
 <section id="generadores"><h2>Generadores</h2><article class="ej" id="generadores-0"><h3>Producir valores de uno en uno</h3><p class="nota">`generador` en vez de `funcion`, y `producir` en vez de `devolver`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">generador</span> pares(<span class="k">val</span> <span class="t">numero</span> hasta): <span class="t">numero</span> {
     <span class="k">para</span> (i = <span class="n">0</span>; i &lt;= hasta; i++) {
         <span class="k">si</span> i % <span class="n">2</span> == <span class="n">0</span> { <span class="k">producir</span> i }

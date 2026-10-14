@@ -117,6 +117,8 @@ struct Nodo {
             int   constante;
             int   es_lista;        /* sea lista x = [...] */
             int   es_diccionario;  /* sea diccionario x = {...} */
+            int   vis;             /* campo de clase: 0 público, 1 privado, 2 protegido */
+            int   estatico;        /* campo de clase estático */
         } declaracion;
 
         /* NODO_ASIGNACION */
@@ -188,7 +190,13 @@ struct Nodo {
             int         num_parametros;
             TipoDato    tipo_retorno;
             char       *tipo_retorno_clase;
-            Nodo       *cuerpo;
+            Nodo       *cuerpo;       /* NULL en un método abstracto */
+            /* Modificadores de método (sólo dentro de una clase) */
+            int         vis;          /* 0 público, 1 privado, 2 protegido */
+            int         estatico;
+            int         abstracto;
+            int         sobrescribe;
+            int         prop;         /* 1 = obtener, 2 = fijar */
         } funcion;
 
         /* NODO_LLAMADA */
@@ -249,6 +257,9 @@ struct Nodo {
             int     num_interfaces;
             Nodo  **metodos;
             int     num_metodos;
+            int     abstracta;     /* 'abstracta clase X' */
+            Nodo  **campos;        /* NODO_DECLARACION de los campos declarados */
+            int     num_campos;
         } clase;
 
         /* NODO_INSTANCIA: Persona("Ana", 22) */
@@ -277,6 +288,7 @@ struct Nodo {
             char  **metodos;        /* nombres de métodos requeridos */
             char  **tipos_retorno;  /* tipo de retorno de cada método */
             int     num_metodos;
+            Nodo  **funciones;      /* método con cuerpo (por defecto) o NULL */
         } interfaz;
 
         /* NODO_INTENTAR */

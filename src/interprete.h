@@ -35,7 +35,15 @@ typedef struct {
     TipoDato    tipo_retorno;
     Nodo       *cuerpo;
     Entorno    *entorno_closure;
+    /* Sólo para métodos de clase */
+    int                 vis;        /* VIS_PUBLICO / VIS_PRIVADO / VIS_PROTEGIDO */
+    int                 estatico;
+    int                 abstracto;
+    int                 prop;       /* 1 = obtener, 2 = fijar */
+    struct ClaseLince  *duena;      /* clase que lo declara */
 } FuncionLince;
+
+enum { VIS_PUBLICO = 0, VIS_PRIVADO = 1, VIS_PROTEGIDO = 2 };
 
 /* Error de Lince */
 typedef struct {
@@ -50,7 +58,20 @@ typedef struct {
     char  **metodos;
     char  **tipos_retorno;
     int     num_metodos;
+    Nodo  **funciones;      /* método por defecto (con cuerpo) o NULL */
 } InterfazLince;
+
+/* Campo declarado en el cuerpo de una clase. Los no declarados (los que se
+   crean con 'mi.x = ...') siguen siendo públicos y dinámicos. */
+typedef struct {
+    char              *nombre;
+    int                vis;
+    int                estatico;
+    int                constante;
+    Nodo              *inicial;          /* expresión inicial, o NULL */
+    Valor             *valor;            /* valor del campo estático */
+    struct ClaseLince *duena;
+} CampoClase;
 
 typedef struct ClaseLince {
     char              *nombre;
@@ -59,6 +80,10 @@ typedef struct ClaseLince {
     struct ClaseLince *padre;          /* NULL si no extiende */
     InterfazLince    **interfaces;     /* interfaces que implementa */
     int                num_interfaces;
+    int                abstracta;
+    CampoClase        *campos;         /* campos declarados con 'sea' / 'fijo' */
+    int                num_campos;
+    Entorno           *entorno;        /* ámbito léxico de la clase (dueño de sus métodos) */
 } ClaseLince;
 
 /* Objeto (instancia de una clase) */
@@ -118,6 +143,7 @@ struct Entorno {
     int        cantidad;
     Entorno   *padre;
     int        refs;    /* conteo de referencias — para closures */
+    struct ClaseLince *dueno;   /* clase en cuyo cuerpo se escribió este código */
 };
 
 /* ─────────────────────────────────────────

@@ -438,10 +438,33 @@ static Nodo *suma(Parser *p) {
     return izq;
 }
 
+/* 'x es Tipo': ¿viene un 'es' seguido de un nombre de clase, interfaz o tipo? */
+static int viene_es(Parser *p) {
+    if (!(coincide(p, TOK_IDENTIFICADOR) && actual(p)->valor &&
+          strcmp(actual(p)->valor, "es") == 0)) return 0;
+    TipoToken t = ver_siguiente(p)->tipo;
+    return t == TOK_IDENTIFICADOR || t == TOK_TIPO_NUMERO || t == TOK_TIPO_TEXTO ||
+           t == TOK_TIPO_LOGICO || t == TOK_TIPO_LISTA || t == TOK_TIPO_DICCIONARIO ||
+           t == TOK_TIPO_NULO || t == TOK_NULO || t == TOK_LISTA || t == TOK_DICCIONARIO || t == TOK_FUNCION;
+}
+
 static Nodo *comparacion(Parser *p) {
     Nodo *izq = suma(p);
     while (coincide(p, TOK_MENOR) || coincide(p, TOK_MAYOR) ||
-           coincide(p, TOK_MENOR_IGUAL) || coincide(p, TOK_MAYOR_IGUAL)) {
+           coincide(p, TOK_MENOR_IGUAL) || coincide(p, TOK_MAYOR_IGUAL) ||
+           viene_es(p)) {
+        if (viene_es(p)) {
+            consumir_cualquiera(p);                       /* es */
+            Token *tipo = consumir_cualquiera(p);         /* Nombre */
+            Nodo *r = nodo_nuevo(NODO_IDENTIFICADOR, p);
+            r->identificador = strdup(tipo->valor);
+            Nodo *n = nodo_nuevo(NODO_BINARIO, p);
+            strcpy(n->binario.operador, "es");
+            n->binario.izquierda = izq;
+            n->binario.derecha   = r;
+            izq = n;
+            continue;
+        }
         Token *op = consumir_cualquiera(p);
         Nodo *n = nodo_nuevo(NODO_BINARIO, p);
         strncpy(n->binario.operador, op->valor, 3);
@@ -711,9 +734,9 @@ static TipoDato parsear_tipo(Parser *p, char **tipo_clase_out) {
     return TIPO_CUALQUIERA;
 }
 
-static Nodo *sent_funcion(Parser *p) {
-    consumir(p, TOK_FUNCION, "'funcion'");
-    Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de función");
+/* Desde el '(' de la lista de parámetros en adelante. 'sin_cuerpo_ok' admite
+   una firma sin '{' (método abstracto): cuerpo NULL. */
+static Nodo *funcion_desde_parametros(Parser *p, Token *nombre, int sin_cuerpo_ok) {
     consumir(p, TOK_PAREN_IZQ, "'('");
 
     Parametro *params    = malloc(sizeof(Parametro) * 64);
@@ -769,7 +792,7 @@ static Nodo *sent_funcion(Parser *p) {
     char *tipo_ret_clase = NULL;
     TipoDato tipo_retorno = parsear_tipo(p, &tipo_ret_clase);
 
-    Nodo *cuerpo = bloque(p);
+    Nodo *cuerpo = (sin_cuerpo_ok && !coincide(p, TOK_LLAVE_IZQ)) ? NULL : bloque(p);
 
     Nodo *n = nodo_nuevo(NODO_FUNCION, p);
     n->funcion.nombre             = strdup(nombre->valor);
@@ -781,7 +804,20 @@ static Nodo *sent_funcion(Parser *p) {
     return n;
 }
 
+static Nodo *sent_funcion(Parser *p) {
+    consumir(p, TOK_FUNCION, "'funcion'");
+    Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de función");
+    return funcion_desde_parametros(p, nombre, 0);
+}
+
+static int es_palabra(Parser *p, const char *w) {
+    return coincide(p, TOK_IDENTIFICADOR) && actual(p)->valor &&
+           strcmp(actual(p)->valor, w) == 0;
+}
+
 static Nodo *sent_clase(Parser *p) {
+    int abstracta = 0;
+    if (es_palabra(p, "abstracta")) { consumir_cualquiera(p); abstracta = 1; }
     consumir(p, TOK_CLASE, "'clase'");
     Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de clase");
 
@@ -811,17 +847,89 @@ static Nodo *sent_clase(Parser *p) {
 
     Nodo **metodos    = malloc(sizeof(Nodo*) * 64);
     int    num_metodos = 0;
+    Nodo **campos     = malloc(sizeof(Nodo*) * 64);
+    int    num_campos  = 0;
 
     while (!coincide(p, TOK_LLAVE_DER) && !coincide(p, TOK_EOF)) {
-        if (!coincide(p, TOK_FUNCION)) {
+        /* Modificadores: publico/privado/protegido, estatico, abstracto,
+           sobrescribe. Son palabras contextuales: fuera de una clase siguen
+           siendo identificadores corrientes. */
+        int vis = 0, estatico = 0, abstracto = 0, sobrescribe = 0;
+        int linea_mod = actual(p)->linea;
+        while (1) {
+            if      (es_palabra(p, "publico"))   { vis = 0; }
+            else if (es_palabra(p, "privado"))   { vis = 1; }
+            else if (es_palabra(p, "protegido")) { vis = 2; }
+            else if (es_palabra(p, "estatico"))  { estatico = 1; }
+            else if (es_palabra(p, "abstracto")) { abstracto = 1; }
+            else if (es_palabra(p, "sobrescribe")) { sobrescribe = 1; }
+            else break;
+            consumir_cualquiera(p);
+        }
+
+        if (coincide(p, TOK_FUNCION) ||
+            ((es_palabra(p, "obtener") || es_palabra(p, "fijar")) &&
+             ver_siguiente(p)->tipo == TOK_IDENTIFICADOR)) {
+            int prop = 0;
+            if (!coincide(p, TOK_FUNCION)) {
+                prop = es_palabra(p, "obtener") ? 1 : 2;
+                consumir_cualquiera(p);
+            } else {
+                consumir(p, TOK_FUNCION, "'funcion'");
+            }
+            Token *mn = consumir(p, TOK_IDENTIFICADOR, "nombre del método");
+            Nodo *m = funcion_desde_parametros(p, mn, abstracto);
+            if (abstracto && m->funcion.cuerpo) {
+                fprintf(stderr, "\n❌ Error en línea %d:\n"
+                    "   El método abstracto '%s' no puede tener cuerpo.\n\n", mn->linea, mn->valor);
+                exit(1);
+            }
+            if (!abstracto && !m->funcion.cuerpo) {
+                fprintf(stderr, "\n❌ Error en línea %d:\n"
+                    "   El método '%s' no tiene cuerpo. ¿Querías marcarlo 'abstracto'?\n\n",
+                    mn->linea, mn->valor);
+                exit(1);
+            }
+            m->funcion.vis = vis; m->funcion.estatico = estatico;
+            m->funcion.abstracto = abstracto; m->funcion.sobrescribe = sobrescribe;
+            m->funcion.prop = prop;
+            if (prop) {
+                /* Se guarda como método 'obtener edad' / 'fijar edad' */
+                char buf[256];
+                snprintf(buf, sizeof(buf), "%s %s", prop == 1 ? "obtener" : "fijar", mn->valor);
+                free(m->funcion.nombre);
+                m->funcion.nombre = strdup(buf);
+            }
+            metodos[num_metodos++] = m;
+        } else if (coincide(p, TOK_SEA) || coincide(p, TOK_FIJO)) {
+            int constante = coincide(p, TOK_FIJO);
+            consumir_cualquiera(p);
+            int es_lista = 0, es_dic = 0;
+            if (coincide(p, TOK_LISTA)) { es_lista = 1; consumir_cualquiera(p); }
+            else if (coincide(p, TOK_DICCIONARIO)) { es_dic = 1; consumir_cualquiera(p); }
+            Token *cn = consumir(p, TOK_IDENTIFICADOR, "nombre del campo");
+            Nodo *valor = NULL;
+            if (coincide(p, TOK_IGUAL)) { consumir(p, TOK_IGUAL, "'='"); valor = expresion(p); }
+            Nodo *c = nodo_nuevo(NODO_DECLARACION, p);
+            c->linea = cn->linea;
+            c->declaracion.nombre = strdup(cn->valor);
+            c->declaracion.valor = valor;
+            c->declaracion.constante = constante;
+            c->declaracion.es_lista = es_lista;
+            c->declaracion.es_diccionario = es_dic;
+            c->declaracion.vis = vis;
+            c->declaracion.estatico = estatico;
+            campos[num_campos++] = c;
+        } else {
+            (void)linea_mod;
             fprintf(stderr,
                 "\n❌ Error en línea %d:\n"
-                "   Dentro de una clase solo puede haber funciones.\n"
+                "   Dentro de una clase solo puede haber métodos ('funcion'), campos\n"
+                "   ('sea' / 'fijo') y propiedades ('obtener' / 'fijar').\n"
                 "   Encontré '%s' en su lugar.\n\n",
                 actual(p)->linea, actual(p)->valor ? actual(p)->valor : "?");
             exit(1);
         }
-        metodos[num_metodos++] = sent_funcion(p);
     }
     consumir(p, TOK_LLAVE_DER, "'}'");
 
@@ -832,6 +940,9 @@ static Nodo *sent_clase(Parser *p) {
     n->clase.num_interfaces = num_interfaces;
     n->clase.metodos        = metodos;
     n->clase.num_metodos    = num_metodos;
+    n->clase.abstracta      = abstracta;
+    n->clase.campos         = campos;
+    n->clase.num_campos     = num_campos;
     return n;
 }
 
@@ -917,12 +1028,15 @@ static Nodo *sent_interfaz(Parser *p) {
 
     char  **metodos      = malloc(sizeof(char*)  * 64);
     char  **tipos_ret    = malloc(sizeof(char*)  * 64);
+    Nodo  **funciones    = calloc(64, sizeof(Nodo*));
     int     num_metodos  = 0;
 
     while (!coincide(p, TOK_LLAVE_DER) && !coincide(p, TOK_EOF)) {
-        /* Solo firmas: funcion nombre(params): tipo */
+        /* Firmas: funcion nombre(params): tipo — o, con cuerpo, un método
+           por defecto que las clases reciben si no tienen uno propio. */
         consumir(p, TOK_FUNCION, "'funcion'");
         Token *nom_met = consumir(p, TOK_IDENTIFICADOR, "nombre del método");
+        int pos_parens = p->pos;
         consumir(p, TOK_PAREN_IZQ, "'('");
         /* Ignorar parámetros — solo importa la firma */
         int prof = 1;
@@ -942,6 +1056,11 @@ static Nodo *sent_interfaz(Parser *p) {
         }
         metodos[num_metodos]   = strdup(nom_met->valor);
         tipos_ret[num_metodos] = tipo_ret_str;
+        if (coincide(p, TOK_LLAVE_IZQ)) {
+            /* Tiene cuerpo: se vuelve al '(' y se parsea como una función */
+            p->pos = pos_parens;
+            funciones[num_metodos] = funcion_desde_parametros(p, nom_met, 0);
+        }
         num_metodos++;
     }
     consumir(p, TOK_LLAVE_DER, "'}'");
@@ -951,6 +1070,7 @@ static Nodo *sent_interfaz(Parser *p) {
     n->interfaz.metodos      = metodos;
     n->interfaz.tipos_retorno = tipos_ret;
     n->interfaz.num_metodos  = num_metodos;
+    n->interfaz.funciones    = funciones;
     return n;
 }
 
@@ -1086,6 +1206,7 @@ static Nodo *sentencia(Parser *p) {
     if (coincide(p, TOK_FUNCION))  return sent_funcion(p);
     if (coincide(p, TOK_DEVOLVER)) return sent_devolver(p);
     if (coincide(p, TOK_CLASE))    return sent_clase(p);
+    if (es_palabra(p, "abstracta") && ver_siguiente(p)->tipo == TOK_CLASE) return sent_clase(p);
     if (coincide(p, TOK_ELEGIR)) {
         consumir(p, TOK_ELEGIR, "'elegir'");
         Nodo *sujeto = expresion(p);

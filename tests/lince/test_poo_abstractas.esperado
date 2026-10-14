@@ -1,0 +1,12 @@
+cuadrado 16
+12
+verdadero
+a 'Figura' es una clase abstracta y no se puede instanciar.
+b El campo 'nombre' de 'Figura' es protegido: no se puede leer desde aquí.
+c La clase 'Mal' no es abstracta pero no implementa 'area', abstracto en 'Figura'.
+d 'Mal2.nada' dice 'sobrescribe', pero ninguna clase padre tiene un método 'nada'.
+verdadero
+e El constructor de 'Unico' es privado: no se puede instanciar desde aquí.
+hola ana
+verdadero
+falso

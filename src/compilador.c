@@ -758,6 +758,13 @@ static void compilar_expr(Compilador *c, Nodo *n) {
             break;
 
         case NODO_BINARIO:
+            if (strcmp(n->binario.operador, "es") == 0) {
+                fprintf(stderr, "\n❌ Error en línea %d: el operador 'es' todavía no se puede "
+                    "compilar a binario nativo. Usa el intérprete.\n\n", n->linea);
+                c->err_count++;
+                fprintf(c->salida, "lince_bool(0)");
+                break;
+            }
             compilar_binario(c, n);
             break;
 
@@ -2904,7 +2911,43 @@ int compilador_expandir_imports(Nodo *ast, const char *ruta_fuente) {
     return expandir(ast, ruta_fuente, &vistos);
 }
 
+/* Las clases con visibilidad, estáticos, abstractos, propiedades o campos
+   declarados, y las interfaces con métodos por defecto, sólo las entiende el
+   intérprete: compilarlas en silencio daría un binario que no respeta lo que
+   el programa declara (un campo 'privado' sería público). */
+static int usa_poo_avanzada(Nodo *ast) {
+    for (int i = 0; ast && i < ast->bloque.cantidad; i++) {
+        Nodo *n = ast->bloque.sentencias[i];
+        if (!n) continue;
+        const char *que = NULL;
+        if (n->tipo == NODO_CLASE) {
+            if (n->clase.abstracta)       que = "clase abstracta";
+            else if (n->clase.num_campos) que = "campos declarados en la clase";
+            for (int j = 0; !que && j < n->clase.num_metodos; j++) {
+                Nodo *m = n->clase.metodos[j];
+                if (m->funcion.vis)         que = "métodos privados o protegidos";
+                else if (m->funcion.estatico)   que = "métodos estáticos";
+                else if (m->funcion.abstracto)  que = "métodos abstractos";
+                else if (m->funcion.sobrescribe) que = "'sobrescribe'";
+                else if (m->funcion.prop)       que = "propiedades (obtener / fijar)";
+            }
+        } else if (n->tipo == NODO_INTERFAZ) {
+            for (int j = 0; j < n->interfaz.num_metodos; j++)
+                if (n->interfaz.funciones && n->interfaz.funciones[j])
+                    que = "métodos por defecto en interfaces";
+        }
+        if (que) {
+            fprintf(stderr,
+                "\n❌ Error en línea %d: %s todavía no se pueden compilar a binario "
+                "nativo.\n   Usa el intérprete, o quítalo del programa.\n\n", n->linea, que);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int compilador_compilar(Nodo *ast, const char *ruta_c, const char *ruta_bin) {
+    if (usa_poo_avanzada(ast)) return 1;
     FILE *f = fopen(ruta_c, "w");
     if (!f) {
         fprintf(stderr, "\n❌ No se pudo crear '%s'\n\n", ruta_c);

@@ -50,7 +50,7 @@
 
     "palabras_clave_declaracion": {
       "name": "keyword.declaration.lince",
-      "match": "\\b(sea|fijo|funcion|clase|extiende|mi|padre|importar|val|ref)\\b"
+      "match": "\\b(sea|fijo|funcion|clase|extiende|mi|padre|importar|val|ref|abstracta|abstracto|estatico|privado|protegido|publico|sobrescribe|obtener|fijar|es)\\b"
     },
 
     "palabras_clave_tipos": {

@@ -1,0 +1,23 @@
+# @seccion: Clases
+# @titulo: Visibilidad: `privado` y `protegido`
+# @nota: Lo `privado` sólo se ve desde dentro de la clase; lo `protegido`, también desde sus subclases. Saltárselo lanza un `ErrorAcceso`, que se captura como cualquier error.
+clase Cuenta {
+    privado sea saldo = 0
+
+    funcion ingresar(val numero cantidad): nulo {
+        mi.saldo = mi.saldo + cantidad
+    }
+    funcion consultar(): numero {
+        devolver mi.saldo
+    }
+}
+
+sea c = Cuenta()
+c.ingresar(50)
+escribir(c.consultar())
+
+intentar {
+    escribir(c.saldo)
+} capturar (ErrorAcceso e) {
+    escribir("No se puede: " + e.mensaje)
+}

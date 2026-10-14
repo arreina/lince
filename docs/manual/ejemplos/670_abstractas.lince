@@ -1,0 +1,27 @@
+# @seccion: Clases
+# @titulo: Clases abstractas y `sobrescribe`
+# @nota: Una clase `abstracta` no se instancia y puede exigir métodos `abstracto` a sus subclases. `sobrescribe` avisa si el padre no tiene ese método, en vez de crear uno nuevo por una errata.
+abstracta clase Figura {
+    abstracto funcion area(): numero
+
+    funcion describir(): texto {
+        devolver "área " + mi.area()
+    }
+}
+
+clase Cuadrado extiende Figura {
+    funcion crear(val numero lado): nulo {
+        mi.lado = lado
+    }
+    sobrescribe funcion area(): numero {
+        devolver mi.lado * mi.lado
+    }
+}
+
+escribir(Cuadrado(3).describir())
+
+intentar {
+    Figura()
+} capturar (ErrorTipo e) {
+    escribir(e.mensaje)
+}

@@ -1,0 +1,50 @@
+# TEST: POO — clases abstractas, sobrescribe, constructor privado, interfaces con métodos por defecto
+abstracta clase Figura {
+    protegido sea nombre = "figura"
+    abstracto funcion area(): numero
+    funcion describir(): texto { devolver mi.nombre + " " + mi.area() }
+}
+clase Cuadrado extiende Figura {
+    privado sea lado = 0
+    funcion crear(val numero l): nulo { mi.lado = l
+        mi.nombre = "cuadrado" }
+    sobrescribe funcion area(): numero { devolver mi.lado * mi.lado }
+    funcion con_lambda(): numero {
+        sea f = funcion(val numero k): numero { devolver mi.lado * k }
+        devolver f(3)
+    }
+}
+sea c = Cuadrado(4)
+escribir(c.describir())
+escribir(c.con_lambda())
+escribir(c es Figura)
+intentar { Figura() } capturar (ErrorTipo e) { escribir("a " + e.mensaje) }
+intentar { escribir(c.nombre) } capturar (ErrorAcceso e) { escribir("b " + e.mensaje) }
+intentar {
+    clase Mal extiende Figura { funcion crear(): nulo { mi.x = 1 } }
+} capturar (Error e) { escribir("c " + e.mensaje) }
+intentar {
+    clase Mal2 extiende Figura { sobrescribe funcion nada(): nulo { } }
+} capturar (Error e) { escribir("d " + e.mensaje) }
+
+clase Unico {
+    estatico sea inst = nulo
+    privado funcion crear(): nulo { mi.n = 1 }
+    estatico funcion obtener(): Unico {
+        si Unico.inst == nulo { Unico.inst = Unico() }
+        devolver Unico.inst
+    }
+}
+escribir(Unico.obtener() == Unico.obtener())
+intentar { Unico() } capturar (ErrorAcceso e) { escribir("e " + e.mensaje) }
+
+interfaz Saludable {
+    funcion nombre(): texto
+    funcion saludar(): texto { devolver "hola " + mi.nombre() }
+}
+clase Persona implementa Saludable {
+    funcion nombre(): texto { devolver "ana" }
+}
+escribir(Persona().saludar())
+escribir(Persona() es Saludable)
+escribir(c es Saludable)

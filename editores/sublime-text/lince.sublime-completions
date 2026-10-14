@@ -26,7 +26,7 @@
     { "trigger": "importar\tImportar módulo", "contents": "importar \"${1:matematica}\"" },
     { "trigger": "esc\tEscribir", "contents": "escribir(${1:\"mensaje\"})" },
 
-    "sea", "fijo", "funcion", "clase", "extiende", "mi", "padre", "importar",
+    "sea", "fijo", "funcion", "clase", "extiende", "mi", "padre", "importar", "abstracta", "abstracto", "estatico", "privado", "protegido", "publico", "sobrescribe", "obtener", "fijar", "es",
     "si", "sino", "para", "cada", "en", "mientras", "hacer", "devolver",
     "intentar", "capturar", "finalmente", "lanzar",
     "val", "ref", "numero", "texto", "logico", "lista", "diccionario", "nulo",

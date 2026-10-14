@@ -14,7 +14,7 @@
 
       <!-- Declaraciones -->
       <Keywords name="Keywords2">
-        sea fijo funcion clase extiende mi padre importar val ref
+        sea fijo funcion clase extiende mi padre importar val ref abstracta abstracto estatico privado protegido publico sobrescribe obtener fijar es
       </Keywords>
 
       <!-- Tipos de dato -->

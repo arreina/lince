@@ -1,0 +1,33 @@
+# @seccion: Clases
+# @titulo: Propiedades, operadores y `a_texto`
+# @nota: `obtener` y `fijar` se usan como un campo pero ejecutan código, así que pueden validar. Los métodos `sumar`, `igual`, `menor`... dan sentido a los operadores, y `a_texto` decide cómo se escribe el objeto.
+clase Vector {
+    privado sea _x = 0
+    obtener x(): numero { devolver mi._x }
+    fijar x(val numero v): nulo {
+        si v < 0 { lanzar Error("x no puede ser negativa") }
+        mi._x = v
+    }
+    funcion sumar(val Vector b): Vector {
+        sea r = Vector()
+        r.x = mi.x + b.x
+        devolver r
+    }
+    funcion menor(val Vector b): logico { devolver mi.x < b.x }
+    funcion igual(val Vector b): logico { devolver mi.x == b.x }
+    funcion a_texto(): texto { devolver "Vector(" + mi.x + ")" }
+}
+
+sea a = Vector()
+a.x = 2
+sea b = Vector()
+b.x = 5
+escribir(a + b)
+escribir(a < b)
+escribir(a == b)
+
+intentar {
+    a.x = -1
+} capturar (Error e) {
+    escribir(e.mensaje)
+}
