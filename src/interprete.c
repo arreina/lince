@@ -1149,6 +1149,1151 @@ static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, 
     return vobj;
 }
 
+static Valor *exec_declaracion(Nodo *n, Entorno *e) {
+    Valor *v = ejecutar(n->declaracion.valor, e);
+    /* Comprobar el tipo anunciado en 'sea lista x' / 'sea
+       diccionario x'. Se hace aquí y no en el parser porque sólo
+       en ejecución se conoce el tipo de verdad: antes se exigía
+       un literal, así que 'sea lista l = datos.ordenar()' —o
+       cualquier llamada— se rechazaba sin motivo. */
+    if (!hay_error && n->declaracion.es_lista && v->tipo != VAL_LISTA) {
+        char msg[256];
+        snprintf(msg, sizeof(msg),
+            "Declaraste '%s' como lista pero el valor no es una lista.",
+            n->declaracion.nombre);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+        hay_error = 1;
+        valor_destruir(v);
+        return valor_nulo();
+    }
+    if (!hay_error && n->declaracion.es_diccionario && v->tipo != VAL_DICCIONARIO) {
+        char msg[256];
+        snprintf(msg, sizeof(msg),
+            "Declaraste '%s' como diccionario pero el valor no es un diccionario.",
+            n->declaracion.nombre);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+        hay_error = 1;
+        valor_destruir(v);
+        return valor_nulo();
+    }
+    if (redefinido(e, n->declaracion.nombre,
+                   n->declaracion.constante ? "'fijo'" : "'sea'",
+                   1, n->linea)) {
+        valor_destruir(v);
+        return valor_nulo();
+    }
+    entorno_definir(e, n->declaracion.nombre, v, n->declaracion.constante);
+    return valor_nulo();
+}
+
+static Valor *exec_si(Nodo *n, Entorno *e) {
+    Valor *cond = ejecutar(n->si.condicion, e);
+    int    ok   = es_verdadero(cond);
+    valor_destruir(cond);
+
+    if (ok) {
+        Entorno *nuevo = entorno_crear(e);
+        Valor   *r     = ejecutar(n->si.entonces, nuevo);
+        entorno_destruir(nuevo);
+        return r;
+    }
+    for (int i = 0; i < n->si.cantidad_sino_si; i++) {
+        Valor *c = ejecutar(n->si.condiciones_sino_si[i], e);
+        int    b = es_verdadero(c);
+        valor_destruir(c);
+        if (b) {
+            Entorno *nuevo = entorno_crear(e);
+            Valor   *r     = ejecutar(n->si.bloques_sino_si[i], nuevo);
+            entorno_destruir(nuevo);
+            return r;
+        }
+    }
+    if (n->si.sino) {
+        Entorno *nuevo = entorno_crear(e);
+        Valor   *r     = ejecutar(n->si.sino, nuevo);
+        entorno_destruir(nuevo);
+        return r;
+    }
+    return valor_nulo();
+}
+
+static Valor *exec_para(Nodo *n, Entorno *e) {
+    Entorno *bucle = entorno_crear(e);
+    Valor   *vinicio = ejecutar(n->para.val_inicio, bucle);
+    entorno_definir(bucle, n->para.var_inicio, vinicio, 0);
+
+    while (!hay_retorno && !hay_error) {
+        Valor *cond = ejecutar(n->para.condicion, bucle);
+        int    ok   = es_verdadero(cond);
+        valor_destruir(cond);
+        if (!ok) break;
+
+        Entorno *cuerpo_e = entorno_crear(bucle);
+        Valor   *r = ejecutar(n->para.cuerpo, cuerpo_e);
+        valor_destruir(r);
+        entorno_destruir(cuerpo_e);
+
+        Valor *vactual = entorno_obtener(bucle, n->para.var_incremento, n->linea);
+        if (hay_error) { valor_destruir(vactual); break; }
+        Valor *vnuevo;
+        if (strcmp(n->para.op_incremento, "++") == 0)
+            vnuevo = valor_numero(vactual->numero + 1);
+        else
+            vnuevo = valor_numero(vactual->numero - 1);
+        valor_destruir(vactual);
+        entorno_asignar(bucle, n->para.var_incremento, vnuevo, n->linea);
+    }
+    entorno_destruir(bucle);
+    return valor_nulo();
+}
+
+static Valor *exec_para_cada(Nodo *n, Entorno *e) {
+    Valor *col = ejecutar(n->para_cada.coleccion, e);
+
+    /* ── Lista o Generador ── */
+    if (col->tipo == VAL_LISTA || col->tipo == VAL_GENERADOR) {
+        int cant = (col->tipo == VAL_LISTA)
+            ? col->lista.cantidad
+            : col->generador.cantidad;
+        for (int i = 0; i < cant && !hay_retorno && !hay_error; i++) {
+            Valor *elem = valor_copiar(
+                col->tipo == VAL_LISTA
+                    ? col->lista.elementos[i]
+                    : col->generador.elementos[i]);
+            validar_tipo(elem, n->para_cada.tipo,
+                         "variable del bucle", n->para_cada.variable, n->linea);
+            Entorno *iter = entorno_crear(e);
+            entorno_definir(iter, n->para_cada.variable, elem, 0);
+            Valor *r = ejecutar(n->para_cada.cuerpo, iter);
+            valor_destruir(r);
+            entorno_destruir(iter);
+        }
+        valor_destruir(col);
+        return valor_nulo();
+    }
+
+    /* ── Diccionario — itera sobre claves ── */
+    if (col->tipo == VAL_DICCIONARIO) {
+        for (int i = 0; i < col->diccionario.cantidad && !hay_retorno && !hay_error; i++) {
+            Valor *clave = valor_texto(col->diccionario.claves[i]);
+
+            validar_tipo(clave, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
+
+            Entorno *iter = entorno_crear(e);
+            entorno_definir(iter, n->para_cada.variable, clave, 0);
+            Valor *r = ejecutar(n->para_cada.cuerpo, iter);
+            valor_destruir(r);
+            entorno_destruir(iter);
+        }
+        valor_destruir(col);
+        return valor_nulo();
+    }
+
+    /* ── Texto — itera carácter a carácter ── */
+    if (col->tipo == VAL_TEXTO) {
+        /* Recorre caracteres, no bytes: en "camión" el bucle da
+           seis vueltas y una de ellas vale "ó". */
+        for (int i = 0; col->texto[i] && !hay_retorno && !hay_error; ) {
+            int tam = utf8_tam(col->texto + i);
+            char tmp[5] = {0};
+            for (int k = 0; k < tam && k < 4; k++) tmp[k] = col->texto[i + k];
+            i += tam;
+            Valor *c = valor_texto(tmp);
+
+            validar_tipo(c, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
+
+            Entorno *iter = entorno_crear(e);
+            entorno_definir(iter, n->para_cada.variable, c, 0);
+            Valor *r = ejecutar(n->para_cada.cuerpo, iter);
+            valor_destruir(r);
+            entorno_destruir(iter);
+        }
+        valor_destruir(col);
+        return valor_nulo();
+    }
+
+    valor_destruir(col);
+    return error_rt("ErrorTipo", n->linea,
+        "'para cada' solo funciona con listas, diccionarios o texto.");
+}
+
+static Valor *exec_llamada(Nodo *n, Entorno *e) {
+    if (++profundidad > MAX_PROFUNDIDAD) {
+        profundidad = 0;
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+            "Demasiadas llamadas anidadas — ¿hay una recursión infinita en '%s'?",
+            n->llamada.nombre);
+        valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
+        hay_error   = 1;
+        return valor_nulo();
+    }
+    Valor *vfun = entorno_obtener(e, n->llamada.nombre, n->linea);
+
+    /* Si el nombre no existe, entorno_obtener ya ha puesto el error:
+       se propaga tal cual en vez de añadir un "no es una función"
+       encima, que sería la consecuencia y no la causa. */
+    if (hay_error) {
+        valor_destruir(vfun);
+        profundidad--;
+        return valor_nulo();
+    }
+    if (vfun->tipo != VAL_FUNCION) {
+        /* Error capturable, no exit(1): matar el proceso por esto
+           impedía que un intentar/capturar se recuperase, y el pilar
+           del lenguaje es que los errores se cuenten, no que aborten. */
+        char msg[256];
+        snprintf(msg, sizeof(msg),
+            "'%s' no es una función, así que no se puede llamar.",
+            n->llamada.nombre);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+        hay_error   = 1;
+        valor_destruir(vfun);
+        profundidad--;
+        return valor_nulo();
+    }
+    FuncionLince *f = vfun->funcion;
+
+    /* ¿Es un generador? */
+    if (vfun->es_modulo == 99) {
+        /* Ejecutar el cuerpo acumulando valores producidos */
+        int args_dados   = n->llamada.num_argumentos;
+        int params_total = f->num_parametros;
+        int params_req   = 0;
+        for (int i = 0; i < params_total; i++)
+            if (!f->parametros[i].valor_defecto) params_req++;
+
+        if (args_dados < params_req || args_dados > params_total) {
+            Valor *err = error_rt("ErrorArgumento", n->linea,
+                "El generador '%s' espera entre %d y %d argumento(s).",
+                f->nombre, params_req, params_total);
+            valor_destruir(vfun);
+            profundidad--;
+            return err;
+        }
+
+        Entorno *fn_e = entorno_crear(f->entorno_closure);
+        for (int i = 0; i < params_total; i++) {
+            Valor *arg = (i < args_dados)
+                ? ejecutar(n->llamada.argumentos[i], e)
+                : ejecutar(f->parametros[i].valor_defecto, e);
+            entorno_definir(fn_e, f->parametros[i].nombre, arg, 0);
+        }
+
+        /* Crear la lista acumuladora */
+        Valor *gen = valor_generador_crear();
+        Valor *gen_anterior = generador_actual;
+        generador_actual    = gen;
+
+        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+
+        generador_actual = gen_anterior;
+        /* Un 'devolver' dentro de un generador no le llega a nadie,
+           pero el valor está creado: hay que soltarlo. */
+        if (hay_retorno) valor_destruir(valor_retorno);
+        hay_retorno      = 0;
+        valor_retorno    = NULL;
+        hay_producir     = 0;
+        entorno_destruir(fn_e);
+        valor_destruir(vfun);
+        profundidad--;
+        return gen;
+    }
+
+    /* ¿Es una función nativa? (entorno_closure == NULL) */
+    if (f->entorno_closure == NULL) {
+        typedef Valor *(*FnNativa)(Valor**, int);
+        FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
+        int nargs = n->llamada.num_argumentos;
+        Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
+        for (int i = 0; i < nargs; i++)
+            args[i] = ejecutar(n->llamada.argumentos[i], e);
+        Valor *resultado = fn(args, nargs);
+        for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
+        free(args);
+        valor_destruir(vfun);
+        profundidad--;
+        return resultado ? resultado : valor_nulo();
+    }
+
+    /* Contar parámetros requeridos (sin valor por defecto) */
+    int args_dados   = n->llamada.num_argumentos;
+    int params_total = f->num_parametros;
+    int params_req   = 0;
+    for (int i = 0; i < params_total; i++)
+        if (!f->parametros[i].valor_defecto) params_req++;
+
+    if (args_dados < params_req || args_dados > params_total) {
+        Valor *err = error_rt("ErrorArgumento", n->linea,
+            "La función '%s' espera entre %d y %d argumento(s) pero recibió %d.",
+            f->nombre, params_req, params_total, args_dados);
+        valor_destruir(vfun);
+        profundidad--;
+        return err;
+    }
+
+    Entorno *fn_e = entorno_crear(f->entorno_closure);
+    for (int i = 0; i < params_total; i++) {
+        Parametro *param = &f->parametros[i];
+        Valor *arg;
+
+        if (i < args_dados) {
+            if (param->por_ref) {
+                arg = ejecutar(n->llamada.argumentos[i], e);
+            } else {
+                Valor *tmp = ejecutar(n->llamada.argumentos[i], e);
+                if (tmp->tipo == VAL_NUMERO || tmp->tipo == VAL_TEXTO ||
+                    tmp->tipo == VAL_BOOLEANO || tmp->tipo == VAL_NULO) {
+                    arg = valor_copiar(tmp);
+                    valor_destruir(tmp);
+                } else {
+                    arg = tmp;
+                }
+            }
+        } else {
+            /* Usar valor por defecto */
+            arg = ejecutar(param->valor_defecto, e);
+        }
+
+        validar_tipo(arg, param->tipo, "parámetro", param->nombre, n->linea);
+        entorno_definir(fn_e, param->nombre, arg, 0);
+    }
+
+    /* El valor del cuerpo no es el retorno de la función (eso va por
+       valor_retorno): es el de su última sentencia, y lo posee quien
+       llama — NODO_BLOQUE ya libera así todos los anteriores. Sin
+       este destruir se fugaban 40 bytes por llamada, que en un bucle
+       de juego son 40 por función y por frame. */
+    valor_destruir(ejecutar(f->cuerpo, fn_e));
+    entorno_destruir(fn_e);
+
+    Valor *retorno = tomar_retorno();
+
+    if (!hay_error)
+        validar_tipo(retorno, f->tipo_retorno, "retorno de función", f->nombre, n->linea);
+
+    valor_destruir(vfun);
+    profundidad--;
+    return retorno;
+}
+
+static Valor *exec_indice(Nodo *n, Entorno *e) {
+    Valor *obj = ejecutar(n->acceso_indice.objeto, e);
+    Valor *idx = ejecutar(n->acceso_indice.indice, e);
+
+    if (obj->tipo == VAL_LISTA) {
+        if (idx->tipo != VAL_NUMERO) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "El índice de una lista debe ser un número.");
+            valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+            hay_error = 1;
+            valor_destruir(obj); valor_destruir(idx);
+            return valor_nulo();
+        }
+        int i = (int)idx->numero;
+        if (i < 0) i = obj->lista.cantidad + i;
+        if (i < 0 || i >= obj->lista.cantidad) {
+            char msg[128];
+            snprintf(msg, sizeof(msg),
+                "Índice %d fuera de rango. La lista tiene %d elementos.",
+                i, obj->lista.cantidad);
+            valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
+            hay_error = 1;
+            valor_destruir(obj); valor_destruir(idx);
+            return valor_nulo();
+        }
+        Valor *res = valor_copiar(obj->lista.elementos[i]);
+        valor_destruir(obj); valor_destruir(idx);
+        return res;
+    }
+    if (obj->tipo == VAL_DICCIONARIO) {
+        if (idx->tipo != VAL_TEXTO) {
+            valor_error = valor_error_nuevo("ErrorTipo",
+                "La clave de un diccionario debe ser texto.", n->linea);
+            hay_error = 1;
+            valor_destruir(obj); valor_destruir(idx);
+            return valor_nulo();
+        }
+        for (int i = 0; i < obj->diccionario.cantidad; i++) {
+            if (strcmp(obj->diccionario.claves[i], idx->texto) == 0) {
+                Valor *res = valor_copiar(obj->diccionario.valores[i]);
+                valor_destruir(obj); valor_destruir(idx);
+                return res;
+            }
+        }
+        char msg[256];
+        snprintf(msg, sizeof(msg),
+            "La clave \"%s\" no existe en el diccionario.", idx->texto);
+        valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
+        hay_error = 1;
+        valor_destruir(obj); valor_destruir(idx);
+        return valor_nulo();
+    }
+    if (obj->tipo == VAL_TEXTO) {
+        if (idx->tipo != VAL_NUMERO) {
+            valor_error = valor_error_nuevo("ErrorTipo",
+                "El índice de un texto debe ser un número.", n->linea);
+            hay_error = 1;
+            valor_destruir(obj); valor_destruir(idx);
+            return valor_nulo();
+        }
+        int i = (int)idx->numero;
+        int len = utf8_longitud(obj->texto);
+        if (i < 0) i = len + i;
+        if (i < 0 || i >= len) {
+            char msg[128];
+            snprintf(msg, sizeof(msg),
+                "Índice %d fuera de rango. El texto tiene %d caracteres.", i, len);
+            valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
+            hay_error = 1;
+            valor_destruir(obj); valor_destruir(idx);
+            return valor_nulo();
+        }
+        /* El carácter puede ocupar varios bytes, así que se copia
+           entero en vez de quedarse con el primero. */
+        int off = utf8_desplazamiento(obj->texto, i);
+        int tam = utf8_tam(obj->texto + off);
+        char tmp[5] = {0};
+        for (int k = 0; k < tam && k < 4; k++) tmp[k] = obj->texto[off + k];
+        Valor *res = valor_texto(tmp);
+        valor_destruir(obj); valor_destruir(idx);
+        return res;
+    }
+    valor_error = valor_error_nuevo("ErrorTipo",
+        "Solo puedes usar [] en listas, diccionarios o texto.", n->linea);
+    hay_error = 1;
+    valor_destruir(obj); valor_destruir(idx);
+    return valor_nulo();
+}
+
+static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
+    Valor *obj = ejecutar(n->asignacion_indice.objeto, e);
+    Valor *idx = ejecutar(n->asignacion_indice.indice, e);
+    Valor *val = ejecutar(n->asignacion_indice.valor,  e);
+
+    if (obj->tipo == VAL_LISTA) {
+        int i = (int)idx->numero;
+        if (i < 0) i = obj->lista.cantidad + i;
+        if (i < 0 || i >= obj->lista.cantidad) {
+            int cant = obj->lista.cantidad;
+            double pedido = idx->numero;
+            valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+            return error_rt("ErrorRango", n->linea,
+                "Índice %.0f fuera de rango. La lista tiene %d elementos.", pedido, cant);
+        }
+        valor_destruir(obj->lista.elementos[i]);
+        obj->lista.elementos[i] = val;
+        /* Reflejar en el entorno */
+        if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR) {
+            entorno_asignar(e, n->asignacion_indice.objeto->identificador, obj, n->linea);
+        }
+        valor_destruir(idx);
+        return valor_nulo();
+    }
+    if (obj->tipo == VAL_DICCIONARIO) {
+        if (idx->tipo != VAL_TEXTO) {
+            valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+            return error_rt("ErrorTipo", n->linea, "La clave de un diccionario debe ser texto.");
+        }
+        for (int i = 0; i < obj->diccionario.cantidad; i++) {
+            if (strcmp(obj->diccionario.claves[i], idx->texto) == 0) {
+                valor_destruir(obj->diccionario.valores[i]);
+                obj->diccionario.valores[i] = val;
+                if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR)
+                    entorno_asignar(e, n->asignacion_indice.objeto->identificador, obj, n->linea);
+                valor_destruir(idx);
+                return valor_nulo();
+            }
+        }
+        /* Clave nueva */
+        valor_diccionario_asegurar(obj, obj->diccionario.cantidad + 1);
+        int i = obj->diccionario.cantidad;
+        obj->diccionario.claves[i]  = strdup(idx->texto);
+        obj->diccionario.valores[i] = val;
+        obj->diccionario.cantidad++;
+        if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR)
+            entorno_asignar(e, n->asignacion_indice.objeto->identificador, obj, n->linea);
+        valor_destruir(idx);
+        return valor_nulo();
+    }
+    valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+    return error_rt("ErrorTipo", n->linea,
+        "Solo puedes asignar por índice en listas o diccionarios.");
+}
+
+static Valor *exec_metodo(Nodo *n, Entorno *e) {
+    Valor *obj = ejecutar(n->metodo.objeto, e);
+    const char *met = n->metodo.metodo;
+
+    /* ── Módulo (diccionario con funciones nativas) ── */
+    if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
+        const char *met = n->metodo.metodo;
+        for (int i = 0; i < obj->diccionario.cantidad; i++) {
+            if (strcmp(obj->diccionario.claves[i], met) == 0) {
+                Valor *vf = obj->diccionario.valores[i];
+                if (vf->tipo == VAL_CLASE) {
+                    Valor *cls = valor_retener(vf);
+                    valor_destruir(obj);
+                    return instanciar_clase(cls, n->metodo.argumentos,
+                                            n->metodo.num_argumentos, e, n->linea);
+                }
+                if (vf->tipo != VAL_FUNCION) {
+                    valor_destruir(obj);
+                    return error_rt("ErrorTipo", n->linea,
+                        "'%s' no es una función del módulo.", met);
+                }
+                FuncionLince *f = vf->funcion;
+
+                int nargs = n->metodo.num_argumentos;
+                Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
+                for (int j = 0; j < nargs; j++)
+                    args[j] = ejecutar(n->metodo.argumentos[j], e);
+
+                Valor *resultado;
+                if (f->entorno_closure == NULL) {
+                    /* Nativa: 'cuerpo' guarda el puntero a la función C */
+                    typedef Valor *(*FnNativa)(Valor**, int);
+                    FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
+                    resultado = fn(args, nargs);
+                    for (int j = 0; j < nargs; j++)
+                        valor_destruir(args[j]);
+                } else {
+                    /* Función Lince. Hasta ahora todos los módulos eran
+                       nativos y esto casteaba 'cuerpo' a puntero de
+                       función sin mirar; con 'importar ... como' hay
+                       módulos cuyas funciones son cierres de verdad, y
+                       ese cast ejecutaba el AST como código — segfault
+                       limpio. interprete_llamar_funcion se queda con
+                       los argumentos y valida aridad y tipos. */
+                    resultado = interprete_llamar_funcion(vf, args, nargs);
+                }
+                free(args);
+                valor_destruir(obj);
+                return resultado ? resultado : valor_nulo();
+            }
+        }
+        valor_destruir(obj);
+        return error_rt("Error", n->linea, "El módulo no tiene la función '%s'.", met);
+    }
+
+    /* ── Métodos de OBJETO ── */
+    if (obj->tipo == VAL_OBJETO) {
+        ClaseLince   *cls       = obj->objeto->clase;
+        const char   *met_nombre = n->metodo.metodo;
+        FuncionLince *f          = buscar_metodo(cls, met_nombre);
+
+        if (!f) {
+            Valor *err = error_rt("Error", n->linea,
+                "La clase '%s' no tiene el método '%s'.", cls->nombre, met_nombre);
+            valor_destruir(obj);
+            return err;
+        }
+
+        if (n->metodo.num_argumentos != f->num_parametros) {
+            Valor *err = error_rt("ErrorArgumento", n->linea,
+                "El método '%s' espera %d argumento(s), recibió %d.",
+                met_nombre, f->num_parametros, n->metodo.num_argumentos);
+            valor_destruir(obj);
+            return err;
+        }
+
+        if (++profundidad > MAX_PROFUNDIDAD) {
+            profundidad = 0;
+            char msg[128];
+            snprintf(msg, sizeof(msg),
+                "Demasiadas llamadas anidadas en método '%s'.", met_nombre);
+            valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
+            hay_error   = 1;
+            valor_destruir(obj);
+            return valor_nulo();
+        }
+        Entorno *fn_e = entorno_crear(f->entorno_closure);
+        for (int j = 0; j < f->num_parametros; j++) {
+            Valor *arg = ejecutar(n->metodo.argumentos[j], e);
+            validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, n->linea);
+            entorno_definir(fn_e, f->parametros[j].nombre, arg, 0);
+        }
+        Valor *esto_anterior   = esto_actual;
+        ClaseLince *cls_ant    = clase_actual;
+        esto_actual  = obj;
+        clase_actual = cls;
+        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+        Valor *retorno = tomar_retorno();
+        esto_actual  = esto_anterior;
+        clase_actual = cls_ant;
+        entorno_destruir(fn_e);
+        valor_destruir(obj);
+        profundidad--;
+        return retorno;
+    }
+
+    /* ── Métodos de LISTA ── */
+    if (obj->tipo == VAL_LISTA) {
+        if (strcmp(met, "longitud") == 0) {
+            int len = obj->lista.cantidad;
+            valor_destruir(obj);
+            return valor_numero(len);
+        }
+        if (strcmp(met, "agregar") == 0) {
+            if (n->metodo.num_argumentos != 1) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea, "'agregar' necesita exactamente 1 argumento.");
+            }
+            Valor *elem = ejecutar(n->metodo.argumentos[0], e);
+            lista_agregar(obj, elem);
+            if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
+                entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
+            else valor_destruir(obj);
+            return valor_nulo();
+        }
+        if (strcmp(met, "eliminar") == 0) {
+            if (n->metodo.num_argumentos != 1) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea,
+                    "'eliminar' necesita exactamente 1 argumento (índice).");
+            }
+            Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
+            int idx = (int)vidx->numero;
+            valor_destruir(vidx);
+            if (idx < 0 || idx >= obj->lista.cantidad) {
+                int cant = obj->lista.cantidad;
+                valor_destruir(obj);
+                return error_rt("ErrorRango", n->linea,
+                    "Índice %d fuera de rango. La lista tiene %d elementos.", idx, cant);
+            }
+            valor_destruir(obj->lista.elementos[idx]);
+            for (int i = idx; i < obj->lista.cantidad - 1; i++)
+                obj->lista.elementos[i] = obj->lista.elementos[i+1];
+            obj->lista.cantidad--;
+            if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
+                entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
+            else valor_destruir(obj);
+            return valor_nulo();
+        }
+        if (strcmp(met, "contiene") == 0) {
+            if (n->metodo.num_argumentos != 1) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
+            }
+            Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
+            int encontrado = 0;
+            for (int i = 0; i < obj->lista.cantidad; i++) {
+                Valor *el = obj->lista.elementos[i];
+                if (el->tipo == VAL_NUMERO && buscado->tipo == VAL_NUMERO && el->numero == buscado->numero) { encontrado = 1; break; }
+                if (el->tipo == VAL_TEXTO  && buscado->tipo == VAL_TEXTO  && strcmp(el->texto, buscado->texto) == 0) { encontrado = 1; break; }
+            }
+            valor_destruir(buscado); valor_destruir(obj);
+            return valor_booleano(encontrado);
+        }
+        if (strcmp(met, "ordenar") == 0) {
+            /* Devuelve una lista nueva: la original no se toca.
+               Sin argumentos usa el orden natural; con una
+               función, la usa como comparador (negativo si el
+               primero va antes, positivo si va después). */
+            CtxOrden ctx = { NULL };
+            Valor *vfn = NULL;
+            if (n->metodo.num_argumentos >= 1) {
+                vfn = ejecutar(n->metodo.argumentos[0], e);
+                if (vfn->tipo != VAL_FUNCION) {
+                    valor_destruir(vfn); valor_destruir(obj);
+                    hay_error = 1;
+                    valor_error = valor_error_nuevo("ErrorTipo",
+                        "'ordenar' espera una función comparadora.", n->linea);
+                    return valor_nulo();
+                }
+                ctx.fn = vfn;
+            }
+            int len = obj->lista.cantidad;
+            Valor *res = valor_lista_crear();
+            for (int i = 0; i < len; i++)
+                lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+            if (len > 1) {
+                Valor **tmp = malloc(sizeof(Valor*) * len);
+                orden_merge(res->lista.elementos, tmp, 0, len, &ctx);
+                free(tmp);
+            }
+            if (vfn) valor_destruir(vfn);
+            valor_destruir(obj);
+            return res;
+        }
+        if (strcmp(met, "invertir") == 0) {
+            /* Lista nueva, del final al principio. */
+            Valor *res = valor_lista_crear();
+            for (int i = obj->lista.cantidad - 1; i >= 0; i--)
+                lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+            valor_destruir(obj);
+            return res;
+        }
+        if (strcmp(met, "copiar") == 0) {
+            /* Copia superficial: útil para no modificar la
+               original, porque las listas se pasan compartidas. */
+            Valor *res = valor_lista_crear();
+            for (int i = 0; i < obj->lista.cantidad; i++)
+                lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
+            valor_destruir(obj);
+            return res;
+        }
+        if (strcmp(met, "posicion") == 0) {
+            if (n->metodo.num_argumentos != 1) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea, "'posicion' necesita exactamente 1 argumento.");
+            }
+            Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
+            int donde = -1;
+            for (int i = 0; i < obj->lista.cantidad; i++) {
+                if (valor_comparar_natural(obj->lista.elementos[i], buscado) == 0) {
+                    donde = i; break;
+                }
+            }
+            valor_destruir(buscado); valor_destruir(obj);
+            return valor_numero(donde);
+        }
+        if (strcmp(met, "insertar") == 0) {
+            if (n->metodo.num_argumentos != 2) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea,
+                    "'insertar' necesita 2 argumentos (índice y valor).");
+            }
+            Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
+            Valor *elem = ejecutar(n->metodo.argumentos[1], e);
+            int idx = (int)vidx->numero;
+            valor_destruir(vidx);
+            /* Insertar al final es válido, de ahí el <=. */
+            if (idx < 0 || idx > obj->lista.cantidad) {
+                valor_destruir(elem); valor_destruir(obj);
+                hay_error = 1;
+                valor_error = valor_error_nuevo("ErrorRango",
+                    "Índice fuera de rango en 'insertar'.", n->linea);
+                return valor_nulo();
+            }
+            /* Se añade al final para que crezca y luego se corre
+               todo un hueco a la derecha. */
+            lista_agregar(obj, elem);
+            for (int i = obj->lista.cantidad - 1; i > idx; i--)
+                obj->lista.elementos[i] = obj->lista.elementos[i-1];
+            obj->lista.elementos[idx] = elem;
+            if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
+                entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
+            else valor_destruir(obj);
+            return valor_nulo();
+        }
+        valor_destruir(obj);
+        return error_rt("Error", n->linea, "Las listas no tienen el método '%s'.", met);
+    }
+
+    /* ── Métodos de TEXTO ── */
+    if (obj->tipo == VAL_TEXTO) {
+        if (strcmp(met, "longitud") == 0) {
+            /* Caracteres, no bytes: "niño" mide 4. */
+            int len = utf8_longitud(obj->texto);
+            valor_destruir(obj);
+            return valor_numero(len);
+        }
+        if (strcmp(met, "mayusculas") == 0) {
+            char *s = utf8_mayusculas(obj->texto);
+            Valor *r = valor_texto(s); free(s); valor_destruir(obj);
+            return r;
+        }
+        if (strcmp(met, "minusculas") == 0) {
+            char *s = utf8_minusculas(obj->texto);
+            Valor *r = valor_texto(s); free(s); valor_destruir(obj);
+            return r;
+        }
+        if (strcmp(met, "contiene") == 0) {
+            if (n->metodo.num_argumentos != 1) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
+            }
+            Valor *sub = ejecutar(n->metodo.argumentos[0], e);
+            int ok = strstr(obj->texto, sub->texto) != NULL;
+            valor_destruir(sub); valor_destruir(obj);
+            return valor_booleano(ok);
+        }
+        if (strcmp(met, "reemplazar") == 0) {
+            if (n->metodo.num_argumentos != 2) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea,
+                    "'reemplazar' necesita 2 argumentos: buscar y reemplazo.");
+            }
+            Valor *buscar = ejecutar(n->metodo.argumentos[0], e);
+            Valor *repla  = ejecutar(n->metodo.argumentos[1], e);
+            char *src = obj->texto, *pat = buscar->texto, *rep = repla->texto;
+            char resultado[4096] = "";
+            char *pos;
+            while ((pos = strstr(src, pat)) != NULL) {
+                strncat(resultado, src, pos - src);
+                strcat(resultado, rep);
+                src = pos + strlen(pat);
+            }
+            strcat(resultado, src);
+            Valor *r = valor_texto(resultado);
+            valor_destruir(buscar); valor_destruir(repla); valor_destruir(obj);
+            return r;
+        }
+        if (strcmp(met, "recortar") == 0) {
+            char *s = strdup(obj->texto);
+            int i = 0, j = strlen(s) - 1;
+            while (s[i] == ' ' || s[i] == '\t') i++;
+            while (j > i && (s[j] == ' ' || s[j] == '\t')) j--;
+            s[j+1] = '\0';
+            Valor *r = valor_texto(s + i); free(s); valor_destruir(obj);
+            return r;
+        }
+        valor_destruir(obj);
+        return error_rt("Error", n->linea, "El texto no tiene el método '%s'.", met);
+    }
+
+    /* ── Métodos de DICCIONARIO ── */
+    if (obj->tipo == VAL_DICCIONARIO) {
+        if (strcmp(met, "contiene") == 0) {
+            if (n->metodo.num_argumentos != 1) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
+            }
+            Valor *clave = ejecutar(n->metodo.argumentos[0], e);
+            int ok = 0;
+            for (int i = 0; i < obj->diccionario.cantidad; i++)
+                if (strcmp(obj->diccionario.claves[i], clave->texto) == 0) { ok = 1; break; }
+            valor_destruir(clave); valor_destruir(obj);
+            return valor_booleano(ok);
+        }
+        if (strcmp(met, "longitud") == 0) {
+            int len = obj->diccionario.cantidad;
+            valor_destruir(obj);
+            return valor_numero(len);
+        }
+        if (strcmp(met, "eliminar") == 0) {
+            if (n->metodo.num_argumentos != 1) {
+                valor_destruir(obj);
+                return error_rt("ErrorArgumento", n->linea,
+                    "'eliminar' necesita exactamente 1 argumento (clave).");
+            }
+            Valor *clave = ejecutar(n->metodo.argumentos[0], e);
+            for (int i = 0; i < obj->diccionario.cantidad; i++) {
+                if (strcmp(obj->diccionario.claves[i], clave->texto) == 0) {
+                    free(obj->diccionario.claves[i]);
+                    valor_destruir(obj->diccionario.valores[i]);
+                    for (int j = i; j < obj->diccionario.cantidad - 1; j++) {
+                        obj->diccionario.claves[j]  = obj->diccionario.claves[j+1];
+                        obj->diccionario.valores[j] = obj->diccionario.valores[j+1];
+                    }
+                    obj->diccionario.cantidad--;
+                    break;
+                }
+            }
+            if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
+                entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
+            valor_destruir(clave);
+            return valor_nulo();
+        }
+        valor_destruir(obj);
+        return error_rt("Error", n->linea, "Los diccionarios no tienen el método '%s'.", met);
+    }
+
+    valor_destruir(obj);
+    return error_rt("Error", n->linea, "El tipo actual no tiene el método '%s'.", met);
+}
+
+static Valor *exec_elegir(Nodo *n, Entorno *e) {
+    Valor *sujeto = ejecutar(n->elegir.sujeto, e);
+    int    encontrado = 0;
+
+    for (int i = 0; i < n->elegir.num_casos && !hay_error && !hay_retorno; i++) {
+        Valor *caso_val = ejecutar(n->elegir.valores[i], e);
+
+        /* Comparación por igualdad */
+        int iguales = 0;
+        if (sujeto->tipo == VAL_NUMERO && caso_val->tipo == VAL_NUMERO)
+            iguales = (sujeto->numero == caso_val->numero);
+        else if (sujeto->tipo == VAL_TEXTO && caso_val->tipo == VAL_TEXTO)
+            iguales = (strcmp(sujeto->texto, caso_val->texto) == 0);
+        else if (sujeto->tipo == VAL_BOOLEANO && caso_val->tipo == VAL_BOOLEANO)
+            iguales = (sujeto->booleano == caso_val->booleano);
+        else if (sujeto->tipo == VAL_NULO && caso_val->tipo == VAL_NULO)
+            iguales = 1;
+
+        valor_destruir(caso_val);
+
+        if (iguales) {
+            encontrado = 1;
+            Entorno *caso_e = entorno_crear(e);
+            Valor   *r      = ejecutar(n->elegir.cuerpos[i], caso_e);
+            valor_destruir(r);
+            entorno_destruir(caso_e);
+            break;
+        }
+    }
+
+    /* Si no coincidió ningún caso, ejecutar otro */
+    if (!encontrado && n->elegir.otro && !hay_error && !hay_retorno) {
+        Entorno *otro_e = entorno_crear(e);
+        Valor   *r      = ejecutar(n->elegir.otro, otro_e);
+        valor_destruir(r);
+        entorno_destruir(otro_e);
+    }
+
+    valor_destruir(sujeto);
+    return valor_nulo();
+}
+
+static Valor *exec_padre(Nodo *n, Entorno *e) {
+    if (!esto_actual || !clase_actual) {
+        return error_rt("Error", n->linea,
+            "'padre()' solo se puede usar dentro del método 'crear' de una clase.");
+    }
+    ClaseLince *cls_padre = clase_actual->padre;
+    if (!cls_padre) {
+        return error_rt("Error", n->linea,
+            "Esta clase no extiende ninguna otra — no hay 'padre' al que llamar.");
+    }
+    FuncionLince *f = buscar_metodo(cls_padre, "crear");
+    if (!f) return valor_nulo(); /* padre sin crear — ok */
+
+    if (n->padre.num_argumentos != f->num_parametros) {
+        return error_rt("ErrorArgumento", n->linea,
+            "'padre()' espera %d argumento(s), recibió %d.",
+            f->num_parametros, n->padre.num_argumentos);
+    }
+
+    Entorno *fn_e = entorno_crear(f->entorno_closure);
+    for (int i = 0; i < f->num_parametros; i++) {
+        Valor *arg = ejecutar(n->padre.argumentos[i], e);
+        validar_tipo(arg, f->parametros[i].tipo, "parámetro", f->parametros[i].nombre, n->linea);
+        entorno_definir(fn_e, f->parametros[i].nombre, arg, 0);
+    }
+
+    ClaseLince *cls_ant = clase_actual;
+    clase_actual = cls_padre;
+    valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+    clase_actual  = cls_ant;
+    if (hay_retorno) valor_destruir(valor_retorno);
+    hay_retorno   = 0;
+    valor_retorno = NULL;
+    entorno_destruir(fn_e);
+    return valor_nulo();
+}
+
+static Valor *exec_intentar(Nodo *n, Entorno *e) {
+    /* Ejecutar el bloque intentar */
+    Entorno *e_try = entorno_crear(e);
+    valor_destruir(ejecutar(n->intentar.cuerpo, e_try));   /* ver la nota de NODO_LLAMADA */
+    entorno_destruir(e_try);
+
+    if (hay_error) {
+        Valor *err = valor_error;
+        hay_error   = 0;
+        valor_error = NULL;
+
+        int capturado = 0;
+        for (int i = 0; i < n->intentar.num_capturas && !capturado; i++) {
+            const char *tipo_cap = n->intentar.tipos_captura[i];
+
+            /* "error" captura cualquier tipo */
+            int coincide_tipo = (strcmp(tipo_cap, "error") == 0) ||
+                                (err->tipo == VAL_ERROR &&
+                                 strcmp(err->error->tipo, tipo_cap) == 0);
+
+            if (coincide_tipo) {
+                /* Crear entorno con la variable del error */
+                Entorno *e_cap = entorno_crear(e);
+
+                /* Exponer el error como objeto con campos */
+                ObjetoLince *obj = calloc(1, sizeof(ObjetoLince));
+                obj->clase      = NULL;
+                obj->num_campos = 3;
+                obj->campos_nombres[0] = strdup("mensaje");
+                obj->campos_valores[0] = valor_texto(err->error->mensaje);
+                obj->campos_nombres[1] = strdup("tipo");
+                obj->campos_valores[1] = valor_texto(err->error->tipo);
+                obj->campos_nombres[2] = strdup("linea");
+                obj->campos_valores[2] = valor_numero(err->error->linea);
+
+                entorno_definir(e_cap, n->intentar.vars_captura[i],
+                                valor_objeto(obj), 0);
+
+                valor_destruir(ejecutar(n->intentar.cuerpos_captura[i], e_cap));   /* ver la nota de NODO_LLAMADA */
+                entorno_destruir(e_cap);
+                capturado = 1;
+            }
+        }
+
+        if (!capturado) {
+            /* Ningún capturar coincidió — propagar */
+            hay_error   = 1;
+            valor_error = err;
+        } else {
+            valor_destruir(err);
+        }
+    }
+
+    /* finalmente — siempre se ejecuta */
+    if (n->intentar.finalmente) {
+        int error_guardado   = hay_error;
+        Valor *err_guardado  = valor_error;
+        int retorno_guardado = hay_retorno;
+        Valor *ret_guardado  = valor_retorno;
+
+        hay_error   = 0;
+        valor_error = NULL;
+
+        Entorno *e_fin = entorno_crear(e);
+        valor_destruir(ejecutar(n->intentar.finalmente, e_fin));   /* ver la nota de NODO_LLAMADA */
+        entorno_destruir(e_fin);
+
+        /* Restaurar señales. Si el propio 'finalmente' ha puesto un
+           error o ha hecho 'devolver', gana lo suyo — pero entonces lo
+           que veníamos guardando hay que soltarlo, que si no se pierde
+           con su tipo y su mensaje. */
+        if (!hay_error) {
+            hay_error   = error_guardado;
+            valor_error = err_guardado;
+        } else {
+            valor_destruir(err_guardado);
+        }
+        if (!hay_retorno) {
+            hay_retorno   = retorno_guardado;
+            valor_retorno = ret_guardado;
+        } else {
+            valor_destruir(ret_guardado);
+        }
+    }
+
+    return valor_nulo();
+}
+
+static Valor *exec_acceso(Nodo *n, Entorno *e) {
+    Valor *obj = ejecutar(n->acceso.objeto, e);
+    /* Acceso a constante de módulo */
+    if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
+        const char *campo = n->acceso.campo;
+        for (int i = 0; i < obj->diccionario.cantidad; i++) {
+            if (strcmp(obj->diccionario.claves[i], campo) == 0) {
+                Valor *r = valor_copiar(obj->diccionario.valores[i]);
+                valor_destruir(obj);
+                return r;
+            }
+        }
+        valor_destruir(obj);
+        return error_rt("Error", n->linea, "El módulo no tiene el campo '%s'.", campo);
+    }
+    if (obj->tipo == VAL_OBJETO) {
+        const char *campo = n->acceso.campo;
+        for (int i = 0; i < obj->objeto->num_campos; i++) {
+            if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
+                Valor *r = valor_copiar(obj->objeto->campos_valores[i]);
+                valor_destruir(obj);
+                return r;
+            }
+        }
+        valor_destruir(obj);
+        return error_rt("Error", n->linea, "El objeto no tiene el campo '%s'.", campo);
+    }
+    valor_destruir(obj);
+    return error_rt("ErrorTipo", n->linea, "Acceso a campo en un tipo que no es objeto.");
+}
+
+static Valor *exec_clase(Nodo *n, Entorno *e) {
+    ClaseLince *c = malloc(sizeof(ClaseLince));
+    c->nombre         = strdup(n->clase.nombre);
+    c->num_metodos    = n->clase.num_metodos;
+    c->metodos        = malloc(sizeof(FuncionLince*) * c->num_metodos);
+    c->padre          = NULL;
+    c->interfaces     = malloc(sizeof(InterfazLince*) * 16);
+    c->num_interfaces = 0;
+
+    /* Resolver clase padre */
+    if (n->clase.padre) {
+        Valor *vpadre = entorno_obtener(e, n->clase.padre, n->linea);
+        if (vpadre->tipo != VAL_CLASE) {
+            valor_destruir(vpadre);
+            return error_rt("ErrorTipo", n->linea,
+                "'%s' no es una clase — no se puede extender.", n->clase.padre);
+        }
+        c->padre = vpadre->clase;
+        valor_destruir(vpadre);
+    }
+
+    /* Registrar métodos */
+    for (int i = 0; i < c->num_metodos; i++) {
+        Nodo *mn = n->clase.metodos[i];
+        FuncionLince *f = malloc(sizeof(FuncionLince));
+        f->nombre           = strdup(mn->funcion.nombre);
+        f->parametros       = mn->funcion.parametros;
+        f->num_parametros   = mn->funcion.num_parametros;
+        f->tipo_retorno     = mn->funcion.tipo_retorno;
+        f->cuerpo           = mn->funcion.cuerpo;
+        f->entorno_closure  = e;
+        c->metodos[i] = f;
+    }
+
+    /* Verificar interfaces */
+    for (int i = 0; i < n->clase.num_interfaces; i++) {
+        Valor *viface = entorno_obtener(e, n->clase.interfaces[i], n->linea);
+        if (!viface || viface->tipo != VAL_DICCIONARIO || viface->es_modulo != 2) {
+            valor_destruir(viface);
+            return error_rt("ErrorTipo", n->linea,
+                "'%s' no es una interfaz.", n->clase.interfaces[i]);
+        }
+        InterfazLince *iface = (InterfazLince*)(uintptr_t)
+            (long long)viface->diccionario.valores[0]->numero;
+        c->interfaces[c->num_interfaces++] = iface;
+
+        for (int j = 0; j < iface->num_metodos; j++) {
+            if (!buscar_metodo(c, iface->metodos[j])) {
+                Valor *err = error_rt("Error", n->linea,
+                    "La clase '%s' dice implementar '%s' pero le falta el método '%s'.",
+                    c->nombre, iface->nombre, iface->metodos[j]);
+                valor_destruir(viface);
+                return err;
+            }
+        }
+        valor_destruir(viface);
+    }
+
+    if (redefinido(e, c->nombre, "esta clase", 0, n->linea))
+        return valor_nulo();
+    entorno_definir(e, c->nombre, valor_clase(c), 0);
+    return valor_nulo();
+}
+
+static Valor *exec_asignacion_campo(Nodo *n, Entorno *e) {
+    Valor *val = ejecutar(n->asignacion_campo.valor, e);
+    Valor *obj;
+
+    if (n->asignacion_campo.objeto->tipo == NODO_ESTO) {
+        obj = esto_actual;
+    } else {
+        obj = ejecutar(n->asignacion_campo.objeto, e);
+    }
+
+    if (!obj || obj->tipo != VAL_OBJETO) {
+        valor_destruir(val);
+        if (obj && n->asignacion_campo.objeto->tipo != NODO_ESTO)
+            valor_destruir(obj);
+        return error_rt("ErrorTipo", n->linea, "Solo puedes asignar campos a objetos.");
+    }
+
+    const char *campo = n->asignacion_campo.campo;
+    /* Buscar si el campo ya existe */
+    for (int i = 0; i < obj->objeto->num_campos; i++) {
+        if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
+            valor_destruir(obj->objeto->campos_valores[i]);
+            obj->objeto->campos_valores[i] = val;
+            if (n->asignacion_campo.objeto->tipo != NODO_ESTO)
+                valor_destruir(obj);
+            return valor_nulo();
+        }
+    }
+    /* Campo nuevo */
+    int idx = obj->objeto->num_campos;
+    obj->objeto->campos_nombres[idx] = strdup(campo);
+    obj->objeto->campos_valores[idx] = val;
+    obj->objeto->num_campos++;
+    if (n->asignacion_campo.objeto->tipo != NODO_ESTO)
+        valor_destruir(obj);
+    return valor_nulo();
+}
+
 static Valor *ejecutar(Nodo *n, Entorno *e) {
     if (!n || hay_retorno || hay_error) return valor_nulo();
 
@@ -1186,42 +2331,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return v;
         }
 
-        case NODO_DECLARACION: {
-            Valor *v = ejecutar(n->declaracion.valor, e);
-            /* Comprobar el tipo anunciado en 'sea lista x' / 'sea
-               diccionario x'. Se hace aquí y no en el parser porque sólo
-               en ejecución se conoce el tipo de verdad: antes se exigía
-               un literal, así que 'sea lista l = datos.ordenar()' —o
-               cualquier llamada— se rechazaba sin motivo. */
-            if (!hay_error && n->declaracion.es_lista && v->tipo != VAL_LISTA) {
-                char msg[256];
-                snprintf(msg, sizeof(msg),
-                    "Declaraste '%s' como lista pero el valor no es una lista.",
-                    n->declaracion.nombre);
-                valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
-                hay_error = 1;
-                valor_destruir(v);
-                return valor_nulo();
-            }
-            if (!hay_error && n->declaracion.es_diccionario && v->tipo != VAL_DICCIONARIO) {
-                char msg[256];
-                snprintf(msg, sizeof(msg),
-                    "Declaraste '%s' como diccionario pero el valor no es un diccionario.",
-                    n->declaracion.nombre);
-                valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
-                hay_error = 1;
-                valor_destruir(v);
-                return valor_nulo();
-            }
-            if (redefinido(e, n->declaracion.nombre,
-                           n->declaracion.constante ? "'fijo'" : "'sea'",
-                           1, n->linea)) {
-                valor_destruir(v);
-                return valor_nulo();
-            }
-            entorno_definir(e, n->declaracion.nombre, v, n->declaracion.constante);
-            return valor_nulo();
-        }
+        case NODO_DECLARACION:
+            return exec_declaracion(n, e);
+
 
         case NODO_ASIGNACION: {
             Valor *v = ejecutar(n->asignacion.valor, e);
@@ -1278,36 +2390,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return ultimo;
         }
 
-        case NODO_SI: {
-            Valor *cond = ejecutar(n->si.condicion, e);
-            int    ok   = es_verdadero(cond);
-            valor_destruir(cond);
+        case NODO_SI:
+            return exec_si(n, e);
 
-            if (ok) {
-                Entorno *nuevo = entorno_crear(e);
-                Valor   *r     = ejecutar(n->si.entonces, nuevo);
-                entorno_destruir(nuevo);
-                return r;
-            }
-            for (int i = 0; i < n->si.cantidad_sino_si; i++) {
-                Valor *c = ejecutar(n->si.condiciones_sino_si[i], e);
-                int    b = es_verdadero(c);
-                valor_destruir(c);
-                if (b) {
-                    Entorno *nuevo = entorno_crear(e);
-                    Valor   *r     = ejecutar(n->si.bloques_sino_si[i], nuevo);
-                    entorno_destruir(nuevo);
-                    return r;
-                }
-            }
-            if (n->si.sino) {
-                Entorno *nuevo = entorno_crear(e);
-                Valor   *r     = ejecutar(n->si.sino, nuevo);
-                entorno_destruir(nuevo);
-                return r;
-            }
-            return valor_nulo();
-        }
 
         case NODO_MIENTRAS: {
             Valor *r = valor_nulo();
@@ -1340,105 +2425,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return r;
         }
 
-        case NODO_PARA: {
-            Entorno *bucle = entorno_crear(e);
-            Valor   *vinicio = ejecutar(n->para.val_inicio, bucle);
-            entorno_definir(bucle, n->para.var_inicio, vinicio, 0);
+        case NODO_PARA:
+            return exec_para(n, e);
 
-            while (!hay_retorno && !hay_error) {
-                Valor *cond = ejecutar(n->para.condicion, bucle);
-                int    ok   = es_verdadero(cond);
-                valor_destruir(cond);
-                if (!ok) break;
 
-                Entorno *cuerpo_e = entorno_crear(bucle);
-                Valor   *r = ejecutar(n->para.cuerpo, cuerpo_e);
-                valor_destruir(r);
-                entorno_destruir(cuerpo_e);
+        case NODO_PARA_CADA:
+            return exec_para_cada(n, e);
 
-                Valor *vactual = entorno_obtener(bucle, n->para.var_incremento, n->linea);
-                if (hay_error) { valor_destruir(vactual); break; }
-                Valor *vnuevo;
-                if (strcmp(n->para.op_incremento, "++") == 0)
-                    vnuevo = valor_numero(vactual->numero + 1);
-                else
-                    vnuevo = valor_numero(vactual->numero - 1);
-                valor_destruir(vactual);
-                entorno_asignar(bucle, n->para.var_incremento, vnuevo, n->linea);
-            }
-            entorno_destruir(bucle);
-            return valor_nulo();
-        }
-
-        case NODO_PARA_CADA: {
-            Valor *col = ejecutar(n->para_cada.coleccion, e);
-
-            /* ── Lista o Generador ── */
-            if (col->tipo == VAL_LISTA || col->tipo == VAL_GENERADOR) {
-                int cant = (col->tipo == VAL_LISTA)
-                    ? col->lista.cantidad
-                    : col->generador.cantidad;
-                for (int i = 0; i < cant && !hay_retorno && !hay_error; i++) {
-                    Valor *elem = valor_copiar(
-                        col->tipo == VAL_LISTA
-                            ? col->lista.elementos[i]
-                            : col->generador.elementos[i]);
-                    validar_tipo(elem, n->para_cada.tipo,
-                                 "variable del bucle", n->para_cada.variable, n->linea);
-                    Entorno *iter = entorno_crear(e);
-                    entorno_definir(iter, n->para_cada.variable, elem, 0);
-                    Valor *r = ejecutar(n->para_cada.cuerpo, iter);
-                    valor_destruir(r);
-                    entorno_destruir(iter);
-                }
-                valor_destruir(col);
-                return valor_nulo();
-            }
-
-            /* ── Diccionario — itera sobre claves ── */
-            if (col->tipo == VAL_DICCIONARIO) {
-                for (int i = 0; i < col->diccionario.cantidad && !hay_retorno && !hay_error; i++) {
-                    Valor *clave = valor_texto(col->diccionario.claves[i]);
-
-                    validar_tipo(clave, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
-
-                    Entorno *iter = entorno_crear(e);
-                    entorno_definir(iter, n->para_cada.variable, clave, 0);
-                    Valor *r = ejecutar(n->para_cada.cuerpo, iter);
-                    valor_destruir(r);
-                    entorno_destruir(iter);
-                }
-                valor_destruir(col);
-                return valor_nulo();
-            }
-
-            /* ── Texto — itera carácter a carácter ── */
-            if (col->tipo == VAL_TEXTO) {
-                /* Recorre caracteres, no bytes: en "camión" el bucle da
-                   seis vueltas y una de ellas vale "ó". */
-                for (int i = 0; col->texto[i] && !hay_retorno && !hay_error; ) {
-                    int tam = utf8_tam(col->texto + i);
-                    char tmp[5] = {0};
-                    for (int k = 0; k < tam && k < 4; k++) tmp[k] = col->texto[i + k];
-                    i += tam;
-                    Valor *c = valor_texto(tmp);
-
-                    validar_tipo(c, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
-
-                    Entorno *iter = entorno_crear(e);
-                    entorno_definir(iter, n->para_cada.variable, c, 0);
-                    Valor *r = ejecutar(n->para_cada.cuerpo, iter);
-                    valor_destruir(r);
-                    entorno_destruir(iter);
-                }
-                valor_destruir(col);
-                return valor_nulo();
-            }
-
-            valor_destruir(col);
-            return error_rt("ErrorTipo", n->linea,
-                "'para cada' solo funciona con listas, diccionarios o texto.");
-        }
 
         case NODO_FUNCION: {
             FuncionLince *f = malloc(sizeof(FuncionLince));
@@ -1455,165 +2448,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_nulo();
         }
 
-        case NODO_LLAMADA: {
-            if (++profundidad > MAX_PROFUNDIDAD) {
-                profundidad = 0;
-                char msg[128];
-                snprintf(msg, sizeof(msg),
-                    "Demasiadas llamadas anidadas — ¿hay una recursión infinita en '%s'?",
-                    n->llamada.nombre);
-                valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
-                hay_error   = 1;
-                return valor_nulo();
-            }
-            Valor *vfun = entorno_obtener(e, n->llamada.nombre, n->linea);
+        case NODO_LLAMADA:
+            return exec_llamada(n, e);
 
-            /* Si el nombre no existe, entorno_obtener ya ha puesto el error:
-               se propaga tal cual en vez de añadir un "no es una función"
-               encima, que sería la consecuencia y no la causa. */
-            if (hay_error) {
-                valor_destruir(vfun);
-                profundidad--;
-                return valor_nulo();
-            }
-            if (vfun->tipo != VAL_FUNCION) {
-                /* Error capturable, no exit(1): matar el proceso por esto
-                   impedía que un intentar/capturar se recuperase, y el pilar
-                   del lenguaje es que los errores se cuenten, no que aborten. */
-                char msg[256];
-                snprintf(msg, sizeof(msg),
-                    "'%s' no es una función, así que no se puede llamar.",
-                    n->llamada.nombre);
-                valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
-                hay_error   = 1;
-                valor_destruir(vfun);
-                profundidad--;
-                return valor_nulo();
-            }
-            FuncionLince *f = vfun->funcion;
-
-            /* ¿Es un generador? */
-            if (vfun->es_modulo == 99) {
-                /* Ejecutar el cuerpo acumulando valores producidos */
-                int args_dados   = n->llamada.num_argumentos;
-                int params_total = f->num_parametros;
-                int params_req   = 0;
-                for (int i = 0; i < params_total; i++)
-                    if (!f->parametros[i].valor_defecto) params_req++;
-
-                if (args_dados < params_req || args_dados > params_total) {
-                    Valor *err = error_rt("ErrorArgumento", n->linea,
-                        "El generador '%s' espera entre %d y %d argumento(s).",
-                        f->nombre, params_req, params_total);
-                    valor_destruir(vfun);
-                    profundidad--;
-                    return err;
-                }
-
-                Entorno *fn_e = entorno_crear(f->entorno_closure);
-                for (int i = 0; i < params_total; i++) {
-                    Valor *arg = (i < args_dados)
-                        ? ejecutar(n->llamada.argumentos[i], e)
-                        : ejecutar(f->parametros[i].valor_defecto, e);
-                    entorno_definir(fn_e, f->parametros[i].nombre, arg, 0);
-                }
-
-                /* Crear la lista acumuladora */
-                Valor *gen = valor_generador_crear();
-                Valor *gen_anterior = generador_actual;
-                generador_actual    = gen;
-
-                valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
-
-                generador_actual = gen_anterior;
-                /* Un 'devolver' dentro de un generador no le llega a nadie,
-                   pero el valor está creado: hay que soltarlo. */
-                if (hay_retorno) valor_destruir(valor_retorno);
-                hay_retorno      = 0;
-                valor_retorno    = NULL;
-                hay_producir     = 0;
-                entorno_destruir(fn_e);
-                valor_destruir(vfun);
-                profundidad--;
-                return gen;
-            }
-
-            /* ¿Es una función nativa? (entorno_closure == NULL) */
-            if (f->entorno_closure == NULL) {
-                typedef Valor *(*FnNativa)(Valor**, int);
-                FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
-                int nargs = n->llamada.num_argumentos;
-                Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
-                for (int i = 0; i < nargs; i++)
-                    args[i] = ejecutar(n->llamada.argumentos[i], e);
-                Valor *resultado = fn(args, nargs);
-                for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
-                free(args);
-                valor_destruir(vfun);
-                profundidad--;
-                return resultado ? resultado : valor_nulo();
-            }
-
-            /* Contar parámetros requeridos (sin valor por defecto) */
-            int args_dados   = n->llamada.num_argumentos;
-            int params_total = f->num_parametros;
-            int params_req   = 0;
-            for (int i = 0; i < params_total; i++)
-                if (!f->parametros[i].valor_defecto) params_req++;
-
-            if (args_dados < params_req || args_dados > params_total) {
-                Valor *err = error_rt("ErrorArgumento", n->linea,
-                    "La función '%s' espera entre %d y %d argumento(s) pero recibió %d.",
-                    f->nombre, params_req, params_total, args_dados);
-                valor_destruir(vfun);
-                profundidad--;
-                return err;
-            }
-
-            Entorno *fn_e = entorno_crear(f->entorno_closure);
-            for (int i = 0; i < params_total; i++) {
-                Parametro *param = &f->parametros[i];
-                Valor *arg;
-
-                if (i < args_dados) {
-                    if (param->por_ref) {
-                        arg = ejecutar(n->llamada.argumentos[i], e);
-                    } else {
-                        Valor *tmp = ejecutar(n->llamada.argumentos[i], e);
-                        if (tmp->tipo == VAL_NUMERO || tmp->tipo == VAL_TEXTO ||
-                            tmp->tipo == VAL_BOOLEANO || tmp->tipo == VAL_NULO) {
-                            arg = valor_copiar(tmp);
-                            valor_destruir(tmp);
-                        } else {
-                            arg = tmp;
-                        }
-                    }
-                } else {
-                    /* Usar valor por defecto */
-                    arg = ejecutar(param->valor_defecto, e);
-                }
-
-                validar_tipo(arg, param->tipo, "parámetro", param->nombre, n->linea);
-                entorno_definir(fn_e, param->nombre, arg, 0);
-            }
-
-            /* El valor del cuerpo no es el retorno de la función (eso va por
-               valor_retorno): es el de su última sentencia, y lo posee quien
-               llama — NODO_BLOQUE ya libera así todos los anteriores. Sin
-               este destruir se fugaban 40 bytes por llamada, que en un bucle
-               de juego son 40 por función y por frame. */
-            valor_destruir(ejecutar(f->cuerpo, fn_e));
-            entorno_destruir(fn_e);
-
-            Valor *retorno = tomar_retorno();
-
-            if (!hay_error)
-                validar_tipo(retorno, f->tipo_retorno, "retorno de función", f->nombre, n->linea);
-
-            valor_destruir(vfun);
-            profundidad--;
-            return retorno;
-        }
 
         case NODO_DEVOLVER: {
             Valor *v = ejecutar(n->devolver, e);
@@ -1648,564 +2485,21 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return dic;
         }
 
-        case NODO_INDICE: {
-            Valor *obj = ejecutar(n->acceso_indice.objeto, e);
-            Valor *idx = ejecutar(n->acceso_indice.indice, e);
+        case NODO_INDICE:
+            return exec_indice(n, e);
 
-            if (obj->tipo == VAL_LISTA) {
-                if (idx->tipo != VAL_NUMERO) {
-                    char msg[128];
-                    snprintf(msg, sizeof(msg), "El índice de una lista debe ser un número.");
-                    valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
-                    hay_error = 1;
-                    valor_destruir(obj); valor_destruir(idx);
-                    return valor_nulo();
-                }
-                int i = (int)idx->numero;
-                if (i < 0) i = obj->lista.cantidad + i;
-                if (i < 0 || i >= obj->lista.cantidad) {
-                    char msg[128];
-                    snprintf(msg, sizeof(msg),
-                        "Índice %d fuera de rango. La lista tiene %d elementos.",
-                        i, obj->lista.cantidad);
-                    valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
-                    hay_error = 1;
-                    valor_destruir(obj); valor_destruir(idx);
-                    return valor_nulo();
-                }
-                Valor *res = valor_copiar(obj->lista.elementos[i]);
-                valor_destruir(obj); valor_destruir(idx);
-                return res;
-            }
-            if (obj->tipo == VAL_DICCIONARIO) {
-                if (idx->tipo != VAL_TEXTO) {
-                    valor_error = valor_error_nuevo("ErrorTipo",
-                        "La clave de un diccionario debe ser texto.", n->linea);
-                    hay_error = 1;
-                    valor_destruir(obj); valor_destruir(idx);
-                    return valor_nulo();
-                }
-                for (int i = 0; i < obj->diccionario.cantidad; i++) {
-                    if (strcmp(obj->diccionario.claves[i], idx->texto) == 0) {
-                        Valor *res = valor_copiar(obj->diccionario.valores[i]);
-                        valor_destruir(obj); valor_destruir(idx);
-                        return res;
-                    }
-                }
-                char msg[256];
-                snprintf(msg, sizeof(msg),
-                    "La clave \"%s\" no existe en el diccionario.", idx->texto);
-                valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
-                hay_error = 1;
-                valor_destruir(obj); valor_destruir(idx);
-                return valor_nulo();
-            }
-            if (obj->tipo == VAL_TEXTO) {
-                if (idx->tipo != VAL_NUMERO) {
-                    valor_error = valor_error_nuevo("ErrorTipo",
-                        "El índice de un texto debe ser un número.", n->linea);
-                    hay_error = 1;
-                    valor_destruir(obj); valor_destruir(idx);
-                    return valor_nulo();
-                }
-                int i = (int)idx->numero;
-                int len = utf8_longitud(obj->texto);
-                if (i < 0) i = len + i;
-                if (i < 0 || i >= len) {
-                    char msg[128];
-                    snprintf(msg, sizeof(msg),
-                        "Índice %d fuera de rango. El texto tiene %d caracteres.", i, len);
-                    valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
-                    hay_error = 1;
-                    valor_destruir(obj); valor_destruir(idx);
-                    return valor_nulo();
-                }
-                /* El carácter puede ocupar varios bytes, así que se copia
-                   entero en vez de quedarse con el primero. */
-                int off = utf8_desplazamiento(obj->texto, i);
-                int tam = utf8_tam(obj->texto + off);
-                char tmp[5] = {0};
-                for (int k = 0; k < tam && k < 4; k++) tmp[k] = obj->texto[off + k];
-                Valor *res = valor_texto(tmp);
-                valor_destruir(obj); valor_destruir(idx);
-                return res;
-            }
-            valor_error = valor_error_nuevo("ErrorTipo",
-                "Solo puedes usar [] en listas, diccionarios o texto.", n->linea);
-            hay_error = 1;
-            valor_destruir(obj); valor_destruir(idx);
-            return valor_nulo();
-        }
 
-        case NODO_ASIGNACION_INDICE: {
-            Valor *obj = ejecutar(n->asignacion_indice.objeto, e);
-            Valor *idx = ejecutar(n->asignacion_indice.indice, e);
-            Valor *val = ejecutar(n->asignacion_indice.valor,  e);
+        case NODO_ASIGNACION_INDICE:
+            return exec_asignacion_indice(n, e);
 
-            if (obj->tipo == VAL_LISTA) {
-                int i = (int)idx->numero;
-                if (i < 0) i = obj->lista.cantidad + i;
-                if (i < 0 || i >= obj->lista.cantidad) {
-                    int cant = obj->lista.cantidad;
-                    double pedido = idx->numero;
-                    valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
-                    return error_rt("ErrorRango", n->linea,
-                        "Índice %.0f fuera de rango. La lista tiene %d elementos.", pedido, cant);
-                }
-                valor_destruir(obj->lista.elementos[i]);
-                obj->lista.elementos[i] = val;
-                /* Reflejar en el entorno */
-                if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR) {
-                    entorno_asignar(e, n->asignacion_indice.objeto->identificador, obj, n->linea);
-                }
-                valor_destruir(idx);
-                return valor_nulo();
-            }
-            if (obj->tipo == VAL_DICCIONARIO) {
-                if (idx->tipo != VAL_TEXTO) {
-                    valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
-                    return error_rt("ErrorTipo", n->linea, "La clave de un diccionario debe ser texto.");
-                }
-                for (int i = 0; i < obj->diccionario.cantidad; i++) {
-                    if (strcmp(obj->diccionario.claves[i], idx->texto) == 0) {
-                        valor_destruir(obj->diccionario.valores[i]);
-                        obj->diccionario.valores[i] = val;
-                        if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR)
-                            entorno_asignar(e, n->asignacion_indice.objeto->identificador, obj, n->linea);
-                        valor_destruir(idx);
-                        return valor_nulo();
-                    }
-                }
-                /* Clave nueva */
-                valor_diccionario_asegurar(obj, obj->diccionario.cantidad + 1);
-                int i = obj->diccionario.cantidad;
-                obj->diccionario.claves[i]  = strdup(idx->texto);
-                obj->diccionario.valores[i] = val;
-                obj->diccionario.cantidad++;
-                if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR)
-                    entorno_asignar(e, n->asignacion_indice.objeto->identificador, obj, n->linea);
-                valor_destruir(idx);
-                return valor_nulo();
-            }
-            valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
-            return error_rt("ErrorTipo", n->linea,
-                "Solo puedes asignar por índice en listas o diccionarios.");
-        }
 
-        case NODO_METODO: {
-            Valor *obj = ejecutar(n->metodo.objeto, e);
-            const char *met = n->metodo.metodo;
+        case NODO_METODO:
+            return exec_metodo(n, e);
 
-            /* ── Módulo (diccionario con funciones nativas) ── */
-            if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
-                const char *met = n->metodo.metodo;
-                for (int i = 0; i < obj->diccionario.cantidad; i++) {
-                    if (strcmp(obj->diccionario.claves[i], met) == 0) {
-                        Valor *vf = obj->diccionario.valores[i];
-                        if (vf->tipo == VAL_CLASE) {
-                            Valor *cls = valor_retener(vf);
-                            valor_destruir(obj);
-                            return instanciar_clase(cls, n->metodo.argumentos,
-                                                    n->metodo.num_argumentos, e, n->linea);
-                        }
-                        if (vf->tipo != VAL_FUNCION) {
-                            valor_destruir(obj);
-                            return error_rt("ErrorTipo", n->linea,
-                                "'%s' no es una función del módulo.", met);
-                        }
-                        FuncionLince *f = vf->funcion;
 
-                        int nargs = n->metodo.num_argumentos;
-                        Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
-                        for (int j = 0; j < nargs; j++)
-                            args[j] = ejecutar(n->metodo.argumentos[j], e);
+        case NODO_ELEGIR:
+            return exec_elegir(n, e);
 
-                        Valor *resultado;
-                        if (f->entorno_closure == NULL) {
-                            /* Nativa: 'cuerpo' guarda el puntero a la función C */
-                            typedef Valor *(*FnNativa)(Valor**, int);
-                            FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
-                            resultado = fn(args, nargs);
-                            for (int j = 0; j < nargs; j++)
-                                valor_destruir(args[j]);
-                        } else {
-                            /* Función Lince. Hasta ahora todos los módulos eran
-                               nativos y esto casteaba 'cuerpo' a puntero de
-                               función sin mirar; con 'importar ... como' hay
-                               módulos cuyas funciones son cierres de verdad, y
-                               ese cast ejecutaba el AST como código — segfault
-                               limpio. interprete_llamar_funcion se queda con
-                               los argumentos y valida aridad y tipos. */
-                            resultado = interprete_llamar_funcion(vf, args, nargs);
-                        }
-                        free(args);
-                        valor_destruir(obj);
-                        return resultado ? resultado : valor_nulo();
-                    }
-                }
-                valor_destruir(obj);
-                return error_rt("Error", n->linea, "El módulo no tiene la función '%s'.", met);
-            }
-
-            /* ── Métodos de OBJETO ── */
-            if (obj->tipo == VAL_OBJETO) {
-                ClaseLince   *cls       = obj->objeto->clase;
-                const char   *met_nombre = n->metodo.metodo;
-                FuncionLince *f          = buscar_metodo(cls, met_nombre);
-
-                if (!f) {
-                    Valor *err = error_rt("Error", n->linea,
-                        "La clase '%s' no tiene el método '%s'.", cls->nombre, met_nombre);
-                    valor_destruir(obj);
-                    return err;
-                }
-
-                if (n->metodo.num_argumentos != f->num_parametros) {
-                    Valor *err = error_rt("ErrorArgumento", n->linea,
-                        "El método '%s' espera %d argumento(s), recibió %d.",
-                        met_nombre, f->num_parametros, n->metodo.num_argumentos);
-                    valor_destruir(obj);
-                    return err;
-                }
-
-                if (++profundidad > MAX_PROFUNDIDAD) {
-                    profundidad = 0;
-                    char msg[128];
-                    snprintf(msg, sizeof(msg),
-                        "Demasiadas llamadas anidadas en método '%s'.", met_nombre);
-                    valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
-                    hay_error   = 1;
-                    valor_destruir(obj);
-                    return valor_nulo();
-                }
-                Entorno *fn_e = entorno_crear(f->entorno_closure);
-                for (int j = 0; j < f->num_parametros; j++) {
-                    Valor *arg = ejecutar(n->metodo.argumentos[j], e);
-                    validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, n->linea);
-                    entorno_definir(fn_e, f->parametros[j].nombre, arg, 0);
-                }
-                Valor *esto_anterior   = esto_actual;
-                ClaseLince *cls_ant    = clase_actual;
-                esto_actual  = obj;
-                clase_actual = cls;
-                valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
-                Valor *retorno = tomar_retorno();
-                esto_actual  = esto_anterior;
-                clase_actual = cls_ant;
-                entorno_destruir(fn_e);
-                valor_destruir(obj);
-                profundidad--;
-                return retorno;
-            }
-
-            /* ── Métodos de LISTA ── */
-            if (obj->tipo == VAL_LISTA) {
-                if (strcmp(met, "longitud") == 0) {
-                    int len = obj->lista.cantidad;
-                    valor_destruir(obj);
-                    return valor_numero(len);
-                }
-                if (strcmp(met, "agregar") == 0) {
-                    if (n->metodo.num_argumentos != 1) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea, "'agregar' necesita exactamente 1 argumento.");
-                    }
-                    Valor *elem = ejecutar(n->metodo.argumentos[0], e);
-                    lista_agregar(obj, elem);
-                    if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
-                        entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
-                    else valor_destruir(obj);
-                    return valor_nulo();
-                }
-                if (strcmp(met, "eliminar") == 0) {
-                    if (n->metodo.num_argumentos != 1) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea,
-                            "'eliminar' necesita exactamente 1 argumento (índice).");
-                    }
-                    Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
-                    int idx = (int)vidx->numero;
-                    valor_destruir(vidx);
-                    if (idx < 0 || idx >= obj->lista.cantidad) {
-                        int cant = obj->lista.cantidad;
-                        valor_destruir(obj);
-                        return error_rt("ErrorRango", n->linea,
-                            "Índice %d fuera de rango. La lista tiene %d elementos.", idx, cant);
-                    }
-                    valor_destruir(obj->lista.elementos[idx]);
-                    for (int i = idx; i < obj->lista.cantidad - 1; i++)
-                        obj->lista.elementos[i] = obj->lista.elementos[i+1];
-                    obj->lista.cantidad--;
-                    if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
-                        entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
-                    else valor_destruir(obj);
-                    return valor_nulo();
-                }
-                if (strcmp(met, "contiene") == 0) {
-                    if (n->metodo.num_argumentos != 1) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
-                    }
-                    Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
-                    int encontrado = 0;
-                    for (int i = 0; i < obj->lista.cantidad; i++) {
-                        Valor *el = obj->lista.elementos[i];
-                        if (el->tipo == VAL_NUMERO && buscado->tipo == VAL_NUMERO && el->numero == buscado->numero) { encontrado = 1; break; }
-                        if (el->tipo == VAL_TEXTO  && buscado->tipo == VAL_TEXTO  && strcmp(el->texto, buscado->texto) == 0) { encontrado = 1; break; }
-                    }
-                    valor_destruir(buscado); valor_destruir(obj);
-                    return valor_booleano(encontrado);
-                }
-                if (strcmp(met, "ordenar") == 0) {
-                    /* Devuelve una lista nueva: la original no se toca.
-                       Sin argumentos usa el orden natural; con una
-                       función, la usa como comparador (negativo si el
-                       primero va antes, positivo si va después). */
-                    CtxOrden ctx = { NULL };
-                    Valor *vfn = NULL;
-                    if (n->metodo.num_argumentos >= 1) {
-                        vfn = ejecutar(n->metodo.argumentos[0], e);
-                        if (vfn->tipo != VAL_FUNCION) {
-                            valor_destruir(vfn); valor_destruir(obj);
-                            hay_error = 1;
-                            valor_error = valor_error_nuevo("ErrorTipo",
-                                "'ordenar' espera una función comparadora.", n->linea);
-                            return valor_nulo();
-                        }
-                        ctx.fn = vfn;
-                    }
-                    int len = obj->lista.cantidad;
-                    Valor *res = valor_lista_crear();
-                    for (int i = 0; i < len; i++)
-                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
-                    if (len > 1) {
-                        Valor **tmp = malloc(sizeof(Valor*) * len);
-                        orden_merge(res->lista.elementos, tmp, 0, len, &ctx);
-                        free(tmp);
-                    }
-                    if (vfn) valor_destruir(vfn);
-                    valor_destruir(obj);
-                    return res;
-                }
-                if (strcmp(met, "invertir") == 0) {
-                    /* Lista nueva, del final al principio. */
-                    Valor *res = valor_lista_crear();
-                    for (int i = obj->lista.cantidad - 1; i >= 0; i--)
-                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
-                    valor_destruir(obj);
-                    return res;
-                }
-                if (strcmp(met, "copiar") == 0) {
-                    /* Copia superficial: útil para no modificar la
-                       original, porque las listas se pasan compartidas. */
-                    Valor *res = valor_lista_crear();
-                    for (int i = 0; i < obj->lista.cantidad; i++)
-                        lista_agregar(res, valor_copiar(obj->lista.elementos[i]));
-                    valor_destruir(obj);
-                    return res;
-                }
-                if (strcmp(met, "posicion") == 0) {
-                    if (n->metodo.num_argumentos != 1) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea, "'posicion' necesita exactamente 1 argumento.");
-                    }
-                    Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
-                    int donde = -1;
-                    for (int i = 0; i < obj->lista.cantidad; i++) {
-                        if (valor_comparar_natural(obj->lista.elementos[i], buscado) == 0) {
-                            donde = i; break;
-                        }
-                    }
-                    valor_destruir(buscado); valor_destruir(obj);
-                    return valor_numero(donde);
-                }
-                if (strcmp(met, "insertar") == 0) {
-                    if (n->metodo.num_argumentos != 2) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea,
-                            "'insertar' necesita 2 argumentos (índice y valor).");
-                    }
-                    Valor *vidx = ejecutar(n->metodo.argumentos[0], e);
-                    Valor *elem = ejecutar(n->metodo.argumentos[1], e);
-                    int idx = (int)vidx->numero;
-                    valor_destruir(vidx);
-                    /* Insertar al final es válido, de ahí el <=. */
-                    if (idx < 0 || idx > obj->lista.cantidad) {
-                        valor_destruir(elem); valor_destruir(obj);
-                        hay_error = 1;
-                        valor_error = valor_error_nuevo("ErrorRango",
-                            "Índice fuera de rango en 'insertar'.", n->linea);
-                        return valor_nulo();
-                    }
-                    /* Se añade al final para que crezca y luego se corre
-                       todo un hueco a la derecha. */
-                    lista_agregar(obj, elem);
-                    for (int i = obj->lista.cantidad - 1; i > idx; i--)
-                        obj->lista.elementos[i] = obj->lista.elementos[i-1];
-                    obj->lista.elementos[idx] = elem;
-                    if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
-                        entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
-                    else valor_destruir(obj);
-                    return valor_nulo();
-                }
-                valor_destruir(obj);
-                return error_rt("Error", n->linea, "Las listas no tienen el método '%s'.", met);
-            }
-
-            /* ── Métodos de TEXTO ── */
-            if (obj->tipo == VAL_TEXTO) {
-                if (strcmp(met, "longitud") == 0) {
-                    /* Caracteres, no bytes: "niño" mide 4. */
-                    int len = utf8_longitud(obj->texto);
-                    valor_destruir(obj);
-                    return valor_numero(len);
-                }
-                if (strcmp(met, "mayusculas") == 0) {
-                    char *s = utf8_mayusculas(obj->texto);
-                    Valor *r = valor_texto(s); free(s); valor_destruir(obj);
-                    return r;
-                }
-                if (strcmp(met, "minusculas") == 0) {
-                    char *s = utf8_minusculas(obj->texto);
-                    Valor *r = valor_texto(s); free(s); valor_destruir(obj);
-                    return r;
-                }
-                if (strcmp(met, "contiene") == 0) {
-                    if (n->metodo.num_argumentos != 1) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
-                    }
-                    Valor *sub = ejecutar(n->metodo.argumentos[0], e);
-                    int ok = strstr(obj->texto, sub->texto) != NULL;
-                    valor_destruir(sub); valor_destruir(obj);
-                    return valor_booleano(ok);
-                }
-                if (strcmp(met, "reemplazar") == 0) {
-                    if (n->metodo.num_argumentos != 2) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea,
-                            "'reemplazar' necesita 2 argumentos: buscar y reemplazo.");
-                    }
-                    Valor *buscar = ejecutar(n->metodo.argumentos[0], e);
-                    Valor *repla  = ejecutar(n->metodo.argumentos[1], e);
-                    char *src = obj->texto, *pat = buscar->texto, *rep = repla->texto;
-                    char resultado[4096] = "";
-                    char *pos;
-                    while ((pos = strstr(src, pat)) != NULL) {
-                        strncat(resultado, src, pos - src);
-                        strcat(resultado, rep);
-                        src = pos + strlen(pat);
-                    }
-                    strcat(resultado, src);
-                    Valor *r = valor_texto(resultado);
-                    valor_destruir(buscar); valor_destruir(repla); valor_destruir(obj);
-                    return r;
-                }
-                if (strcmp(met, "recortar") == 0) {
-                    char *s = strdup(obj->texto);
-                    int i = 0, j = strlen(s) - 1;
-                    while (s[i] == ' ' || s[i] == '\t') i++;
-                    while (j > i && (s[j] == ' ' || s[j] == '\t')) j--;
-                    s[j+1] = '\0';
-                    Valor *r = valor_texto(s + i); free(s); valor_destruir(obj);
-                    return r;
-                }
-                valor_destruir(obj);
-                return error_rt("Error", n->linea, "El texto no tiene el método '%s'.", met);
-            }
-
-            /* ── Métodos de DICCIONARIO ── */
-            if (obj->tipo == VAL_DICCIONARIO) {
-                if (strcmp(met, "contiene") == 0) {
-                    if (n->metodo.num_argumentos != 1) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
-                    }
-                    Valor *clave = ejecutar(n->metodo.argumentos[0], e);
-                    int ok = 0;
-                    for (int i = 0; i < obj->diccionario.cantidad; i++)
-                        if (strcmp(obj->diccionario.claves[i], clave->texto) == 0) { ok = 1; break; }
-                    valor_destruir(clave); valor_destruir(obj);
-                    return valor_booleano(ok);
-                }
-                if (strcmp(met, "longitud") == 0) {
-                    int len = obj->diccionario.cantidad;
-                    valor_destruir(obj);
-                    return valor_numero(len);
-                }
-                if (strcmp(met, "eliminar") == 0) {
-                    if (n->metodo.num_argumentos != 1) {
-                        valor_destruir(obj);
-                        return error_rt("ErrorArgumento", n->linea,
-                            "'eliminar' necesita exactamente 1 argumento (clave).");
-                    }
-                    Valor *clave = ejecutar(n->metodo.argumentos[0], e);
-                    for (int i = 0; i < obj->diccionario.cantidad; i++) {
-                        if (strcmp(obj->diccionario.claves[i], clave->texto) == 0) {
-                            free(obj->diccionario.claves[i]);
-                            valor_destruir(obj->diccionario.valores[i]);
-                            for (int j = i; j < obj->diccionario.cantidad - 1; j++) {
-                                obj->diccionario.claves[j]  = obj->diccionario.claves[j+1];
-                                obj->diccionario.valores[j] = obj->diccionario.valores[j+1];
-                            }
-                            obj->diccionario.cantidad--;
-                            break;
-                        }
-                    }
-                    if (n->metodo.objeto->tipo == NODO_IDENTIFICADOR)
-                        entorno_asignar(e, n->metodo.objeto->identificador, obj, n->linea);
-                    valor_destruir(clave);
-                    return valor_nulo();
-                }
-                valor_destruir(obj);
-                return error_rt("Error", n->linea, "Los diccionarios no tienen el método '%s'.", met);
-            }
-
-            valor_destruir(obj);
-            return error_rt("Error", n->linea, "El tipo actual no tiene el método '%s'.", met);
-        }
-
-        case NODO_ELEGIR: {
-            Valor *sujeto = ejecutar(n->elegir.sujeto, e);
-            int    encontrado = 0;
-
-            for (int i = 0; i < n->elegir.num_casos && !hay_error && !hay_retorno; i++) {
-                Valor *caso_val = ejecutar(n->elegir.valores[i], e);
-
-                /* Comparación por igualdad */
-                int iguales = 0;
-                if (sujeto->tipo == VAL_NUMERO && caso_val->tipo == VAL_NUMERO)
-                    iguales = (sujeto->numero == caso_val->numero);
-                else if (sujeto->tipo == VAL_TEXTO && caso_val->tipo == VAL_TEXTO)
-                    iguales = (strcmp(sujeto->texto, caso_val->texto) == 0);
-                else if (sujeto->tipo == VAL_BOOLEANO && caso_val->tipo == VAL_BOOLEANO)
-                    iguales = (sujeto->booleano == caso_val->booleano);
-                else if (sujeto->tipo == VAL_NULO && caso_val->tipo == VAL_NULO)
-                    iguales = 1;
-
-                valor_destruir(caso_val);
-
-                if (iguales) {
-                    encontrado = 1;
-                    Entorno *caso_e = entorno_crear(e);
-                    Valor   *r      = ejecutar(n->elegir.cuerpos[i], caso_e);
-                    valor_destruir(r);
-                    entorno_destruir(caso_e);
-                    break;
-                }
-            }
-
-            /* Si no coincidió ningún caso, ejecutar otro */
-            if (!encontrado && n->elegir.otro && !hay_error && !hay_retorno) {
-                Entorno *otro_e = entorno_crear(e);
-                Valor   *r      = ejecutar(n->elegir.otro, otro_e);
-                valor_destruir(r);
-                entorno_destruir(otro_e);
-            }
-
-            valor_destruir(sujeto);
-            return valor_nulo();
-        }
 
         case NODO_GENERADOR: {
             /* Registra el generador como función especial en el entorno */
@@ -2314,42 +2608,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_funcion(f);
         }
 
-        case NODO_PADRE: {
-            if (!esto_actual || !clase_actual) {
-                return error_rt("Error", n->linea,
-                    "'padre()' solo se puede usar dentro del método 'crear' de una clase.");
-            }
-            ClaseLince *cls_padre = clase_actual->padre;
-            if (!cls_padre) {
-                return error_rt("Error", n->linea,
-                    "Esta clase no extiende ninguna otra — no hay 'padre' al que llamar.");
-            }
-            FuncionLince *f = buscar_metodo(cls_padre, "crear");
-            if (!f) return valor_nulo(); /* padre sin crear — ok */
+        case NODO_PADRE:
+            return exec_padre(n, e);
 
-            if (n->padre.num_argumentos != f->num_parametros) {
-                return error_rt("ErrorArgumento", n->linea,
-                    "'padre()' espera %d argumento(s), recibió %d.",
-                    f->num_parametros, n->padre.num_argumentos);
-            }
-
-            Entorno *fn_e = entorno_crear(f->entorno_closure);
-            for (int i = 0; i < f->num_parametros; i++) {
-                Valor *arg = ejecutar(n->padre.argumentos[i], e);
-                validar_tipo(arg, f->parametros[i].tipo, "parámetro", f->parametros[i].nombre, n->linea);
-                entorno_definir(fn_e, f->parametros[i].nombre, arg, 0);
-            }
-
-            ClaseLince *cls_ant = clase_actual;
-            clase_actual = cls_padre;
-            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
-            clase_actual  = cls_ant;
-            if (hay_retorno) valor_destruir(valor_retorno);
-            hay_retorno   = 0;
-            valor_retorno = NULL;
-            entorno_destruir(fn_e);
-            return valor_nulo();
-        }
 
         case NODO_LANZAR: {            Valor *vobj = ejecutar(n->lanzar, e);
 
@@ -2380,124 +2641,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_nulo();
         }
 
-        case NODO_INTENTAR: {
-            /* Ejecutar el bloque intentar */
-            Entorno *e_try = entorno_crear(e);
-            valor_destruir(ejecutar(n->intentar.cuerpo, e_try));   /* ver la nota de NODO_LLAMADA */
-            entorno_destruir(e_try);
+        case NODO_INTENTAR:
+            return exec_intentar(n, e);
 
-            if (hay_error) {
-                Valor *err = valor_error;
-                hay_error   = 0;
-                valor_error = NULL;
 
-                int capturado = 0;
-                for (int i = 0; i < n->intentar.num_capturas && !capturado; i++) {
-                    const char *tipo_cap = n->intentar.tipos_captura[i];
+        case NODO_ACCESO:
+            return exec_acceso(n, e);
 
-                    /* "error" captura cualquier tipo */
-                    int coincide_tipo = (strcmp(tipo_cap, "error") == 0) ||
-                                        (err->tipo == VAL_ERROR &&
-                                         strcmp(err->error->tipo, tipo_cap) == 0);
-
-                    if (coincide_tipo) {
-                        /* Crear entorno con la variable del error */
-                        Entorno *e_cap = entorno_crear(e);
-
-                        /* Exponer el error como objeto con campos */
-                        ObjetoLince *obj = calloc(1, sizeof(ObjetoLince));
-                        obj->clase      = NULL;
-                        obj->num_campos = 3;
-                        obj->campos_nombres[0] = strdup("mensaje");
-                        obj->campos_valores[0] = valor_texto(err->error->mensaje);
-                        obj->campos_nombres[1] = strdup("tipo");
-                        obj->campos_valores[1] = valor_texto(err->error->tipo);
-                        obj->campos_nombres[2] = strdup("linea");
-                        obj->campos_valores[2] = valor_numero(err->error->linea);
-
-                        entorno_definir(e_cap, n->intentar.vars_captura[i],
-                                        valor_objeto(obj), 0);
-
-                        valor_destruir(ejecutar(n->intentar.cuerpos_captura[i], e_cap));   /* ver la nota de NODO_LLAMADA */
-                        entorno_destruir(e_cap);
-                        capturado = 1;
-                    }
-                }
-
-                if (!capturado) {
-                    /* Ningún capturar coincidió — propagar */
-                    hay_error   = 1;
-                    valor_error = err;
-                } else {
-                    valor_destruir(err);
-                }
-            }
-
-            /* finalmente — siempre se ejecuta */
-            if (n->intentar.finalmente) {
-                int error_guardado   = hay_error;
-                Valor *err_guardado  = valor_error;
-                int retorno_guardado = hay_retorno;
-                Valor *ret_guardado  = valor_retorno;
-
-                hay_error   = 0;
-                valor_error = NULL;
-
-                Entorno *e_fin = entorno_crear(e);
-                valor_destruir(ejecutar(n->intentar.finalmente, e_fin));   /* ver la nota de NODO_LLAMADA */
-                entorno_destruir(e_fin);
-
-                /* Restaurar señales. Si el propio 'finalmente' ha puesto un
-                   error o ha hecho 'devolver', gana lo suyo — pero entonces lo
-                   que veníamos guardando hay que soltarlo, que si no se pierde
-                   con su tipo y su mensaje. */
-                if (!hay_error) {
-                    hay_error   = error_guardado;
-                    valor_error = err_guardado;
-                } else {
-                    valor_destruir(err_guardado);
-                }
-                if (!hay_retorno) {
-                    hay_retorno   = retorno_guardado;
-                    valor_retorno = ret_guardado;
-                } else {
-                    valor_destruir(ret_guardado);
-                }
-            }
-
-            return valor_nulo();
-        }
-
-        case NODO_ACCESO: {
-            Valor *obj = ejecutar(n->acceso.objeto, e);
-            /* Acceso a constante de módulo */
-            if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
-                const char *campo = n->acceso.campo;
-                for (int i = 0; i < obj->diccionario.cantidad; i++) {
-                    if (strcmp(obj->diccionario.claves[i], campo) == 0) {
-                        Valor *r = valor_copiar(obj->diccionario.valores[i]);
-                        valor_destruir(obj);
-                        return r;
-                    }
-                }
-                valor_destruir(obj);
-                return error_rt("Error", n->linea, "El módulo no tiene el campo '%s'.", campo);
-            }
-            if (obj->tipo == VAL_OBJETO) {
-                const char *campo = n->acceso.campo;
-                for (int i = 0; i < obj->objeto->num_campos; i++) {
-                    if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
-                        Valor *r = valor_copiar(obj->objeto->campos_valores[i]);
-                        valor_destruir(obj);
-                        return r;
-                    }
-                }
-                valor_destruir(obj);
-                return error_rt("Error", n->linea, "El objeto no tiene el campo '%s'.", campo);
-            }
-            valor_destruir(obj);
-            return error_rt("ErrorTipo", n->linea, "Acceso a campo en un tipo que no es objeto.");
-        }
 
         case NODO_ESTO: {
             if (!esto_actual) {
@@ -2507,69 +2657,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_retener(esto_actual);
         }
 
-        case NODO_CLASE: {
-            ClaseLince *c = malloc(sizeof(ClaseLince));
-            c->nombre         = strdup(n->clase.nombre);
-            c->num_metodos    = n->clase.num_metodos;
-            c->metodos        = malloc(sizeof(FuncionLince*) * c->num_metodos);
-            c->padre          = NULL;
-            c->interfaces     = malloc(sizeof(InterfazLince*) * 16);
-            c->num_interfaces = 0;
+        case NODO_CLASE:
+            return exec_clase(n, e);
 
-            /* Resolver clase padre */
-            if (n->clase.padre) {
-                Valor *vpadre = entorno_obtener(e, n->clase.padre, n->linea);
-                if (vpadre->tipo != VAL_CLASE) {
-                    valor_destruir(vpadre);
-                    return error_rt("ErrorTipo", n->linea,
-                        "'%s' no es una clase — no se puede extender.", n->clase.padre);
-                }
-                c->padre = vpadre->clase;
-                valor_destruir(vpadre);
-            }
-
-            /* Registrar métodos */
-            for (int i = 0; i < c->num_metodos; i++) {
-                Nodo *mn = n->clase.metodos[i];
-                FuncionLince *f = malloc(sizeof(FuncionLince));
-                f->nombre           = strdup(mn->funcion.nombre);
-                f->parametros       = mn->funcion.parametros;
-                f->num_parametros   = mn->funcion.num_parametros;
-                f->tipo_retorno     = mn->funcion.tipo_retorno;
-                f->cuerpo           = mn->funcion.cuerpo;
-                f->entorno_closure  = e;
-                c->metodos[i] = f;
-            }
-
-            /* Verificar interfaces */
-            for (int i = 0; i < n->clase.num_interfaces; i++) {
-                Valor *viface = entorno_obtener(e, n->clase.interfaces[i], n->linea);
-                if (!viface || viface->tipo != VAL_DICCIONARIO || viface->es_modulo != 2) {
-                    valor_destruir(viface);
-                    return error_rt("ErrorTipo", n->linea,
-                        "'%s' no es una interfaz.", n->clase.interfaces[i]);
-                }
-                InterfazLince *iface = (InterfazLince*)(uintptr_t)
-                    (long long)viface->diccionario.valores[0]->numero;
-                c->interfaces[c->num_interfaces++] = iface;
-
-                for (int j = 0; j < iface->num_metodos; j++) {
-                    if (!buscar_metodo(c, iface->metodos[j])) {
-                        Valor *err = error_rt("Error", n->linea,
-                            "La clase '%s' dice implementar '%s' pero le falta el método '%s'.",
-                            c->nombre, iface->nombre, iface->metodos[j]);
-                        valor_destruir(viface);
-                        return err;
-                    }
-                }
-                valor_destruir(viface);
-            }
-
-            if (redefinido(e, c->nombre, "esta clase", 0, n->linea))
-                return valor_nulo();
-            entorno_definir(e, c->nombre, valor_clase(c), 0);
-            return valor_nulo();
-        }
 
         case NODO_INSTANCIA: {
             Valor *vcls = entorno_obtener(e, n->instancia.clase, n->linea);
@@ -2582,43 +2672,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                                     n->instancia.num_argumentos, e, n->linea);
         }
 
-        case NODO_ASIGNACION_CAMPO: {
-            Valor *val = ejecutar(n->asignacion_campo.valor, e);
-            Valor *obj;
+        case NODO_ASIGNACION_CAMPO:
+            return exec_asignacion_campo(n, e);
 
-            if (n->asignacion_campo.objeto->tipo == NODO_ESTO) {
-                obj = esto_actual;
-            } else {
-                obj = ejecutar(n->asignacion_campo.objeto, e);
-            }
-
-            if (!obj || obj->tipo != VAL_OBJETO) {
-                valor_destruir(val);
-                if (obj && n->asignacion_campo.objeto->tipo != NODO_ESTO)
-                    valor_destruir(obj);
-                return error_rt("ErrorTipo", n->linea, "Solo puedes asignar campos a objetos.");
-            }
-
-            const char *campo = n->asignacion_campo.campo;
-            /* Buscar si el campo ya existe */
-            for (int i = 0; i < obj->objeto->num_campos; i++) {
-                if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
-                    valor_destruir(obj->objeto->campos_valores[i]);
-                    obj->objeto->campos_valores[i] = val;
-                    if (n->asignacion_campo.objeto->tipo != NODO_ESTO)
-                        valor_destruir(obj);
-                    return valor_nulo();
-                }
-            }
-            /* Campo nuevo */
-            int idx = obj->objeto->num_campos;
-            obj->objeto->campos_nombres[idx] = strdup(campo);
-            obj->objeto->campos_valores[idx] = val;
-            obj->objeto->num_campos++;
-            if (n->asignacion_campo.objeto->tipo != NODO_ESTO)
-                valor_destruir(obj);
-            return valor_nulo();
-        }
 
         default:
             fprintf(stderr, "\n❌ Error interno: tipo de nodo desconocido (%d).\n\n", n->tipo);
