@@ -932,8 +932,8 @@ Notas:
 ### Rendimiento
 
 El ejecutable va a la velocidad del intérprete. Mediciones con los programas de
-`bench/` (`make bench`), en segundos: `fib(30)` 0,5 · bucle de 5 millones de
-iteraciones 0,6 · diccionario de 50.000 claves 0,04.
+`bench/` (`make bench`), en segundos: `fib(30)` 0,3 · bucle de 5 millones de
+iteraciones 0,5 · diccionario de 50.000 claves 0,04.
 
 ---
 

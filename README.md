@@ -203,7 +203,7 @@ lince compilar programa.lince
 
 `lince compilar` crea un único ejecutable con tu programa y los archivos que importa dentro: se puede copiar a otra máquina sin instalar Lince ni nada más. Soporta el 100 % del lenguaje y tarda milisegundos, porque el ejecutable lleva el propio intérprete.
 
-**Rendimiento** (`make bench`, en segundos): `fib(30)` 0,5 · bucle de 5 millones de iteraciones 0,6 · diccionario de 50.000 claves 0,04.
+**Rendimiento** (`make bench`, en segundos): `fib(30)` 0,3 · bucle de 5 millones de iteraciones 0,5 · diccionario de 50.000 claves 0,04.
 
 ## Tests
 

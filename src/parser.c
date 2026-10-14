@@ -179,7 +179,7 @@ static Nodo *primario(Parser *p) {
         consumir(p, TOK_FUNCION, "'funcion'");
         consumir(p, TOK_PAREN_IZQ, "'('");
 
-        Parametro *params     = malloc(sizeof(Parametro) * 64);
+        Parametro *params     = calloc(64, sizeof(Parametro));
         int        num_params = 0;
 
         if (!coincide(p, TOK_PAREN_DER)) {
@@ -739,7 +739,7 @@ static TipoDato parsear_tipo(Parser *p, char **tipo_clase_out) {
 static Nodo *funcion_desde_parametros(Parser *p, Token *nombre, int sin_cuerpo_ok) {
     consumir(p, TOK_PAREN_IZQ, "'('");
 
-    Parametro *params    = malloc(sizeof(Parametro) * 64);
+    Parametro *params    = calloc(64, sizeof(Parametro));
     int        num_params = 0;
 
     if (!coincide(p, TOK_PAREN_DER)) {
@@ -1079,7 +1079,7 @@ static Nodo *sent_generador(Parser *p) {
     Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre del generador");
     consumir(p, TOK_PAREN_IZQ, "'('");
 
-    Parametro *params     = malloc(sizeof(Parametro) * 64);
+    Parametro *params     = calloc(64, sizeof(Parametro));
     int        num_params = 0;
 
     if (!coincide(p, TOK_PAREN_DER)) {

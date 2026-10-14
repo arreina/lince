@@ -78,12 +78,14 @@ typedef struct {
     char     *tipo_clase;     /* si tipo == TIPO_CLASE */
     int       por_ref;        /* 0=val, 1=ref */
     struct Nodo *valor_defecto; /* NULL si no tiene valor por defecto */
+    const char *nombre_i;       /* nombre internado (lo rellena el intérprete) */
 } Parametro;
 typedef struct Nodo Nodo;
 
 struct Nodo {
     TipoNodo tipo;
     int      linea;   /* línea del código fuente */
+    const char *nombre_i;   /* nombre internado, lo rellena el intérprete al usarlo */
     int      linea_ini; /* sentencias: línea donde empiezan (0 si no es una sentencia) */
     union {
         /* NODO_NUMERO */

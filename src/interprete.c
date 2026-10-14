@@ -253,6 +253,11 @@ static void valor_liberar(Valor *v) {
     v->refs--;
     if (v->refs > 0) return;
 
+    /* Los escalares son los más frecuentes: sin nada que liberar por dentro */
+    if (v->tipo == VAL_NUMERO || v->tipo == VAL_BOOLEANO || v->tipo == VAL_NULO) {
+        valor_soltar(v);
+        return;
+    }
     if (v->tipo == VAL_TEXTO) free(v->texto);
     if (v->tipo == VAL_LISTA) {
         for (int i = 0; i < v->lista.cantidad; i++)
@@ -520,10 +525,11 @@ static void texto_medir(Valor *v) {
 static Valor *valor_copiar(Valor *v) {
     if (!v) return valor_nulo();
     switch (v->tipo) {
-        case VAL_NUMERO:      return valor_numero(v->numero);
-        case VAL_TEXTO:       return valor_retener(v);   /* los textos no se modifican: se comparten */
-        case VAL_BOOLEANO:    return valor_booleano(v->booleano);
-        case VAL_NULO:        return valor_nulo();
+        /* Números, lógicos, nulos y textos no se modifican nunca: se comparten */
+        case VAL_NUMERO:
+        case VAL_BOOLEANO:
+        case VAL_NULO:
+        case VAL_TEXTO:       return valor_retener(v);
         case VAL_FUNCION:
         case VAL_LISTA:
         case VAL_DICCIONARIO:
@@ -696,6 +702,55 @@ static int importado_ya(const char *ruta) {
     return 0;
 }
 
+/* ── Nombres internados ──
+   Cada nombre de variable se guarda una sola vez y para siempre; así los
+   ámbitos comparan punteros en vez de cadenas y no copian el nombre al
+   declarar. Los nodos guardan en 'nombre_i' el suyo ya internado. */
+static const char **_int_tab = NULL;
+static size_t       _int_cap = 0, _int_n = 0;
+
+static unsigned hash_nombre(const char *s) {
+    unsigned h = 2166136261u;
+    for (; *s; s++) h = (h ^ (unsigned char)*s) * 16777619u;
+    return h;
+}
+
+/* Nombre ya internado igual a 's', o NULL si nunca se ha usado */
+static const char *intern_buscar(const char *s) {
+    if (!_int_n) return NULL;
+    size_t m = _int_cap - 1, h = hash_nombre(s) & m;
+    while (_int_tab[h]) {
+        if (strcmp(_int_tab[h], s) == 0) return _int_tab[h];
+        h = (h + 1) & m;
+    }
+    return NULL;
+}
+
+static const char *intern(const char *s) {
+    const char *ya = intern_buscar(s);
+    if (ya) return ya;
+    if ((_int_n + 1) * 2 > _int_cap) {
+        size_t cap = _int_cap ? _int_cap * 2 : 1024;
+        const char **nueva = calloc(cap, sizeof(char *));
+        for (size_t i = 0; i < _int_cap; i++)
+            if (_int_tab[i]) {
+                size_t h = hash_nombre(_int_tab[i]) & (cap - 1);
+                while (nueva[h]) h = (h + 1) & (cap - 1);
+                nueva[h] = _int_tab[i];
+            }
+        free(_int_tab);
+        _int_tab = nueva; _int_cap = cap;
+    }
+    size_t h = hash_nombre(s) & (_int_cap - 1);
+    while (_int_tab[h]) h = (h + 1) & (_int_cap - 1);
+    _int_tab[h] = strdup(s);
+    _int_n++;
+    return _int_tab[h];
+}
+
+#define NI(n, s)  ((n)->nombre_i ? (n)->nombre_i : ((n)->nombre_i = intern(s)))
+#define PI(p)     ((p)->nombre_i ? (p)->nombre_i : ((p)->nombre_i = intern((p)->nombre)))
+
 /* Empaqueta lo definido en 'mod_e' como un diccionario-módulo, igual que los
  * módulos estándar, para exponerlo bajo un alias: 'col.colisionan(a, b)'.
  *
@@ -711,10 +766,14 @@ static Valor *empaquetar_modulo(Entorno *mod_e) {
     return dic;
 }
 
-static int ya_definido_aqui(Entorno *e, const char *nombre) {
+static int ya_definido_aqui_i(Entorno *e, const char *id) {
     for (int i = 0; i < e->cantidad; i++)
-        if (e->vars[i].nombre[0] == nombre[0] && strcmp(e->vars[i].nombre, nombre) == 0) return 1;
+        if (e->vars[i].nombre == id) return 1;
     return 0;
+}
+static int ya_definido_aqui(Entorno *e, const char *nombre) {
+    const char *id = intern_buscar(nombre);
+    return id && ya_definido_aqui_i(e, id);
 }
 
 /* Da el error de redefinición si procede. Devuelve 1 si lo ha dado. */
@@ -737,7 +796,7 @@ static int redefinido(Entorno *e, const char *nombre, const char *que,
     return 1;
 }
 
-void entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante) {
+void entorno_definir_i(Entorno *e, const char *nombre, Valor *valor, int constante) {
     if (e->cantidad >= MAX_VARS) {
         /* Alcanzable por un programa normal (256 variables en un ámbito), no
            un fallo interno: error capturable y se suelta el valor, que quien
@@ -747,10 +806,15 @@ void entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante
             "Demasiadas variables en el mismo ámbito (el máximo es %d).", MAX_VARS);
         return;
     }
-    e->vars[e->cantidad].nombre    = strdup(nombre);
+    e->vars[e->cantidad].nombre    = nombre;
     e->vars[e->cantidad].valor     = valor;
     e->vars[e->cantidad].constante = constante;
     e->cantidad++;
+}
+
+/* 'nombre' puede ser cualquier cadena: se interna aquí */
+void entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante) {
+    entorno_definir_i(e, intern(nombre), valor, constante);
 }
 
 static void entorno_liberar(Entorno *e);
@@ -760,7 +824,6 @@ static void entorno_destruir(Entorno *e) {
     e->refs--;
     if (e->refs > 0) return;
     for (int i = 0; i < e->cantidad; i++) {
-        free(e->vars[i].nombre);
         valor_destruir(e->vars[i].valor);
     }
     Entorno *padre = e->padre;
@@ -776,12 +839,13 @@ static void entorno_destruir(Entorno *e) {
 
 static void entorno_liberar(Entorno *e) { entorno_destruir(e); }
 
-static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
-    for (int i = 0; i < e->cantidad; i++) {
-        if (e->vars[i].nombre[0] == nombre[0] && strcmp(e->vars[i].nombre, nombre) == 0)
-            return valor_copiar(e->vars[i].valor);
-    }
-    if (e->padre) return entorno_obtener(e->padre, nombre, linea);
+/* 'id' es el nombre internado (o NULL si ese nombre no existe en ningún sitio);
+   'nombre' sólo sirve para el mensaje de error. */
+static Valor *entorno_obtener_i(Entorno *e, const char *id, const char *nombre, int linea) {
+    for (; e; e = e->padre)
+        for (int i = 0; i < e->cantidad; i++)
+            if (e->vars[i].nombre == id)
+                return valor_copiar(e->vars[i].valor);
     /* Siempre capturable. Antes, sin número de línea (linea == 0 — la
        llamaba el incremento de un 'para') caía a un fprintf y exit(1), y un
        'para (i = 0; i < 3; j++)' con 'j' sin definir mataba el proceso. */
@@ -789,9 +853,14 @@ static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
     return valor_nulo();
 }
 
-static void entorno_asignar(Entorno *e, const char *nombre, Valor *nuevo, int linea) {
-    for (int i = 0; i < e->cantidad; i++) {
-        if (e->vars[i].nombre[0] == nombre[0] && strcmp(e->vars[i].nombre, nombre) == 0) {
+static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
+    return entorno_obtener_i(e, intern_buscar(nombre), nombre, linea);
+}
+
+static void entorno_asignar_i(Entorno *e, const char *id, const char *nombre, Valor *nuevo, int linea) {
+    for (; e; e = e->padre) {
+        for (int i = 0; i < e->cantidad; i++) {
+            if (e->vars[i].nombre != id) continue;
             if (e->vars[i].constante) {
                 /* 'nuevo' se entregó a esta función: si no se asigna, hay que
                    soltarlo o se fuga. */
@@ -806,11 +875,14 @@ static void entorno_asignar(Entorno *e, const char *nombre, Valor *nuevo, int li
             return;
         }
     }
-    if (e->padre) { entorno_asignar(e->padre, nombre, nuevo, linea); return; }
     valor_destruir(nuevo);
     poner_error("Error", linea,
         "Intentas asignar un valor a '%s', pero nunca la definiste. "
         "¿Querías escribir 'sea %s = ...' primero?", nombre, nombre);
+}
+
+static void entorno_asignar(Entorno *e, const char *nombre, Valor *nuevo, int linea) {
+    entorno_asignar_i(e, intern_buscar(nombre), nombre, nuevo, linea);
 }
 
 /* ─────────────────────────────────────────
@@ -1451,7 +1523,7 @@ static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
     Entorno *fn_e = entorno_crear(f->entorno_closure);
     for (int j = 0; j < f->num_parametros; j++) {
         validar_tipo(args[j], f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, linea);
-        entorno_definir(fn_e, f->parametros[j].nombre, args[j], 0);
+        entorno_definir_i(fn_e, PI(&f->parametros[j]), args[j], 0);
     }
     Valor *esto_anterior = esto_actual;
     ClaseLince *cls_ant  = clase_actual;
@@ -1575,7 +1647,7 @@ static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, 
         for (int j = 0; j < f->num_parametros; j++) {
             Valor *arg = ejecutar(argn[j], e);
             validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, linea);
-            entorno_definir(fn_e, f->parametros[j].nombre, arg, 0);
+            entorno_definir_i(fn_e, PI(&f->parametros[j]), arg, 0);
         }
         Valor *esto_anterior   = esto_actual;
         ClaseLince *cls_ant    = clase_actual;
@@ -1620,13 +1692,15 @@ static Valor *exec_declaracion(Nodo *n, Entorno *e) {
         valor_destruir(v);
         return valor_nulo();
     }
-    if (redefinido(e, n->declaracion.nombre,
+    const char *id = NI(n, n->declaracion.nombre);
+    if (ya_definido_aqui_i(e, id) &&
+        redefinido(e, n->declaracion.nombre,
                    n->declaracion.constante ? "'fijo'" : "'sea'",
                    1, n->linea)) {
         valor_destruir(v);
         return valor_nulo();
     }
-    entorno_definir(e, n->declaracion.nombre, v, n->declaracion.constante);
+    entorno_definir_i(e, id, v, n->declaracion.constante);
     return valor_nulo();
 }
 
@@ -1677,7 +1751,7 @@ static Valor *exec_para(Nodo *n, Entorno *e) {
         valor_destruir(r);
         entorno_destruir(cuerpo_e);
 
-        Valor *vactual = entorno_obtener(bucle, n->para.var_incremento, n->linea);
+        Valor *vactual = entorno_obtener_i(bucle, NI(n, n->para.var_incremento), n->para.var_incremento, n->linea);
         if (hay_error) { valor_destruir(vactual); break; }
         Valor *vnuevo;
         if (strcmp(n->para.op_incremento, "++") == 0)
@@ -1685,7 +1759,7 @@ static Valor *exec_para(Nodo *n, Entorno *e) {
         else
             vnuevo = valor_numero(vactual->numero - 1);
         valor_destruir(vactual);
-        entorno_asignar(bucle, n->para.var_incremento, vnuevo, n->linea);
+        entorno_asignar_i(bucle, NI(n, n->para.var_incremento), n->para.var_incremento, vnuevo, n->linea);
     }
     entorno_destruir(bucle);
     return valor_nulo();
@@ -1707,7 +1781,7 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
             validar_tipo(elem, n->para_cada.tipo,
                          "variable del bucle", n->para_cada.variable, n->linea);
             Entorno *iter = entorno_crear(e);
-            entorno_definir(iter, n->para_cada.variable, elem, 0);
+            entorno_definir_i(iter, NI(n, n->para_cada.variable), elem, 0);
             Valor *r = ejecutar(n->para_cada.cuerpo, iter);
             valor_destruir(r);
             entorno_destruir(iter);
@@ -1773,7 +1847,7 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
         hay_error   = 1;
         return valor_nulo();
     }
-    Valor *vfun = entorno_obtener(e, n->llamada.nombre, n->linea);
+    Valor *vfun = entorno_obtener_i(e, NI(n, n->llamada.nombre), n->llamada.nombre, n->linea);
 
     /* Si el nombre no existe, entorno_obtener ya ha puesto el error:
        se propaga tal cual en vez de añadir un "no es una función"
@@ -1822,7 +1896,7 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
             Valor *arg = (i < args_dados)
                 ? ejecutar(n->llamada.argumentos[i], e)
                 : ejecutar(f->parametros[i].valor_defecto, e);
-            entorno_definir(fn_e, f->parametros[i].nombre, arg, 0);
+            entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
         }
 
         /* Crear la lista acumuladora */
@@ -1901,7 +1975,7 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
         }
 
         validar_tipo(arg, param->tipo, "parámetro", param->nombre, n->linea);
-        entorno_definir(fn_e, param->nombre, arg, 0);
+        entorno_definir_i(fn_e, PI(param), arg, 0);
     }
 
     /* El valor del cuerpo no es el retorno de la función (eso va por
@@ -2200,7 +2274,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         for (int j = 0; j < f->num_parametros; j++) {
             Valor *arg = ejecutar(n->metodo.argumentos[j], e);
             validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, n->linea);
-            entorno_definir(fn_e, f->parametros[j].nombre, arg, 0);
+            entorno_definir_i(fn_e, PI(&f->parametros[j]), arg, 0);
         }
         Valor *esto_anterior   = esto_actual;
         ClaseLince *cls_ant    = clase_actual;
@@ -2549,7 +2623,7 @@ static Valor *exec_padre(Nodo *n, Entorno *e) {
     for (int i = 0; i < f->num_parametros; i++) {
         Valor *arg = ejecutar(n->padre.argumentos[i], e);
         validar_tipo(arg, f->parametros[i].tipo, "parámetro", f->parametros[i].nombre, n->linea);
-        entorno_definir(fn_e, f->parametros[i].nombre, arg, 0);
+        entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
     }
 
     ClaseLince *cls_ant = clase_actual;
@@ -2987,7 +3061,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_nulo();
 
         case NODO_IDENTIFICADOR:
-            return entorno_obtener(e, n->identificador, n->linea);
+            return entorno_obtener_i(e, NI(n, n->identificador), n->identificador, n->linea);
 
         case NODO_BINARIO:
             return exec_binario(n, e);
@@ -2995,8 +3069,10 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         case NODO_UNARIO: {
             Valor *v = ejecutar(n->unario.operando, e);
             if (strcmp(n->unario.operador, "-") == 0 && v->tipo == VAL_NUMERO) {
-                v->numero = -v->numero;
-                return v;
+                if (v->refs == 1) { v->numero = -v->numero; return v; }
+                Valor *neg = valor_numero(-v->numero);   /* compartido con una variable: no se toca */
+                valor_destruir(v);
+                return neg;
             }
             if (strcmp(n->unario.operador, "no") == 0) {
                 int b = !es_verdadero(v);
@@ -3012,12 +3088,12 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_ASIGNACION: {
             Valor *v = ejecutar(n->asignacion.valor, e);
-            entorno_asignar(e, n->asignacion.nombre, v, n->linea);
+            entorno_asignar_i(e, NI(n, n->asignacion.nombre), n->asignacion.nombre, v, n->linea);
             return valor_nulo();
         }
 
         case NODO_INCREMENTO: {
-            Valor *v = entorno_obtener(e, n->incremento.nombre, n->linea);
+            Valor *v = entorno_obtener_i(e, NI(n, n->incremento.nombre), n->incremento.nombre, n->linea);
             /* Si la variable no existe, entorno_obtener ya ha puesto ese
                error: se propaga, no se le añade encima uno de "no contiene un
                número" que sería la consecuencia y no la causa. */
@@ -3036,7 +3112,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             /* 'v' es una copia hecha por entorno_obtener y nadie la soltaba:
                cada 'x++' suelto fugaba una asignación. */
             valor_destruir(v);
-            entorno_asignar(e, n->incremento.nombre, nuevo, n->linea);
+            entorno_asignar_i(e, NI(n, n->incremento.nombre), n->incremento.nombre, nuevo, n->linea);
             return valor_nulo();
         }
 

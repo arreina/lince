@@ -138,7 +138,7 @@ struct Valor {
 #define MAX_VARS 256
 
 typedef struct EntradaVar {
-    char  *nombre;
+    const char *nombre;   /* internado: se compara por puntero */
     Valor *valor;
     int    constante;
 } EntradaVar;
@@ -179,6 +179,7 @@ void   valor_diccionario_agregar(Valor *dic, const char *clave, Valor *valor);
 int    valor_diccionario_buscar(Valor *dic, const char *clave);
 void   lista_agregar(Valor *lista, Valor *elem);
 Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea);
+void   entorno_definir_i(Entorno *e, const char *nombre_internado, Valor *valor, int constante);
 void   entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante);
 
 extern int    hay_error;
