@@ -80,7 +80,7 @@ test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner_compilador.lince'
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) tests/servidor/smoke.sh ./lince_debug 8124'
 	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
-	@bash -c '$(ASAN_ENV) tests/depurador/smoke.sh ./lince_debug'
+	@bash -c '$(ASAN_ENV) bash tests/depurador/smoke.sh ./lince_debug'
 
 # Servidor de lenguaje ('lince lsp'): habla el protocolo de verdad.
 test-lsp: $(BIN)
