@@ -755,6 +755,17 @@ expresiones.reemplazar("hola mundo", "mundo", "Lince")  # "hola Lince"
 
 En Linux/Mac usa regex POSIX completo. En Windows usa búsqueda de subcadena.
 
+### `pruebas`
+
+```lince
+importar "pruebas"
+pruebas.suite("suma")                          # título de un grupo
+pruebas.afirmar("2+2 es 4", 2 + 2 == 4)        # condición verdadera
+pruebas.igual("listas", [1, 2], [1, 2])        # compara valores (listas y diccionarios incluidos)
+pruebas.lanza("divide por 0", funcion(): nulo { sea x = 1 / 0 })  # la función debe dar error
+pruebas.resumen()                              # total; sale con código 1 si algo falló
+```
+
 ---
 
 ## Importar archivos y paquetes

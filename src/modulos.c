@@ -2096,6 +2096,113 @@ void modulo_registrar(Entorno *entorno, const char *nombre,
     registrar_modulo_diccionario(entorno, nombre, fns, num_fns, NULL, NULL, 0);
 }
 
+/* ─────────────────────────────────────────
+   MÓDULO: pruebas
+   Pruebas unitarias para programas Lince. Cuenta aciertos y fallos;
+   resumen() imprime el total y sale con código 1 si algo falló.
+───────────────────────────────────────── */
+static int _prb_total, _prb_fallos;
+
+static int prb_iguales(Valor *a, Valor *b) {
+    if (a->tipo != b->tipo) return 0;
+    switch (a->tipo) {
+        case VAL_NUMERO:    return a->numero == b->numero;
+        case VAL_TEXTO:     return strcmp(a->texto, b->texto) == 0;
+        case VAL_BOOLEANO:  return a->booleano == b->booleano;
+        case VAL_NULO:      return 1;
+        case VAL_LISTA:
+            if (a->lista.cantidad != b->lista.cantidad) return 0;
+            for (int i = 0; i < a->lista.cantidad; i++)
+                if (!prb_iguales(a->lista.elementos[i], b->lista.elementos[i])) return 0;
+            return 1;
+        case VAL_DICCIONARIO:
+            if (a->diccionario.cantidad != b->diccionario.cantidad) return 0;
+            for (int i = 0; i < a->diccionario.cantidad; i++) {
+                int hallada = 0;
+                for (int j = 0; j < b->diccionario.cantidad && !hallada; j++)
+                    if (strcmp(a->diccionario.claves[i], b->diccionario.claves[j]) == 0) {
+                        if (!prb_iguales(a->diccionario.valores[i], b->diccionario.valores[j])) return 0;
+                        hallada = 1;
+                    }
+                if (!hallada) return 0;
+            }
+            return 1;
+        default:            return a == b;
+    }
+}
+
+static const char *prb_desc(Valor **a, int n) {
+    return (n > 0 && a[0]->tipo == VAL_TEXTO) ? a[0]->texto : "(sin descripción)";
+}
+
+static void prb_registrar(int ok, const char *desc) {
+    _prb_total++;
+    if (ok) printf("    ✅ %s\n", desc);
+    else  { _prb_fallos++; printf("    ❌ FALLO: %s\n", desc); }
+}
+
+static Valor *fn_prb_suite(Valor **a, int n) {
+    printf("  ▶ %s\n", prb_desc(a, n));
+    return valor_nulo();
+}
+
+static Valor *fn_prb_afirmar(Valor **a, int n) {
+    int ok = n > 1 && a[1]->tipo == VAL_BOOLEANO && a[1]->booleano;
+    prb_registrar(ok, prb_desc(a, n));
+    return valor_nulo();
+}
+
+static Valor *fn_prb_igual(Valor **a, int n) {
+    if (n < 3) return valor_nulo();
+    int ok = prb_iguales(a[1], a[2]);
+    prb_registrar(ok, prb_desc(a, n));
+    if (!ok) {
+        char *e = valor_a_texto_repl(a[1]), *o = valor_a_texto_repl(a[2]);
+        printf("       esperado: %s\n       obtenido: %s\n", e, o);
+        free(e); free(o);
+    }
+    return valor_nulo();
+}
+
+static Valor *fn_prb_lanza(Valor **a, int n) {
+    if (n < 2 || a[1]->tipo != VAL_FUNCION) {
+        prb_registrar(0, prb_desc(a, n));
+        return valor_nulo();
+    }
+    hay_error = 0;
+    Valor *r = interprete_llamar_funcion(a[1], NULL, 0);
+    int lanzo = hay_error;
+    if (r) valor_destruir(r);
+    if (lanzo) {
+        hay_error = 0;
+        valor_destruir(valor_error);
+        valor_error = NULL;
+    }
+    prb_registrar(lanzo, prb_desc(a, n));
+    return valor_nulo();
+}
+
+static Valor *fn_prb_resumen(Valor **a, int n) {
+    (void)a; (void)n;
+    printf("\n  %d pruebas: %d correctas, %d fallidas\n",
+           _prb_total, _prb_total - _prb_fallos, _prb_fallos);
+    fflush(stdout);
+    if (_prb_fallos > 0) exit(1);
+    return valor_nulo();
+}
+
+static void cargar_pruebas(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"suite",    fn_prb_suite,    1},
+        {"afirmar",  fn_prb_afirmar,  2},
+        {"igual",    fn_prb_igual,    3},
+        {"lanza",    fn_prb_lanza,    2},
+        {"resumen",  fn_prb_resumen,  0},
+    };
+    registrar_modulo_diccionario(entorno, "pruebas",
+        fns, 5, NULL, NULL, 0);
+}
+
 static void cargar_matematica(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"raiz",       fn_mat_raiz,       1},
@@ -2278,6 +2385,7 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"expresiones", cargar_expresiones},
     {"servidor", cargar_servidor},
     {"terminal", cargar_terminal},
+    {"pruebas", cargar_pruebas},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -2304,7 +2412,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones",
+        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }

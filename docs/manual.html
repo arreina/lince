@@ -147,13 +147,13 @@
 <div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
-<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a></div>
+<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `pruebas`</a></div>
 </nav>
 
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>39 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>40 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -646,7 +646,22 @@ tiempo.esperar(<span class="n">20</span>)
 servidor.obtener(<span class="s">&quot;/&quot;</span>, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> peticion): <span class="t">diccionario</span> {
     <span class="k">devolver</span> {<span class="s">&quot;codigo&quot;</span>: <span class="n">200</span>, <span class="s">&quot;tipo&quot;</span>: <span class="s">&quot;text/plain&quot;</span>, <span class="s">&quot;cuerpo&quot;</span>: <span class="s">&quot;hola desde Lince&quot;</span>}
 })
-<span class="k">escribir</span>(<span class="s">&quot;ruta registrada&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>ruta registrada</pre></div><span class="fuente">970_red_y_servidor.lince</span></article></section>
+<span class="k">escribir</span>(<span class="s">&quot;ruta registrada&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>ruta registrada</pre></div><span class="fuente">970_red_y_servidor.lince</span></article><article class="ej" id="modulos-y-librerias-8"><h3>El módulo `pruebas`</h3><p class="nota">Pruebas unitarias para tus programas: `afirmar` comprueba una condición, `igual` compara valores (también listas y diccionarios), `lanza` comprueba que una función da error y `resumen` imprime el total y termina con código 1 si algo falló, ideal para la integración continua.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;pruebas&quot;</span>
+
+<span class="k">funcion</span> doble(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">numero</span> {
+    <span class="k">devolver</span> n * <span class="n">2</span>
+}
+
+pruebas.suite(<span class="s">&quot;doble&quot;</span>)
+pruebas.afirmar(<span class="s">&quot;doble de 4 es 8&quot;</span>, doble(<span class="n">4</span>) == <span class="n">8</span>)
+pruebas.igual(<span class="s">&quot;una lista de dobles&quot;</span>, [doble(<span class="n">1</span>), doble(<span class="n">2</span>)], [<span class="n">2</span>, <span class="n">4</span>])
+pruebas.lanza(<span class="s">&quot;dividir por cero da error&quot;</span>, <span class="k">funcion</span>(): <span class="k">nulo</span> { <span class="k">sea</span> x = <span class="n">1</span> / <span class="n">0</span> })
+pruebas.resumen()</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>  ▶ doble
+    ✅ doble de 4 es 8
+    ✅ una lista de dobles
+    ✅ dividir por cero da error
+
+  3 pruebas: 3 correctas, 0 fallidas</pre></div><span class="fuente">980_pruebas.lince</span></article></section>
 </main>
 </div>
 

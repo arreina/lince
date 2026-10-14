@@ -91,7 +91,7 @@
     },
     "palabras_clave_modulos": {
       "name": "support.class.module.lince",
-      "match": "\\b(matematica|texto|archivos|tiempo|sistema|json|red|expresiones|servidor|terminal)(?=\\.)"
+      "match": "\\b(matematica|texto|archivos|tiempo|sistema|json|red|expresiones|servidor|terminal|pruebas)(?=\\.)"
     },
     "literales": {
       "patterns": [
