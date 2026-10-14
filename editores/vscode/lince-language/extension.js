@@ -76,11 +76,13 @@ function atender(msg) {
 // ── ciclo de vida del servidor ──────────────
 function arrancar() {
     const ruta = vscode.workspace.getConfiguration('lince').get('ruta') || 'lince';
-    proceso = cp.spawn(ruta, ['lsp'], { stdio: ['pipe', 'pipe', 'ignore'] });
+    const p = cp.spawn(ruta, ['lsp'], { stdio: ['pipe', 'pipe', 'ignore'] });
+    proceso = p;
+    p.stdin.on('error', () => { /* proceso muerto: se ignora */ });
     buffer = Buffer.alloc(0);
-    proceso.stdout.on('data', alRecibir);
-    proceso.on('error', () => {
-        proceso = null;
+    p.stdout.on('data', alRecibir);
+    p.on('error', () => {
+        if (proceso === p) proceso = null;
         if (!avisado) {
             avisado = true;
             vscode.window.showWarningMessage(
@@ -88,7 +90,7 @@ function arrancar() {
                 `autocompletado. Instala Lince o indica su ruta en el ajuste «lince.ruta».`);
         }
     });
-    proceso.on('exit', () => { proceso = null; });
+    p.on('exit', () => { if (proceso === p) proceso = null; });
     pedir('initialize', { processId: process.pid, rootUri: null, capabilities: {} })
         .then(() => {
             notificar('initialized', {});
@@ -118,6 +120,7 @@ function cambiar(doc) {
     const clave = doc.uri.toString();
     clearTimeout(versiones.get(clave));
     versiones.set(clave, setTimeout(() => {
+        versiones.delete(clave);
         notificar('textDocument/didChange', {
             textDocument: { uri: clave, version: doc.version },
             contentChanges: [{ text: doc.getText() }] });
@@ -126,6 +129,8 @@ function cambiar(doc) {
 
 function cerrar(doc) {
     if (!esLince(doc)) return;
+    clearTimeout(versiones.get(doc.uri.toString()));
+    versiones.delete(doc.uri.toString());
     notificar('textDocument/didClose', { textDocument: { uri: doc.uri.toString() } });
     diagnosticos.delete(doc.uri);
 }

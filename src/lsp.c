@@ -72,6 +72,8 @@ int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max
     int estado = 0;
     waitpid(pid, &estado, 0);
     if (WIFEXITED(estado) && WEXITSTATUS(estado) == 0) return 0;
+    /* muerto por señal (alarma, fallo del parser): no es un error de sintaxis */
+    if (WIFSIGNALED(estado) && buf[0] == '\0') return 0;
 
     /* "❌ Error en línea N:\n   mensaje\n   mensaje" */
     *linea = 1;
@@ -448,7 +450,9 @@ static char *leer_fichero(const char *ruta) {
     fseek(f, 0, SEEK_END);
     long n = ftell(f);
     rewind(f);
+    if (n < 0 || n > (64L << 20)) { fclose(f); return NULL; }
     char *t = malloc((size_t)n + 1);
+    if (!t) { fclose(f); return NULL; }
     size_t k = fread(t, 1, (size_t)n, f);
     t[k] = '\0';
     fclose(f);
