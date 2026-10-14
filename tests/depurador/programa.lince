@@ -1,0 +1,11 @@
+funcion suma(val numero a, val numero b): numero {
+    sea r = a + b
+    devolver r
+}
+
+sea total = 0
+sea i = 1
+para (i = 1; i <= 3; i++) {
+    total = suma(total, i)
+}
+escribir(total)

@@ -3,7 +3,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -Wno-maybe-uninitialized -Wno-format-truncation -Wno-stringop-truncation
 LDFLAGS = -lm -ldl
-SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c
+SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c
 
 # ── Detección de plataforma ───────────────
 UNAME := $(shell uname 2>/dev/null || echo Windows)
@@ -80,6 +80,7 @@ test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner_compilador.lince'
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) tests/servidor/smoke.sh ./lince_debug 8124'
 	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
+	@bash -c '$(ASAN_ENV) tests/depurador/smoke.sh ./lince_debug'
 
 # Servidor de lenguaje ('lince lsp'): habla el protocolo de verdad.
 test-lsp: $(BIN)
@@ -92,7 +93,7 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-asan
+test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-depurador test-asan
 
 # ── Manual ────────────────────────────────
 # docs/manual.html se genera: los ejemplos son .lince de verdad y la salida
@@ -115,6 +116,9 @@ editores:
 
 editores-check:
 	@python3 editores/generar.py --comprobar
+
+test-depurador: $(BIN)
+	@bash tests/depurador/smoke.sh ./$(BIN)
 
 # Medidas de rendimiento del intérprete (bench/*.lince): tiempo y memoria de cada una
 bench: all
@@ -150,6 +154,6 @@ else
 endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-lsp test-editores editores editores-check bench vsix \
+        test-asan test-depurador test-lsp test-editores editores editores-check bench vsix \
         test-todo clean install uninstall docs docs-check
 

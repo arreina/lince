@@ -27,6 +27,7 @@ static int    hay_retorno    = 0;
    resuelva junto a la librería y no junto a quien la usó. */
 static char _archivo_actual[1024] = "";
 
+const char *interprete_archivo_actual(void) { return _archivo_actual; }
 void interprete_fijar_archivo(const char *ruta) {
     snprintf(_archivo_actual, sizeof(_archivo_actual), "%s", ruta ? ruta : "");
 }
@@ -45,11 +46,26 @@ static void _directorio_de(const char *archivo, char *destino, size_t max) {
 static Valor *valor_retorno  = NULL;
 static Valor *esto_actual    = NULL;
 static ClaseLince *clase_actual = NULL;
+#define MAX_PROFUNDIDAD 500
 static int    profundidad    = 0;
+
+/* Pila de llamadas para el depurador: nombre y línea de cada llamada activa */
+#define PILA_MAX (MAX_PROFUNDIDAD + 8)
+static const char *_pila_nombre[PILA_MAX];
+static int         _pila_linea[PILA_MAX];
+static void (*_hook_sentencia)(Nodo *s, Entorno *e) = NULL;
+
+void interprete_fijar_hook(void (*hook)(Nodo *sentencia, Entorno *e)) { _hook_sentencia = hook; }
+int  interprete_profundidad(void) { return profundidad; }
+const char *interprete_archivo_actual(void);
+int  interprete_pila(int nivel, const char **nombre, int *linea) {
+    if (nivel < 1 || nivel > profundidad) return 0;
+    *nombre = _pila_nombre[nivel]; *linea = _pila_linea[nivel];
+    return 1;
+}
 static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
                             Valor **args, int nargs, int linea);
 static FuncionLince *buscar_metodo(ClaseLince *cls, const char *nombre);
-#define MAX_PROFUNDIDAD 500
 #define MAX_GENERADOR   10000  /* límite de seguridad para generadores */
 static int    hay_producir   = 0;
 static Valor *generador_actual = NULL; /* lista acumulando valores producidos */
@@ -1422,6 +1438,7 @@ static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
             "El método '%s' espera %d argumento(s), recibió %d.",
             f->nombre, f->num_parametros, nargs);
     }
+    if (profundidad >= 0 && profundidad + 1 < PILA_MAX) { _pila_nombre[profundidad + 1] = f->nombre; _pila_linea[profundidad + 1] = linea; }
     if (++profundidad > MAX_PROFUNDIDAD) {
         profundidad = 0;
         char msg[128];
@@ -1745,6 +1762,7 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
 }
 
 static Valor *exec_llamada(Nodo *n, Entorno *e) {
+    if (profundidad >= 0 && profundidad + 1 < PILA_MAX) { _pila_nombre[profundidad + 1] = n->llamada.nombre; _pila_linea[profundidad + 1] = n->linea; }
     if (++profundidad > MAX_PROFUNDIDAD) {
         profundidad = 0;
         char msg[128];
@@ -2167,6 +2185,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
             return err;
         }
 
+        if (profundidad >= 0 && profundidad + 1 < PILA_MAX) { _pila_nombre[profundidad + 1] = met_nombre; _pila_linea[profundidad + 1] = n->linea; }
         if (++profundidad > MAX_PROFUNDIDAD) {
             profundidad = 0;
             char msg[128];
@@ -3041,6 +3060,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             Valor *ultimo = valor_nulo();
             for (int i = 0; i < n->bloque.cantidad && !hay_retorno && !hay_error; i++) {
                 valor_destruir(ultimo);
+                if (_hook_sentencia) _hook_sentencia(n->bloque.sentencias[i], e);
                 ultimo = ejecutar(n->bloque.sentencias[i], e);
             }
             return ultimo;

@@ -84,6 +84,7 @@ typedef struct Nodo Nodo;
 struct Nodo {
     TipoNodo tipo;
     int      linea;   /* línea del código fuente */
+    int      linea_ini; /* sentencias: línea donde empiezan (0 si no es una sentencia) */
     union {
         /* NODO_NUMERO */
         double numero;

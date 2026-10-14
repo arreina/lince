@@ -63,7 +63,7 @@ static void error_sintaxis(Parser *p, const char *mensaje) {
 static Nodo *nodo_nuevo(TipoNodo tipo, Parser *p) {
     Nodo *n = calloc(1, sizeof(Nodo));
     n->tipo  = tipo;
-    n->linea = p ? actual(p)->linea : 0;
+    n->linea = !p ? 0 : (p->pos > 0 ? p->tokens[p->pos - 1].linea : actual(p)->linea);
     return n;
 }
 
@@ -1195,7 +1195,7 @@ static Nodo *sent_intentar(Parser *p) {
     return n;
 }
 
-static Nodo *sentencia(Parser *p) {
+static Nodo *sentencia_interna(Parser *p) {
     if (coincide(p, TOK_SEA))      return sent_declaracion(p, 0);
     if (coincide(p, TOK_FIJO))     return sent_declaracion(p, 1);
     if (coincide(p, TOK_ESCRIBIR)) return sent_escribir(p);
@@ -1373,6 +1373,15 @@ static Nodo *sentencia(Parser *p) {
 
     error_sintaxis(p, "Sentencia no reconocida.");
     return NULL;
+}
+
+/* Cada sentencia recuerda la línea donde EMPIEZA (el depurador la necesita:
+   'linea' es la del token que sigue a lo ya leído al crear el nodo). */
+static Nodo *sentencia(Parser *p) {
+    int inicio = actual(p)->linea;
+    Nodo *n = sentencia_interna(p);
+    if (n) n->linea_ini = inicio;
+    return n;
 }
 /* ─────────────────────────────────────────
    API PÚBLICA

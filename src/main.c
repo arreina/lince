@@ -12,6 +12,7 @@
 #include "repl.h"
 #include "paquetes.h"
 #include "empaquetado.h"
+#include "depurador.h"
 #include "lsp.h"
 
 static char *leer_archivo(const char *ruta) {
@@ -40,6 +41,7 @@ static void mostrar_ayuda(void) {
     printf("  lince compilar <archivo.lince>           Compila a binario nativo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
     printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
+    printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");
     printf("  lince                                    Abre el REPL interactivo\n");
     printf("  lince instalar <url>                     Instala un paquete\n");
@@ -92,6 +94,15 @@ int main(int argc, char *argv[]) {
 
     /* Servidor de lenguaje para editores: 'lince lsp' */
     if (strcmp(cmd, "lsp") == 0) return lsp_servir();
+
+    /* Depurador interactivo: 'lince depurar archivo.lince [args]' */
+    if (strcmp(cmd, "depurar") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "\n❌ Uso: lince depurar <archivo.lince> [argumentos]\n\n");
+            return 1;
+        }
+        return depurador_ejecutar(argv[2], argc - 3, argv + 3);
+    }
 
     /* Comprobar la sintaxis sin ejecutar: 'lince comprobar archivo.lince' */
     if (strcmp(cmd, "comprobar") == 0) {

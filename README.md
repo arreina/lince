@@ -74,6 +74,7 @@ cd lince && make
 ```bash
 lince programa.lince              # ejecutar
 lince compilar programa.lince     # crear un ejecutable autónomo
+lince depurar programa.lince      # depurar paso a paso
 lince comprobar programa.lince    # sólo comprobar la sintaxis
 lince lsp                         # servidor de lenguaje para tu editor
 lince                             # REPL interactivo

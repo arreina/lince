@@ -937,6 +937,31 @@ iteraciones 0,6 · diccionario de 50.000 claves 0,04.
 
 ---
 
+## Depurador
+
+```bash
+lince depurar programa.lince [argumentos]
+```
+
+Ejecuta el programa parándose en la primera línea. Comandos:
+
+| Comando | Qué hace |
+|---------|----------|
+| `s` / `paso` | ejecuta la siguiente línea, entrando en las funciones |
+| `n` / `siguiente` | ejecuta la siguiente línea sin entrar en las funciones |
+| `o` / `salir` | sigue hasta salir de la función actual |
+| `c` / `continuar` | sigue hasta el siguiente punto de parada (o el final) |
+| `b 12`, `b lib.lince:5` | pone un punto de parada; `bs` los lista y `d n` borra el n-ésimo |
+| `l`, `l 20` | muestra el código alrededor de la línea actual o de la indicada |
+| `p expr` | evalúa una expresión en el ámbito actual (`p x * 2`, o `p x = 5` para cambiarla) |
+| `v` / `g` | variables locales / globales |
+| `bt` | pila de llamadas |
+| `q` | termina el programa |
+
+Si no hay más entrada (stdin cerrado), el programa sigue hasta el final.
+
+---
+
 ## REPL interactivo
 
 ```bash
@@ -944,6 +969,7 @@ lince          # abre el REPL
 lince prog.lince               # ejecuta archivo
 lince prog.lince arg1 arg2     # con argumentos
 lince compilar prog.lince      # crea un ejecutable autónomo
+lince depurar prog.lince       # depurador paso a paso
 ```
 
 ### Comandos del REPL

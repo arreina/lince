@@ -217,6 +217,13 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs);
    'importar "./x"' junto al fichero que los escribe, no junto al directorio
    de trabajo de quien lanza el programa. */
 void interprete_fijar_archivo(const char *ruta);
+const char *interprete_archivo_actual(void);
+
+/* Depuración: el hook se llama antes de cada sentencia de un bloque. */
+void interprete_fijar_hook(void (*hook)(Nodo *sentencia, Entorno *e));
+int  interprete_profundidad(void);
+/* Llamada activa 'nivel' (1 = la más externa): nombre y línea desde la que se hizo */
+int  interprete_pila(int nivel, const char **nombre, int *linea);
 
 /* Lector de archivos 'importar' alternativo al disco (programas empaquetados):
    devuelve el contenido de la ruta o NULL si no es suyo. */
