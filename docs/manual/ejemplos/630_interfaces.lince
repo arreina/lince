@@ -1,0 +1,37 @@
+# @seccion: Clases
+# @titulo: Interfaces
+# @nota: Una `interfaz` lista los métodos que una clase promete tener. Si a la clase le falta alguno, `implementa` da error al declararla.
+interfaz Forma {
+    funcion area(): numero
+    funcion describir(): texto
+}
+
+clase Rectangulo implementa Forma {
+    funcion crear(val numero ancho, val numero alto): nulo {
+        mi.ancho = ancho
+        mi.alto  = alto
+    }
+    funcion area(): numero {
+        devolver mi.ancho * mi.alto
+    }
+    funcion describir(): texto {
+        devolver "Rectángulo " + mi.ancho + "x" + mi.alto
+    }
+}
+
+clase Cuadrado implementa Forma {
+    funcion crear(val numero lado): nulo {
+        mi.lado = lado
+    }
+    funcion area(): numero {
+        devolver mi.lado * mi.lado
+    }
+    funcion describir(): texto {
+        devolver "Cuadrado de lado " + mi.lado
+    }
+}
+
+sea lista formas = [Rectangulo(2, 3), Cuadrado(5)]
+para cada elemento f en formas {
+    escribir(f.describir() + " → " + f.area())
+}

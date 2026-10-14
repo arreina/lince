@@ -1,0 +1,7 @@
+# @seccion: Módulos y librerías
+# @titulo: Clases de una librería con `como`
+# @nota: Las clases de la librería se instancian por el alias: `figuras.Cuadrado(3)`.
+importar "./lib_figuras" como figuras
+
+sea c = figuras.Cuadrado(3)
+escribir(c.area())

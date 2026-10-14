@@ -1,0 +1,23 @@
+# @seccion: Clases
+# @titulo: Enumeraciones
+# @nota: Una `enumeracion` da nombre a un conjunto fijo de valores. Se comparan con `==` y encajan en `elegir`.
+enumeracion Semaforo {
+    Rojo
+    Ambar
+    Verde
+}
+
+funcion accion(val texto s): texto {
+    elegir s {
+        caso Semaforo.Rojo  { devolver "parar" }
+        caso Semaforo.Ambar { devolver "precaución" }
+        otro                { devolver "avanzar" }
+    }
+    devolver ""
+}
+
+sea luz = Semaforo.Ambar
+escribir(luz == Semaforo.Ambar)
+escribir(accion(Semaforo.Rojo))
+escribir(accion(luz))
+escribir(accion(Semaforo.Verde))

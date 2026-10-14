@@ -1,0 +1,15 @@
+# @seccion: Módulos y librerías
+# @titulo: Los módulos `archivos` y `sistema`
+# @nota: `archivos` lee y escribe en disco; `sistema` ejecuta órdenes del sistema y lee el entorno.
+importar "archivos"
+importar "sistema"
+
+sea ruta = "/tmp/lince_manual_ejemplo.txt"
+archivos.escribir(ruta, "hola")
+archivos.agregar(ruta, " mundo")
+escribir(archivos.leer(ruta))
+escribir(archivos.existe(ruta))
+archivos.eliminar(ruta)
+escribir(archivos.existe(ruta))
+
+escribir(sistema.ejecutar("echo desde el sistema"))

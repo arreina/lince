@@ -1,0 +1,15 @@
+# @seccion: Módulos y librerías
+# @titulo: Los módulos `texto` y `expresiones`
+# @nota: `texto` trocea, une y rellena; `expresiones` busca patrones (expresiones regulares).
+importar "texto"
+importar "expresiones"
+
+sea partes = texto.dividir("a,b,c", ",")
+escribir(partes)
+escribir(texto.unir(partes, " - "))
+escribir(texto.rellenar_izq("7", 3, "0"))
+escribir(texto.empieza_con("lince", "li"))
+
+escribir(expresiones.coincidir("abc123", "[0-9]+"))
+escribir(expresiones.buscar("precio: 42 euros", "[0-9]+"))
+escribir(expresiones.reemplazar("a1b22c", "[0-9]+", "#"))
