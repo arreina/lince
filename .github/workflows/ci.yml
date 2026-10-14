@@ -45,6 +45,9 @@ jobs:
       - name: Los editores están al día
         run: make editores-check
 
+      - name: El código de cripto embebido en el compilador está al día
+        run: make embebidos-check
+
       # El manual publica la salida real de cada ejemplo, así que si alguien
       # toca uno sin regenerar —o el lenguaje cambia de comportamiento— la
       # página quedaría mintiendo. Esto lo detecta.

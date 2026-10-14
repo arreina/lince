@@ -769,6 +769,24 @@ tiempo.analizar_utc("2024-02-29", "%Y-%m-%d")            # marca de tiempo, o nu
 `_utc` no dependen de la zona horaria. `dia_semana` va de 0 (domingo) a 6. Los
 formatos son los de `strftime`. `analizar` no está disponible en Windows.
 
+### `cripto`
+
+```lince
+importar "cripto"
+cripto.sha256("abc")                  # "ba7816bf..." (hexadecimal)
+cripto.sha1("abc")   cripto.md5("abc")
+cripto.hmac_sha256("clave", "texto")  # firma de un mensaje
+cripto.base64("Hola")                 # "SG9sYQ=="
+cripto.desbase64("SG9sYQ==")          # "Hola"; nulo si no es base64 válido
+cripto.hex("Lince")                   # "4c696e6365"
+cripto.deshex("4c696e6365")           # "Lince"; nulo si no es hexadecimal válido
+```
+
+Trabajan con texto, así que no admiten datos binarios con bytes nulos.
+`sha1` y `md5` están rotos para firmas y seguridad: úsalos solo para sumas de
+comprobación o por compatibilidad. Para guardar contraseñas, no basta un hash
+rápido.
+
 ### `sqlite`
 
 ```lince

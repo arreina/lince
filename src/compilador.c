@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "compilador.h"
+#include "cripto_embebido.h"
 #include "parser.h"
 
 /* ─────────────────────────────────────────
@@ -982,6 +983,7 @@ static void compilar_expr(Compilador *c, Nodo *n) {
                 if (strcmp(mod, "servidor") == 0)    _fn_mod = "_lmod_srv_get";
                 if (strcmp(mod, "pruebas") == 0)     _fn_mod = "_lmod_prb_get";
                 if (strcmp(mod, "sqlite") == 0)      _fn_mod = "_lmod_sql_get";
+                if (strcmp(mod, "cripto") == 0)      _fn_mod = "_lmod_cr_get";
                 if (_fn_mod) {
                     if (nargs > 0) {
                         fprintf(c->salida, "({ LValor *%s[%d] = {", args_arr, nargs);
@@ -2459,6 +2461,47 @@ static void emitir_modulo_compilado(Compilador *c, const char *nombre) {
             "}\n"
         );
         registrar_funcion(c, "sqlite");
+    }
+
+    else if (strcmp(nombre, "cripto") == 0) {
+        fprintf(c->salida, "/* módulo cripto */\n");
+        fputs(CRIPTO_C, c->salida);
+        fprintf(c->salida,
+            "static LValor *_cr_txt(LValor **a, int n, int i, const char *fn) {\n"
+            "    if (i < n && a[i]->tipo == L_TXT) return a[i];\n"
+            "    char msg[96]; snprintf(msg, sizeof(msg), \"%%s() espera texto\", fn);\n"
+            "    LINCE_LANZAR(\"ErrorTipo\", msg);\n"
+            "    return NULL;\n"
+            "}\n"
+            "static LValor *_cr_devolver(char *s) {\n"
+            "    if (!s) return lince_nulo();\n"
+            "    LValor *v = lince_txt(s); free(s); return v;\n"
+            "}\n"
+            "static LValor *_lmod_cr_get(const char *prop, LValor **args, int nargs) {\n"
+            "    unsigned char h[32];\n"
+            "    if (strcmp(prop, \"sha256\") == 0) { LValor *t = _cr_txt(args, nargs, 0, prop);\n"
+            "        cr_sha256((const unsigned char *)t->txt, strlen(t->txt), h); return _cr_devolver(cr_hex(h, 32)); }\n"
+            "    if (strcmp(prop, \"sha1\") == 0) { LValor *t = _cr_txt(args, nargs, 0, prop);\n"
+            "        cr_sha1((const unsigned char *)t->txt, strlen(t->txt), h); return _cr_devolver(cr_hex(h, 20)); }\n"
+            "    if (strcmp(prop, \"md5\") == 0) { LValor *t = _cr_txt(args, nargs, 0, prop);\n"
+            "        cr_md5((const unsigned char *)t->txt, strlen(t->txt), h); return _cr_devolver(cr_hex(h, 16)); }\n"
+            "    if (strcmp(prop, \"hmac_sha256\") == 0) {\n"
+            "        LValor *k = _cr_txt(args, nargs, 0, prop), *t = _cr_txt(args, nargs, 1, prop);\n"
+            "        cr_hmac_sha256((const unsigned char *)k->txt, strlen(k->txt),\n"
+            "                       (const unsigned char *)t->txt, strlen(t->txt), h);\n"
+            "        return _cr_devolver(cr_hex(h, 32)); }\n"
+            "    if (strcmp(prop, \"base64\") == 0) { LValor *t = _cr_txt(args, nargs, 0, prop);\n"
+            "        return _cr_devolver(cr_base64((const unsigned char *)t->txt, strlen(t->txt))); }\n"
+            "    if (strcmp(prop, \"desbase64\") == 0) { LValor *t = _cr_txt(args, nargs, 0, prop);\n"
+            "        return _cr_devolver(cr_desbase64(t->txt)); }\n"
+            "    if (strcmp(prop, \"hex\") == 0) { LValor *t = _cr_txt(args, nargs, 0, prop);\n"
+            "        return _cr_devolver(cr_hex((const unsigned char *)t->txt, strlen(t->txt))); }\n"
+            "    if (strcmp(prop, \"deshex\") == 0) { LValor *t = _cr_txt(args, nargs, 0, prop);\n"
+            "        return _cr_devolver(cr_deshex(t->txt)); }\n"
+            "    return lince_nulo();\n"
+            "}\n"
+        );
+        registrar_funcion(c, "cripto");
     }
 
     else if (strcmp(nombre, "sistema") == 0) {

@@ -2531,6 +2531,82 @@ static void cargar_sqlite(Entorno *entorno) {
         fns, 5, NULL, NULL, 0);
 }
 
+/* ─────────────────────────────────────────
+   MÓDULO: cripto
+   Hashes, HMAC, base64 y hexadecimal (src/cripto.h). Trabajan con texto.
+───────────────────────────────────────── */
+#include "cripto.h"
+
+static Valor *cr_txt_arg(Valor **a, int n, int i, const char *fn) {
+    if (i < n && a[i]->tipo == VAL_TEXTO) return a[i];
+    char msg[96];
+    snprintf(msg, sizeof(msg), "%s() espera texto", fn);
+    hay_error = 1;
+    valor_error = valor_error_nuevo("ErrorTipo", msg, 0);
+    return NULL;
+}
+
+static Valor *cr_devolver(char *s) {
+    if (!s) return valor_nulo();
+    Valor *v = valor_texto(s);
+    free(s);
+    return v;
+}
+
+#define CR_HASH(nombre, tam, fn) \
+static Valor *fn_cr_##nombre(Valor **a, int n) { \
+    Valor *t = cr_txt_arg(a, n, 0, #nombre); \
+    if (!t) return valor_nulo(); \
+    unsigned char h[tam]; \
+    fn((const unsigned char *)t->texto, strlen(t->texto), h); \
+    return cr_devolver(cr_hex(h, tam)); \
+}
+CR_HASH(sha256, 32, cr_sha256)
+CR_HASH(sha1,   20, cr_sha1)
+CR_HASH(md5,    16, cr_md5)
+
+static Valor *fn_cr_hmac_sha256(Valor **a, int n) {
+    Valor *k = cr_txt_arg(a, n, 0, "hmac_sha256");
+    Valor *t = k ? cr_txt_arg(a, n, 1, "hmac_sha256") : NULL;
+    if (!k || !t) return valor_nulo();
+    unsigned char h[32];
+    cr_hmac_sha256((const unsigned char *)k->texto, strlen(k->texto),
+                   (const unsigned char *)t->texto, strlen(t->texto), h);
+    return cr_devolver(cr_hex(h, 32));
+}
+
+static Valor *fn_cr_base64(Valor **a, int n) {
+    Valor *t = cr_txt_arg(a, n, 0, "base64");
+    return t ? cr_devolver(cr_base64((const unsigned char *)t->texto, strlen(t->texto))) : valor_nulo();
+}
+static Valor *fn_cr_desbase64(Valor **a, int n) {
+    Valor *t = cr_txt_arg(a, n, 0, "desbase64");
+    return t ? cr_devolver(cr_desbase64(t->texto)) : valor_nulo();
+}
+static Valor *fn_cr_hex(Valor **a, int n) {
+    Valor *t = cr_txt_arg(a, n, 0, "hex");
+    return t ? cr_devolver(cr_hex((const unsigned char *)t->texto, strlen(t->texto))) : valor_nulo();
+}
+static Valor *fn_cr_deshex(Valor **a, int n) {
+    Valor *t = cr_txt_arg(a, n, 0, "deshex");
+    return t ? cr_devolver(cr_deshex(t->texto)) : valor_nulo();
+}
+
+static void cargar_cripto(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"sha256",      fn_cr_sha256,      1},
+        {"sha1",        fn_cr_sha1,        1},
+        {"md5",         fn_cr_md5,         1},
+        {"hmac_sha256", fn_cr_hmac_sha256, 2},
+        {"base64",      fn_cr_base64,      1},
+        {"desbase64",   fn_cr_desbase64,   1},
+        {"hex",         fn_cr_hex,         1},
+        {"deshex",      fn_cr_deshex,      1},
+    };
+    registrar_modulo_diccionario(entorno, "cripto",
+        fns, 8, NULL, NULL, 0);
+}
+
 static void cargar_matematica(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"raiz",       fn_mat_raiz,       1},
@@ -2723,6 +2799,7 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"terminal", cargar_terminal},
     {"pruebas", cargar_pruebas},
     {"sqlite", cargar_sqlite},
+    {"cripto", cargar_cripto},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -2749,7 +2826,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite",
+        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite, cripto",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }
