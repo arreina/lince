@@ -1,0 +1,30 @@
+2
+1000
+10
+5
+50
+Cuenta(ana)
+hola Cuenta(ana)
+60
+falso
+falso
+verdadero
+verdadero
+falso
+verdadero
+1 El campo 'saldo' de 'Cuenta' es privado: no se puede leer desde aquí.
+2 El campo 'saldo' de 'Cuenta' es privado: no se puede modificar desde aquí.
+3 El método 'secreto' de 'Cuenta' es privado: no se puede llamar desde aquí.
+4 'Cuenta.MAX' es constante ('fijo'): no se puede modificar.
+5 negativo
+7
+8
+6 El campo 'clave' de 'Base' es privado: no se puede leer desde aquí.
+7 El método 'interno' de 'Base' es privado: no se puede llamar desde aquí.
+42
+1
+2
+verdadero
+verdadero
+verdadero
+verdadero

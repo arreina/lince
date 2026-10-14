@@ -1241,6 +1241,53 @@ static void orden_merge(Valor **src, Valor **tmp, int ini, int fin,
     orden_mezclar(src, tmp, ini, med, fin, ctx);
 }
 
+/* ── Fuentes de los 'importar' ──
+   Un programa empaquetado (lince compilar) lleva dentro los archivos que
+   importa; el anfitrión que lo arranca registra un lector que los sirve por
+   su ruta. Si el lector no los tiene, se leen del disco como siempre. */
+static const char *(*_lector_embebido)(const char *ruta) = NULL;
+
+void interprete_fijar_lector(const char *(*lector)(const char *ruta)) {
+    _lector_embebido = lector;
+}
+
+/* Contenido del archivo 'ruta' (con malloc), o NULL si no existe */
+char *interprete_leer_fuente(const char *ruta) {
+    if (_lector_embebido) {
+        const char *emb = _lector_embebido(ruta);
+        if (emb) return strdup(emb);
+    }
+    FILE *f = fopen(ruta, "r");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long tam = ftell(f);
+    rewind(f);
+    char *codigo = malloc(tam + 1);
+    size_t leido = fread(codigo, 1, tam, f);
+    codigo[leido] = '\0';
+    fclose(f);
+    return codigo;
+}
+
+/* Ruta de 'importar "./x"' hecho desde 'archivo_actual': primero junto a ese
+   fichero y, si ahí no está, en el directorio de trabajo. 1 si existe. */
+int interprete_resolver_import(const char *archivo_actual, const char *nombre,
+                               char *ruta, size_t max) {
+    if (archivo_actual && archivo_actual[0]) {
+        char dir[1024];
+        _directorio_de(archivo_actual, dir, sizeof(dir));
+        if (dir[0]) {
+            snprintf(ruta, max, "%s/%s.lince", dir, nombre);
+            char *c = interprete_leer_fuente(ruta);
+            if (c) { free(c); return 1; }
+        }
+    }
+    snprintf(ruta, max, "%s.lince", nombre);
+    char *c = interprete_leer_fuente(ruta);
+    if (c) { free(c); return 1; }
+    return 0;
+}
+
 /* El caso NODO_IMPORTAR, fuera de ejecutar() a propósito.
  *
  * ejecutar() es recursiva y su marco de pila se paga en cada nodo del árbol.
@@ -1267,21 +1314,14 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
                 return valor_nulo();
             }
             /* Ejecutar el archivo del paquete en el entorno actual */
-            FILE *f = fopen(ruta, "r");
-            if (!f) {
+            char *codigo = interprete_leer_fuente(ruta);
+            if (!codigo) {
                 valor_error = valor_error_nuevo("Error",
                     "No se pudo leer el paquete.", n->linea);
                 hay_error = 1;
                 return valor_nulo();
             }
-            if (importado_ya(ruta)) { fclose(f); return valor_nulo(); }
-
-            fseek(f, 0, SEEK_END);
-            long tam = ftell(f); rewind(f);
-            char *codigo = malloc(tam + 1);
-            size_t leido = fread(codigo, 1, tam, f);
-            codigo[leido] = '\0';
-            fclose(f);
+            if (importado_ya(ruta)) { free(codigo); return valor_nulo(); }
 
             Lexer  *lx  = lexer_crear(codigo);
             int     cnt = 0;
@@ -1305,21 +1345,8 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
              * que la deja en «fichero que se incluye» y no en librería. El
              * respaldo contra el cwd se mantiene para no romper nada. */
             char ruta[1024];
-            FILE *f = NULL;
 
-            if (_archivo_actual[0]) {
-                char dir[1024];
-                _directorio_de(_archivo_actual, dir, sizeof(dir));
-                if (dir[0]) {
-                    snprintf(ruta, sizeof(ruta), "%s/%s.lince", dir, nombre);
-                    f = fopen(ruta, "r");
-                }
-            }
-            if (!f) {
-                snprintf(ruta, sizeof(ruta), "%s.lince", nombre);
-                f = fopen(ruta, "r");
-            }
-            if (!f) {
+            if (!interprete_resolver_import(_archivo_actual, nombre, ruta, sizeof(ruta))) {
                 char msg[384];
                 snprintf(msg, sizeof(msg),
                     "No se encontró '%s.lince', ni junto a '%s' ni en el "
@@ -1337,14 +1364,8 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
                y un 'como geo' dejaría muda una importación simple
                posterior. Repetir el mismo alias lo caza el error de
                redefinición de más abajo. */
-            if (!alias && importado_ya(ruta)) { fclose(f); return valor_nulo(); }
-
-            fseek(f, 0, SEEK_END);
-            long tam = ftell(f); rewind(f);
-            char *codigo = malloc(tam + 1);
-            size_t leido = fread(codigo, 1, tam, f);
-            codigo[leido] = '\0';
-            fclose(f);
+            if (!alias && importado_ya(ruta)) return valor_nulo();
+            char *codigo = interprete_leer_fuente(ruta);
 
             Lexer  *lx  = lexer_crear(codigo);
             int     cnt = 0;

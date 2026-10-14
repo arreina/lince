@@ -1,0 +1,12 @@
+# TEST: un ejecutable empaquetado recibe sus soporta todo el lenguaje
+interfaz Saludo {
+    funcion saludar(): texto
+    funcion doble(): texto { devolver mi.saludar() + mi.saludar() }
+}
+clase Hola implementa Saludo {
+    funcion saludar(): texto { devolver "hola" }
+}
+sea h = Hola()
+escribir(h.doble())
+escribir(h es Saludo)
+escribir(h es Hola)

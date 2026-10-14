@@ -883,49 +883,35 @@ Los paquetes se instalan en `~/.lince/paquetes/`.
 
 ---
 
-## Compilador a binario nativo
+## Ejecutables (`lince compilar`)
 
 ```bash
 lince compilar programa.lince           # genera ./programa
 lince compilar programa.lince -o nombre # nombre personalizado
 ```
 
-Transpila a C y compila con `gcc -O2`. Requiere `gcc` instalado.
+Crea un único ejecutable autónomo: una copia del intérprete de Lince con el
+programa y todos los archivos que importa metidos dentro (`importar "./x"`, con
+o sin `como`, y `importar "paquete:x"`). En la máquina de destino no hace falta
+instalar Lince, ni `gcc`, ni llevar los archivos originales. Los argumentos que
+se le pasan al ejecutable llegan al programa con `argumentos()`.
 
-Los `importar` de archivos locales se resuelven al compilar: el archivo
-importado se inserta en el programa, así que el binario no necesita nada
-alrededor. El alias (`como`) también funciona: las definiciones de la
-librería se renombran (`nombre__alias`) y `alias.nombre` se reescribe a ese
-nombre. Dentro de un binario, el alias sólo se puede usar como `alias.nombre`
-(no como valor suelto).
+Como el ejecutable lleva el mismo intérprete, soporta el **100 % del lenguaje**
+(POO completa, `es`, generadores, todos los módulos, el servidor...) y se
+comporta exactamente igual que `lince programa.lince`. Compilar es instantáneo.
 
-### Soporte del compilador
-
-| Característica | Compilador |
-|----------------|-----------|
-| Variables, constantes, tipos | ✅ |
-| Funciones, recursión, defaults | ✅ |
-| Lambdas y closures | ✅ |
-| Listas y diccionarios | ✅ |
-| Para, mientras, hacer, para cada | ✅ |
-| Si/sino, elegir/caso | ✅ |
-| Clases, herencia, padre() | ✅ |
-| Interfaces | ✅ |
-| Enumeraciones | ✅ |
-| intentar/capturar/finalmente | ✅ |
-| Generadores y rango() | ✅ |
-| Todos los módulos estándar | ✅ |
-| Variables de nivel superior usadas en funciones | ✅ |
-| `importar "./archivo"` de un archivo local | ✅ |
-| `importar "./archivo" como alias` | ❌ — usa el intérprete |
+Notas:
+- Las bibliotecas externas que use un módulo (por ejemplo `libsqlite3` en
+  `sqlite`) siguen haciendo falta en la máquina donde se ejecute.
+- Un `importar` que no se puede resolver al compilar avisa con un ⚠ y el
+  ejecutable fallará al llegar a esa línea, como lo haría el intérprete.
+- Los archivos se leen al compilar: si cambian después, hay que volver a compilar.
 
 ### Rendimiento
 
-```
-Fibonacci(30) — intérprete:       ~4000ms
-Fibonacci(30) — binario nativo:    ~600ms
-Mejora: ~6.7x
-```
+El ejecutable va a la velocidad del intérprete. Mediciones con los programas de
+`bench/` (`make bench`), en segundos: `fib(30)` 0,5 · bucle de 5 millones de
+iteraciones 0,6 · diccionario de 50.000 claves 0,04.
 
 ---
 
@@ -935,7 +921,7 @@ Mejora: ~6.7x
 lince          # abre el REPL
 lince prog.lince               # ejecuta archivo
 lince prog.lince arg1 arg2     # con argumentos
-lince compilar prog.lince      # compila a binario
+lince compilar prog.lince      # crea un ejecutable autónomo
 ```
 
 ### Comandos del REPL
@@ -957,12 +943,12 @@ Atajos: ↑/↓ historial, ←/→ cursor, Inicio/Fin, Supr.
 
 ```bash
 make test                              # 22 tests del intérprete
-./lince tests/runner_compilador.lince  # 8 tests del compilador
+./lince tests/runner_compilador.lince  # tests de los ejecutables empaquetados
 ```
 
 **Tests del intérprete (22):** `test_variables`, `test_operadores`, `test_condicionales`, `test_bucles`, `test_funciones`, `test_listas`, `test_diccionarios`, `test_texto`, `test_clases`, `test_errores`, `test_modulos`, `test_json`, `test_sistema`, `test_enumeraciones`, `test_interfaces`, `test_closures`, `test_recursion`, `test_casos_limite`, `test_generadores`, `test_matematica`, `test_archivos`, `test_expresiones`
 
-**Tests del compilador (8):** `test_basico`, `test_listas_dics`, `test_funciones`, `test_clases`, `test_closures`, `test_generadores`, `test_errores`, `test_modulos`
+**Tests de los ejecutables (17):** programas de `tests/compilador/` que se empaquetan, se ejecutan y se comparan con su salida esperada, más `probar_empaquetado.sh` (argumentos, código de salida, archivos importados).
 
 ---
 
@@ -998,15 +984,15 @@ lince/
 │   ├── parser.c/h      # análisis sintáctico (AST)
 │   ├── interprete.c/h  # ejecución del AST
 │   ├── modulos.c/h     # módulos estándar
-│   ├── compilador.c/h  # compilador a binario nativo
+│   ├── empaquetado.c/h # lince compilar: ejecutables autónomos
 │   ├── repl.c/h        # REPL interactivo con historial
 │   ├── paquetes.c/h    # gestor de paquetes
 │   └── plataforma.h    # compatibilidad multiplataforma
 ├── tests/
 │   ├── runner.lince           # runner de tests del intérprete
-│   ├── runner_compilador.lince # runner de tests del compilador
+│   ├── runner_compilador.lince # runner de tests de los ejecutables
 │   ├── lince/                 # 22 tests del intérprete
-│   └── compilador/            # 8 tests del compilador
+│   └── compilador/            # tests de los ejecutables empaquetados
 ├── editores/           # soporte VSCode, Sublime, Notepad++
 ├── ejemplos/           # programas de ejemplo
 ├── ESPECIFICACION.md

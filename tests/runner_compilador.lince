@@ -16,7 +16,9 @@ sea lista tests = [
     "test_fechas",
     "test_division_cero",
     "test_sqlite",
-    "test_cripto"
+    "test_cripto",
+    "test_poo_avanzada",
+    "test_interfaces_defecto"
 ]
 
 sea dir_tests = "tests/compilador"

@@ -217,3 +217,14 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs);
    'importar "./x"' junto al fichero que los escribe, no junto al directorio
    de trabajo de quien lanza el programa. */
 void interprete_fijar_archivo(const char *ruta);
+
+/* Lector de archivos 'importar' alternativo al disco (programas empaquetados):
+   devuelve el contenido de la ruta o NULL si no es suyo. */
+void interprete_fijar_lector(const char *(*lector)(const char *ruta));
+
+/* Contenido (malloc) del archivo que se importaría con esa ruta, o NULL */
+char *interprete_leer_fuente(const char *ruta);
+
+/* Resuelve 'importar "./x"' desde un fichero, como el intérprete. 1 si existe */
+int interprete_resolver_import(const char *archivo_actual, const char *nombre,
+                               char *ruta, size_t max);

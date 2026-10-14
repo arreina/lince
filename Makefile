@@ -3,7 +3,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -Wno-maybe-uninitialized -Wno-format-truncation -Wno-stringop-truncation
 LDFLAGS = -lm -ldl
-SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/compilador.c src/lsp.c
+SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c
 
 # ── Detección de plataforma ───────────────
 UNAME := $(shell uname 2>/dev/null || echo Windows)
@@ -47,6 +47,7 @@ test: $(BIN)
 
 test-compilador: $(BIN)
 	@./$(BIN) tests/runner_compilador.lince
+	@bash tests/compilador/probar_empaquetado.sh
 
 # Test de humo del servidor: levanta un servidor real y le hace
 # peticiones. Es la única cobertura del módulo 'servidor'.
@@ -91,7 +92,7 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check embebidos-check test-asan
+test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-asan
 
 # ── Manual ────────────────────────────────
 # docs/manual.html se genera: los ejemplos son .lince de verdad y la salida
@@ -118,15 +119,6 @@ editores-check:
 # Medidas de rendimiento del intérprete (bench/*.lince): tiempo y memoria de cada una
 bench: all
 	@for f in bench/*.lince; do /usr/bin/time -f "$$(basename $$f) %es %MKB" ./lince $$f >/dev/null; done
-
-# El compilador pega src/cripto.h dentro de los programas que genera, a partir
-# de src/cripto_embebido.h (generado). 'embebidos-check' falla en la CI si se
-# tocó cripto.h sin regenerar.
-embebidos:
-	@python3 tools/embeber_cripto.py
-
-embebidos-check:
-	@python3 tools/embeber_cripto.py --comprobar
 
 # Extensión de VS Code empaquetada (.vsix) en build/
 vsix:
@@ -158,6 +150,6 @@ else
 endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-lsp test-editores editores editores-check embebidos embebidos-check bench vsix \
+        test-asan test-lsp test-editores editores editores-check bench vsix \
         test-todo clean install uninstall docs docs-check
 

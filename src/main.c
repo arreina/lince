@@ -11,7 +11,7 @@
 #include "interprete.h"
 #include "repl.h"
 #include "paquetes.h"
-#include "compilador.h"
+#include "empaquetado.h"
 #include "lsp.h"
 
 static char *leer_archivo(const char *ruta) {
@@ -53,7 +53,35 @@ static void mostrar_ayuda(void) {
     printf("  lince instalar https://github.com/usuario/paquete\n\n");
 }
 
+/* Ejecuta el programa que lleva dentro un ejecutable creado con 'lince compilar' */
+static int ejecutar_empaquetado(int argc, char *argv[]) {
+    const char *ruta   = empaquetado_ruta_principal();
+    const char *codigo = empaquetado_codigo_principal();
+    interprete_fijar_lector(empaquetado_buscar);
+
+    Lexer      *lexer    = lexer_crear(codigo);
+    int         cantidad = 0;
+    Token      *tokens   = lexer_tokenizar(lexer, &cantidad);
+    Parser     *parser   = parser_crear(tokens, cantidad);
+    Nodo       *programa = parser_parsear(parser);
+    Interprete *interp   = interprete_crear();
+
+    interprete_fijar_archivo(ruta);
+    interprete_set_args(argc - 1, argv + 1);   /* todos los argumentos son del programa */
+    interprete_ejecutar(interp, programa);
+
+    interprete_destruir(interp);
+    nodo_destruir(programa);
+    parser_destruir(parser);
+    lexer_destruir(lexer);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
+    /* ¿Es un ejecutable con un programa dentro? */
+    if (empaquetado_cargar(argv[0]))
+        return ejecutar_empaquetado(argc, argv);
+
     /* Sin argumentos — REPL */
     if (argc < 2) {
         repl_iniciar();
@@ -77,7 +105,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    /* Subcomando compilar */
+    /* Subcomando compilar: empaqueta el programa en un ejecutable */
     if (strcmp(cmd, "compilar") == 0) {
         if (argc < 3) {
             fprintf(stderr,
@@ -92,46 +120,26 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        /* Nombre del binario — por defecto el nombre del archivo sin .lince */
+        /* Nombre del ejecutable — por defecto el del archivo sin .lince */
         char ruta_bin[512];
-        char ruta_c[512];
         if (argc >= 5 && strcmp(argv[3], "-o") == 0) {
-            strncpy(ruta_bin, argv[4], sizeof(ruta_bin) - 1);
+            snprintf(ruta_bin, sizeof(ruta_bin), "%s", argv[4]);
         } else {
-            /* Quitar .lince del nombre */
-            strncpy(ruta_bin, archivo, sizeof(ruta_bin) - 1);
+            snprintf(ruta_bin, sizeof(ruta_bin), "%s", archivo);
             char *punto = strrchr(ruta_bin, '.');
             if (punto) *punto = '\0';
+#ifdef _WIN32
+            strncat(ruta_bin, ".exe", sizeof(ruta_bin) - strlen(ruta_bin) - 1);
+#endif
         }
-        snprintf(ruta_c, sizeof(ruta_c), "%s.c", ruta_bin);
 
         printf("\n🐆 Lince — Compilador\n\n");
         printf("   Fuente  : %s\n", archivo);
-        printf("   Salida  : %s\n", ruta_bin);
-        printf("   C gen.  : %s\n\n", ruta_c);
+        printf("   Salida  : %s\n\n", ruta_bin);
 
-        char       *codigo   = leer_archivo(archivo);
-        Lexer      *lexer    = lexer_crear(codigo);
-        int         cantidad = 0;
-        Token      *tokens   = lexer_tokenizar(lexer, &cantidad);
-        Parser     *parser   = parser_crear(tokens, cantidad);
-        Nodo       *programa = parser_parsear(parser);
-
-        /* Los importar de archivos locales se resuelven en el AST antes de
-           emitir nada: así el compilador los ve como código del propio
-           archivo. */
-        int resultado = compilador_expandir_imports(programa, archivo);
+        int resultado = empaquetado_crear(archivo, ruta_bin);
         if (resultado == 0)
-            resultado = compilador_compilar(programa, ruta_c, ruta_bin);
-
-        if (resultado == 0) {
             printf("✅ Compilado correctamente → %s\n\n", ruta_bin);
-        }
-
-        nodo_destruir(programa);
-        parser_destruir(parser);
-        lexer_destruir(lexer);
-        free(codigo);
         return resultado;
     }
 

@@ -48,7 +48,7 @@ para cada elemento p en personas {
 - **Propósito general** — scripts, herramientas, automatización, aprendizaje
 - **Sin dependencias** — un solo binario, compilado con `gcc` y `make`
 - **Errores claros** — mensajes literales con número de línea exacto
-- **Compilador incluido** — genera binarios nativos ~6.7x más rápidos
+- **Ejecutables autónomos** — `lince compilar` empaqueta tu programa en un único ejecutable, sin instalar nada en destino
 
 ## Instalación
 
@@ -73,7 +73,7 @@ cd lince && make
 
 ```bash
 lince programa.lince              # ejecutar
-lince compilar programa.lince     # compilar a binario nativo
+lince compilar programa.lince     # crear un ejecutable autónomo
 lince comprobar programa.lince    # sólo comprobar la sintaxis
 lince lsp                         # servidor de lenguaje para tu editor
 lince                             # REPL interactivo
@@ -193,33 +193,27 @@ sea nums = expresiones.todos("a1 b2 c3", "[0-9]+")
 
 **Módulos disponibles:** `matematica` · `texto` · `archivos` · `tiempo` · `sistema` · `json` · `red` · `expresiones` · `terminal` · `servidor` · `pruebas` · `sqlite` · `cripto`
 
-## Compilador a binario nativo
+## Ejecutables autónomos
 
 ```bash
 lince compilar programa.lince
 ./programa
 ```
 
-El compilador transpila a C y usa `gcc -O2`. Soporta el 100% del lenguaje incluyendo closures, generadores, clases, interfaces, enumeraciones y todos los módulos.
+`lince compilar` crea un único ejecutable con tu programa y los archivos que importa dentro: se puede copiar a otra máquina sin instalar Lince ni nada más. Soporta el 100 % del lenguaje y tarda milisegundos, porque el ejecutable lleva el propio intérprete.
 
-**Rendimiento** (Fibonacci 30):
-
-| Modo | Tiempo |
-|------|--------|
-| Intérprete | ~4000ms |
-| Binario nativo | ~600ms |
-| **Mejora** | **~6.7x** |
+**Rendimiento** (`make bench`, en segundos): `fib(30)` 0,5 · bucle de 5 millones de iteraciones 0,6 · diccionario de 50.000 claves 0,04.
 
 ## Tests
 
 ```bash
 make test                              # 22 tests del intérprete
-./lince tests/runner_compilador.lince  # 8 tests del compilador
+./lince tests/runner_compilador.lince  # tests de los ejecutables
 ```
 
 ```
-✅ 22/22 tests del intérprete pasaron
-✅  8/8  tests del compilador pasaron
+✅ 34/34 tests del intérprete pasaron
+✅  17/17  tests del compilador pasaron
 ```
 
 ## Soporte para editores
@@ -241,13 +235,13 @@ lince/
 │   ├── lexer.c/h           # análisis léxico
 │   ├── parser.c/h          # análisis sintáctico
 │   ├── interprete.c/h      # evaluación
-│   ├── compilador.c/h      # compilador a binario nativo
+│   ├── empaquetado.c/h     # lince compilar: crea ejecutables autónomos
 │   ├── modulos.c/h         # módulos estándar
 │   ├── repl.c/h            # REPL con historial
 │   └── paquetes.c/h        # gestor de paquetes
 ├── tests/
 │   ├── runner.lince               # 22 tests del intérprete
-│   ├── runner_compilador.lince    # 8 tests del compilador
+│   ├── runner_compilador.lince    # tests de los ejecutables
 │   ├── lince/                     # tests del intérprete
 │   └── compilador/                # tests del compilador
 ├── editores/               # soporte para editores

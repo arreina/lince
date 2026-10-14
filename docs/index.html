@@ -509,7 +509,7 @@
   </svg>
 
   <h1>Programa en <span>español</span></h1>
-  <p>Lince es un lenguaje de programación de propósito general. Sin dependencias, compilado desde C puro, con mensajes de error claros y un compilador a binario nativo incluido.</p>
+  <p>Lince es un lenguaje de programación de propósito general. Sin dependencias, compilado desde C puro, con mensajes de error claros y ejecutables autónomos incluidos.</p>
 
   <div class="hero-btns">
     <a class="btn btn-primary" href="#instalar">
@@ -730,8 +730,8 @@ archivos.<span class="fn">escribir</span>(<span class="s">"log.txt"</span>, <spa
       </div>
       <div class="feature-card">
         <div class="feature-icon">⚡</div>
-        <h3>Compilador a binario nativo</h3>
-        <p>Transpila a C y usa gcc -O2. El binario resultante es ~6.7x más rápido que el intérprete. Sin JVM, sin runtime.</p>
+        <h3>Ejecutables autónomos</h3>
+        <p>lince compilar empaqueta tu programa y los archivos que importa en un único ejecutable. Se copia a otra máquina y funciona: sin instalar Lince, sin JVM.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📦</div>
@@ -795,35 +795,39 @@ archivos.<span class="fn">escribir</span>(<span class="s">"log.txt"</span>, <spa
   <div class="section-inner" style="display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center;">
     <div>
       <div class="section-label">Rendimiento</div>
-      <h2>Intérprete o binario nativo</h2>
+      <h2>Un script o un ejecutable</h2>
       <p style="color:var(--texto2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin-bottom:1.5rem;">
-        Usa el intérprete para desarrollo rápido. Compila a binario cuando necesitas velocidad. El compilador es parte del mismo binario — sin herramientas extra.
+        Ejecuta tus programas directamente mientras desarrollas. Cuando quieras repartirlos, empaquétalos en un solo ejecutable: el compilador es parte del mismo binario, sin herramientas extra.
       </p>
       <div class="uso-grid" style="grid-template-columns:1fr 1fr;margin-bottom:0;">
         <div class="uso-card">
           <div class="uso-cmd">lince prog.lince</div>
-          <div class="uso-desc">Ejecutar con intérprete</div>
+          <div class="uso-desc">Ejecutar directamente</div>
         </div>
         <div class="uso-card">
           <div class="uso-cmd">lince compilar prog.lince</div>
-          <div class="uso-desc">Compilar a binario nativo</div>
+          <div class="uso-desc">Crear un ejecutable autónomo</div>
         </div>
       </div>
     </div>
     <div>
       <div class="bench">
-        <div class="bench-header">Fibonacci(30) — tiempo de ejecución</div>
+        <div class="bench-header">Tiempo de ejecución (medido con make bench)</div>
         <div class="bench-row">
-          <span class="bench-label">Intérprete</span>
+          <span class="bench-label">Fibonacci(30)</span>
+          <div class="bench-bar-wrap"><div class="bench-bar" style="width:85%;background:#6A2D72;"></div></div>
+          <span class="bench-val">~0,5 s</span>
+        </div>
+        <div class="bench-row">
+          <span class="bench-label">Bucle de 5 millones</span>
           <div class="bench-bar-wrap"><div class="bench-bar" style="width:100%;background:#6A2D72;"></div></div>
-          <span class="bench-val">~4000ms</span>
+          <span class="bench-val">~0,6 s</span>
         </div>
         <div class="bench-row">
-          <span class="bench-label">Binario nativo</span>
-          <div class="bench-bar-wrap"><div class="bench-bar" style="width:15%;background:#F1BF00;"></div></div>
-          <span class="bench-val">~600ms</span>
+          <span class="bench-label">Diccionario de 50.000 claves</span>
+          <div class="bench-bar-wrap"><div class="bench-bar" style="width:7%;background:#F1BF00;"></div></div>
+          <span class="bench-val">~0,04 s</span>
         </div>
-        <div class="bench-win">✓ &nbsp;6.7x más rápido con el compilador</div>
       </div>
     </div>
   </div>
@@ -897,13 +901,13 @@ archivos.<span class="fn">escribir</span>(<span class="s">"log.txt"</span>, <spa
       <div class="tests-row">
         <div class="test-badge">
           <span class="test-check">✅</span>
-          <span class="test-count">22/22</span>
+          <span class="test-count">34/34</span>
           <span class="test-name">tests del intérprete</span>
         </div>
         <div class="test-badge">
           <span class="test-check">✅</span>
-          <span class="test-count">8/8</span>
-          <span class="test-name">tests del compilador</span>
+          <span class="test-count">17/17</span>
+          <span class="test-name">tests de los ejecutables</span>
         </div>
       </div>
     </div>
