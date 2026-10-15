@@ -25,10 +25,10 @@ escribir(matematica.es_entero(4.0))
 escribir(matematica.es_entero(4.5))
 
 importar "archivos"
-archivos.escribir("/tmp/lince_comp_mod.txt", "contenido de prueba")
-escribir(archivos.existe("/tmp/lince_comp_mod.txt"))
-sea c = archivos.leer("/tmp/lince_comp_mod.txt")
+archivos.escribir("lince_comp_mod.txt", "contenido de prueba")
+escribir(archivos.existe("lince_comp_mod.txt"))
+sea c = archivos.leer("lince_comp_mod.txt")
 escribir(c)
-archivos.eliminar("/tmp/lince_comp_mod.txt")
-escribir(archivos.existe("/tmp/lince_comp_mod.txt"))
+archivos.eliminar("lince_comp_mod.txt")
+escribir(archivos.existe("lince_comp_mod.txt"))
 

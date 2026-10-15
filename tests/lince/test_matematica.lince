@@ -38,3 +38,24 @@ sea pi_ok = matematica.PI > 3.14 y matematica.PI < 3.15
 escribir(pi_ok)
 sea e_ok = matematica.E > 2.71 y matematica.E < 2.72
 escribir(e_ok)
+
+# semilla: misma semilla, misma secuencia
+matematica.semilla(42)
+sea s1 = matematica.aleatorio(1, 1000) * 1000000 + matematica.aleatorio(1, 1000)
+matematica.semilla(42)
+sea s2 = matematica.aleatorio(1, 1000) * 1000000 + matematica.aleatorio(1, 1000)
+escribir(s1 == s2)
+sea dentro = verdadero
+para cada numero i en rango(0, 2000) {
+    sea r = matematica.aleatorio(1, 6)
+    si r < 1 o r > 6 o no matematica.es_entero(r) { dentro = falso }
+}
+escribir(dentro)
+# utilidades para juegos
+escribir(matematica.distancia(0, 0, 3, 4))
+escribir(matematica.angulo(0, 0, 0, 10))
+escribir(matematica.interpolar(10, 20, 0.25))
+escribir(matematica.limitar(15, 0, 10))
+escribir(matematica.limitar(-3, 0, 10))
+escribir(matematica.signo(-7))
+escribir(matematica.redondear(matematica.grados(matematica.radianes(45))))

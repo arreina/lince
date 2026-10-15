@@ -1,14 +1,16 @@
 /* ─────────────────────────────────────────
    MÓDULO: juego  (se incluye desde modulos.c)
-   Ventana 2D, dibujo, teclado, ratón y sonido sencillos. Usa SDL2 cargada en
-   tiempo de ejecución (dlopen / LoadLibrary): Lince no la necesita para
-   compilarse, y si no está instalada solo falla 'importar "juego"' al abrir.
+   Ventana 2D, dibujo, imágenes, texto, teclado, ratón, mando y sonido. Usa SDL2
+   (y SDL2_image para PNG/JPG, si está) cargadas en tiempo de ejecución
+   (dlopen / LoadLibrary): Lince no las necesita para compilarse, y si faltan
+   solo falla juego.abrir().
    Estructura típica:
        juego.abrir("Mi juego", 800, 600)
        mientras juego.abierto() { ...dibujar...; juego.presentar() }
 ───────────────────────────────────────── */
 #ifdef _WIN32
 #define JG_ABRIR_LIB()   ((void *)LoadLibraryA("SDL2.dll"))
+#define JG_ABRIR_IMG()   ((void *)LoadLibraryA("SDL2_image.dll"))
 #define JG_SIMBOLO(h, n) ((void *)GetProcAddress((HMODULE)(h), n))
 #else
 static void *jg_abrir_lib(void) {
@@ -20,7 +22,17 @@ static void *jg_abrir_lib(void) {
     }
     return NULL;
 }
+static void *jg_abrir_img(void) {
+    static const char *const nombres[] = {
+        "libSDL2_image-2.0.so.0", "libSDL2_image.so", "libSDL2_image-2.0.0.dylib", "libSDL2_image.dylib", NULL };
+    for (int i = 0; nombres[i]; i++) {
+        void *h = dlopen(nombres[i], RTLD_NOW);
+        if (h) return h;
+    }
+    return NULL;
+}
 #define JG_ABRIR_LIB()   jg_abrir_lib()
+#define JG_ABRIR_IMG()   jg_abrir_img()
 #define JG_SIMBOLO(h, n) dlsym(h, n)
 #endif
 
@@ -55,9 +67,61 @@ static struct {
     unsigned (*OpenAudio)(const char *, int, const void *, void *, int);
     void (*CloseAudio)(unsigned);
     void (*PauseAudio)(unsigned, int);
-    int  (*QueueAudio)(unsigned, const void *, unsigned);
-    unsigned (*QueuedAudio)(unsigned);
+    void (*LockAudio)(unsigned);
+    void (*UnlockAudio)(unsigned);
+    void *(*TextureFromSurface)(void *, void *);
+    int  (*QueryTexture)(void *, unsigned *, int *, int *, int *);
+    void (*DestroyTexture)(void *);
+    int  (*RenderCopyEx)(void *, void *, const JgRect *, const JgRect *, double, const void *, int);
+    int  (*TextureAlpha)(void *, unsigned char);
+    int  (*TextureColor)(void *, unsigned char, unsigned char, unsigned char);
+    int  (*TextureBlend)(void *, int);
+    void *(*RWFromConstMem)(const void *, int);
+    void *(*LoadBMP_RW)(void *, int);
+    void *(*LoadWAV_RW)(void *, int, void *, unsigned char **, unsigned *);
+    void (*FreeWAV)(unsigned char *);
+    void *(*NewAudioStream)(unsigned short, unsigned char, int, unsigned short, unsigned char, int);
+    int  (*StreamPut)(void *, const void *, int);
+    int  (*StreamFlush)(void *);
+    int  (*StreamAvailable)(void *);
+    int  (*StreamGet)(void *, void *, int);
+    void (*FreeStream)(void *);
+    int  (*NumJoysticks)(void);
+    int  (*IsGameController)(int);
+    void *(*ControllerOpen)(int);
+    void (*ControllerClose)(void *);
+    unsigned char (*ControllerButton)(void *, int);
+    short (*ControllerAxis)(void *, int);
+    int  (*SetFullscreen)(void *, unsigned);
+    int  (*LogicalSize)(void *, int, int);
+    int  (*OutputSize)(void *, int *, int *);
+    /* opcionales */
+    void (*WindowToLogical)(void *, int, int, float *, float *);   /* SDL ≥ 2.0.18 */
+    void *(*IMG_Load_RW)(void *, int);                               /* SDL2_image */
 } _jg;
+
+/* Formato de audio de Lince: 16 bits con signo, estéreo, 44100 Hz */
+#define JG_FRECUENCIA 44100
+#define JG_S16        0x8010
+#define JG_CANALES    2
+
+typedef struct { int freq; unsigned short formato; unsigned char canales, silencio;
+                 unsigned short muestras, pad; unsigned tam; void (*callback)(void *, unsigned char *, int);
+                 void *datos; } JgAudioSpec;
+
+typedef struct { void *tex; int ancho, alto; char *ruta; } JgImagen;
+typedef struct { short *datos; int muestras; char *ruta; } JgSonido;   /* muestras por canal */
+typedef struct {
+    const short *datos; int muestras, pos, bucle, activa, id;
+    float vol;
+    short *propio;        /* pitidos: la voz es dueña de sus datos */
+} JgVoz;
+
+#define JG_MAX_IMAGENES 1024
+#define JG_MAX_SONIDOS  256
+#define JG_VOCES        32
+#define JG_MANDOS       4
+#define JG_BOTONES      15
 
 static struct {
     int cargada, abierta, ancho, alto, cierre;
@@ -74,10 +138,24 @@ static struct {
        LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma. */
     long limite, total;
     int pulsar[16], npulsar, clic_x, clic_y, hay_clic;
+    double cam_x, cam_y, t_inicio;
+    int completa;
+    JgImagen imagenes[JG_MAX_IMAGENES];
+    int nimagenes;
+    JgSonido sonidos[JG_MAX_SONIDOS];
+    int nsonidos;
+    JgVoz voces[JG_VOCES];
+    int siguiente_voz, voz_musica;
+    float volumen;
+    void *mandos[JG_MANDOS];
+    unsigned char botones[JG_MANDOS][JG_BOTONES], botones_prev[JG_MANDOS][JG_BOTONES];
+    int njoy;
 } _jgs;
 
 static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
+static void jg_leer_mandos(void);
+static void jg_recoger_voces(void);
 
 static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
@@ -119,8 +197,37 @@ static int jg_cargar(void) {
     JG_FN(OpenAudio, "SDL_OpenAudioDevice")
     JG_FN(CloseAudio, "SDL_CloseAudioDevice")
     JG_FN(PauseAudio, "SDL_PauseAudioDevice")
-    JG_FN(QueueAudio, "SDL_QueueAudio")
-    JG_FN(QueuedAudio, "SDL_GetQueuedAudioSize")
+    JG_FN(LockAudio, "SDL_LockAudioDevice")
+    JG_FN(UnlockAudio, "SDL_UnlockAudioDevice")
+    JG_FN(TextureFromSurface, "SDL_CreateTextureFromSurface")
+    JG_FN(QueryTexture, "SDL_QueryTexture")
+    JG_FN(DestroyTexture, "SDL_DestroyTexture")
+    JG_FN(RenderCopyEx, "SDL_RenderCopyEx")
+    JG_FN(TextureAlpha, "SDL_SetTextureAlphaMod")
+    JG_FN(TextureColor, "SDL_SetTextureColorMod")
+    JG_FN(TextureBlend, "SDL_SetTextureBlendMode")
+    JG_FN(RWFromConstMem, "SDL_RWFromConstMem")
+    JG_FN(LoadBMP_RW, "SDL_LoadBMP_RW")
+    JG_FN(LoadWAV_RW, "SDL_LoadWAV_RW")
+    JG_FN(FreeWAV, "SDL_FreeWAV")
+    JG_FN(NewAudioStream, "SDL_NewAudioStream")
+    JG_FN(StreamPut, "SDL_AudioStreamPut")
+    JG_FN(StreamFlush, "SDL_AudioStreamFlush")
+    JG_FN(StreamAvailable, "SDL_AudioStreamAvailable")
+    JG_FN(StreamGet, "SDL_AudioStreamGet")
+    JG_FN(FreeStream, "SDL_FreeAudioStream")
+    JG_FN(NumJoysticks, "SDL_NumJoysticks")
+    JG_FN(IsGameController, "SDL_IsGameController")
+    JG_FN(ControllerOpen, "SDL_GameControllerOpen")
+    JG_FN(ControllerClose, "SDL_GameControllerClose")
+    JG_FN(ControllerButton, "SDL_GameControllerGetButton")
+    JG_FN(ControllerAxis, "SDL_GameControllerGetAxis")
+    JG_FN(SetFullscreen, "SDL_SetWindowFullscreen")
+    JG_FN(LogicalSize, "SDL_RenderSetLogicalSize")
+    JG_FN(OutputSize, "SDL_GetRendererOutputSize")
+    *(void **)(&_jg.WindowToLogical) = JG_SIMBOLO(h, "SDL_RenderWindowToLogical");
+    void *hi = JG_ABRIR_IMG();
+    if (hi) *(void **)(&_jg.IMG_Load_RW) = JG_SIMBOLO(hi, "IMG_Load_RW");
     return 1;
 }
 
@@ -193,6 +300,13 @@ static void jg_pintar(const unsigned char c[4]) {
 
 static void jg_cerrar_todo(void) {
     if (_jgs.audio) { _jg.CloseAudio(_jgs.audio); _jgs.audio = 0; }
+    for (int i = 0; i < JG_VOCES; i++) free(_jgs.voces[i].propio);
+    memset(_jgs.voces, 0, sizeof _jgs.voces);
+    for (int i = 0; i < _jgs.nsonidos; i++) { free(_jgs.sonidos[i].datos); free(_jgs.sonidos[i].ruta); }
+    _jgs.nsonidos = 0;
+    for (int i = 0; i < _jgs.nimagenes; i++) { _jg.DestroyTexture(_jgs.imagenes[i].tex); free(_jgs.imagenes[i].ruta); }
+    _jgs.nimagenes = 0;
+    for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
     if (_jgs.render) _jg.DestroyRenderer(_jgs.render);
     if (_jgs.ventana) _jg.DestroyWindow(_jgs.ventana);
     _jgs.render = _jgs.ventana = NULL;
@@ -210,7 +324,8 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     if (_jgs.abierta) return jg_error("Error", "la ventana ya está abierta");
     if (!jg_cargar())
         return jg_error("ErrorJuego", "no se encuentra SDL2: instálala (por ejemplo 'sudo apt install libsdl2-2.0-0')");
-    if (_jg.Init(0x20 | 0x10) != 0 && _jg.Init(0x20) != 0) {   /* vídeo (+ audio si se puede) */
+    /* vídeo, y si se puede audio y mandos (0x10 audio, 0x200 joystick, 0x2000 mando) */
+    if (_jg.Init(0x20 | 0x10 | 0x200 | 0x2000) != 0 && _jg.Init(0x20 | 0x10) != 0 && _jg.Init(0x20) != 0) {
         char msg[400];
         snprintf(msg, sizeof(msg), "no se pudo iniciar SDL2: %s", _jg.GetError());
         return jg_error("ErrorJuego", msg);
@@ -227,8 +342,17 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         jg_cerrar_todo();
         return jg_error("ErrorJuego", msg);
     }
+    _jg.LogicalSize(_jgs.render, (int)w, (int)h);    /* en pantalla completa se escala */
     memset(_jgs.teclas, 0, sizeof(_jgs.teclas));
     memset(_jgs.previas, 0, sizeof(_jgs.previas));
+    memset(_jgs.botones, 0, sizeof(_jgs.botones));
+    memset(_jgs.botones_prev, 0, sizeof(_jgs.botones_prev));
+    _jgs.cam_x = _jgs.cam_y = 0;
+    _jgs.completa = 0;
+    _jgs.njoy = -1;
+    _jgs.volumen = 1;
+    _jgs.voz_musica = 0;
+    _jgs.t_inicio = jg_ahora();
     _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.cierre = 0;
     _jgs.limite = 0; _jgs.total = 0; _jgs.npulsar = 0; _jgs.hay_clic = 0;
     const char *e = getenv("LINCE_JUEGO_FOTOGRAMAS");
@@ -295,7 +419,7 @@ static Valor *jg_rect(Valor **a, int n, int relleno, const char *fn) {
     for (int i = 0; i < 4; i++) if (!jg_num(a, n, i, &v[i], fn)) return valor_nulo();
     unsigned char c[4];
     if (!jg_color(a, n, 4, c)) return valor_nulo();
-    JgRect r = {(int)floor(v[0]), (int)floor(v[1]), (int)ceil(v[2]), (int)ceil(v[3])};
+    JgRect r = {(int)floor(v[0] - _jgs.cam_x), (int)floor(v[1] - _jgs.cam_y), (int)ceil(v[2]), (int)ceil(v[3])};
     jg_pintar(c);
     if (relleno) _jg.FillRect(_jgs.render, &r); else _jg.DrawRect(_jgs.render, &r);
     return valor_nulo();
@@ -311,7 +435,8 @@ static Valor *fn_jg_linea(Valor **a, int n) {
     unsigned char c[4];
     if (!jg_color(a, n, 4, c)) return valor_nulo();
     jg_pintar(c);
-    _jg.DrawLine(_jgs.render, (int)v[0], (int)v[1], (int)v[2], (int)v[3]);
+    _jg.DrawLine(_jgs.render, (int)(v[0] - _jgs.cam_x), (int)(v[1] - _jgs.cam_y),
+                 (int)(v[2] - _jgs.cam_x), (int)(v[3] - _jgs.cam_y));
     return valor_nulo();
 }
 
@@ -323,7 +448,7 @@ static Valor *fn_jg_circulo(Valor **a, int n) {
     unsigned char c[4];
     if (!jg_color(a, n, 3, c)) return valor_nulo();
     jg_pintar(c);
-    int cx = (int)v[0], cy = (int)v[1], r = (int)v[2];
+    int cx = (int)(v[0] - _jgs.cam_x), cy = (int)(v[1] - _jgs.cam_y), r = (int)v[2];
     for (int dy = -r; dy <= r; dy++) {
         int dx = (int)floor(sqrt((double)r * r - (double)dy * dy) + 0.5);
         JgRect fila = {cx - dx, cy + dy, 2 * dx + 1, 1};
@@ -398,6 +523,8 @@ static Valor *fn_jg_texto(Valor **a, int n) {
     if (!jg_color(a, n, 4, c)) return valor_nulo();
     int e = esc < 1 ? 1 : esc > 64 ? 64 : (int)esc;
     jg_pintar(c);
+    x -= _jgs.cam_x;
+    y -= _jgs.cam_y;
     int px = (int)x, py = (int)y, ac;
     const unsigned char *p = (const unsigned char *)a[0]->texto;
     while (*p) {
@@ -531,6 +658,13 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     if (nt > 512) nt = 512;
     memcpy(_jgs.teclas, k, (size_t)nt);
     _jgs.raton = _jg.MouseState(&_jgs.rx, &_jgs.ry);
+    if (_jg.WindowToLogical) {                 /* con pantalla completa la ventana se escala */
+        float lx, ly;
+        _jg.WindowToLogical(_jgs.render, _jgs.rx, _jgs.ry, &lx, &ly);
+        _jgs.rx = (int)lx; _jgs.ry = (int)ly;
+    }
+    jg_leer_mandos();
+    jg_recoger_voces();
     if (_jgs.total & 1) {
         for (int i = 0; i < _jgs.npulsar; i++) _jgs.teclas[_jgs.pulsar[i]] = 1;
         if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; _jgs.raton |= 1; }
@@ -540,12 +674,14 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
 
 /* Guarda la imagen actual de la ventana como BMP; 1 si va bien */
 static int jg_guardar_bmp(const char *ruta) {
-    size_t tam = (size_t)_jgs.ancho * _jgs.alto * 4;
+    int w = _jgs.ancho, h = _jgs.alto;
+    _jg.OutputSize(_jgs.render, &w, &h);
+    size_t tam = (size_t)w * h * 4;
     unsigned char *px = malloc(tam);
     if (!px) return 0;
     int ok = 0;
-    if (_jg.ReadPixels(_jgs.render, NULL, 0x16362004, px, _jgs.ancho * 4) == 0) {
-        void *sup = _jg.SurfaceFrom(px, _jgs.ancho, _jgs.alto, 32, _jgs.ancho * 4,
+    if (_jg.ReadPixels(_jgs.render, NULL, 0x16362004, px, w * 4) == 0) {
+        void *sup = _jg.SurfaceFrom(px, w, h, 32, w * 4,
                                     0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
         void *rw = _jg.RWFromFile(ruta, "wb");
         if (sup && rw) ok = _jg.SaveBMP_RW(sup, rw, 1) == 0;
@@ -563,45 +699,515 @@ static Valor *fn_jg_captura(Valor **a, int n) {
     return valor_nulo();
 }
 
+/* ── Sonido: mezclador propio ──
+   Un dispositivo de audio (estéreo, 16 bits, 44100 Hz) con callback que suma
+   hasta JG_VOCES voces. Los sonidos se convierten a ese formato al cargarlos. */
+static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
+    (void)datos;
+    short *salida = (short *)flujo;
+    int muestras = largo / (int)sizeof(short);           /* L y R intercaladas */
+    for (int i = 0; i < muestras; i++) {
+        int acc = 0;
+        for (int v = 0; v < JG_VOCES; v++) {
+            JgVoz *voz = &_jgs.voces[v];
+            if (!voz->activa) continue;
+            int total = voz->muestras * JG_CANALES;
+            if (voz->pos >= total) {
+                if (voz->bucle && total > 0) voz->pos = 0;
+                else { voz->activa = 0; continue; }
+            }
+            acc += (int)(voz->datos[voz->pos++] * voz->vol);
+        }
+        acc = (int)(acc * _jgs.volumen);
+        salida[i] = (short)(acc > 32767 ? 32767 : acc < -32768 ? -32768 : acc);
+    }
+}
+
+/* Abre el dispositivo la primera vez; 0 si no hay audio (se juega en silencio) */
+static int jg_audio(void) {
+    if (_jgs.audio) return 1;
+    JgAudioSpec want, have;
+    memset(&want, 0, sizeof want);
+    want.freq = JG_FRECUENCIA; want.formato = JG_S16; want.canales = JG_CANALES; want.muestras = 1024;
+    want.callback = jg_mezclar;
+    _jgs.audio = _jg.OpenAudio(NULL, 0, &want, &have, 0);      /* sin cambios permitidos: SDL convierte */
+    if (!_jgs.audio) return 0;
+    _jg.PauseAudio(_jgs.audio, 0);
+    return 1;
+}
+
+/* Libera los datos de los pitidos que ya sonaron (desde el hilo principal) */
+static void jg_recoger_voces(void) {
+    if (!_jgs.audio) return;
+    _jg.LockAudio(_jgs.audio);
+    for (int v = 0; v < JG_VOCES; v++)
+        if (!_jgs.voces[v].activa && _jgs.voces[v].propio) {
+            free(_jgs.voces[v].propio);
+            _jgs.voces[v].propio = NULL;
+        }
+    _jg.UnlockAudio(_jgs.audio);
+}
+
+/* Pone a sonar unos datos; devuelve el id de la voz (0 si no hay audio o hueco) */
+static int jg_sonar(const short *datos, int muestras, float vol, int bucle, short *propio) {
+    if (!jg_audio()) { free(propio); return 0; }
+    jg_recoger_voces();
+    _jg.LockAudio(_jgs.audio);
+    int libre = -1;
+    for (int v = 0; v < JG_VOCES; v++)
+        if (!_jgs.voces[v].activa && !_jgs.voces[v].propio) { libre = v; break; }
+    if (libre < 0) {                                       /* todas ocupadas: se roba la más avanzada */
+        int mejor = -1;
+        for (int v = 0; v < JG_VOCES; v++)
+            if (_jgs.voces[v].id != _jgs.voz_musica && !_jgs.voces[v].bucle &&
+                (mejor < 0 || _jgs.voces[v].pos > _jgs.voces[mejor].pos)) mejor = v;
+        if (mejor < 0) { _jg.UnlockAudio(_jgs.audio); free(propio); return 0; }
+        free(_jgs.voces[mejor].propio);
+        libre = mejor;
+    }
+    JgVoz *voz = &_jgs.voces[libre];
+    voz->datos = datos; voz->muestras = muestras; voz->pos = 0;
+    voz->vol = vol; voz->bucle = bucle; voz->propio = propio;
+    voz->id = ++_jgs.siguiente_voz;
+    voz->activa = 1;
+    _jg.UnlockAudio(_jgs.audio);
+    return voz->id;
+}
+
+static void jg_parar_voz(int id) {
+    if (!_jgs.audio || id <= 0) return;
+    _jg.LockAudio(_jgs.audio);
+    for (int v = 0; v < JG_VOCES; v++)
+        if (_jgs.voces[v].id == id) _jgs.voces[v].activa = 0;
+    _jg.UnlockAudio(_jgs.audio);
+}
+
+static float jg_volumen_arg(Valor **a, int n, int i, float defecto) {
+    if (i < n && a[i]->tipo == VAL_NUMERO) {
+        double v = a[i]->numero;
+        return (float)(v < 0 ? 0 : v > 1 ? 1 : v);
+    }
+    return defecto;
+}
+
 /* pitido(frecuencia, milisegundos[, volumen]): onda cuadrada suavizada, no bloquea */
 static Valor *fn_jg_pitido(Valor **a, int n) {
     JG_ABIERTA();
-    double f, ms, vol = 0.25;
+    double f, ms;
     if (!jg_num(a, n, 0, &f, "pitido") || !jg_num(a, n, 1, &ms, "pitido")) return valor_nulo();
-    if (n > 2 && !jg_num(a, n, 2, &vol, "pitido")) return valor_nulo();
     if (f < 20 || f > 20000 || ms <= 0 || ms > 5000) return jg_error("Error", "pitido(): frecuencia 20-20000 Hz y duración hasta 5000 ms");
-    if (vol < 0) vol = 0;
-    if (vol > 1) vol = 1;
-    if (!_jgs.audio) {
-        struct { int freq; unsigned short formato; unsigned char canales, silencio; unsigned short muestras, pad;
-                 unsigned tam; void *callback, *datos; } want, have;
-        memset(&want, 0, sizeof(want));
-        want.freq = 44100; want.formato = 0x8010; want.canales = 1; want.muestras = 1024;   /* S16 */
-        _jgs.audio = _jg.OpenAudio(NULL, 0, &want, &have, 0);
-        if (!_jgs.audio) return valor_nulo();                 /* sin audio: se ignora en silencio */
-        if (have.formato != 0x8010 || have.canales != 1 || have.freq != 44100) {
-            _jg.CloseAudio(_jgs.audio); _jgs.audio = 0;
-            return valor_nulo();
-        }
-        _jg.PauseAudio(_jgs.audio, 0);
-    }
-    if (_jg.QueuedAudio(_jgs.audio) > 44100 * 2) return valor_nulo();   /* ya hay >1 s en cola */
-    int total = (int)(44100 * ms / 1000);
-    short *buf = malloc((size_t)total * sizeof(short));
+    float vol = jg_volumen_arg(a, n, 2, 0.25f);
+    int total = (int)(JG_FRECUENCIA * ms / 1000);
+    if (total < 2) return valor_nulo();
+    short *buf = malloc((size_t)total * JG_CANALES * sizeof(short));
     if (!buf) return valor_nulo();
     int fade = total < 441 ? total / 2 : 441;                           /* 10 ms de rampa: sin chasquidos */
     for (int i = 0; i < total; i++) {
-        double fase = fmod(i * f / 44100.0, 1.0);
-        double s = fase < 0.5 ? 1.0 : -1.0;
+        double fase = fmod(i * f / JG_FRECUENCIA, 1.0);
+        double m = fase < 0.5 ? 1.0 : -1.0;
         double env = i < fade ? (double)i / fade : (total - i) < fade ? (double)(total - i) / fade : 1.0;
-        buf[i] = (short)(s * env * vol * 12000);
+        short muestra = (short)(m * env * 12000);
+        buf[2 * i] = buf[2 * i + 1] = muestra;
     }
-    _jg.QueueAudio(_jgs.audio, buf, (unsigned)(total * sizeof(short)));
-    free(buf);
+    jg_sonar(buf, total, vol, 0, buf);
     return valor_nulo();
 }
 
-/* aleatorio utilidades: colision_rectangulos(x1,y1,w1,h1, x2,y2,w2,h2) */
+/* Carga un WAV (del disco o del ejecutable empaquetado) en el formato de Lince */
+static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max) {
+    size_t largo = 0;
+    char *bytes = interprete_leer_bytes(ruta, &largo);
+    if (!bytes) { snprintf(error, max, "no se encuentra el sonido '%s'", ruta); return 0; }
+    JgAudioSpec spec;
+    unsigned char *wav = NULL;
+    unsigned wav_largo = 0;
+    void *rw = _jg.RWFromConstMem(bytes, (int)largo);
+    if (!rw || !_jg.LoadWAV_RW(rw, 1, &spec, &wav, &wav_largo)) {
+        free(bytes);
+        snprintf(error, max, "'%s' no es un WAV válido: %s", ruta, _jg.GetError());
+        return 0;
+    }
+    free(bytes);
+    /* SDL convierte formato y canales; la frecuencia se cambia aquí (su remuestreador
+       se guarda el final del sonido) */
+    void *flujo = _jg.NewAudioStream(spec.formato, spec.canales, spec.freq, JG_S16, JG_CANALES, spec.freq);
+    if (!flujo) { _jg.FreeWAV(wav); snprintf(error, max, "formato de audio no soportado en '%s'", ruta); return 0; }
+    _jg.StreamPut(flujo, wav, (int)wav_largo);
+    _jg.StreamFlush(flujo);
+    _jg.FreeWAV(wav);
+    /* el conversor puede entregar los datos en varios trozos */
+    size_t cap = (size_t)wav_largo * 4 + 4096, leido = 0;
+    char *buf = malloc(cap);
+    for (;;) {
+        if (!buf) break;
+        int disp = _jg.StreamAvailable(flujo);
+        if (disp <= 0) break;
+        if (leido + (size_t)disp > cap) {
+            cap = (leido + (size_t)disp) * 2;
+            char *nuevo = realloc(buf, cap);
+            if (!nuevo) { free(buf); buf = NULL; break; }
+            buf = nuevo;
+        }
+        int r = _jg.StreamGet(flujo, buf + leido, disp);
+        if (r <= 0) break;
+        leido += (size_t)r;
+    }
+    _jg.FreeStream(flujo);
+    if (!buf) { snprintf(error, max, "sin memoria"); return 0; }
+    int origen = (int)(leido / (sizeof(short) * JG_CANALES));
+    if (spec.freq != JG_FRECUENCIA && origen > 1 && spec.freq > 0) {
+        const short *ent = (const short *)buf;
+        int destino = (int)((long long)origen * JG_FRECUENCIA / spec.freq);
+        short *sal = malloc((size_t)destino * JG_CANALES * sizeof(short) + 4);
+        if (!sal) { free(buf); snprintf(error, max, "sin memoria"); return 0; }
+        double paso = (double)spec.freq / JG_FRECUENCIA;
+        for (int i = 0; i < destino; i++) {
+            double t = i * paso;
+            int j = (int)t;
+            double f = t - j;
+            if (j >= origen - 1) { j = origen - 2; f = 1; }
+            for (int c = 0; c < JG_CANALES; c++)
+                sal[i * JG_CANALES + c] = (short)(ent[j * JG_CANALES + c] * (1 - f) + ent[(j + 1) * JG_CANALES + c] * f);
+        }
+        free(buf);
+        buf = (char *)sal;
+        origen = destino;
+    }
+    *datos = (short *)buf;
+    *muestras = origen;
+    return 1;
+}
+
+static int jg_id_de(Valor *v, const char *clave_tipo) {
+    if (v->tipo == VAL_DICCIONARIO) {
+        int k = valor_diccionario_buscar(v, clave_tipo);
+        if (k >= 0 && v->diccionario.valores[k]->tipo == VAL_NUMERO) return (int)v->diccionario.valores[k]->numero;
+    }
+    return -1;
+}
+
+/* sonido(ruta): carga un WAV; devuelve {"sonido": n, "duracion": segundos} */
+static Valor *fn_jg_sonido(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "sonido() espera la ruta de un archivo .wav");
+    int k = -1;
+    for (int i = 0; i < _jgs.nsonidos; i++)
+        if (strcmp(_jgs.sonidos[i].ruta, a[0]->texto) == 0) { k = i; break; }
+    if (k < 0) {
+        if (_jgs.nsonidos == JG_MAX_SONIDOS) return jg_error("ErrorJuego", "demasiados sonidos cargados");
+        char error[600];
+        short *datos;
+        int muestras;
+        if (!jg_cargar_wav(a[0]->texto, &datos, &muestras, error, sizeof error)) return jg_error("ErrorJuego", error);
+        k = _jgs.nsonidos++;
+        _jgs.sonidos[k].datos = datos;
+        _jgs.sonidos[k].muestras = muestras;
+        _jgs.sonidos[k].ruta = strdup(a[0]->texto);
+    }
+    Valor *d = valor_diccionario_crear();
+    valor_diccionario_agregar(d, "sonido", valor_numero(k));
+    valor_diccionario_agregar(d, "duracion", valor_numero((double)_jgs.sonidos[k].muestras / JG_FRECUENCIA));
+    valor_diccionario_agregar(d, "ruta", valor_texto(a[0]->texto));
+    return d;
+}
+
+static JgSonido *jg_sonido_arg(Valor **a, int n, const char *fn) {
+    int k = n > 0 ? jg_id_de(a[0], "sonido") : -1;
+    if (k < 0 || k >= _jgs.nsonidos) {
+        char msg[120];
+        snprintf(msg, sizeof msg, "%s() espera un sonido cargado con juego.sonido()", fn);
+        jg_error("ErrorTipo", msg);
+        return NULL;
+    }
+    return &_jgs.sonidos[k];
+}
+
+/* reproducir(sonido[, volumen[, bucle]]): devuelve el número de la voz */
+static Valor *fn_jg_reproducir(Valor **a, int n) {
+    JG_ABIERTA();
+    JgSonido *s = jg_sonido_arg(a, n, "reproducir");
+    if (!s) return valor_nulo();
+    int bucle = n > 2 && a[2]->tipo == VAL_BOOLEANO && a[2]->booleano;
+    return valor_numero(jg_sonar(s->datos, s->muestras, jg_volumen_arg(a, n, 1, 1), bucle, NULL));
+}
+
+/* detener([voz]): para una voz o, sin argumento, todo (también la música) */
+static Valor *fn_jg_detener(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n > 0 && a[0]->tipo == VAL_NUMERO) { jg_parar_voz((int)a[0]->numero); return valor_nulo(); }
+    if (_jgs.audio) {
+        _jg.LockAudio(_jgs.audio);
+        for (int v = 0; v < JG_VOCES; v++) _jgs.voces[v].activa = 0;
+        _jg.UnlockAudio(_jgs.audio);
+    }
+    _jgs.voz_musica = 0;
+    return valor_nulo();
+}
+
+/* musica(sonido[, volumen]): suena en bucle y sustituye a la anterior; musica(nulo) la para */
+static Valor *fn_jg_musica(Valor **a, int n) {
+    JG_ABIERTA();
+    jg_parar_voz(_jgs.voz_musica);
+    _jgs.voz_musica = 0;
+    if (n < 1 || a[0]->tipo == VAL_NULO) return valor_nulo();
+    JgSonido *s = jg_sonido_arg(a, n, "musica");
+    if (!s) return valor_nulo();
+    _jgs.voz_musica = jg_sonar(s->datos, s->muestras, jg_volumen_arg(a, n, 1, 0.6f), 1, NULL);
+    return valor_nulo();
+}
+
+/* volumen(v): volumen general de 0 a 1 */
+static Valor *fn_jg_volumen(Valor **a, int n) {
+    if (n > 0) {
+        double v;
+        if (!jg_num(a, n, 0, &v, "volumen")) return valor_nulo();
+        _jgs.volumen = (float)(v < 0 ? 0 : v > 1 ? 1 : v);
+    }
+    return valor_numero(_jgs.volumen);
+}
+
+/* ── Imágenes ── */
+static Valor *jg_imagen_valor(int k) {
+    Valor *d = valor_diccionario_crear();
+    valor_diccionario_agregar(d, "imagen", valor_numero(k));
+    valor_diccionario_agregar(d, "ancho", valor_numero(_jgs.imagenes[k].ancho));
+    valor_diccionario_agregar(d, "alto", valor_numero(_jgs.imagenes[k].alto));
+    valor_diccionario_agregar(d, "ruta", valor_texto(_jgs.imagenes[k].ruta));
+    return d;
+}
+
+/* imagen(ruta): PNG/JPG (con SDL2_image) o BMP; devuelve {"imagen", "ancho", "alto"} */
+static Valor *fn_jg_imagen(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "imagen() espera la ruta de una imagen");
+    for (int i = 0; i < _jgs.nimagenes; i++)
+        if (strcmp(_jgs.imagenes[i].ruta, a[0]->texto) == 0) return jg_imagen_valor(i);
+    if (_jgs.nimagenes == JG_MAX_IMAGENES) return jg_error("ErrorJuego", "demasiadas imágenes cargadas");
+    size_t largo = 0;
+    char *bytes = interprete_leer_bytes(a[0]->texto, &largo);
+    char msg[600];
+    if (!bytes) {
+        snprintf(msg, sizeof msg, "no se encuentra la imagen '%s'", a[0]->texto);
+        return jg_error("ErrorJuego", msg);
+    }
+    int es_bmp = largo > 2 && bytes[0] == 'B' && bytes[1] == 'M';
+    void *sup = NULL;
+    void *rw = _jg.RWFromConstMem(bytes, (int)largo);
+    if (rw) sup = es_bmp || !_jg.IMG_Load_RW ? _jg.LoadBMP_RW(rw, 1) : _jg.IMG_Load_RW(rw, 1);
+    free(bytes);
+    if (!sup) {
+        if (!es_bmp && !_jg.IMG_Load_RW)
+            snprintf(msg, sizeof msg, "para cargar '%s' hace falta SDL2_image (por ejemplo 'sudo apt install libsdl2-image-2.0-0'); sin ella solo se leen .bmp", a[0]->texto);
+        else
+            snprintf(msg, sizeof msg, "no se pudo leer la imagen '%s': %s", a[0]->texto, _jg.GetError());
+        return jg_error("ErrorJuego", msg);
+    }
+    void *tex = _jg.TextureFromSurface(_jgs.render, sup);
+    _jg.FreeSurface(sup);
+    if (!tex) {
+        snprintf(msg, sizeof msg, "no se pudo preparar la imagen '%s': %s", a[0]->texto, _jg.GetError());
+        return jg_error("ErrorJuego", msg);
+    }
+    int k = _jgs.nimagenes++;
+    _jgs.imagenes[k].tex = tex;
+    _jgs.imagenes[k].ruta = strdup(a[0]->texto);
+    _jg.QueryTexture(tex, NULL, NULL, &_jgs.imagenes[k].ancho, &_jgs.imagenes[k].alto);
+    _jg.TextureBlend(tex, 1);
+    return jg_imagen_valor(k);
+}
+
+/* Lee la opción numérica 'clave' del diccionario; 1 si estaba */
+static int jg_opcion(Valor *op, const char *clave, double *out) {
+    if (!op || op->tipo != VAL_DICCIONARIO) return 0;
+    int k = valor_diccionario_buscar(op, clave);
+    if (k < 0) return 0;
+    Valor *v = op->diccionario.valores[k];
+    if (v->tipo == VAL_NUMERO) { *out = v->numero; return 1; }
+    if (v->tipo == VAL_BOOLEANO) { *out = v->booleano; return 1; }
+    return 0;
+}
+static Valor *jg_opcion_valor(Valor *op, const char *clave) {
+    if (!op || op->tipo != VAL_DICCIONARIO) return NULL;
+    int k = valor_diccionario_buscar(op, clave);
+    return k < 0 ? NULL : op->diccionario.valores[k];
+}
+
+/* dibujar(imagen, x, y[, opciones]). Opciones (todas opcionales):
+     escala, ancho, alto, angulo (grados), espejo, voltear, centrado, alfa (0-255),
+     color ([r, g, b] para teñir), recorte ([x, y, ancho, alto]),
+     cuadro + celda (hoja de sprites: número de cuadro y [ancho, alto] de cada uno) */
+static Valor *fn_jg_dibujar(Valor **a, int n) {
+    JG_ABIERTA();
+    int k = n > 0 ? jg_id_de(a[0], "imagen") : -1;
+    if (k < 0 || k >= _jgs.nimagenes) return jg_error("ErrorTipo", "dibujar() espera una imagen cargada con juego.imagen()");
+    double x, y;
+    if (!jg_num(a, n, 1, &x, "dibujar") || !jg_num(a, n, 2, &y, "dibujar")) return valor_nulo();
+    Valor *op = n > 3 ? a[3] : NULL;
+    if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
+        return jg_error("ErrorTipo", "dibujar(): las opciones van en un diccionario, por ejemplo {\"escala\": 2}");
+    JgImagen *img = &_jgs.imagenes[k];
+    JgRect src = {0, 0, img->ancho, img->alto};
+    Valor *rec = jg_opcion_valor(op, "recorte");
+    Valor *celda = jg_opcion_valor(op, "celda");
+    double cuadro;
+    if (rec) {
+        if (rec->tipo != VAL_LISTA || rec->lista.cantidad != 4) return jg_error("ErrorTipo", "dibujar(): 'recorte' es [x, y, ancho, alto]");
+        int *dst[4] = {&src.x, &src.y, &src.w, &src.h};
+        for (int i = 0; i < 4; i++) {
+            if (rec->lista.elementos[i]->tipo != VAL_NUMERO) return jg_error("ErrorTipo", "dibujar(): 'recorte' es [x, y, ancho, alto]");
+            *dst[i] = (int)rec->lista.elementos[i]->numero;
+        }
+    } else if (celda) {
+        if (celda->tipo != VAL_LISTA || celda->lista.cantidad != 2 ||
+            celda->lista.elementos[0]->tipo != VAL_NUMERO || celda->lista.elementos[1]->tipo != VAL_NUMERO)
+            return jg_error("ErrorTipo", "dibujar(): 'celda' es [ancho, alto] de cada cuadro");
+        int cw = (int)celda->lista.elementos[0]->numero, ch = (int)celda->lista.elementos[1]->numero;
+        if (cw < 1 || ch < 1) return jg_error("Error", "dibujar(): la celda debe medir al menos 1×1");
+        int columnas = img->ancho / cw;
+        if (columnas < 1) columnas = 1;
+        int filas = img->alto / ch;
+        if (filas < 1) filas = 1;
+        int c = jg_opcion(op, "cuadro", &cuadro) ? (int)cuadro : 0;
+        if (c < 0) c = 0;
+        c %= columnas * filas;
+        src.x = (c % columnas) * cw; src.y = (c / columnas) * ch; src.w = cw; src.h = ch;
+    }
+    double escala = 1, w, h, angulo = 0, v;
+    jg_opcion(op, "escala", &escala);
+    w = src.w * escala; h = src.h * escala;
+    if (jg_opcion(op, "ancho", &v)) w = v;
+    if (jg_opcion(op, "alto", &v)) h = v;
+    jg_opcion(op, "angulo", &angulo);
+    if (jg_opcion(op, "centrado", &v) && v) { x -= w / 2; y -= h / 2; }
+    int volteo = 0;
+    if (jg_opcion(op, "espejo", &v) && v) volteo |= 1;
+    if (jg_opcion(op, "voltear", &v) && v) volteo |= 2;
+    double alfa = 255;
+    jg_opcion(op, "alfa", &alfa);
+    unsigned char tinte[4] = {255, 255, 255, 255};
+    Valor *col = jg_opcion_valor(op, "color");
+    if (col) { Valor *arg[1] = {col}; if (!jg_color(arg, 1, 0, tinte)) return valor_nulo(); }
+    _jg.TextureAlpha(img->tex, (unsigned char)(alfa < 0 ? 0 : alfa > 255 ? 255 : alfa));
+    _jg.TextureColor(img->tex, tinte[0], tinte[1], tinte[2]);
+    JgRect dst = {(int)floor(x - _jgs.cam_x), (int)floor(y - _jgs.cam_y), (int)ceil(w), (int)ceil(h)};
+    _jg.RenderCopyEx(_jgs.render, img->tex, &src, &dst, angulo, NULL, volteo);
+    return valor_nulo();
+}
+
+/* ── Cámara y pantalla ── */
+/* camara(x, y): lo que se dibuja se desplaza; camara() vuelve a (0, 0). Devuelve [x, y] */
+static Valor *fn_jg_camara(Valor **a, int n) {
+    if (n >= 2) {
+        double x, y;
+        if (!jg_num(a, n, 0, &x, "camara") || !jg_num(a, n, 1, &y, "camara")) return valor_nulo();
+        _jgs.cam_x = x; _jgs.cam_y = y;
+    } else if (n == 0) {
+        _jgs.cam_x = _jgs.cam_y = 0;
+    } else {
+        return jg_error("ErrorTipo", "camara() espera (x, y) o nada");
+    }
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(_jgs.cam_x));
+    lista_agregar(l, valor_numero(_jgs.cam_y));
+    return l;
+}
+
+/* pantalla_completa([sí/no]): sin argumento alterna. El juego se escala sin deformarse. */
+static Valor *fn_jg_pantalla_completa(Valor **a, int n) {
+    JG_ABIERTA();
+    int quiere = !_jgs.completa;
+    if (n > 0 && a[0]->tipo == VAL_BOOLEANO) quiere = a[0]->booleano;
+    if (_jg.SetFullscreen(_jgs.ventana, quiere ? 0x1001u : 0) == 0) _jgs.completa = quiere;
+    return valor_booleano(_jgs.completa);
+}
+
+/* tiempo(): segundos desde que se abrió la ventana (para animaciones) */
+static Valor *fn_jg_tiempo(Valor **a, int n) {
+    (void)a; (void)n;
+    if (!_jgs.abierta) return valor_numero(0);
+    if (_jgs.limite) return valor_numero(_jgs.total / 60.0);      /* modo de prueba: tiempo fijo */
+    return valor_numero(jg_ahora() - _jgs.t_inicio);
+}
+
+/* ── Mandos ── */
+static const char *const JG_NOMBRES_BOTON[JG_BOTONES] = {
+    "a", "b", "x", "y", "atras", "guia", "inicio", "stick_izq", "stick_der",
+    "lb", "rb", "arriba", "abajo", "izquierda", "derecha" };
+
+static void jg_abrir_mandos(void) {
+    for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
+    int k = 0, total = _jg.NumJoysticks();
+    for (int j = 0; j < total && k < JG_MANDOS; j++)
+        if (_jg.IsGameController(j)) {
+            void *m = _jg.ControllerOpen(j);
+            if (m) _jgs.mandos[k++] = m;
+        }
+    _jgs.njoy = total;
+}
+
+static void jg_leer_mandos(void) {
+    memcpy(_jgs.botones_prev, _jgs.botones, sizeof _jgs.botones);
+    if (_jg.NumJoysticks() != _jgs.njoy) jg_abrir_mandos();
+    for (int i = 0; i < JG_MANDOS; i++)
+        for (int b = 0; b < JG_BOTONES; b++)
+            _jgs.botones[i][b] = _jgs.mandos[i] ? _jg.ControllerButton(_jgs.mandos[i], b) : 0;
+}
+
+static int jg_mando_arg(Valor **a, int n, int i) {
+    if (i < n && a[i]->tipo == VAL_NUMERO) {
+        int m = (int)a[i]->numero - 1;
+        return m >= 0 && m < JG_MANDOS ? m : -1;
+    }
+    return 0;
+}
+
+static Valor *fn_jg_mandos(Valor **a, int n) {
+    (void)a; (void)n;
+    int c = 0;
+    for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) c++;
+    return valor_numero(c);
+}
+
+/* boton(nombre[, mando]) / boton_pulsado(nombre[, mando]); mando = 1..4 */
+static Valor *jg_boton_mando(Valor **a, int n, int pulso, const char *fn) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) {
+        char msg[120];
+        snprintf(msg, sizeof msg, "%s() espera el nombre de un botón, por ejemplo \"a\"", fn);
+        return jg_error("ErrorTipo", msg);
+    }
+    int b = -1;
+    for (int i = 0; i < JG_BOTONES; i++) if (strcmp(a[0]->texto, JG_NOMBRES_BOTON[i]) == 0) { b = i; break; }
+    if (b < 0) {
+        char msg[300];
+        snprintf(msg, sizeof msg, "%s(): botón desconocido '%s' (a, b, x, y, lb, rb, inicio, atras, guia, arriba, abajo, izquierda, derecha, stick_izq, stick_der)", fn, a[0]->texto);
+        return jg_error("Error", msg);
+    }
+    int m = jg_mando_arg(a, n, 1);
+    if (m < 0) return valor_booleano(0);
+    int ahora = _jgs.botones[m][b], antes = _jgs.botones_prev[m][b];
+    return valor_booleano(pulso ? (ahora && !antes) : ahora);
+}
+static Valor *fn_jg_boton(Valor **a, int n)         { return jg_boton_mando(a, n, 0, "boton"); }
+static Valor *fn_jg_boton_pulsado(Valor **a, int n) { return jg_boton_mando(a, n, 1, "boton_pulsado"); }
+
+/* eje(nombre[, mando]): izq_x, izq_y, der_x, der_y (-1..1), lt, rt (0..1); zona muerta 0,15 */
+static Valor *fn_jg_eje(Valor **a, int n) {
+    JG_ABIERTA();
+    static const char *const ejes[] = {"izq_x", "izq_y", "der_x", "der_y", "lt", "rt"};
+    int e = -1;
+    if (n > 0 && a[0]->tipo == VAL_TEXTO)
+        for (int i = 0; i < 6; i++) if (strcmp(a[0]->texto, ejes[i]) == 0) { e = i; break; }
+    if (e < 0) return jg_error("Error", "eje() espera \"izq_x\", \"izq_y\", \"der_x\", \"der_y\", \"lt\" o \"rt\"");
+    int m = jg_mando_arg(a, n, 1);
+    if (m < 0 || !_jgs.mandos[m]) return valor_numero(0);
+    double v = _jg.ControllerAxis(_jgs.mandos[m], e) / 32767.0;
+    if (v < -1) v = -1;
+    if (fabs(v) < 0.15) v = 0;
+    return valor_numero(v);
+}
+
+/* colision(x1, y1, w1, h1, x2, y2, w2, h2): ¿se solapan los dos rectángulos? */
 static Valor *fn_jg_colision(Valor **a, int n) {
     double v[8];
     for (int i = 0; i < 8; i++) if (!jg_num(a, n, i, &v[i], "colision")) return valor_nulo();
@@ -638,6 +1244,20 @@ static void cargar_juego(Entorno *entorno) {
         {"captura",         fn_jg_captura,          1},
         {"pitido",          fn_jg_pitido,          -1},
         {"colision",        fn_jg_colision,         8},
+        {"imagen",          fn_jg_imagen,           1},
+        {"dibujar",         fn_jg_dibujar,         -1},
+        {"sonido",          fn_jg_sonido,           1},
+        {"reproducir",      fn_jg_reproducir,      -1},
+        {"detener",         fn_jg_detener,         -1},
+        {"musica",          fn_jg_musica,          -1},
+        {"volumen",         fn_jg_volumen,         -1},
+        {"camara",          fn_jg_camara,          -1},
+        {"pantalla_completa", fn_jg_pantalla_completa, -1},
+        {"tiempo",          fn_jg_tiempo,           0},
+        {"mandos",          fn_jg_mandos,           0},
+        {"boton",           fn_jg_boton,           -1},
+        {"boton_pulsado",   fn_jg_boton_pulsado,   -1},
+        {"eje",             fn_jg_eje,             -1},
     };
     registrar_modulo_diccionario(entorno, "juego",
         fns, (int)(sizeof(fns) / sizeof(fns[0])), NULL, NULL, 0);

@@ -1,0 +1,59 @@
+importar "juego"
+
+# Imágenes, hojas de sprites, cámara, sonido y mandos
+juego.abrir("Prueba 2", 100, 80)
+
+# Una imagen de 4×2 cuadros de 8×8 (generada por el test): cuadro 0 rojo, 1 verde, ...
+sea hoja = juego.imagen("hoja.png")
+escribir("hoja: " + a_texto(hoja["ancho"]) + "x" + a_texto(hoja["alto"]))
+sea otra = juego.imagen("hoja.png")
+escribir("misma imagen: " + a_texto(otra["imagen"] == hoja["imagen"]))
+sea bmp = juego.imagen("cuadro.bmp")
+escribir("bmp: " + a_texto(bmp["ancho"]) + "x" + a_texto(bmp["alto"]))
+
+juego.limpiar([0, 0, 0])
+juego.dibujar(hoja, 0, 0, {"celda": [8, 8], "cuadro": 1, "escala": 2})       # verde en 0..16
+juego.dibujar(hoja, 20, 0, {"recorte": [0, 0, 8, 8], "ancho": 10, "alto": 10})  # rojo en 20..30
+juego.dibujar(bmp, 40, 0)                                                       # azul 10×10
+juego.dibujar(hoja, 70, 10, {"celda": [8, 8], "cuadro": 0, "escala": 2, "centrado": verdadero, "alfa": 0})
+juego.camara(-50, -40)
+juego.rectangulo(0, 0, 10, 10, [255, 255, 0])                                   # amarillo en 50,40
+escribir("camara: " + a_texto(juego.camara(-50, -40)[0]))
+juego.camara()
+juego.captura("prueba2.bmp")
+
+intentar {
+    juego.imagen("no_existe.png")
+    escribir("MAL: imagen inexistente aceptada")
+} capturar (ErrorJuego e) {
+    escribir("imagen inexistente: ok")
+}
+intentar {
+    juego.dibujar({"x": 1}, 0, 0)
+    escribir("MAL: dibujar sin imagen")
+} capturar (ErrorTipo e) {
+    escribir("dibujar sin imagen: ok")
+}
+
+sea s = juego.sonido("tono.wav")
+escribir("duración: " + a_texto(s["duracion"]))
+sea voz = juego.reproducir(s, 0.5)
+escribir("voz: " + a_texto(voz > 0))
+juego.musica(s, 0.2)
+juego.musica(nulo)
+juego.detener(voz)
+juego.volumen(0.8)
+escribir("volumen: " + a_texto(juego.volumen()))
+intentar {
+    juego.reproducir("tono.wav")
+    escribir("MAL: reproducir texto")
+} capturar (ErrorTipo e) {
+    escribir("reproducir sin sonido: ok")
+}
+
+juego.presentar()
+escribir("mandos: " + a_texto(juego.mandos()))
+escribir("botón a: " + a_texto(juego.boton("a")))
+escribir("eje: " + a_texto(juego.eje("izq_x")))
+escribir("tiempo: " + a_texto(juego.tiempo() >= 0))
+juego.cerrar()

@@ -44,4 +44,56 @@ if amar > 20: print("  ✅ el texto se dibuja")
 else: print("  ❌ el texto no se dibuja"); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt; exit 1; }
+# ── Segunda parte: imágenes, sprites, cámara, sonido y mandos ──
+python3 - <<'PY'
+import struct, wave
+# hoja.png de 32×16: 8 cuadros de 8×8 con colores distintos (PNG sin compresión externa)
+import zlib
+colores = [(255,0,0),(0,255,0),(0,0,255),(255,255,0),(255,0,255),(0,255,255),(255,255,255),(128,128,128)]
+filas = []
+for y in range(16):
+    fila = b"\x00"
+    for x in range(32):
+        c = colores[(y // 8) * 4 + x // 8]
+        fila += bytes(c) + b"\xff"
+    filas.append(fila)
+def bloque(t, d): return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+png = b"\x89PNG\r\n\x1a\n" + bloque(b"IHDR", struct.pack(">IIBBBBB", 32, 16, 8, 6, 0, 0, 0)) \
+    + bloque(b"IDAT", zlib.compress(b"".join(filas))) + bloque(b"IEND", b"")
+open("hoja.png", "wb").write(png)
+# cuadro.bmp 10×10 azul (24 bits)
+w = h = 10; fila = (bytes((255, 0, 0)) * w) + b"\x00\x00"
+datos = fila * h
+cab = b"BM" + struct.pack("<IHHI", 54 + len(datos), 0, 0, 54) + struct.pack("<IiiHHIIiiII", 40, w, h, 1, 24, 0, len(datos), 2835, 2835, 0, 0)
+open("cuadro.bmp", "wb").write(cab + datos)
+# tono.wav: 0,5 s, mono, 22050 Hz (se convierte al formato de Lince)
+with wave.open("tono.wav", "wb") as f:
+    f.setnchannels(1); f.setsampwidth(2); f.setframerate(22050)
+    f.writeframes(b"".join(struct.pack("<h", 8000 if (i // 25) % 2 else -8000) for i in range(11025)))
+PY
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 20 "$LINCE" "$DIR/prueba2.lince" > salida2.txt 2>&1
+[ $? -eq 0 ] && ok "la segunda prueba termina bien" || mal "la segunda prueba falló"
+for l in "hoja: 32x16" "misma imagen: verdadero" "bmp: 10x10" "camara: -50" "imagen inexistente: ok" \
+         "dibujar sin imagen: ok" "duración: 0.5" "voz: verdadero" "volumen: 0.8" "reproducir sin sonido: ok" \
+         "mandos: 0" "botón a: falso" "eje: 0" "tiempo: verdadero"; do
+    grep -qxF "$l" salida2.txt && ok "$l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+d = open("prueba2.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+def px(x, y):
+    fila = (abs(h) - 1 - y) if h > 0 else y
+    b, g, r, a = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 4]
+    return (r, g, b)
+casos = [((8, 8), (0, 255, 0), "sprite: cuadro 1 de la hoja, escalado"), ((17, 8), (0, 0, 0), "…mide 16 px"),
+         ((25, 5), (255, 0, 0), "recorte con ancho/alto"), ((45, 5), (0, 0, 255), "imagen BMP"),
+         ((70, 10), (0, 0, 0), "alfa 0 no se ve"), ((55, 45), (255, 255, 0), "la cámara desplaza el dibujo")]
+mal = 0
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ píxel:", nombre)
+    else: print("  ❌ píxel:", nombre, "→", px(x, y)); mal += 1
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt; exit 1; }
