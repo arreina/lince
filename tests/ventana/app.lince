@@ -1,0 +1,6 @@
+importar "servidor"
+servidor.obtener("/", funcion(val diccionario req): diccionario {
+    devolver servidor.html("<h1>hola desde la ventana</h1>")
+})
+servidor.ventana(8766)
+escribir("no debería llegar aquí")

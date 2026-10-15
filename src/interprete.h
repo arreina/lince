@@ -228,7 +228,10 @@ int  interprete_pila(int nivel, const char **nombre, int *linea);
 
 /* Lector de archivos 'importar' alternativo al disco (programas empaquetados):
    devuelve el contenido de la ruta o NULL si no es suyo. */
-void interprete_fijar_lector(const char *(*lector)(const char *ruta));
+void interprete_fijar_lector(const char *(*lector)(const char *ruta, size_t *largo));
+
+/* Como interprete_leer_fuente, pero también devuelve los bytes leídos (binarios) */
+char *interprete_leer_bytes(const char *ruta, size_t *largo);
 
 /* Contenido (malloc) del archivo que se importaría con esa ruta, o NULL */
 char *interprete_leer_fuente(const char *ruta);

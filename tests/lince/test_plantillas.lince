@@ -1,0 +1,39 @@
+# TEST: plantillas
+importar "plantillas"
+
+sea datos = {
+    "titulo": "Tareas <hoy>",
+    "usuario": "Ana & Luis",
+    "tareas": [
+        {"texto": "Comprar pan", "hecha": falso, "etiquetas": ["casa", "urgente"]},
+        {"texto": "Escribir \"informe\"", "hecha": verdadero, "etiquetas": []}
+    ]
+}
+escribir(plantillas.archivo("tests/lince/plantillas/pagina.html", datos))
+
+# Sin tareas
+datos["tareas"] = []
+escribir(plantillas.renderizar("{{#si no tareas}}vacío{{#sino}}hay{{/si}} / {{{ usuario }}} / {{ usuario }}", datos))
+
+# Números, lógicos y nulo
+escribir(plantillas.renderizar("{{ n }} {{ d }} {{ b }} [{{ z }}]", {"n": 3, "d": 2.5, "b": verdadero, "z": nulo}))
+
+# Bucles anidados con @indice
+escribir(plantillas.renderizar("{{#para fila en filas}}{{ @indice }}:{{#para x en fila}}{{ x }}{{/para}};{{/para}}", {"filas": [[1, 2], [3], []]}))
+
+# Errores
+intentar {
+    plantillas.renderizar("línea 1\nhola {{ falta }}", {})
+} capturar (ErrorPlantilla e) {
+    escribir(e.mensaje)
+}
+intentar {
+    plantillas.renderizar("{{#para x lista}}{{/para}}", {"lista": []})
+} capturar (ErrorPlantilla e) {
+    escribir(e.mensaje)
+}
+intentar {
+    plantillas.archivo("no/existe.html", {})
+} capturar (ErrorPlantilla e) {
+    escribir(e.mensaje)
+}

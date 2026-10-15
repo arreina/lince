@@ -147,13 +147,13 @@
 <div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
-<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-9" class="sub">Fechas con `tiempo`</a><a href="#modulos-y-librerias-10" class="sub">Bases de datos con `sqlite`</a><a href="#modulos-y-librerias-11" class="sub">Hashes y base64 con `cripto`</a><a href="#modulos-y-librerias-12" class="sub">Concurrencia con `tareas`</a></div>
+<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-9" class="sub">Fechas con `tiempo`</a><a href="#modulos-y-librerias-10" class="sub">Bases de datos con `sqlite`</a><a href="#modulos-y-librerias-11" class="sub">Hashes y base64 con `cripto`</a><a href="#modulos-y-librerias-12" class="sub">Concurrencia con `tareas`</a><a href="#modulos-y-librerias-13" class="sub">HTML con datos: `plantillas`</a></div>
 </nav>
 
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>44 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>45 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -731,7 +731,29 @@ nulo</pre></div><span class="fuente">995_cripto.lince</span></article><article c
     <span class="k">escribir</span>(<span class="s">&quot;la tarea falló: &quot;</span> + e.mensaje)
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>85
 [1, 4, 9, 16, 25]
-la tarea falló: Error: algo falló</pre></div><span class="fuente">996_tareas.lince</span></article></section>
+la tarea falló: Error: algo falló</pre></div><span class="fuente">996_tareas.lince</span></article><article class="ej" id="modulos-y-librerias-13"><h3>HTML con datos: `plantillas`</h3><p class="nota">`{{ x }}` inserta un valor escapando el HTML (seguro con datos de usuarios) y `{{{ x }}}` lo inserta tal cual. `{{#si}}` / `{{#sino}}` y `{{#para x en lista}}` controlan qué sale; dentro de un bucle `{{ @numero }}` cuenta desde 1. `plantillas.archivo(ruta, datos)` hace lo mismo leyendo un archivo, que puede incluir otros con `{{&gt; parcial.html}}`. Una variable que no existe da `ErrorPlantilla`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;plantillas&quot;</span>
+
+<span class="k">sea</span> datos = {
+    <span class="s">&quot;titulo&quot;</span>: <span class="s">&quot;Mis tareas &lt;hoy&gt;&quot;</span>,
+    <span class="s">&quot;tareas&quot;</span>: [
+        {<span class="s">&quot;texto&quot;</span>: <span class="s">&quot;Comprar pan&quot;</span>, <span class="s">&quot;hecha&quot;</span>: <span class="k">falso</span>},
+        {<span class="s">&quot;texto&quot;</span>: <span class="s">&quot;Escribir el informe&quot;</span>, <span class="s">&quot;hecha&quot;</span>: <span class="k">verdadero</span>}
+    ]
+}
+
+<span class="k">sea</span> plantilla = <span class="s">&quot;&lt;h1&gt;{{ titulo }}&lt;/h1&gt;
+&lt;ul&gt;
+{{#para t en tareas}}
+  &lt;li&gt;{{ @numero }}. {{ t.texto }}{{#si t.hecha}} ✔{{/si}}&lt;/li&gt;
+{{/para}}
+&lt;/ul&gt;
+{{#si no tareas}}&lt;p&gt;No hay tareas.&lt;/p&gt;{{/si}}&quot;</span>
+
+<span class="k">escribir</span>(plantillas.renderizar(plantilla, datos))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>&lt;h1&gt;Mis tareas &amp;lt;hoy&amp;gt;&lt;/h1&gt;
+&lt;ul&gt;
+  &lt;li&gt;1. Comprar pan&lt;/li&gt;
+  &lt;li&gt;2. Escribir el informe ✔&lt;/li&gt;
+&lt;/ul&gt;</pre></div><span class="fuente">997_plantillas.lince</span></article></section>
 </main>
 </div>
 

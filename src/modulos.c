@@ -1020,13 +1020,21 @@ static const char *_srv_mime(const char *ext) {
     if (strcmp(ext, ".jpg")==0)  return "image/jpeg";
     if (strcmp(ext, ".svg")==0)  return "image/svg+xml";
     if (strcmp(ext, ".ico")==0)  return "image/x-icon";
+    if (strcmp(ext, ".jpeg")==0) return "image/jpeg";
+    if (strcmp(ext, ".gif")==0)  return "image/gif";
+    if (strcmp(ext, ".webp")==0) return "image/webp";
+    if (strcmp(ext, ".woff2")==0) return "font/woff2";
+    if (strcmp(ext, ".txt")==0)  return "text/plain; charset=utf-8";
     return "text/plain";
 }
 
 /* ── Enviar respuesta HTTP ──────────────── */
 
-static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
-                                   const char *cuerpo, Valor *cookies) {
+static char _srv_loc[1024] = "";   /* cabecera Location de la respuesta en curso */
+static int _srv_cors = 1;   /* cabecera Access-Control-Allow-Origin: * (la quita 'ventana') */
+
+static void _srv_enviar_respuesta_n(int fd, int codigo, const char *tipo,
+                                    const char *cuerpo, size_t cuerpo_len, Valor *cookies) {
     const char *estado = "OK";
     if (codigo == 201) estado = "Created";
     else if (codigo == 204) estado = "No Content";
@@ -1038,8 +1046,8 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
     else if (codigo == 405) estado = "Method Not Allowed";
     else if (codigo == 500) estado = "Internal Server Error";
 
-    size_t cuerpo_len = cuerpo ? strlen(cuerpo) : 0;
     if (!tipo || strpbrk(tipo, "\r\n")) tipo = "text/plain";
+    const char *cors = _srv_cors ? "Access-Control-Allow-Origin: *\r\n" : "";
 
     /* Construir cabeceras base. Si no cabe entero no se puede enviar
        truncado: cortar a media línea dejaría la respuesta sin el fin de
@@ -1051,8 +1059,8 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
         "Content-Type: %s\r\n"
         "Content-Length: %zu\r\n"
         "Connection: close\r\n"
-        "Access-Control-Allow-Origin: *\r\n",
-        codigo, estado, tipo, cuerpo_len);
+        "%s",
+        codigo, estado, tipo, cuerpo_len, cors);
     if (clen < 0 || (size_t)clen >= sizeof(cab)) {
         fprintf(stderr, "⚠  servidor: cabeceras demasiado largas "
                         "(¿'tipo' excesivo?), se usa text/plain\n");
@@ -1061,12 +1069,18 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
             "Content-Type: text/plain\r\n"
             "Content-Length: %zu\r\n"
             "Connection: close\r\n"
-            "Access-Control-Allow-Origin: *\r\n",
-            codigo, estado, cuerpo_len);
+            "%s",
+            codigo, estado, cuerpo_len, cors);
         if (clen < 0) return;
     }
 
     send(fd, cab, (size_t)clen, 0);
+
+    if (_srv_loc[0] && !strpbrk(_srv_loc, "\r\n")) {
+        char loc[1100];
+        int ll = snprintf(loc, sizeof loc, "Location: %s\r\n", _srv_loc);
+        if (ll > 0 && (size_t)ll < sizeof loc) send(fd, loc, (size_t)ll, 0);
+    }
 
     /* Set-Cookie por cada entrada del diccionario cookies */
     if (cookies && cookies->tipo == VAL_DICCIONARIO) {
@@ -1095,6 +1109,11 @@ static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
 
     send(fd, "\r\n", 2, 0);
     if (cuerpo && cuerpo_len > 0) send(fd, cuerpo, cuerpo_len, 0);
+}
+
+static void _srv_enviar_respuesta(int fd, int codigo, const char *tipo,
+                                  const char *cuerpo, Valor *cookies) {
+    _srv_enviar_respuesta_n(fd, codigo, tipo, cuerpo, cuerpo ? strlen(cuerpo) : 0, cookies);
 }
 
 /* ── Manejar conexión ───────────────────── */
@@ -1130,7 +1149,16 @@ static void _srv_manejar_conexion(int fd) {
         valor_destruir(params);
 
         Valor *cookies_resp = NULL;
-        if (resp && resp->tipo == VAL_DICCIONARIO) {
+        if (hay_error) {
+            /* El manejador falló: se cuenta en la consola del servidor y el
+               cliente recibe un 500, no una página vacía como si fuera bien. */
+            if (valor_error && valor_error->tipo == VAL_ERROR)
+                fprintf(stderr, "❌ %s %s: %s %s\n", metodo, ruta,
+                        valor_error->error->tipo, valor_error->error->mensaje);
+            hay_error = 0;
+            _srv_enviar_respuesta(fd, 500, "text/html; charset=utf-8",
+                "<h1>500 — Error interno</h1><p>El servidor no pudo atender la petición.</p>", NULL);
+        } else if (resp && resp->tipo == VAL_DICCIONARIO) {
             int cod = 200;
             const char *tipo_r = "text/html; charset=utf-8";
             char *cuerpo_r = "";
@@ -1147,6 +1175,9 @@ static void _srv_manejar_conexion(int fd) {
                 if (strcmp(resp->diccionario.claves[j], "cookies") == 0 &&
                     resp->diccionario.valores[j]->tipo == VAL_DICCIONARIO)
                     cookies_resp = resp->diccionario.valores[j];
+                if (strcmp(resp->diccionario.claves[j], "ubicacion") == 0 &&
+                    resp->diccionario.valores[j]->tipo == VAL_TEXTO)
+                    snprintf(_srv_loc, sizeof _srv_loc, "%s", resp->diccionario.valores[j]->texto);
             }
             _srv_enviar_respuesta(fd, cod, tipo_r, cuerpo_r, cookies_resp);
         } else if (resp && resp->tipo == VAL_TEXTO) {
@@ -1165,17 +1196,18 @@ static void _srv_manejar_conexion(int fd) {
         char ruta_file[512];
         const char *r = ruta;
         if (strcmp(r, "/") == 0) r = "/index.html";
-        snprintf(ruta_file, sizeof(ruta_file), "%s%s", _srv_dir_estaticos, r);
-        FILE *f = fopen(ruta_file, "rb");
-        if (f) {
-            fseek(f, 0, SEEK_END); long tam = ftell(f); rewind(f);
-            char *cont = malloc(tam + 1);
-            fread(cont, 1, tam, f); cont[tam] = '\0'; fclose(f);
-            const char *ext = strrchr(ruta_file, '.');
-            _srv_enviar_respuesta(fd, 200, _srv_mime(ext), cont, NULL);
-            free(cont); close(fd);
-            valor_destruir(consulta); valor_destruir(cookies);
-            return;
+        /* Nunca fuera de la carpeta de estáticos */
+        if (strstr(r, "..") == NULL) {
+            snprintf(ruta_file, sizeof(ruta_file), "%s%s", _srv_dir_estaticos, r);
+            size_t tam = 0;
+            char *cont = interprete_leer_bytes(ruta_file, &tam);
+            if (cont) {
+                const char *ext = strrchr(ruta_file, '.');
+                _srv_enviar_respuesta_n(fd, 200, _srv_mime(ext), cont, tam, NULL);
+                free(cont); close(fd);
+                valor_destruir(consulta); valor_destruir(cookies);
+                return;
+            }
         }
     }
 
@@ -1304,10 +1336,13 @@ static Valor *fn_srv_redirigir(Valor **a, int n) {
     res->diccionario.claves[2]  = strdup("cuerpo");
     res->diccionario.valores[2] = valor_texto(redir);
     res->diccionario.cantidad   = 3;
+    valor_diccionario_agregar(res, "ubicacion", valor_texto(url));
     return res;
 }
 
 /* ── Escuchar (con fork por conexión) ───── */
+
+static int _srv_solo_local = 0;   /* 'ventana' escucha sólo en 127.0.0.1 */
 
 static Valor *fn_srv_escuchar(Valor **a, int n) {
     int puerto = (n >= 1 && a[0]->tipo == VAL_NUMERO) ? (int)a[0]->numero : 8080;
@@ -1330,7 +1365,7 @@ static Valor *fn_srv_escuchar(Valor **a, int n) {
 
     struct sockaddr_in addr = {0};
     addr.sin_family      = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_addr.s_addr = _srv_solo_local ? htonl(INADDR_LOOPBACK) : INADDR_ANY;
     addr.sin_port        = htons(puerto);
 
     if (bind(srv_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -1371,6 +1406,163 @@ static Valor *fn_srv_escuchar(Valor **a, int n) {
         }
     }
     return valor_nulo();
+#endif
+}
+
+/* servidor.formulario(cuerpo): «a=1&b=hola+mundo%21» → {"a": "1", "b": "hola mundo!"}.
+   Es el formato en que un <form> HTML envía sus campos. */
+static int srv_hex(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+static char *srv_decodificar(const char *s, size_t n) {
+    char *o = malloc(n + 1);
+    size_t k = 0;
+    for (size_t i = 0; i < n; i++) {
+        if (s[i] == '+') o[k++] = ' ';
+        else if (s[i] == '%' && i + 2 < n + 0 && srv_hex(s[i + 1]) >= 0 && srv_hex(s[i + 2]) >= 0) {
+            o[k++] = (char)(srv_hex(s[i + 1]) << 4 | srv_hex(s[i + 2]));
+            i += 2;
+        } else o[k++] = s[i];
+    }
+    o[k] = '\0';
+    return o;
+}
+static Valor *fn_srv_formulario(Valor **a, int n) {
+    Valor *d = valor_diccionario_crear();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return d;
+    const char *p = a[0]->texto;
+    while (*p) {
+        const char *fin = strchr(p, '&');
+        size_t largo = fin ? (size_t)(fin - p) : strlen(p);
+        const char *eq = memchr(p, '=', largo);
+        size_t lk = eq ? (size_t)(eq - p) : largo;
+        if (lk > 0) {
+            char *k = srv_decodificar(p, lk);
+            char *v = eq ? srv_decodificar(eq + 1, largo - lk - 1) : strdup("");
+            int pos = valor_diccionario_buscar(d, k);
+            if (pos >= 0) { valor_destruir(d->diccionario.valores[pos]); d->diccionario.valores[pos] = valor_texto(v); }
+            else valor_diccionario_agregar(d, k, valor_texto(v));
+            free(k); free(v);
+        }
+        if (!fin) break;
+        p = fin + 1;
+    }
+    return d;
+}
+
+/* servidor.ventana(puerto[, ancho, alto]): como escuchar(), pero además abre
+   la aplicación en una ventana propia del navegador (sin barra de direcciones)
+   y termina el programa cuando se cierra la ventana. El servidor sólo atiende
+   en 127.0.0.1. Con la variable de entorno LINCE_NAVEGADOR se elige el programa
+   a lanzar (recibe la URL como único argumento). */
+#ifndef _WIN32
+static void ventana_esperar_servidor(int puerto) {
+    for (int i = 0; i < 100; i++) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in sa = {0};
+        sa.sin_family = AF_INET;
+        sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+        sa.sin_port = htons(puerto);
+        int ok = connect(fd, (struct sockaddr *)&sa, sizeof sa) == 0;
+        close(fd);
+        if (ok) return;
+        usleep(100000);
+    }
+}
+
+/* Lanza 'argv' y espera a que acabe. Devuelve -1 si no se pudo ejecutar */
+static int ventana_lanzar(char *const argv[]) {
+    pid_t p = fork();
+    if (p < 0) return -1;
+    if (p == 0) {
+        signal(SIGCHLD, SIG_DFL);
+        if (!freopen("/dev/null", "w", stdout)) _exit(127);
+        if (!freopen("/dev/null", "w", stderr)) _exit(127);
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+    int st = 0;
+    waitpid(p, &st, 0);
+    if (WIFEXITED(st) && WEXITSTATUS(st) == 127) return -1;
+    return WIFEXITED(st) ? WEXITSTATUS(st) : 1;
+}
+
+static void ventana_ayudante(pid_t padre, int puerto, int ancho, int alto) {
+    signal(SIGCHLD, SIG_DFL);
+    signal(SIGTERM, SIG_DFL);
+    ventana_esperar_servidor(puerto);
+    char url[64], perfil[96], tam[48];
+    snprintf(url, sizeof url, "http://127.0.0.1:%d/", puerto);
+
+    int cerrada = 0;
+    const char *propio = getenv("LINCE_NAVEGADOR");
+    if (propio && *propio) {
+        char *const av[] = { (char *)propio, url, NULL };
+        if (ventana_lanzar(av) >= 0) cerrada = 1;
+    } else {
+        static const char *const candidatos[] = {
+            "google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
+            "microsoft-edge", "microsoft-edge-stable", "brave-browser",
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium", NULL };
+        snprintf(perfil, sizeof perfil, "--user-data-dir=/tmp/lince-ventana-%d", (int)getpid());
+        snprintf(tam, sizeof tam, "--window-size=%d,%d", ancho, alto);
+        char app[96];
+        snprintf(app, sizeof app, "--app=%s", url);
+        for (int i = 0; candidatos[i] && !cerrada; i++) {
+            char *const av[] = { (char *)candidatos[i], app, perfil, tam,
+                                 "--no-first-run", "--no-default-browser-check", NULL };
+            time_t t0 = time(NULL);
+            int r = ventana_lanzar(av);
+            if (r >= 0 && (r == 0 || time(NULL) - t0 >= 2)) cerrada = 1;
+        }
+        char rm[128];
+        snprintf(rm, sizeof rm, "rm -rf /tmp/lince-ventana-%d >/dev/null 2>&1", (int)getpid());
+        /* los procesos del navegador pueden tardar un instante en soltar el perfil */
+        if (system(rm) != 0) { sleep(1); if (system(rm) != 0) { /* se queda en /tmp */ } }
+    }
+    if (cerrada) {
+        if (getppid() == padre) kill(padre, SIGTERM);
+        return;
+    }
+    /* Sin navegador con modo aplicación: el predeterminado, y el servidor sigue */
+    char *const xdg[] = { "xdg-open", url, NULL };
+    char *const mac[] = { "open", url, NULL };
+    if (ventana_lanzar(xdg) < 0) ventana_lanzar(mac);
+    fprintf(stderr, "Abre %s en tu navegador (Ctrl+C para terminar).\n", url);
+}
+
+static void ventana_salir(int sig) { (void)sig; _exit(0); }
+#endif
+
+static Valor *fn_srv_ventana(Valor **a, int n) {
+#ifdef _WIN32
+    (void)a; (void)n;
+    printf("⚠  servidor.ventana() no está disponible en Windows aún.\n");
+    return valor_nulo();
+#else
+    int puerto = (n >= 1 && a[0]->tipo == VAL_NUMERO) ? (int)a[0]->numero : 8765;
+    int ancho  = (n >= 2 && a[1]->tipo == VAL_NUMERO) ? (int)a[1]->numero : 1000;
+    int alto   = (n >= 3 && a[2]->tipo == VAL_NUMERO) ? (int)a[2]->numero : 700;
+    fflush(NULL);
+    pid_t padre = getpid();
+    pid_t h = fork();
+    if (h == 0) {
+        ventana_ayudante(padre, puerto, ancho, alto);
+        _exit(0);
+    }
+    signal(SIGTERM, ventana_salir);       /* al cerrar la ventana: salida limpia */
+    _srv_solo_local = 1;
+    _srv_cors = 0;       /* una página ajena no debe poder leer esta aplicación */
+    Valor *p = valor_numero(puerto);
+    Valor *args[1] = { p };
+    Valor *r = fn_srv_escuchar(args, 1);
+    valor_destruir(p);
+    return r;
 #endif
 }
 
@@ -2954,6 +3146,392 @@ static void cargar_tareas(Entorno *entorno) {
         fns, 6, NULL, NULL, 0);
 }
 
+/* ─────────────────────────────────────────
+   MÓDULO: plantillas
+   Rellena HTML (o cualquier texto) con datos de Lince.
+
+     {{ nombre }}            valor, con los caracteres de HTML escapados
+     {{{ nombre }}}          valor tal cual (HTML ya preparado)
+     {{ usuario.nombre }}    campo de un diccionario; {{ lista.0 }} elemento
+     {{ lista.longitud }}    número de elementos (también de textos y diccionarios)
+     {{#si cond}} … {{#sino}} … {{/si}}      ('no cond' niega)
+     {{#para x en lista}} … {{/para}}        ({{@indice}} desde 0, {{@numero}} desde 1)
+     {{> otra.html}}         incluye otra plantilla (junto a la actual)
+     {{! comentario }}
+───────────────────────────────────────── */
+typedef struct { char *d; size_t n, cap; } PBuf;
+
+static void pb_poner(PBuf *b, const char *p, size_t k) {
+    if (b->n + k + 1 > b->cap) {
+        b->cap = (b->n + k + 1) * 2;
+        b->d = realloc(b->d, b->cap);
+    }
+    memcpy(b->d + b->n, p, k);
+    b->n += k;
+    b->d[b->n] = '\0';
+}
+
+#define PL_MAX_VARS 48
+#define PL_MAX_TEMPS 64
+typedef struct { const char *nombre; Valor *valor; } PVar;
+typedef struct {
+    Valor      *raiz;
+    PVar        vars[PL_MAX_VARS];
+    int         nvars;
+    Valor      *temps[PL_MAX_TEMPS];
+    int         ntemps;
+    const char *dir;            /* carpeta de la plantilla, para {{> parcial}} */
+    const char *base;           /* inicio del texto que se está procesando (para la línea) */
+    int         prof;
+    char        error[480];
+} PCtx;
+
+static int pl_fallo(PCtx *c, const char *donde, const char *fmt, const char *arg) {
+    int linea = 1;
+    for (const char *p = c->base; p && p < donde; p++) if (*p == '\n') linea++;
+    char tmp[300];
+    snprintf(tmp, sizeof tmp, fmt, arg ? arg : "");
+    snprintf(c->error, sizeof c->error, "plantilla, línea %d: %s", linea, tmp);
+    return 0;
+}
+
+static Valor *pl_temp(PCtx *c, Valor *v) {
+    if (c->ntemps < PL_MAX_TEMPS) c->temps[c->ntemps++] = v; else valor_destruir(v);
+    return v;
+}
+
+/* Valor de un camino «a.b.0» o NULL si no existe (el valor es prestado) */
+static Valor *pl_buscar(PCtx *c, const char *ruta, size_t k) {
+    char seg[128];
+    size_t i = 0;
+    Valor *v = NULL;
+    int primero = 1;
+    while (i <= k) {
+        size_t j = i;
+        while (j < k && ruta[j] != '.') j++;
+        size_t l = j - i;
+        if (l == 0 || l >= sizeof seg) return NULL;
+        memcpy(seg, ruta + i, l); seg[l] = '\0';
+        if (primero) {
+            primero = 0;
+            for (int x = c->nvars - 1; x >= 0 && !v; x--)
+                if (strcmp(c->vars[x].nombre, seg) == 0) v = c->vars[x].valor;
+            if (!v && c->raiz && c->raiz->tipo == VAL_DICCIONARIO) {
+                int p = valor_diccionario_buscar(c->raiz, seg);
+                if (p >= 0) v = c->raiz->diccionario.valores[p];
+            }
+            if (!v) return NULL;
+        } else if (v->tipo == VAL_DICCIONARIO) {
+            int p = valor_diccionario_buscar(v, seg);
+            if (p >= 0) { v = v->diccionario.valores[p]; }
+            else if (strcmp(seg, "longitud") == 0) v = pl_temp(c, valor_numero(v->diccionario.cantidad));
+            else return NULL;
+        } else if (v->tipo == VAL_LISTA) {
+            char *fin;
+            long idx = strtol(seg, &fin, 10);
+            if (*fin == '\0') {
+                if (idx < 0 || idx >= v->lista.cantidad) return NULL;
+                v = v->lista.elementos[idx];
+            } else if (strcmp(seg, "longitud") == 0) v = pl_temp(c, valor_numero(v->lista.cantidad));
+            else return NULL;
+        } else if (v->tipo == VAL_TEXTO && strcmp(seg, "longitud") == 0) {
+            v = pl_temp(c, valor_numero(utf8_longitud(v->texto)));
+        } else return NULL;
+        i = j + 1;
+        if (j >= k) break;
+    }
+    return v;
+}
+
+static int pl_verdadero(Valor *v) {
+    switch (v->tipo) {
+        case VAL_NULO:        return 0;
+        case VAL_BOOLEANO:    return v->booleano;
+        case VAL_NUMERO:      return v->numero != 0;
+        case VAL_TEXTO:       return v->texto[0] != '\0';
+        case VAL_LISTA:       return v->lista.cantidad > 0;
+        case VAL_DICCIONARIO: return v->diccionario.cantidad > 0;
+        default:              return 1;
+    }
+}
+
+static void pl_valor(PBuf *out, Valor *v, int escapar) {
+    char tmp[64];
+    const char *s = "";
+    char *rep = NULL;
+    switch (v->tipo) {
+        case VAL_NULO: s = ""; break;
+        case VAL_TEXTO: s = v->texto; break;
+        case VAL_BOOLEANO: s = v->booleano ? "verdadero" : "falso"; break;
+        case VAL_NUMERO:
+            if (v->numero == (long long)v->numero) snprintf(tmp, sizeof tmp, "%lld", (long long)v->numero);
+            else snprintf(tmp, sizeof tmp, "%g", v->numero);
+            s = tmp; break;
+        default: rep = valor_a_texto_repl(v); s = rep; break;
+    }
+    if (!escapar) { pb_poner(out, s, strlen(s)); free(rep); return; }
+    for (const char *p = s; *p; p++) {
+        switch (*p) {
+            case '&':  pb_poner(out, "&amp;", 5); break;
+            case '<':  pb_poner(out, "&lt;", 4); break;
+            case '>':  pb_poner(out, "&gt;", 4); break;
+            case '"':  pb_poner(out, "&quot;", 6); break;
+            case '\'': pb_poner(out, "&#39;", 5); break;
+            default:   pb_poner(out, p, 1);
+        }
+    }
+    free(rep);
+}
+
+static const char *pl_saltar_esp(const char *p, const char *fin) {
+    while (p < fin && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+    return p;
+}
+static const char *pl_fin_recorte(const char *ini, const char *fin) {
+    while (fin > ini && (fin[-1] == ' ' || fin[-1] == '\t' || fin[-1] == '\n' || fin[-1] == '\r')) fin--;
+    return fin;
+}
+
+/* ¿Está la etiqueta [t0,t1) sola en su línea (sin nada más que espacios)? Así
+   las líneas de {{#si}}, {{/si}}, {{#para}}… no dejan líneas vacías en el
+   resultado. *desde = inicio de esa línea; *hasta = inicio de la siguiente. */
+static int pl_sola(const char *base, const char *t0, const char *t1, const char *fin,
+                   const char **desde, const char **hasta) {
+    const char *a = t0;
+    while (a > base && (a[-1] == ' ' || a[-1] == '\t')) a--;
+    if (a > base && a[-1] != '\n') return 0;
+    const char *b = t1;
+    while (b < fin && (*b == ' ' || *b == '\t' || *b == '\r')) b++;
+    if (b < fin && *b != '\n') return 0;
+    *desde = a;
+    *hasta = b < fin ? b + 1 : b;
+    return 1;
+}
+
+static int pl_render(PCtx *c, const char *p, const char *fin, PBuf *out);
+
+/* Busca el cierre «{{/tipo}}» que empareja con la apertura ya leída (en p).
+   Con 'sino' no nulo, anota dónde está el «{{#sino}}» de primer nivel. */
+static const char *pl_cierre(const char *p, const char *fin, const char *tipo,
+                             const char **sino, const char **tras_sino) {
+    char ap[16], ci[16];
+    snprintf(ap, sizeof ap, "{{#%s", tipo);
+    snprintf(ci, sizeof ci, "{{/%s}}", tipo);
+    size_t lap = strlen(ap), lci = strlen(ci);
+    int prof = 1;
+    if (sino) *sino = NULL;
+    while (p < fin) {
+        const char *q = memchr(p, '{', (size_t)(fin - p));
+        if (!q) return NULL;
+        if (q + lci <= fin && strncmp(q, ci, lci) == 0) {
+            if (--prof == 0) return q;
+            p = q + lci;
+        } else if (q + lap < fin && strncmp(q, ap, lap) == 0 &&
+                   (q[lap] == ' ' || q[lap] == '}')) {
+            prof++;
+            p = q + lap;
+        } else if (sino && prof == 1 && q + 9 <= fin && strncmp(q, "{{#sino}}", 9) == 0 &&
+                   strcmp(tipo, "si") == 0) {
+            *sino = q; *tras_sino = q + 9;
+            p = q + 9;
+        } else p = q + 1;
+    }
+    return NULL;
+}
+
+static int pl_render(PCtx *c, const char *p, const char *fin, PBuf *out) {
+    if (c->prof > 24) return pl_fallo(c, p, "demasiado anidamiento (¿una plantilla se incluye a sí misma?)%s", NULL);
+    c->prof++;
+    while (p < fin) {
+        const char *q = p;
+        while (q + 1 < fin && !(q[0] == '{' && q[1] == '{')) q++;
+        if (q + 1 >= fin) { pb_poner(out, p, (size_t)(fin - p)); break; }
+        pb_poner(out, p, (size_t)(q - p));
+
+        int triple = (q + 2 < fin && q[2] == '{');
+        const char *ini = q + (triple ? 3 : 2);
+        const char *cierre = triple ? "}}}" : "}}";
+        size_t lc = strlen(cierre);
+        const char *e = ini;
+        while (e + lc <= fin && strncmp(e, cierre, lc) != 0) e++;
+        if (e + lc > fin) { c->prof--; return pl_fallo(c, q, "falta cerrar «%s»", triple ? "{{{" : "{{"); }
+        p = e + lc;
+
+        if (!triple && *ini == '!') {                                /* comentario */
+            const char *d0, *h0;
+            if (pl_sola(c->base, q, p, fin, &d0, &h0)) { out->n -= (size_t)(q - d0); out->d[out->n] = '\0'; p = h0; }
+            continue;
+        }
+
+        const char *a = pl_saltar_esp(ini, e), *b = pl_fin_recorte(a, e);
+        if (!triple && *a == '>') {                                  /* parcial */
+            const char *n0 = pl_saltar_esp(a + 1, b);
+            char nombre[512], ruta[1024];
+            size_t l = (size_t)(b - n0);
+            if (l == 0 || l >= sizeof nombre) { c->prof--; return pl_fallo(c, q, "parcial sin nombre válido%s", NULL); }
+            memcpy(nombre, n0, l); nombre[l] = '\0';
+            snprintf(ruta, sizeof ruta, "%s%s%s", c->dir ? c->dir : "", c->dir && c->dir[0] ? "/" : "", nombre);
+            size_t leido = 0;
+            char *sub = interprete_leer_bytes(ruta, &leido);
+            if (!sub) { c->prof--; return pl_fallo(c, q, "no se encontró el parcial '%s'", nombre); }
+            const char *base_ant = c->base;
+            c->base = sub;
+            int ok = pl_render(c, sub, sub + leido, out);
+            c->base = base_ant;
+            free(sub);
+            if (!ok) { c->prof--; return 0; }
+            continue;
+        }
+        if (!triple && *a == '#') {
+            if (b - a >= 3 && strncmp(a, "#si", 3) == 0 && (a + 3 == b || a[3] == ' ')) {
+                const char *cond = pl_saltar_esp(a + 3, b);
+                int niega = 0;
+                if (b - cond > 3 && strncmp(cond, "no ", 3) == 0) { niega = 1; cond = pl_saltar_esp(cond + 3, b); }
+                if (cond >= b) { c->prof--; return pl_fallo(c, q, "«#si» necesita una condición%s", NULL); }
+                const char *sino, *tras;
+                const char *fc = pl_cierre(p, fin, "si", &sino, &tras);
+                if (!fc) { c->prof--; return pl_fallo(c, q, "«#si» sin «{{/si}}»%s", NULL); }
+                char ruta[200]; size_t l = (size_t)(b - cond);
+                if (l >= sizeof ruta) l = sizeof ruta - 1;
+                memcpy(ruta, cond, l); ruta[l] = '\0';
+                Valor *v = pl_buscar(c, ruta, l);
+                if (!v) { c->prof--; return pl_fallo(c, q, "«%s» no existe en los datos", ruta); }
+                int cierto = pl_verdadero(v) != niega;
+                const char *d0, *h0;
+                /* apertura sola en su línea */
+                if (pl_sola(c->base, q, p, fin, &d0, &h0)) { out->n -= (size_t)(q - d0); out->d[out->n] = '\0'; p = h0; }
+                /* «{{#sino}}» y cierre: dónde acaba el trozo «entonces» y dónde empieza el «sino» */
+                const char *fin_then = sino ? sino : fc, *ini_else = tras;
+                if (sino && pl_sola(c->base, sino, tras, fin, &d0, &h0)) { fin_then = d0; ini_else = h0; }
+                const char *fin_else = fc, *tras_cierre = fc + strlen("{{/si}}");
+                if (pl_sola(c->base, fc, tras_cierre, fin, &d0, &h0)) { fin_else = d0; tras_cierre = h0; if (!sino) fin_then = d0; }
+                int ok = cierto ? pl_render(c, p, fin_then, out)
+                                : (sino ? pl_render(c, ini_else, fin_else, out) : 1);
+                if (!ok) { c->prof--; return 0; }
+                p = tras_cierre;
+                continue;
+            }
+            if (b - a >= 5 && strncmp(a, "#para", 5) == 0 && (a + 5 == b || a[5] == ' ')) {
+                /* #para x en ruta */
+                const char *v0 = pl_saltar_esp(a + 5, b), *v1 = v0;
+                while (v1 < b && *v1 != ' ') v1++;
+                const char *en = pl_saltar_esp(v1, b);
+                if (v1 == v0 || b - en < 3 || strncmp(en, "en ", 3) != 0)
+                    { c->prof--; return pl_fallo(c, q, "se esperaba «{{#para x en lista}}»%s", NULL); }
+                const char *r0 = pl_saltar_esp(en + 3, b);
+                char var[64], ruta[200];
+                size_t lv = (size_t)(v1 - v0), lr = (size_t)(b - r0);
+                if (lv == 0 || lv >= sizeof var || lr == 0 || lr >= sizeof ruta)
+                    { c->prof--; return pl_fallo(c, q, "se esperaba «{{#para x en lista}}»%s", NULL); }
+                memcpy(var, v0, lv); var[lv] = '\0';
+                memcpy(ruta, r0, lr); ruta[lr] = '\0';
+                const char *fc = pl_cierre(p, fin, "para", NULL, NULL);
+                if (!fc) { c->prof--; return pl_fallo(c, q, "«#para» sin «{{/para}}»%s", NULL); }
+                Valor *col = pl_buscar(c, ruta, lr);
+                if (!col) { c->prof--; return pl_fallo(c, q, "«%s» no existe en los datos", ruta); }
+                int n = col->tipo == VAL_LISTA ? col->lista.cantidad
+                      : col->tipo == VAL_DICCIONARIO ? col->diccionario.cantidad : -1;
+                if (n < 0) { c->prof--; return pl_fallo(c, q, "«%s» no es una lista (ni un diccionario)", ruta); }
+                if (c->nvars + 3 > PL_MAX_VARS) { c->prof--; return pl_fallo(c, q, "demasiados bucles anidados%s", NULL); }
+                int base_vars = c->nvars;
+                const char *d0, *h0, *fin_cuerpo = fc, *tras_cierre = fc + strlen("{{/para}}");
+                if (pl_sola(c->base, q, p, fin, &d0, &h0)) { out->n -= (size_t)(q - d0); out->d[out->n] = '\0'; p = h0; }
+                if (pl_sola(c->base, fc, tras_cierre, fin, &d0, &h0)) { fin_cuerpo = d0; tras_cierre = h0; }
+                for (int i = 0; i < n; i++) {
+                    c->nvars = base_vars;
+                    Valor *clave = NULL;
+                    Valor *elem = col->tipo == VAL_LISTA ? col->lista.elementos[i]
+                        : (clave = pl_temp(c, valor_texto(col->diccionario.claves[i])));
+                    c->vars[c->nvars++] = (PVar){ var, elem };
+                    c->vars[c->nvars++] = (PVar){ "@indice", pl_temp(c, valor_numero(i)) };
+                    c->vars[c->nvars++] = (PVar){ "@numero", pl_temp(c, valor_numero(i + 1)) };
+                    (void)clave;
+                    int ok = pl_render(c, p, fin_cuerpo, out);
+                    if (!ok) { c->nvars = base_vars; c->prof--; return 0; }
+                }
+                c->nvars = base_vars;
+                p = tras_cierre;
+                continue;
+            }
+            c->prof--;
+            return pl_fallo(c, q, "etiqueta desconocida «%s»", "{{#…}}");
+        }
+        if (!triple && *a == '/') { c->prof--; return pl_fallo(c, q, "cierre «{{%s}}» sin su apertura", "/…"); }
+
+        /* variable */
+        char ruta[200]; size_t l = (size_t)(b - a);
+        if (l == 0) { c->prof--; return pl_fallo(c, q, "etiqueta vacía%s", NULL); }
+        if (l >= sizeof ruta) l = sizeof ruta - 1;
+        memcpy(ruta, a, l); ruta[l] = '\0';
+        Valor *v = pl_buscar(c, ruta, l);
+        if (!v) { c->prof--; return pl_fallo(c, q, "«%s» no existe en los datos", ruta); }
+        pl_valor(out, v, !triple);
+    }
+    c->prof--;
+    return 1;
+}
+
+static Valor *pl_ejecutar(const char *texto, size_t largo, Valor *datos, const char *dir) {
+    PCtx *c = calloc(1, sizeof(PCtx));
+    c->raiz = datos; c->dir = dir; c->base = texto;
+    PBuf out = {0};
+    pb_poner(&out, "", 0);
+    int ok = pl_render(c, texto, texto + largo, &out);
+    Valor *res;
+    if (ok) {
+        res = valor_texto(out.d);
+    } else {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorPlantilla", c->error, 0);
+        res = valor_nulo();
+    }
+    for (int i = 0; i < c->ntemps; i++) valor_destruir(c->temps[i]);
+    free(out.d); free(c);
+    return res;
+}
+
+static Valor *fn_pl_renderizar(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_DICCIONARIO) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo", "renderizar() espera (texto de la plantilla, diccionario de datos)", 0);
+        return valor_nulo();
+    }
+    return pl_ejecutar(a[0]->texto, strlen(a[0]->texto), a[1], NULL);
+}
+
+static Valor *fn_pl_archivo(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_DICCIONARIO) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo", "archivo() espera (ruta de la plantilla, diccionario de datos)", 0);
+        return valor_nulo();
+    }
+    size_t leido = 0;
+    char *txt = interprete_leer_bytes(a[0]->texto, &leido);
+    if (!txt) {
+        char msg[600];
+        snprintf(msg, sizeof msg, "no se encontró la plantilla '%s'", a[0]->texto);
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorPlantilla", msg, 0);
+        return valor_nulo();
+    }
+    char dir[1024];
+    snprintf(dir, sizeof dir, "%s", a[0]->texto);
+    char *barra = strrchr(dir, '/');
+    if (barra) *barra = '\0'; else dir[0] = '\0';
+    Valor *r = pl_ejecutar(txt, leido, a[1], dir);
+    free(txt);
+    return r;
+}
+
+static void cargar_plantillas(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"renderizar", fn_pl_renderizar, 2},
+        {"archivo",    fn_pl_archivo,    2},
+    };
+    registrar_modulo_diccionario(entorno, "plantillas",
+        fns, 2, NULL, NULL, 0);
+}
+
 static void cargar_matematica(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"raiz",       fn_mat_raiz,       1},
@@ -3103,9 +3681,11 @@ static void cargar_servidor(Entorno *entorno) {
         {"texto",      fn_srv_texto,          -1},
         {"redirigir",  fn_srv_redirigir,       1},
         {"escuchar",   fn_srv_escuchar,       -1},
+        {"ventana",    fn_srv_ventana,        -1},
+        {"formulario", fn_srv_formulario,      1},
     };
     registrar_modulo_diccionario(entorno, "servidor",
-        fns, 11, NULL, NULL, 0);
+        fns, 13, NULL, NULL, 0);
 }
 
 static void cargar_terminal(Entorno *entorno) {
@@ -3148,6 +3728,7 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"sqlite", cargar_sqlite},
     {"cripto", cargar_cripto},
     {"tareas", cargar_tareas},
+    {"plantillas", cargar_plantillas},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -3174,7 +3755,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite, cripto, tareas",
+        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite, cripto, tareas, plantillas",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }

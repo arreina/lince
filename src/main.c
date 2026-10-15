@@ -40,6 +40,7 @@ static void mostrar_ayuda(void) {
     printf("  lince <archivo.lince>                    Ejecuta un programa\n");
     printf("  lince compilar <archivo.lince>           Compila a binario nativo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
+    printf("  lince compilar <a.lince> --incluir <ruta> Incluye plantillas o archivos (varias veces)\n");
     printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");
@@ -131,11 +132,24 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        /* Nombre del ejecutable — por defecto el del archivo sin .lince */
-        char ruta_bin[512];
-        if (argc >= 5 && strcmp(argv[3], "-o") == 0) {
-            snprintf(ruta_bin, sizeof(ruta_bin), "%s", argv[4]);
-        } else {
+        /* Opciones: -o nombre, --incluir ruta (varias) */
+        char ruta_bin[512] = "";
+        const char *extras[64];
+        int num_extras = 0;
+        for (int i = 3; i < argc; i++) {
+            if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+                snprintf(ruta_bin, sizeof(ruta_bin), "%s", argv[++i]);
+            } else if (strcmp(argv[i], "--incluir") == 0 && i + 1 < argc) {
+                if (num_extras < 64) extras[num_extras++] = argv[++i];
+                else i++;
+            } else {
+                fprintf(stderr, "\n❌ Opción desconocida: %s\n"
+                    "   Uso: lince compilar <archivo.lince> [-o nombre] [--incluir carpeta_o_archivo]...\n\n", argv[i]);
+                return 1;
+            }
+        }
+        if (!ruta_bin[0]) {
+            /* por defecto el nombre del archivo sin .lince */
             snprintf(ruta_bin, sizeof(ruta_bin), "%s", archivo);
             char *punto = strrchr(ruta_bin, '.');
             if (punto) *punto = '\0';
@@ -148,7 +162,7 @@ int main(int argc, char *argv[]) {
         printf("   Fuente  : %s\n", archivo);
         printf("   Salida  : %s\n\n", ruta_bin);
 
-        int resultado = empaquetado_crear(archivo, ruta_bin);
+        int resultado = empaquetado_crear(archivo, ruta_bin, extras, num_extras);
         if (resultado == 0)
             printf("✅ Compilado correctamente → %s\n\n", ruta_bin);
         return resultado;

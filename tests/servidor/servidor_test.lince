@@ -42,6 +42,17 @@ servidor.enviar("/enviar", funcion(val diccionario peticion): diccionario {
               "cuerpo": "recibido:" + peticion["cuerpo"]}
 })
 
+# Un manejador que falla: el cliente recibe un 500 y el error sale en la consola.
+servidor.obtener("/falla", funcion(val diccionario peticion): diccionario {
+    sea vacio = {}
+    devolver {"codigo": 200, "tipo": "text/plain", "cuerpo": vacio["no_existe"]}
+})
+
+# Redirección: lleva cabecera Location.
+servidor.obtener("/ir", funcion(val diccionario peticion): diccionario {
+    devolver servidor.redirigir("/destino")
+})
+
 # El puerto lo fija smoke.sh, para poder correr varias suites a la vez
 # (por ejemplo la normal y la de AddressSanitizer) sin que choquen.
 sea puerto = texto.a_numero(sistema.entorno("LINCE_PUERTO_TEST", "8123"))

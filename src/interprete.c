@@ -1333,28 +1333,42 @@ static void orden_merge(Valor **src, Valor **tmp, int ini, int fin,
    Un programa empaquetado (lince compilar) lleva dentro los archivos que
    importa; el anfitrión que lo arranca registra un lector que los sirve por
    su ruta. Si el lector no los tiene, se leen del disco como siempre. */
-static const char *(*_lector_embebido)(const char *ruta) = NULL;
+static const char *(*_lector_embebido)(const char *ruta, size_t *largo) = NULL;
 
-void interprete_fijar_lector(const char *(*lector)(const char *ruta)) {
+void interprete_fijar_lector(const char *(*lector)(const char *ruta, size_t *largo)) {
     _lector_embebido = lector;
 }
 
-/* Contenido del archivo 'ruta' (con malloc), o NULL si no existe */
-char *interprete_leer_fuente(const char *ruta) {
+/* Contenido del archivo 'ruta' (con malloc, terminado en '\0'; *largo = bytes
+   leídos), o NULL si no existe. Sirve igual para texto y para binarios. */
+char *interprete_leer_bytes(const char *ruta, size_t *largo) {
     if (_lector_embebido) {
-        const char *emb = _lector_embebido(ruta);
-        if (emb) return strdup(emb);
+        size_t n = 0;
+        const char *emb = _lector_embebido(ruta, &n);
+        if (emb) {
+            char *c = malloc(n + 1);
+            memcpy(c, emb, n); c[n] = '\0';
+            if (largo) *largo = n;
+            return c;
+        }
     }
-    FILE *f = fopen(ruta, "r");
+    FILE *f = fopen(ruta, "rb");
     if (!f) return NULL;
     fseek(f, 0, SEEK_END);
     long tam = ftell(f);
     rewind(f);
-    char *codigo = malloc(tam + 1);
-    size_t leido = fread(codigo, 1, tam, f);
+    if (tam < 0) { fclose(f); return NULL; }
+    char *codigo = malloc((size_t)tam + 1);
+    size_t leido = fread(codigo, 1, (size_t)tam, f);
     codigo[leido] = '\0';
     fclose(f);
+    if (largo) *largo = leido;
     return codigo;
+}
+
+/* Contenido del archivo 'ruta' (con malloc), o NULL si no existe */
+char *interprete_leer_fuente(const char *ruta) {
+    return interprete_leer_bytes(ruta, NULL);
 }
 
 /* Ruta de 'importar "./x"' hecho desde 'archivo_actual': primero junto a ese
@@ -3720,6 +3734,7 @@ Interprete *interprete_crear(void) {
     registrar_error_predefinido(interp->global, "ErrorAcceso");
     registrar_error_predefinido(interp->global, "ErrorBD");
     registrar_error_predefinido(interp->global, "ErrorTarea");
+    registrar_error_predefinido(interp->global, "ErrorPlantilla");
 
     /* Registrar funciones de conversión de tipos */
     registrar_fn_nativa(interp->global, "a_numero", fn_conv_numero, 1);

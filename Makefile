@@ -93,7 +93,7 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-depurador test-asan
+test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-depurador test-ventana test-asan
 
 # ── Manual ────────────────────────────────
 # docs/manual.html se genera: los ejemplos son .lince de verdad y la salida
@@ -119,6 +119,10 @@ editores-check:
 
 test-depurador: $(BIN)
 	@bash tests/depurador/smoke.sh ./$(BIN)
+
+test-ventana: $(BIN)
+	@bash tests/ventana/smoke.sh ./$(BIN)
+	@bash tests/ventana/app_web.sh ./$(BIN)
 
 # Medidas de rendimiento del intérprete (bench/*.lince): tiempo y memoria de cada una
 bench: all
@@ -154,6 +158,6 @@ else
 endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-depurador test-lsp test-editores editores editores-check bench vsix \
+        test-asan test-depurador test-ventana test-lsp test-editores editores editores-check bench vsix \
         test-todo clean install uninstall docs docs-check
 

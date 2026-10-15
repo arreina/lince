@@ -53,3 +53,9 @@ final de `04_palindromos.lince`.
 En la carpeta `ejemplos/` hay programas más completos (una agenda, una
 tienda, una calculadora). Estos de aquí son más pequeños y cada uno se
 centra en una idea.
+
+## Aplicaciones
+
+| Carpeta | Qué es | Qué enseña |
+|---------|--------|------------|
+| `tareas_web/` | Gestor de tareas con interfaz web y base de datos | `servidor` (rutas, formularios, estáticos, `ventana`), `plantillas`, `sqlite`, y repartirla como un ejecutable con `lince compilar app.lince --incluir plantillas` |

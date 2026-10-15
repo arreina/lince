@@ -63,7 +63,7 @@ SRV_PID=$!
 # Esperar a que acepte conexiones (hasta ~10s) en vez de dormir a ciegas.
 listo=0
 for _ in $(seq 1 100); do
-    if curl -fsS -o /dev/null "${BASE}/eco/x?q=1" 2>/dev/null; then listo=1; break; fi
+    if curl -fsS -o /dev/null "${BASE}/eco/x?q=1" -b "sesion=listo" 2>/dev/null; then listo=1; break; fi
     if ! kill -0 "$SRV_PID" 2>/dev/null; then break; fi
     sleep 0.1
 done
@@ -109,6 +109,16 @@ comprobar "POST recibe el cuerpo" "recibido:hola" "$r"
 # ── Ruta inexistente ───────────────────────────────────────────
 cod=$(curl -sS -o /dev/null -w '%{http_code}' "${BASE}/no-existe")
 comprobar "ruta desconocida devuelve 404" "404" "$cod"
+
+# ── Un manejador que falla da 500 y se registra ────────────────
+cod=$(curl -sS -o /dev/null -w '%{http_code}' "${BASE}/falla")
+comprobar "un manejador que falla devuelve 500" "500" "$cod"
+sleep 0.3
+if grep -q 'GET /falla: ErrorRango' "$LOG"; then printf '  \033[32m✅\033[0m el error del manejador sale en el log\n'; else printf '  \033[31m❌\033[0m el error del manejador no sale en el log\n'; FALLOS=$((FALLOS + 1)); fi
+
+# ── Redirección con cabecera Location ──────────────────────────
+loc=$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "${BASE}/ir")
+comprobar "redirigir envía Location" "302 ${BASE}/destino" "$loc"
 
 # ── Errores del sanitizer en los procesos hijo ─────────────────
 # El padre sale con 0 aunque un hijo aborte, así que hay que mirar el log.

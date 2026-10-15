@@ -1,0 +1,22 @@
+# @seccion: Módulos y librerías
+# @titulo: HTML con datos: `plantillas`
+# @nota: `{{ x }}` inserta un valor escapando el HTML (seguro con datos de usuarios) y `{{{ x }}}` lo inserta tal cual. `{{#si}}` / `{{#sino}}` y `{{#para x en lista}}` controlan qué sale; dentro de un bucle `{{ @numero }}` cuenta desde 1. `plantillas.archivo(ruta, datos)` hace lo mismo leyendo un archivo, que puede incluir otros con `{{> parcial.html}}`. Una variable que no existe da `ErrorPlantilla`.
+importar "plantillas"
+
+sea datos = {
+    "titulo": "Mis tareas <hoy>",
+    "tareas": [
+        {"texto": "Comprar pan", "hecha": falso},
+        {"texto": "Escribir el informe", "hecha": verdadero}
+    ]
+}
+
+sea plantilla = "<h1>{{ titulo }}</h1>
+<ul>
+{{#para t en tareas}}
+  <li>{{ @numero }}. {{ t.texto }}{{#si t.hecha}} ✔{{/si}}</li>
+{{/para}}
+</ul>
+{{#si no tareas}}<p>No hay tareas.</p>{{/si}}"
+
+escribir(plantillas.renderizar(plantilla, datos))

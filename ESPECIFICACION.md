@@ -769,6 +769,70 @@ tiempo.analizar_utc("2024-02-29", "%Y-%m-%d")            # marca de tiempo, o nu
 `_utc` no dependen de la zona horaria. `dia_semana` va de 0 (domingo) a 6. Los
 formatos son los de `strftime`. `analizar` no está disponible en Windows.
 
+### `servidor`
+
+Servidor web. Cada petición se atiende en un proceso aparte (fork), así que lo
+que un manejador cambie en variables **no** llega a la siguiente petición:
+guarda los datos en una base de datos (`sqlite`) o en archivos, y abre la base
+dentro de cada manejador.
+
+```lince
+importar "servidor"
+servidor.obtener("/", funcion(val diccionario peticion): diccionario {
+    devolver servidor.html("<h1>Hola</h1>")
+})
+servidor.enviar("/anadir", funcion(val diccionario peticion): diccionario {   # POST
+    sea campos = servidor.formulario(peticion["cuerpo"])     # {"texto": "..."}
+    devolver servidor.redirigir("/")                         # 302 con Location
+})
+servidor.obtener("/tarea/:id", funcion(val diccionario p): diccionario {
+    devolver servidor.json("{\"id\": " + p["params"]["id"] + "}")
+})
+servidor.estaticos("publico")        # sirve ./publico/… para lo que no sea una ruta
+servidor.escuchar(8080)              # http://localhost:8080 (bloquea)
+servidor.ventana(8765, 520, 640)     # abre la aplicación en su propia ventana
+```
+
+Rutas: `obtener` (GET), `enviar` (POST), `actualizar` (PUT), `borrar` (DELETE),
+con parámetros `:nombre`. La petición trae `metodo`, `ruta`, `cuerpo`,
+`consulta` (la parte `?a=1`), `params` y `cookies`. Un manejador devuelve el
+resultado de `html`, `json`, `texto` o `redirigir`, o un diccionario con
+`codigo`, `tipo`, `cuerpo`, `cookies` y `ubicacion`. Si el manejador falla, el
+cliente recibe un 500 y el error sale por la consola del servidor.
+
+`servidor.ventana(puerto[, ancho, alto])` es como `escuchar`, pero atiende solo
+en `127.0.0.1` (y sin la cabecera CORS abierta, para que otras páginas no
+puedan hablar con tu aplicación), abre una ventana de aplicación del navegador
+(Chrome, Chromium, Edge o Brave, sin barra de direcciones) y **termina el
+programa al cerrarla**. Si no hay ninguno de esos navegadores abre el
+predeterminado y el servidor sigue hasta Ctrl+C. Con la variable de entorno
+`LINCE_NAVEGADOR` se elige el programa que se lanza (recibe la URL). Solo POSIX;
+en macOS usa las rutas de las aplicaciones de Chrome, Edge y Chromium, sin probar.
+
+### `plantillas`
+
+Rellena HTML (o cualquier texto) con datos de Lince.
+
+```lince
+importar "plantillas"
+plantillas.renderizar("Hola {{ nombre }}", {"nombre": "Ana"})
+plantillas.archivo("plantillas/pagina.html", datos)       # desde un archivo
+```
+
+| Sintaxis | Qué hace |
+|----------|----------|
+| `{{ x }}` | inserta el valor escapando `& < > " '` (seguro con datos de usuarios) |
+| `{{{ x }}}` | lo inserta tal cual (HTML ya preparado) |
+| `{{ a.b }}`, `{{ lista.0 }}` | campo de un diccionario, elemento de una lista |
+| `{{ lista.longitud }}` | número de elementos (también en textos y diccionarios) |
+| `{{#si x}} … {{#sino}} … {{/si}}` | condicional; `{{#si no x}}` niega. Falsos: `nulo`, `falso`, `0`, `""`, lista o diccionario vacíos |
+| `{{#para x en lista}} … {{/para}}` | bucle; `{{ @indice }}` (desde 0) y `{{ @numero }}` (desde 1). En un diccionario recorre las claves |
+| `{{> otra.html}}` | incluye otra plantilla, buscada junto a la actual |
+| `{{! texto }}` | comentario |
+
+Las líneas que contienen solo una etiqueta de bloque no dejan líneas vacías en
+el resultado. Una variable que no existe da `ErrorPlantilla` con la línea.
+
 ### `cripto`
 
 ```lince
@@ -921,6 +985,17 @@ se le pasan al ejecutable llegan al programa con `argumentos()`.
 Como el ejecutable lleva el mismo intérprete, soporta el **100 % del lenguaje**
 (POO completa, `es`, generadores, todos los módulos, el servidor...) y se
 comporta exactamente igual que `lince programa.lince`. Compilar es instantáneo.
+
+Una aplicación que lee archivos propios (plantillas, CSS, imágenes) los lleva
+dentro con `--incluir`, que se puede repetir y acepta archivos o carpetas:
+
+```bash
+lince compilar app.lince -o mi_app --incluir plantillas --incluir datos/semilla.json
+```
+
+Con eso `plantillas.archivo("plantillas/pagina.html", …)` y `servidor.estaticos`
+leen del propio ejecutable, con la ruta relativa tal como se indicó. Ver
+`examples/tareas_web` para una aplicación completa.
 
 Notas:
 - Las bibliotecas externas que use un módulo (por ejemplo `libsqlite3` en

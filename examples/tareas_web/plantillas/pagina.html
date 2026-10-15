@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tareas</title>
+  <link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+  <h1>🐆 Tareas</h1>
+  <p class="resumen">{{ pendientes }} pendientes de {{ tareas.longitud }}</p>
+
+  <form class="nueva" method="post" action="/anadir">
+    <input type="text" name="texto" placeholder="¿Qué hay que hacer?" autofocus autocomplete="off">
+    <button class="principal">Añadir</button>
+  </form>
+
+  <ul>
+  {{#para t en tareas}}
+    <li class="{{#si t.hecha}}hecha{{/si}}">
+      <form method="post" action="/alternar/{{ t.id }}"><button>{{#si t.hecha}}↩{{#sino}}✔{{/si}}</button></form>
+      <span class="texto">{{ t.texto }}</span>
+      <form method="post" action="/borrar/{{ t.id }}"><button>✕</button></form>
+    </li>
+  {{/para}}
+  </ul>
+  {{#si no tareas}}
+  <p class="vacio">No hay tareas. ¡Añade la primera!</p>
+  {{/si}}
+</body>
+</html>

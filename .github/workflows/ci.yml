@@ -45,6 +45,9 @@ jobs:
       - name: Depurador
         run: make test-depurador
 
+      - name: Ventana (servidor.ventana)
+        run: make test-ventana
+
       - name: Los editores están al día
         run: make editores-check
 

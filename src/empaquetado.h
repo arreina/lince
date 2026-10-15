@@ -8,8 +8,11 @@
 #ifndef LINCE_EMPAQUETADO_H
 #define LINCE_EMPAQUETADO_H
 
-/* Crea 'salida' a partir de 'archivo'. 0 si va bien. */
-int empaquetado_crear(const char *archivo, const char *salida);
+#include <stddef.h>
+
+/* Crea 'salida' a partir de 'archivo', con los archivos o carpetas 'extras'
+   (plantillas, estáticos…) dentro. 0 si va bien. */
+int empaquetado_crear(const char *archivo, const char *salida, const char *const *extras, int num_extras);
 
 /* ¿Lleva este ejecutable un programa dentro? Si es así lo carga y devuelve 1.
    'argv0' sirve para localizarse en sistemas sin /proc. */
@@ -20,6 +23,6 @@ const char *empaquetado_ruta_principal(void);
 const char *empaquetado_codigo_principal(void);
 
 /* Lector para interprete_fijar_lector: contenido empaquetado de una ruta */
-const char *empaquetado_buscar(const char *ruta);
+const char *empaquetado_buscar(const char *ruta, size_t *largo);
 
 #endif /* LINCE_EMPAQUETADO_H */

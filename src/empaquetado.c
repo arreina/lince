@@ -12,6 +12,9 @@
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#ifndef _WIN32
+#include <dirent.h>
+#endif
 #include "empaquetado.h"
 #include "lexer.h"
 #include "parser.h"
@@ -100,9 +103,19 @@ int empaquetado_cargar(const char *argv0) {
 const char *empaquetado_ruta_principal(void)   { return _num_entradas ? _entradas[0].clave : NULL; }
 const char *empaquetado_codigo_principal(void) { return _num_entradas ? _entradas[0].contenido : NULL; }
 
-const char *empaquetado_buscar(const char *ruta) {
+/* «./a/b» y «a/b» son la misma ruta */
+static const char *sin_punto(const char *r) {
+    while (r[0] == '.' && r[1] == '/') r += 2;
+    return r;
+}
+
+const char *empaquetado_buscar(const char *ruta, size_t *largo) {
+    const char *rn = sin_punto(ruta);
     for (int i = 0; i < _num_entradas; i++)
-        if (strcmp(_entradas[i].clave, ruta) == 0) return _entradas[i].contenido;
+        if (strcmp(_entradas[i].clave, ruta) == 0 || strcmp(sin_punto(_entradas[i].clave), rn) == 0) {
+            if (largo) *largo = _entradas[i].largo;
+            return _entradas[i].contenido;
+        }
     return NULL;
 }
 
@@ -113,9 +126,50 @@ static int ya_esta(const char *clave) {
     return 0;
 }
 
-static void anadir(const char *clave, const char *contenido) {
+static void anadir_bin(const char *clave, const char *contenido, size_t largo) {
     _entradas = realloc(_entradas, sizeof(Entrada) * (size_t)(_num_entradas + 1));
-    _entradas[_num_entradas++] = (Entrada){ strdup(clave), strdup(contenido), strlen(contenido) };
+    char *copia = malloc(largo + 1);
+    memcpy(copia, contenido, largo); copia[largo] = '\0';
+    _entradas[_num_entradas++] = (Entrada){ strdup(clave), copia, largo };
+}
+
+static void anadir(const char *clave, const char *contenido) {
+    anadir_bin(clave, contenido, strlen(contenido));
+}
+
+/* Añade un archivo o, si es una carpeta, todo lo que contiene (sin los
+   ocultos). La clave es la ruta tal como se pasó: así la encuentra el programa
+   cuando la pide con esa misma ruta relativa. */
+static int anadir_extra(const char *ruta) {
+    struct stat st;
+    if (stat(ruta, &st) != 0) {
+        fprintf(stderr, "\n❌ No existe '%s' (indicado con --incluir).\n\n", ruta);
+        return 0;
+    }
+#ifndef _WIN32
+    if (S_ISDIR(st.st_mode)) {
+        DIR *d = opendir(ruta);
+        if (!d) return 0;
+        struct dirent *e;
+        int ok = 1;
+        while (ok && (e = readdir(d)) != NULL) {
+            if (e->d_name[0] == '.') continue;
+            char sub[2048];
+            size_t l = strlen(ruta);
+            snprintf(sub, sizeof sub, "%s%s%s", ruta, (l && ruta[l - 1] == '/') ? "" : "/", e->d_name);
+            ok = anadir_extra(sub);
+        }
+        closedir(d);
+        return ok;
+    }
+#endif
+    size_t largo = 0;
+    char *c = interprete_leer_bytes(ruta, &largo);
+    if (!c) { fprintf(stderr, "\n❌ No se pudo leer '%s'.\n\n", ruta); return 0; }
+    const char *clave = sin_punto(ruta);
+    if (!ya_esta(clave)) anadir_bin(clave, c, largo);
+    free(c);
+    return 1;
 }
 
 /* Valida la sintaxis (el parser termina el proceso si hay un error) y recorre
@@ -158,7 +212,7 @@ static void recoger(const char *codigo, const char *actual) {
     lexer_destruir(lx);
 }
 
-int empaquetado_crear(const char *archivo, const char *salida) {
+int empaquetado_crear(const char *archivo, const char *salida, const char *const *extras, int num_extras) {
     char principal[PATH_MAXIMO + 1];
 #ifdef _WIN32
     if (!_fullpath(principal, archivo, sizeof(principal))) snprintf(principal, sizeof(principal), "%s", archivo);
@@ -174,6 +228,8 @@ int empaquetado_crear(const char *archivo, const char *salida) {
     anadir(principal, codigo);
     recoger(codigo, principal);
     free(codigo);
+    for (int i = 0; i < num_extras; i++)
+        if (!anadir_extra(extras[i])) return 1;
 
     char yo[PATH_MAXIMO + 1];
     if (!ruta_ejecutable(NULL, yo, sizeof(yo))) {
