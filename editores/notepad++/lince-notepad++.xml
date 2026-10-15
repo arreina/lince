@@ -29,12 +29,12 @@
 
       <!-- Tipos de error predefinidos -->
       <Keywords name="Keywords5">
-        Error ErrorAcceso ErrorArgumento ErrorBD ErrorMatematico ErrorNulo ErrorPlantilla ErrorRango ErrorRecursion ErrorTarea ErrorTipo
+        Error ErrorAcceso ErrorArgumento ErrorBD ErrorJuego ErrorMatematico ErrorNulo ErrorPlantilla ErrorRango ErrorRecursion ErrorTarea ErrorTipo
       </Keywords>
 
       <!-- Módulos estándar -->
       <Keywords name="Keywords6">
-        a_logico a_numero a_texto argumentos escribir filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json red expresiones servidor terminal pruebas sqlite cripto tareas plantillas
+        a_logico a_numero a_texto argumentos escribir filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json red expresiones servidor terminal pruebas sqlite cripto tareas plantillas juego
       </Keywords>
 
       <!-- Operadores -->

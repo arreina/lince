@@ -1,0 +1,121 @@
+# Pong para dos jugadores (o contra la máquina).
+#   Jugador 1: W / S        Jugador 2: flechas arriba / abajo
+#   Espacio: sacar          1 / 2: cambiar entre 1 y 2 jugadores        Esc: salir
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 800
+fijo ALTO = 500
+fijo PALA_W = 12
+fijo PALA_H = 90
+fijo VEL_PALA = 420
+fijo FONDO = [18, 20, 30]
+fijo CLARO = [235, 235, 245]
+
+sea y1 = (ALTO - PALA_H) / 2
+sea y2 = (ALTO - PALA_H) / 2
+sea bx = ANCHO / 2
+sea by = ALTO / 2
+sea vx = 0
+sea vy = 0
+sea puntos1 = 0
+sea puntos2 = 0
+sea jugadores = 1
+sea en_juego = falso
+
+funcion limitar(val numero v, val numero minimo, val numero maximo): numero {
+    si v < minimo { devolver minimo }
+    si v > maximo { devolver maximo }
+    devolver v
+}
+
+funcion sacar(val numero dir): nulo {
+    bx = ANCHO / 2
+    by = ALTO / 2
+    vx = 330 * dir
+    vy = (matematica.aleatorio() - 0.5) * 360
+    en_juego = verdadero
+}
+
+juego.abrir("Pong en Lince", ANCHO, ALTO)
+
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    si juego.tecla_pulsada("escape") { juego.salir() }
+    si juego.tecla_pulsada("1") { jugadores = 1 }
+    si juego.tecla_pulsada("2") { jugadores = 2 }
+
+    # entrada
+    si juego.tecla("w") { y1 = y1 - VEL_PALA * dt }
+    si juego.tecla("s") { y1 = y1 + VEL_PALA * dt }
+    si jugadores == 2 {
+        si juego.tecla("arriba") { y2 = y2 - VEL_PALA * dt }
+        si juego.tecla("abajo") { y2 = y2 + VEL_PALA * dt }
+    } sino {
+        # la máquina sigue la pelota con algo de retraso
+        sea objetivo = by - PALA_H / 2
+        si y2 < objetivo - 8 { y2 = y2 + VEL_PALA * 0.7 * dt }
+        si y2 > objetivo + 8 { y2 = y2 - VEL_PALA * 0.7 * dt }
+    }
+    y1 = limitar(y1, 0, ALTO - PALA_H)
+    y2 = limitar(y2, 0, ALTO - PALA_H)
+
+    si no en_juego {
+        si juego.tecla_pulsada("espacio") { sacar(1) }
+    } sino {
+        bx = bx + vx * dt
+        by = by + vy * dt
+        si by < 8 {
+            by = 8
+            vy = -vy
+            juego.pitido(300, 40)
+        }
+        si by > ALTO - 8 {
+            by = ALTO - 8
+            vy = -vy
+            juego.pitido(300, 40)
+        }
+
+        si vx < 0 y juego.colision(bx - 8, by - 8, 16, 16, 30, y1, PALA_W, PALA_H) {
+            bx = 30 + PALA_W + 8
+            vx = -vx * 1.06
+            vy = vy + ((by - (y1 + PALA_H / 2)) / (PALA_H / 2)) * 160
+            juego.pitido(520, 60)
+        }
+        si vx > 0 y juego.colision(bx - 8, by - 8, 16, 16, ANCHO - 30 - PALA_W, y2, PALA_W, PALA_H) {
+            bx = ANCHO - 30 - PALA_W - 8
+            vx = -vx * 1.06
+            vy = vy + ((by - (y2 + PALA_H / 2)) / (PALA_H / 2)) * 160
+            juego.pitido(520, 60)
+        }
+        si bx < -10 {
+            puntos2 = puntos2 + 1
+            en_juego = falso
+            juego.pitido(150, 250)
+        }
+        si bx > ANCHO + 10 {
+            puntos1 = puntos1 + 1
+            en_juego = falso
+            juego.pitido(150, 250)
+        }
+    }
+
+    # dibujo
+    juego.limpiar(FONDO)
+    para cada numero i en rango(0, ALTO / 20) {
+        juego.rectangulo(ANCHO / 2 - 2, i * 20 + 4, 4, 10, [60, 66, 90])
+    }
+    juego.rectangulo(30, y1, PALA_W, PALA_H, CLARO)
+    juego.rectangulo(ANCHO - 30 - PALA_W, y2, PALA_W, PALA_H, CLARO)
+    juego.circulo(bx, by, 8, [255, 200, 80])
+    juego.texto(a_texto(puntos1), ANCHO / 2 - 80 - juego.ancho_texto(a_texto(puntos1), 6), 24, 6, CLARO)
+    juego.texto(a_texto(puntos2), ANCHO / 2 + 80, 24, 6, CLARO)
+    si no en_juego {
+        sea msg = "ESPACIO PARA SACAR"
+        juego.texto(msg, (ANCHO - juego.ancho_texto(msg, 3)) / 2, ALTO - 70, 3, [255, 200, 80])
+        sea modo = "1 JUGADOR  (1 / 2)"
+        si jugadores == 2 { modo = "2 JUGADORES  (1 / 2)" }
+        juego.texto(modo, (ANCHO - juego.ancho_texto(modo, 2)) / 2, ALTO - 40, 2, [120, 126, 150])
+    }
+    juego.presentar()
+}

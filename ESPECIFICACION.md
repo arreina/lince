@@ -809,6 +809,49 @@ predeterminado y el servidor sigue hasta Ctrl+C. Con la variable de entorno
 `LINCE_NAVEGADOR` se elige el programa que se lanza (recibe la URL). Solo POSIX;
 en macOS usa las rutas de las aplicaciones de Chrome, Edge y Chromium, sin probar.
 
+### `juego`
+
+Ventana 2D con dibujo, teclado, ratón y sonido, para hacer videojuegos. Usa SDL2,
+que se carga al abrir la ventana (no hace falta para compilar Lince; en Debian/Ubuntu:
+`sudo apt install libsdl2-2.0-0`). El bucle lo escribes tú:
+
+```lince
+importar "juego"
+juego.abrir("Mi juego", 800, 600)
+sea x = 100
+mientras juego.abierto() {
+    si juego.tecla("derecha") { x = x + 300 * juego.dt() }     # dt: segundos del último fotograma
+    juego.limpiar([20, 20, 30])
+    juego.circulo(x, 300, 20, "#ffc850")
+    juego.texto("Hola", 10, 10, 3)
+    juego.presentar()                                          # muestra, espera a 60 fps y lee la entrada
+}
+```
+
+| Función | Qué hace |
+|---|---|
+| `abrir(título, ancho, alto)` / `cerrar()` / `salir()` | abre la ventana / la destruye / pide terminar el bucle (`abierto()` pasa a falso, como al pulsar la X) |
+| `abierto()` · `titulo(t)` · `ancho()` · `alto()` | estado y tamaño |
+| `presentar()` | muestra lo dibujado, espera al siguiente fotograma y actualiza la entrada y `dt()` |
+| `dt()` · `fps()` | segundos del último fotograma · fotogramas por segundo medidos |
+| `limpiar([color])` | rellena toda la ventana |
+| `rectangulo(x, y, ancho, alto[, color])` · `contorno(...)` | rectángulo relleno / solo borde |
+| `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
+| `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
+| `tecla(nombre)` · `tecla_pulsada(n)` · `tecla_soltada(n)` | mantenida / pulsada en este fotograma / soltada en este fotograma |
+| `raton()` · `boton_raton(n)` · `clic(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · giro de la rueda |
+| `pitido(frecuencia, ms[, volumen])` | tono sencillo; no bloquea |
+| `colision(x1, y1, w1, h1, x2, y2, w2, h2)` | ¿se solapan dos rectángulos? |
+| `captura(ruta)` | guarda la ventana como `.bmp` |
+
+Los colores son `[r, g, b]`, `[r, g, b, a]` (0–255) o texto `"#rrggbb"` / `"#rrggbbaa"`; si
+se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`, `"izquierda"`,
+`"derecha"`, `"espacio"`, `"entrar"`, `"escape"`, `"borrar"`, `"tab"`, `"mayus"`, `"ctrl"`,
+`"alt"`, `"f1"`–`"f12"` (y los nombres de SDL). Los fallos son de tipo `ErrorJuego`
+(sin SDL2, sin pantalla) o `Error`. Ejemplo completo: `examples/juegos/pong.lince`.
+
+---
+
 ### `plantillas`
 
 Rellena HTML (o cualquier texto) con datos de Lince.

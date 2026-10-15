@@ -3734,6 +3734,7 @@ Interprete *interprete_crear(void) {
     registrar_error_predefinido(interp->global, "ErrorAcceso");
     registrar_error_predefinido(interp->global, "ErrorBD");
     registrar_error_predefinido(interp->global, "ErrorTarea");
+    registrar_error_predefinido(interp->global, "ErrorJuego");
     registrar_error_predefinido(interp->global, "ErrorPlantilla");
 
     /* Registrar funciones de conversión de tipos */

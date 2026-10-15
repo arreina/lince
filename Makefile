@@ -23,7 +23,7 @@ endif
 # ── Compilar ──────────────────────────────
 all: $(BIN)
 
-$(BIN): $(SRC)
+$(BIN): $(SRC) src/juego.h src/cripto.h
 	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
 	@echo "✅ Lince compilado — usa: ./$(BIN) archivo.lince"
 
@@ -81,6 +81,7 @@ test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) tests/servidor/smoke.sh ./lince_debug 8124'
 	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/depurador/smoke.sh ./lince_debug'
+	@bash -c '$(ASAN_ENV) bash tests/juego/smoke.sh ./lince_debug'
 
 # Servidor de lenguaje ('lince lsp'): habla el protocolo de verdad.
 test-lsp: $(BIN)
@@ -93,7 +94,10 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-depurador test-ventana test-asan
+test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-depurador test-ventana test-juego test-asan
+
+test-juego: $(BIN)
+	@bash tests/juego/smoke.sh ./$(BIN)
 
 # ── Manual ────────────────────────────────
 # docs/manual.html se genera: los ejemplos son .lince de verdad y la salida
@@ -159,5 +163,5 @@ endif
 
 .PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
         test-asan test-depurador test-ventana test-lsp test-editores editores editores-check bench vsix \
-        test-todo clean install uninstall docs docs-check
+        test-juego test-todo clean install uninstall docs docs-check
 

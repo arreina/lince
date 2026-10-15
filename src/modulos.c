@@ -2724,6 +2724,8 @@ static void cargar_sqlite(Entorno *entorno) {
         fns, 5, NULL, NULL, 0);
 }
 
+#include "juego.h"
+
 /* ─────────────────────────────────────────
    MÓDULO: cripto
    Hashes, HMAC, base64 y hexadecimal (src/cripto.h). Trabajan con texto.
@@ -3729,6 +3731,7 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"cripto", cargar_cripto},
     {"tareas", cargar_tareas},
     {"plantillas", cargar_plantillas},
+    {"juego", cargar_juego},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -3755,7 +3758,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite, cripto, tareas, plantillas",
+        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red, expresiones, pruebas, sqlite, cripto, tareas, plantillas, juego",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }
