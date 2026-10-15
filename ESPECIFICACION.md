@@ -742,9 +742,11 @@ formatos son los de `strftime`; `analizar` entiende `%Y %y %m %d %H %M %S`.
 
 ### `juego`
 
-Ventana 2D con dibujo, teclado, ratón y sonido, para hacer videojuegos. Usa SDL2,
-que se carga al abrir la ventana (no hace falta para compilar Lince; en Debian/Ubuntu:
-`sudo apt install libsdl2-2.0-0`). El bucle lo escribes tú:
+Ventana 2D con dibujo, imágenes, teclado, ratón, mando y sonido, para hacer
+videojuegos. Usa SDL2, que se carga al abrir la ventana (no hace falta para compilar
+Lince). Para PNG y JPG hace falta además SDL2_image. En Debian/Ubuntu:
+`sudo apt install libsdl2-2.0-0 libsdl2-image-2.0-0`; en Windows, `SDL2.dll` y
+`SDL2_image.dll` junto al juego. El bucle lo escribes tú:
 
 ```lince
 importar "juego"
@@ -759,27 +761,66 @@ mientras juego.abierto() {
 }
 ```
 
+**Ventana y bucle**
+
 | Función | Qué hace |
 |---|---|
 | `abrir(título, ancho, alto)` / `cerrar()` / `salir()` | abre la ventana / la destruye / pide terminar el bucle (`abierto()` pasa a falso, como al pulsar la X) |
 | `abierto()` · `titulo(t)` · `ancho()` · `alto()` | estado y tamaño |
 | `presentar()` | muestra lo dibujado, espera al siguiente fotograma y actualiza la entrada y `dt()` |
-| `dt()` · `fps()` | segundos del último fotograma · fotogramas por segundo medidos |
+| `dt()` · `fps()` · `tiempo()` | segundos del último fotograma · fotogramas por segundo · segundos desde que se abrió |
+| `pantalla_completa([sí/no])` | sin argumento alterna; el juego se escala sin deformarse y el ratón sigue en coordenadas del juego |
+
+**Dibujo**
+
+| Función | Qué hace |
+|---|---|
 | `limpiar([color])` | rellena toda la ventana |
 | `rectangulo(x, y, ancho, alto[, color])` · `contorno(...)` | rectángulo relleno / solo borde |
 | `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
 | `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
+| `camara(x, y)` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador |
+| `captura(ruta)` | guarda la ventana como `.bmp` |
+
+**Imágenes y sprites**
+
+| Función | Qué hace |
+|---|---|
+| `imagen(ruta)` | carga un PNG o JPG (necesita SDL2_image) o un BMP; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo |
+| `sprite(filas, colores)` | crea una imagen a partir de texto, un carácter por píxel: `juego.sprite([".X.", "XXX"], {"X": [255, 0, 0]})`; los caracteres sin color son transparentes |
+| `dibujar(imagen, x, y[, opciones])` | dibuja la imagen; `opciones` es un diccionario con cualquiera de: `escala`, `ancho`, `alto`, `angulo` (grados), `espejo`, `voltear`, `centrado` (x, y es el centro), `alfa` (0–255), `color` (tinte), `recorte` (`[x, y, ancho, alto]`), y para hojas de sprites `celda` (`[ancho, alto]` de cada cuadro) con `cuadro` (número de cuadro) |
+
+**Entrada**
+
+| Función | Qué hace |
+|---|---|
 | `tecla(nombre)` · `tecla_pulsada(n)` · `tecla_soltada(n)` | mantenida / pulsada en este fotograma / soltada en este fotograma |
 | `raton()` · `boton_raton(n)` · `clic(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · giro de la rueda |
-| `pitido(frecuencia, ms[, volumen])` | tono sencillo; no bloquea |
-| `colision(x1, y1, w1, h1, x2, y2, w2, h2)` | ¿se solapan dos rectángulos? |
-| `captura(ruta)` | guarda la ventana como `.bmp` |
+| `mandos()` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4) · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
+
+**Sonido**
+
+| Función | Qué hace |
+|---|---|
+| `sonido(ruta)` | carga un `.wav`; devuelve `{"sonido", "duracion", "ruta"}` |
+| `reproducir(sonido[, volumen[, bucle]])` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz |
+| `detener([voz])` | para esa voz o, sin argumento, todo |
+| `musica(sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para |
+| `volumen([v])` | volumen general de 0 a 1 |
+| `pitido(frecuencia, ms[, volumen])` | tono sencillo, sin archivos |
+
+**Utilidades:** `colision(x1, y1, w1, h1, x2, y2, w2, h2)` dice si se solapan dos rectángulos. En
+`matematica` hay además `distancia`, `angulo`, `interpolar`, `limitar`, `signo`, `radianes`,
+`grados` y `semilla` (misma semilla, misma secuencia de `aleatorio`: partidas repetibles).
+
+Las imágenes y los sonidos se leen también desde dentro de un ejecutable de `lince compilar`
+si se incluyeron con `--incluir`.
 
 Los colores son `[r, g, b]`, `[r, g, b, a]` (0–255) o texto `"#rrggbb"` / `"#rrggbbaa"`; si
 se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`, `"izquierda"`,
 `"derecha"`, `"espacio"`, `"entrar"`, `"escape"`, `"borrar"`, `"tab"`, `"mayus"`, `"ctrl"`,
 `"alt"`, `"f1"`–`"f12"` (y los nombres de SDL). Los fallos son de tipo `ErrorJuego`
-(sin SDL2, sin pantalla) o `Error`. Ejemplos completos: los siete minijuegos de `examples/`.
+(sin SDL2, sin pantalla) o `Error`. Ejemplos completos: los ocho minijuegos de `examples/`.
 
 ### `pruebas`
 

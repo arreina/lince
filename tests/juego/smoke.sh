@@ -75,7 +75,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 20 "$LINCE" "$DIR/prueba2.li
 [ $? -eq 0 ] && ok "la segunda prueba termina bien" || mal "la segunda prueba falló"
 for l in "hoja: 32x16" "misma imagen: verdadero" "bmp: 10x10" "camara: -50" "imagen inexistente: ok" \
          "dibujar sin imagen: ok" "duración: 0.5" "voz: verdadero" "volumen: 0.8" "reproducir sin sonido: ok" \
-         "mandos: 0" "botón a: falso" "eje: 0" "tiempo: verdadero"; do
+         "mandos: 0" "sprite: 3x3" "botón a: falso" "eje: 0" "tiempo: verdadero"; do
     grep -qxF "$l" salida2.txt && ok "$l" || mal "falta la línea: $l"
 done
 python3 - <<'PY' || fallos=$((fallos+1))
@@ -89,7 +89,8 @@ def px(x, y):
     return (r, g, b)
 casos = [((8, 8), (0, 255, 0), "sprite: cuadro 1 de la hoja, escalado"), ((17, 8), (0, 0, 0), "…mide 16 px"),
          ((25, 5), (255, 0, 0), "recorte con ancho/alto"), ((45, 5), (0, 0, 255), "imagen BMP"),
-         ((70, 10), (0, 0, 0), "alfa 0 no se ve"), ((55, 45), (255, 255, 0), "la cámara desplaza el dibujo")]
+         ((70, 10), (0, 0, 0), "alfa 0 no se ve"), ((55, 45), (255, 255, 0), "la cámara desplaza el dibujo"),
+         ((81, 70), (255, 0, 0), "sprite de texto: píxel pintado"), ((81, 61), (0, 0, 0), "sprite de texto: '.' transparente")]
 mal = 0
 for (x, y), esp, nombre in casos:
     if px(x, y) == esp: print("  ✅ píxel:", nombre)

@@ -1016,6 +1016,59 @@ static Valor *fn_jg_imagen(Valor **a, int n) {
     return jg_imagen_valor(k);
 }
 
+/* sprite(filas, colores): imagen hecha con texto, un carácter por píxel.
+     sea nave = juego.sprite([".X.", "XXX"], {"X": [120, 200, 240]})
+   Los caracteres que no están en 'colores' son transparentes. */
+static Valor *fn_jg_sprite(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 2 || a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_DICCIONARIO || a[0]->lista.cantidad == 0)
+        return jg_error("ErrorTipo", "sprite() espera (lista de filas de texto, diccionario de colores)");
+    if (_jgs.nimagenes == JG_MAX_IMAGENES) return jg_error("ErrorJuego", "demasiadas imágenes cargadas");
+    int alto = a[0]->lista.cantidad, ancho = 0;
+    for (int y = 0; y < alto; y++) {
+        Valor *f = a[0]->lista.elementos[y];
+        if (f->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "sprite(): cada fila es un texto");
+        int l = (int)strlen(f->texto);
+        if (l > ancho) ancho = l;
+    }
+    if (ancho == 0 || ancho > 4096 || alto > 4096) return jg_error("Error", "sprite(): tamaño no válido");
+    /* paleta: un color por carácter ASCII */
+    unsigned char pal[128][4];
+    memset(pal, 0, sizeof pal);
+    Valor *d = a[1];
+    for (int i = 0; i < d->diccionario.cantidad; i++) {
+        const char *k = d->diccionario.claves[i];
+        if (!k[0] || k[1] || (unsigned char)k[0] >= 128)
+            return jg_error("ErrorTipo", "sprite(): cada clave de colores es un solo carácter, por ejemplo \"X\"");
+        Valor *arg[1] = {d->diccionario.valores[i]};
+        if (!jg_color(arg, 1, 0, pal[(unsigned char)k[0]])) return valor_nulo();
+    }
+    unsigned *px = calloc((size_t)ancho * alto, 4);
+    if (!px) return jg_error("Error", "sin memoria");
+    for (int y = 0; y < alto; y++) {
+        const unsigned char *t = (const unsigned char *)a[0]->lista.elementos[y]->texto;
+        for (int x = 0; t[x]; x++) {
+            if (t[x] >= 128) continue;
+            const unsigned char *c = pal[t[x]];
+            px[y * ancho + x] = (unsigned)c[3] << 24 | (unsigned)c[0] << 16 | (unsigned)c[1] << 8 | c[2];
+        }
+    }
+    void *sup = _jg.SurfaceFrom(px, ancho, alto, 32, ancho * 4, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    void *tex = sup ? _jg.TextureFromSurface(_jgs.render, sup) : NULL;
+    if (sup) _jg.FreeSurface(sup);
+    free(px);
+    if (!tex) return jg_error("ErrorJuego", "no se pudo crear el sprite");
+    int k = _jgs.nimagenes++;
+    char nombre[32];
+    snprintf(nombre, sizeof nombre, "<sprite %d>", k);
+    _jgs.imagenes[k].tex = tex;
+    _jgs.imagenes[k].ruta = strdup(nombre);
+    _jgs.imagenes[k].ancho = ancho;
+    _jgs.imagenes[k].alto = alto;
+    _jg.TextureBlend(tex, 1);
+    return jg_imagen_valor(k);
+}
+
 /* Lee la opción numérica 'clave' del diccionario; 1 si estaba */
 static int jg_opcion(Valor *op, const char *clave, double *out) {
     if (!op || op->tipo != VAL_DICCIONARIO) return 0;
@@ -1246,6 +1299,7 @@ static void cargar_juego(Entorno *entorno) {
         {"colision",        fn_jg_colision,         8},
         {"imagen",          fn_jg_imagen,           1},
         {"dibujar",         fn_jg_dibujar,         -1},
+        {"sprite",          fn_jg_sprite,           2},
         {"sonido",          fn_jg_sonido,           1},
         {"reproducir",      fn_jg_reproducir,      -1},
         {"detener",         fn_jg_detener,         -1},

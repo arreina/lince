@@ -1,6 +1,6 @@
 # @seccion: Módulos y librerías
 # @titulo: El módulo `juego`
-# @nota: Es el módulo central de Lince: ventana, dibujo, teclado, ratón y sonido sobre SDL2 (en `examples/` hay siete juegos completos). Estas funciones de ayuda no necesitan abrir ventana.
+# @nota: Es el módulo central de Lince: ventana, dibujo, teclado, ratón y sonido sobre SDL2 (en `examples/` hay ocho juegos completos). Estas funciones de ayuda no necesitan abrir ventana.
 importar "juego"
 
 # ¿se tocan el jugador y el enemigo? (x, y, ancho, alto de cada uno)

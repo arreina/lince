@@ -16,6 +16,9 @@ juego.dibujar(hoja, 0, 0, {"celda": [8, 8], "cuadro": 1, "escala": 2})       # v
 juego.dibujar(hoja, 20, 0, {"recorte": [0, 0, 8, 8], "ancho": 10, "alto": 10})  # rojo en 20..30
 juego.dibujar(bmp, 40, 0)                                                       # azul 10×10
 juego.dibujar(hoja, 70, 10, {"celda": [8, 8], "cuadro": 0, "escala": 2, "centrado": verdadero, "alfa": 0})
+sea punto = juego.sprite(["..R", ".RR", "RRR"], {"R": "#ff0000"})
+escribir("sprite: " + a_texto(punto["ancho"]) + "x" + a_texto(punto["alto"]))
+juego.dibujar(punto, 80, 60, {"escala": 4})                                    # 80..92, abajo-izq rojo
 juego.camara(-50, -40)
 juego.rectangulo(0, 0, 10, 10, [255, 255, 0])                                   # amarillo en 50,40
 escribir("camara: " + a_texto(juego.camara(-50, -40)[0]))
