@@ -704,7 +704,7 @@ archivos.listar("carpeta")        # lista de nombres
 ### `tiempo`
 
 ```lince
-tiempo.ahora()     # timestamp Unix
+tiempo.ahora()     # segundos desde 1970, con decimales (sirve para medir tiempos)
 tiempo.fecha()     # "2025-01-15"
 tiempo.hora()      # "14:30:00"
 tiempo.esperar(500) # pausa 500ms

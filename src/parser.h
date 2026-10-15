@@ -87,6 +87,11 @@ struct Nodo {
     int      linea;   /* línea del código fuente */
     const char *nombre_i;   /* nombre internado, lo rellena el intérprete al usarlo */
     int      linea_ini; /* sentencias: línea donde empiezan (0 si no es una sentencia) */
+    /* Cachés del intérprete para obj.campo (los rellena él): posición del campo
+       en el último objeto, y el campo declarado de la última clase vista */
+    int         cache_i;
+    const void *cache_clase;
+    void       *cache_cd;
     union {
         /* NODO_NUMERO */
         double numero;

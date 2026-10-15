@@ -804,9 +804,19 @@ static Valor *fn_arc_listar(Valor **a, int n) {
    MÓDULO: tiempo
 ───────────────────────────────────────── */
 
+/* ahora(): segundos desde 1970, con decimales (resolución de microsegundos) */
 static Valor *fn_tpo_ahora(Valor **a, int n) {
     (void)a; (void)n;
-    return valor_numero((double)time(NULL));
+#ifdef _WIN32
+    FILETIME ft;
+    GetSystemTimeAsFileTime(&ft);
+    unsigned long long t = ((unsigned long long)ft.dwHighDateTime << 32) | ft.dwLowDateTime;
+    return valor_numero((double)(t - 116444736000000000ULL) / 1e7);   /* de 1601 a 1970 */
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return valor_numero((double)ts.tv_sec + ts.tv_nsec / 1e9);
+#endif
 }
 
 static Valor *fn_tpo_esperar(Valor **a, int n) {

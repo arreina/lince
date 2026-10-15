@@ -130,19 +130,24 @@ static Valor *valor_texto_propio(char *s) {
     return v;
 }
 
+/* nulo, verdadero y falso son únicos y no se liberan nunca (cuenta de
+   referencias inalcanzable): ejecutar() devuelve nulo en cada sentencia y cada
+   comparación un lógico, y así no cuestan una reserva. Nadie los modifica:
+   los que cambian un valor en su sitio lo hacen sólo con números de refs == 1. */
+#define REFS_INMORTAL (1 << 29)
+static Valor _val_nulo      = { .tipo = VAL_NULO,     .refs = REFS_INMORTAL };
+static Valor _val_verdadero = { .tipo = VAL_BOOLEANO, .refs = REFS_INMORTAL, .booleano = 1 };
+static Valor _val_falso     = { .tipo = VAL_BOOLEANO, .refs = REFS_INMORTAL, .booleano = 0 };
+
 Valor *valor_booleano(int b) {
-    Valor *v = valor_alloc();
-    v->tipo     = VAL_BOOLEANO;
-    v->refs     = 1; v->es_modulo = 0;
-    v->booleano = b;
+    Valor *v = b ? &_val_verdadero : &_val_falso;
+    v->refs++;
     return v;
 }
 
 Valor *valor_nulo(void) {
-    Valor *v = valor_alloc();
-    v->tipo = VAL_NULO;
-    v->refs = 1; v->es_modulo = 0;
-    return v;
+    _val_nulo.refs++;
+    return &_val_nulo;
 }
 
 static Valor *valor_funcion(FuncionLince *f) {
@@ -252,6 +257,10 @@ static void valor_liberar(Valor *v) {
     if (!v) return;
     v->refs--;
     if (v->refs > 0) return;
+    if (v == &_val_nulo || v == &_val_verdadero || v == &_val_falso) {   /* no debería pasar */
+        v->refs = REFS_INMORTAL;
+        return;
+    }
 
     /* Los escalares son los más frecuentes: sin nada que liberar por dentro */
     if (v->tipo == VAL_NUMERO || v->tipo == VAL_BOOLEANO || v->tipo == VAL_NULO) {
@@ -1083,8 +1092,21 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
     if (n->binario.operador[0] == 'e' && n->binario.operador[1] == 's' && !n->binario.operador[2])
         return exec_es(n, e);
     Valor *izq = ejecutar(n->binario.izquierda, e);
-    Valor *der = ejecutar(n->binario.derecha,   e);
     const char *op = n->binario.operador;
+    /* 'y' / 'o' en cortocircuito: si la izquierda ya decide, la derecha no se
+       evalúa (así 'lista.longitud() > 0 y lista[0] == x' no falla con la lista vacía) */
+    if ((op[0] == 'y' || op[0] == 'o') && !op[1] && izq->tipo != VAL_OBJETO) {
+        int v = es_verdadero(izq);
+        valor_destruir(izq);
+        if (hay_error) return valor_nulo();
+        if (op[0] == 'y' ? !v : v) return valor_booleano(v);
+        Valor *der = ejecutar(n->binario.derecha, e);
+        int d = es_verdadero(der);
+        valor_destruir(der);
+        if (hay_error) return valor_nulo();
+        return valor_booleano(d);
+    }
+    Valor *der = ejecutar(n->binario.derecha,   e);
     Valor *resultado = NULL;
 
     /* Un objeto a la izquierda: los operadores los define su clase */
@@ -2242,7 +2264,11 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
     if (obj->tipo == VAL_OBJETO) {
         ClaseLince   *cls       = obj->objeto->clase;
         const char   *met_nombre = n->metodo.metodo;
-        FuncionLince *f          = buscar_metodo(cls, met_nombre);
+        if (n->cache_clase != cls) {                /* el método, recordado por clase */
+            n->cache_cd    = buscar_metodo(cls, met_nombre);
+            n->cache_clase = cls;
+        }
+        FuncionLince *f          = (FuncionLince *)n->cache_cd;
 
         if (!f) {
             Valor *err = error_rt("Error", n->linea,
@@ -2739,6 +2765,25 @@ static Valor *exec_intentar(Nodo *n, Entorno *e) {
     return valor_nulo();
 }
 
+/* Posición de 'campo' en el objeto (-1 si no está), probando antes la del
+   último acceso desde este nodo: casi siempre acierta. */
+static inline int campo_objeto(Nodo *n, ObjetoLince *o, const char *campo) {
+    int k = n->cache_i;
+    if (k < o->num_campos && strcmp(o->campos_nombres[k], campo) == 0) return k;
+    for (int i = 0; i < o->num_campos; i++)
+        if (strcmp(o->campos_nombres[i], campo) == 0) { n->cache_i = i; return i; }
+    return -1;
+}
+
+/* buscar_campo(clase, campo, 0) recordado por nodo y clase */
+static inline CampoClase *campo_declarado(Nodo *n, ClaseLince *c, const char *campo) {
+    if (n->cache_clase != c) {
+        n->cache_cd = buscar_campo(c, campo, 0);
+        n->cache_clase = c;
+    }
+    return (CampoClase *)n->cache_cd;
+}
+
 static Valor *exec_acceso(Nodo *n, Entorno *e) {
     Valor *obj = ejecutar(n->acceso.objeto, e);
     /* Acceso a constante de módulo */
@@ -2757,9 +2802,10 @@ static Valor *exec_acceso(Nodo *n, Entorno *e) {
     }
     if (obj->tipo == VAL_OBJETO) {
         const char *campo = n->acceso.campo;
-        for (int i = 0; i < obj->objeto->num_campos; i++) {
-            if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
-                CampoClase *cd = buscar_campo(obj->objeto->clase, campo, 0);
+        int i = campo_objeto(n, obj->objeto, campo);
+        if (i >= 0) {
+            {
+                CampoClase *cd = campo_declarado(n, obj->objeto->clase, campo);
                 if (cd && cd->vis != VIS_PUBLICO && !acceso_permitido(cd->vis, cd->duena, e)) {
                     Valor *err = error_rt("ErrorAcceso", n->linea,
                         "El campo '%s' de '%s' es %s: no se puede leer desde aquí.",
@@ -3003,9 +3049,10 @@ static Valor *exec_asignacion_campo(Nodo *n, Entorno *e) {
     }
 
     /* Buscar si el campo ya existe */
-    for (int i = 0; i < obj->objeto->num_campos; i++) {
-        if (strcmp(obj->objeto->campos_nombres[i], campo) == 0) {
-            CampoClase *cd = buscar_campo(obj->objeto->clase, campo, 0);
+    int i = campo_objeto(n, obj->objeto, campo);
+    if (i >= 0) {
+        {
+            CampoClase *cd = campo_declarado(n, obj->objeto->clase, campo);
             Valor *err = NULL;
             if (cd && cd->vis != VIS_PUBLICO && !acceso_permitido(cd->vis, cd->duena, e))
                 err = error_rt("ErrorAcceso", n->linea,
