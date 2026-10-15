@@ -62,6 +62,9 @@ jobs:
       # Las mismas suites sobre el binario instrumentado. Es lo que
       # detecta los usos de memoria liberada del intérprete, que en un build normal pasan desapercibidos o se
       # manifiestan como fallos intermitentes.
+      - name: SDL2 para los tests del módulo juego
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
+
       - name: Compilar con AddressSanitizer
         run: make debug
 
