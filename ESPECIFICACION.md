@@ -290,7 +290,7 @@ d.eliminar("edad")
 s.longitud()
 s.mayusculas()
 s.minusculas()
-s.recortar()
+s.recortar()            # sin espacios, tabuladores ni saltos de línea en los extremos
 s.contiene("algo")
 s.reemplazar("a", "b")
 s[0]                    # carácter por índice
@@ -713,7 +713,8 @@ tiempo.esperar(500) # pausa 500ms
 ### `sistema`
 
 ```lince
-sistema.ejecutar("ls -la")
+sistema.ejecutar("ls -la")             # devuelve lo que escribe el comando
+sistema.proceso("make")                # {"salida", "error", "codigo", "ok"}
 sistema.existe("archivo.txt")
 sistema.salir(0)
 ```
@@ -802,7 +803,7 @@ mientras juego.abierto() {
 
 | Función | Qué hace |
 |---|---|
-| `sonido(ruta)` | carga un `.wav`; devuelve `{"sonido", "duracion", "ruta"}` |
+| `sonido(ruta)` | carga un `.wav` o un `.ogg` (Ogg Vorbis, mucho más pequeño: mejor para la música); devuelve `{"sonido", "duracion", "ruta"}` |
 | `reproducir(sonido[, volumen[, bucle]])` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz |
 | `detener([voz])` | para esa voz o, sin argumento, todo |
 | `musica(sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para |

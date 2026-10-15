@@ -12,6 +12,10 @@ escribir(s.reemplazar("Mundo", "Lince"))
 # Recortar
 sea con_espacios = "   hola   "
 escribir(con_espacios.recortar())
+sea con_saltos = "\t linea\r\n"
+sea solo_espacios = "   "
+escribir("[" + con_saltos.recortar() + "]")
+escribir("[" + solo_espacios.recortar() + "]")
 
 # Acceso por índice
 escribir(s[0])

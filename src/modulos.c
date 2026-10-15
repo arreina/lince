@@ -17,6 +17,7 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/wait.h>
 #else
 #include <windows.h>
 #include <direct.h>      /* _mkdir */
@@ -1007,43 +1008,72 @@ static Valor *fn_sis_ejecutar(Valor **a, int n) {
     return valor_texto(buf);
 }
 
+/* Archivo temporal propio para la salida de errores de un comando */
+static int sis_temporal(char *ruta, size_t max) {
+#ifdef _WIN32
+    char dir[MAX_PATH];
+    if (max < MAX_PATH || !GetTempPathA(sizeof dir, dir) || !GetTempFileNameA(dir, "lnc", 0, ruta)) return 0;
+    return 1;
+#else
+    const char *dir = getenv("TMPDIR");
+    snprintf(ruta, max, "%s/lince_err_XXXXXX", dir && *dir ? dir : "/tmp");
+    int fd = mkstemp(ruta);
+    if (fd < 0) return 0;
+    close(fd);
+    return 1;
+#endif
+}
+
 static Valor *fn_sis_proceso(Valor **a, int n) {
-    /* proceso(cmd) → diccionario {salida, error, codigo} */
+    /* proceso(cmd) → diccionario {salida, error, codigo, ok} */
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) return valor_nulo();
 
-    char cmd_out[4096], cmd_err[4096];
-    snprintf(cmd_out, sizeof(cmd_out), "%s 2>/tmp/_lince_stderr.txt", a[0]->texto);
-    FILE *proc = popen(cmd_out, "r");
-    if (!proc) return valor_nulo();
+    char ruta_err[4096] = "";
+    int con_err = sis_temporal(ruta_err, sizeof ruta_err);
+    size_t largo_cmd = strlen(a[0]->texto) + strlen(ruta_err) + 32;
+    char *cmd = malloc(largo_cmd);
+    if (!cmd) return valor_nulo();
+    /* El comando va en su propio proceso para que la redirección recoja todo
+       lo que escriba en la salida de errores, también con '1>&2' dentro */
+#ifdef _WIN32
+    if (con_err) snprintf(cmd, largo_cmd, "cmd /s /c \"%s\" 2>\"%s\"", a[0]->texto, ruta_err);
+#else
+    if (con_err) snprintf(cmd, largo_cmd, "(%s\n) 2>\"%s\"", a[0]->texto, ruta_err);
+#endif
+    else         snprintf(cmd, largo_cmd, "%s", a[0]->texto);
+    FILE *proc = popen(cmd, "r");
+    free(cmd);
+    if (!proc) { if (con_err) remove(ruta_err); return valor_nulo(); }
 
     char buf[65536] = "";
     char linea[4096];
     while (fgets(linea, sizeof(linea), proc))
         strncat(buf, linea, sizeof(buf) - strlen(buf) - 1);
-    int codigo = pclose(proc);
+    int estado = pclose(proc);
+#ifdef _WIN32
+    int codigo = estado;                       /* en Windows ya es el código de salida */
+#else
+    int codigo = WIFEXITED(estado) ? WEXITSTATUS(estado) : -1;
+#endif
 
     /* Leer stderr */
     char buf_err[65536] = "";
-    FILE *ferr = fopen("/tmp/_lince_stderr.txt", "r");
-    if (ferr) {
-        while (fgets(linea, sizeof(linea), ferr))
-            strncat(buf_err, linea, sizeof(buf_err) - strlen(buf_err) - 1);
-        fclose(ferr);
-        remove("/tmp/_lince_stderr.txt");
+    if (con_err) {
+        FILE *ferr = fopen(ruta_err, "r");
+        if (ferr) {
+            while (fgets(linea, sizeof(linea), ferr))
+                strncat(buf_err, linea, sizeof(buf_err) - strlen(buf_err) - 1);
+            fclose(ferr);
+        }
+        remove(ruta_err);
     }
 
-    /* Construir diccionario de resultado */
     Valor *res = valor_diccionario_crear();
-    res->diccionario.claves[0]  = strdup("salida");
-    res->diccionario.valores[0] = valor_texto(buf);
-    res->diccionario.claves[1]  = strdup("error");
-    res->diccionario.valores[1] = valor_texto(buf_err);
-    res->diccionario.claves[2]  = strdup("codigo");
-    res->diccionario.valores[2] = valor_numero((double)(codigo >> 8));
-    res->diccionario.claves[3]  = strdup("ok");
-    res->diccionario.valores[3] = valor_booleano(codigo == 0);
-    res->diccionario.cantidad   = 4;
+    valor_diccionario_agregar(res, "salida", valor_texto(buf));
+    valor_diccionario_agregar(res, "error",  valor_texto(buf_err));
+    valor_diccionario_agregar(res, "codigo", valor_numero(codigo));
+    valor_diccionario_agregar(res, "ok",     valor_booleano(codigo == 0));
     return res;
 }
 
@@ -1480,6 +1510,7 @@ static void cargar_pruebas(Entorno *entorno) {
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
+#include "ogg.h"
 #include "juego.h"
 
 static void cargar_matematica(Entorno *entorno) {

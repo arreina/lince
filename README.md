@@ -48,7 +48,7 @@ Ocho minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, e
 ## ¿Por qué Lince?
 
 - **En español** — la programación no debería requerir saber inglés
-- **Hecho para juegos** — ventana, dibujo 2D, imágenes y sprites, texto, teclado, ratón, mando, sonido, cámara y colisiones en un solo módulo (`juego`)
+- **Hecho para juegos** — ventana, dibujo 2D, imágenes y sprites, texto, teclado, ratón, mando, sonido (WAV y OGG), cámara y colisiones en un solo módulo (`juego`)
 - **Sin dependencias para compilar** — un solo binario, compilado con `gcc` y `make` (SDL2 se carga al abrir la ventana)
 - **Errores claros** — mensajes literales con número de línea exacto
 - **Ejecutables autónomos** — `lince compilar` empaqueta tu programa en un único ejecutable, sin instalar nada en destino

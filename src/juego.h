@@ -813,12 +813,38 @@ static Valor *fn_jg_pitido(Valor **a, int n) {
     return valor_nulo();
 }
 
-/* Carga un WAV (del disco o del ejecutable empaquetado) en el formato de Lince */
+/* Un OGG decodificado a estéreo de 16 bits (aún a su frecuencia original) */
+static char *jg_ogg_estereo(const char *bytes, size_t largo, int *frecuencia, size_t *leido) {
+    int canales, muestras;
+    short *ogg = ogg_decodificar((const unsigned char *)bytes, largo, &canales, frecuencia, &muestras);
+    if (!ogg) return NULL;
+    short *est = malloc((size_t)muestras * JG_CANALES * sizeof(short) + 4);
+    if (est)
+        for (int i = 0; i < muestras; i++) {                 /* mono: igual en los dos lados */
+            est[2 * i]     = ogg[(size_t)i * canales];
+            est[2 * i + 1] = ogg[(size_t)i * canales + (canales > 1)];
+        }
+    free(ogg);
+    *leido = (size_t)muestras * JG_CANALES * sizeof(short);
+    return (char *)est;
+}
+
+/* Carga un WAV u OGG (del disco o del ejecutable empaquetado) en el formato de Lince */
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max) {
     size_t largo = 0;
     char *bytes = interprete_leer_bytes(ruta, &largo);
     if (!bytes) { snprintf(error, max, "no se encuentra el sonido '%s'", ruta); return 0; }
     JgAudioSpec spec;
+    char *buf;
+    size_t leido = 0;
+    if (largo >= 4 && memcmp(bytes, "OggS", 4) == 0) {
+        int freq = 0;
+        buf = jg_ogg_estereo(bytes, largo, &freq, &leido);
+        free(bytes);
+        if (!buf) { snprintf(error, max, "'%s' no es un OGG Vorbis válido", ruta); return 0; }
+        spec.freq = freq;
+        goto remuestrear;
+    }
     unsigned char *wav = NULL;
     unsigned wav_largo = 0;
     void *rw = _jg.RWFromConstMem(bytes, (int)largo);
@@ -836,8 +862,8 @@ static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *e
     _jg.StreamFlush(flujo);
     _jg.FreeWAV(wav);
     /* el conversor puede entregar los datos en varios trozos */
-    size_t cap = (size_t)wav_largo * 4 + 4096, leido = 0;
-    char *buf = malloc(cap);
+    size_t cap = (size_t)wav_largo * 4 + 4096;
+    buf = malloc(cap);
     for (;;) {
         if (!buf) break;
         int disp = _jg.StreamAvailable(flujo);
@@ -853,6 +879,7 @@ static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *e
         leido += (size_t)r;
     }
     _jg.FreeStream(flujo);
+remuestrear:
     if (!buf) { snprintf(error, max, "sin memoria"); return 0; }
     int origen = (int)(leido / (sizeof(short) * JG_CANALES));
     if (spec.freq != JG_FRECUENCIA && origen > 1 && spec.freq > 0) {
@@ -886,10 +913,10 @@ static int jg_id_de(Valor *v, const char *clave_tipo) {
     return -1;
 }
 
-/* sonido(ruta): carga un WAV; devuelve {"sonido": n, "duracion": segundos} */
+/* sonido(ruta): carga un WAV u OGG; devuelve {"sonido": n, "duracion": segundos} */
 static Valor *fn_jg_sonido(Valor **a, int n) {
     JG_ABIERTA();
-    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "sonido() espera la ruta de un archivo .wav");
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "sonido() espera la ruta de un archivo .wav u .ogg");
     int k = -1;
     for (int i = 0; i < _jgs.nsonidos; i++)
         if (strcmp(_jgs.sonidos[i].ruta, a[0]->texto) == 0) { k = i; break; }

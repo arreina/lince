@@ -30,3 +30,14 @@ si sistema.plataforma() == "windows" { listar = "dir /b lince_test_existe.txt 2>
 sea ok = sistema.ejecutar(listar)
 escribir(ok.recortar().longitud() > 0)
 archivos.eliminar("lince_test_existe.txt")
+
+# proceso: salida, errores y código de salida por separado
+sea falla = "echo fallo 1>&2; exit 3"
+si sistema.plataforma() == "windows" { falla = "echo fallo 1>&2 & exit 3" }
+sea r = sistema.proceso(falla)
+escribir(r["error"].recortar())
+escribir(r["codigo"])
+escribir(r["ok"])
+sea bien = sistema.proceso("echo hola")
+escribir(bien["salida"].recortar())
+escribir(bien["ok"])

@@ -826,7 +826,6 @@ void entorno_definir(Entorno *e, const char *nombre, Valor *valor, int constante
     entorno_definir_i(e, intern(nombre), valor, constante);
 }
 
-static void entorno_liberar(Entorno *e);
 
 static void entorno_destruir(Entorno *e) {
     if (!e) return;
@@ -845,8 +844,6 @@ static void entorno_destruir(Entorno *e) {
     }
     if (padre) entorno_destruir(padre);
 }
-
-static void entorno_liberar(Entorno *e) { entorno_destruir(e); }
 
 /* 'id' es el nombre internado (o NULL si ese nombre no existe en ningún sitio);
    'nombre' sólo sirve para el mensaje de error. */
@@ -2537,8 +2534,8 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         if (strcmp(met, "recortar") == 0) {
             char *s = strdup(obj->texto);
             int i = 0, j = strlen(s) - 1;
-            while (s[i] == ' ' || s[i] == '\t') i++;
-            while (j > i && (s[j] == ' ' || s[j] == '\t')) j--;
+            while (s[i] && isspace((unsigned char)s[i])) i++;
+            while (j >= i && isspace((unsigned char)s[j])) j--;
             s[j+1] = '\0';
             Valor *r = valor_texto(s + i); free(s); valor_destruir(obj);
             return r;

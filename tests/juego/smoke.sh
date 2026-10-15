@@ -71,10 +71,11 @@ with wave.open("tono.wav", "wb") as f:
     f.setnchannels(1); f.setsampwidth(2); f.setframerate(22050)
     f.writeframes(b"".join(struct.pack("<h", 8000 if (i // 25) % 2 else -8000) for i in range(11025)))
 PY
+cp "$DIR/tono.ogg" .      # 0,5 s estéreo a 44100 Hz, Ogg Vorbis
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 20 "$LINCE" "$DIR/prueba2.lince" > salida2.txt 2>&1
 [ $? -eq 0 ] && ok "la segunda prueba termina bien" || mal "la segunda prueba falló"
 for l in "hoja: 32x16" "misma imagen: verdadero" "bmp: 10x10" "camara: -50" "imagen inexistente: ok" \
-         "dibujar sin imagen: ok" "duración: 0.5" "voz: verdadero" "volumen: 0.8" "reproducir sin sonido: ok" \
+         "dibujar sin imagen: ok" "duración: 0.5" "ogg: 0.5" "sonido inválido: ok" "voz: verdadero" "volumen: 0.8" "reproducir sin sonido: ok" \
          "mandos: 0" "sprite: 3x3" "botón a: falso" "eje: 0" "tiempo: verdadero"; do
     grep -qxF "$l" salida2.txt && ok "$l" || mal "falta la línea: $l"
 done

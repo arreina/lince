@@ -40,6 +40,15 @@ intentar {
 
 sea s = juego.sonido("tono.wav")
 escribir("duración: " + a_texto(s["duracion"]))
+sea musica_ogg = juego.sonido("tono.ogg")
+escribir("ogg: " + a_texto(musica_ogg["duracion"]))
+juego.musica(musica_ogg, 0.3)
+intentar {
+    juego.sonido("hoja.png")
+    escribir("MAL: png como sonido")
+} capturar (ErrorJuego e) {
+    escribir("sonido inválido: ok")
+}
 sea voz = juego.reproducir(s, 0.5)
 escribir("voz: " + a_texto(voz > 0))
 juego.musica(s, 0.2)
