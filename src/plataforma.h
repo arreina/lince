@@ -22,6 +22,7 @@
 ───────────────────────────────────────── */
 #ifdef LINCE_WINDOWS
     #include <windows.h>
+    #include <direct.h>     /* _mkdir */
     static inline void lince_esperar_ms(int ms) {
         Sleep((DWORD)ms);
     }

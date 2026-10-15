@@ -4,7 +4,7 @@
 LINCE="$(cd "$(dirname "${1:-./lince}")" && pwd)/$(basename "${1:-./lince}")"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "🐆 Juego"
-if ! ldconfig -p 2>/dev/null | grep -q "libSDL2-2.0.so.0"; then
+if ! ldconfig -p 2>/dev/null | grep -q "libSDL2-2.0.so.0" && [ ! -f /mingw64/bin/SDL2.dll ]; then
     echo "  ⏭  SDL2 no está instalada: se omite"
     exit 0
 fi

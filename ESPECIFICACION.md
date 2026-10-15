@@ -738,7 +738,7 @@ tiempo.analizar_utc("2024-02-29", "%Y-%m-%d")            # marca de tiempo, o nu
 
 `crear`, `formatear`, `partes` y `analizar` usan la hora local; las versiones
 `_utc` no dependen de la zona horaria. `dia_semana` va de 0 (domingo) a 6. Los
-formatos son los de `strftime`. `analizar` no está disponible en Windows.
+formatos son los de `strftime`; `analizar` entiende `%Y %y %m %d %H %M %S`.
 
 ### `juego`
 

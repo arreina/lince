@@ -30,29 +30,76 @@ void lsp_analizar(const char *texto) {
 }
 
 #ifdef _WIN32
-
-int lsp_servir(void) {
-    fprintf(stderr, "El servidor de lenguaje todavía no está disponible en Windows.\n");
-    return 1;
-}
-int lsp_comprobar_texto(const char *t, int *l, char *m, size_t x) {
-    (void)t; (void)l; (void)m; (void)x; return 0;
-}
-
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 #else
-
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
-#include "lexer.h"
-#include "parser.h"
+#endif
 #include "interprete.h"
 #include "modulos.h"
 
 /* ─────────────────────────────────────────
    Comprobación de sintaxis
+   Se hace en otro proceso porque el parser termina en el primer error.
+   Deja en buf lo que el parser escribió en stderr; devuelve 1 si hubo error
+   de sintaxis, 0 si el texto es correcto o el proceso no terminó bien.
 ───────────────────────────────────────── */
-int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max) {
+#ifdef _WIN32
+static int analizar_aparte(const char *texto, char *buf, size_t max) {
+    /* Windows no tiene fork: el texto va a un archivo temporal y se comprueba
+       con 'lince comprobar' en un proceso nuevo del propio ejecutable. */
+    char dir[MAX_PATH], tmp[MAX_PATH], exe[MAX_PATH];
+    if (!GetTempPathA(sizeof dir, dir) || !GetTempFileNameA(dir, "lnc", 0, tmp)) return 0;
+    if (!GetModuleFileNameA(NULL, exe, sizeof exe)) return 0;
+    FILE *f = fopen(tmp, "wb");
+    if (!f) return 0;
+    fwrite(texto, 1, strlen(texto), f);
+    fclose(f);
+
+    SECURITY_ATTRIBUTES sa = {sizeof sa, NULL, TRUE};
+    HANDLE lee = NULL, escribe = NULL;
+    if (!CreatePipe(&lee, &escribe, &sa, 1 << 16)) { DeleteFileA(tmp); return 0; }
+    SetHandleInformation(lee, HANDLE_FLAG_INHERIT, 0);
+    HANDLE nulo = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, NULL);
+
+    char cmd[3 * MAX_PATH];
+    snprintf(cmd, sizeof cmd, "\"%s\" comprobar \"%s\"", exe, tmp);
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    memset(&si, 0, sizeof si);
+    si.cb = sizeof si;
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdInput = NULL;
+    si.hStdOutput = nulo;
+    si.hStdError = escribe;
+    BOOL ok = CreateProcessA(NULL, cmd, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    CloseHandle(escribe);
+    if (nulo != INVALID_HANDLE_VALUE) CloseHandle(nulo);
+    if (!ok) { CloseHandle(lee); DeleteFileA(tmp); return 0; }
+
+    DWORD codigo = 0;
+    if (WaitForSingleObject(pi.hProcess, 3000) == WAIT_TIMEOUT) {   /* parser colgado */
+        TerminateProcess(pi.hProcess, 99);
+        WaitForSingleObject(pi.hProcess, 1000);
+    }
+    GetExitCodeProcess(pi.hProcess, &codigo);
+    size_t total = 0;
+    DWORD r;
+    while (total < max - 1 && ReadFile(lee, buf + total, (DWORD)(max - 1 - total), &r, NULL) && r > 0)
+        total += r;
+    buf[total] = '\0';
+    CloseHandle(lee);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    DeleteFileA(tmp);
+    if (codigo == 0 || codigo == 99) return 0;
+    return buf[0] != '\0';
+}
+#else
+static int analizar_aparte(const char *texto, char *buf, size_t max) {
     int fds[2];
     if (pipe(fds) != 0) return 0;
     fflush(NULL);
@@ -66,12 +113,11 @@ int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max
         _exit(0);
     }
     close(fds[1]);
-    char buf[4096];
     size_t total = 0;
     ssize_t r;
-    while ((r = read(fds[0], buf + total, sizeof(buf) - 1 - total)) > 0) {
+    while ((r = read(fds[0], buf + total, max - 1 - total)) > 0) {
         total += (size_t)r;
-        if (total >= sizeof(buf) - 1) break;
+        if (total >= max - 1) break;
     }
     buf[total] = '\0';
     close(fds[0]);
@@ -80,6 +126,18 @@ int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max
     if (WIFEXITED(estado) && WEXITSTATUS(estado) == 0) return 0;
     /* muerto por señal (alarma, fallo del parser): no es un error de sintaxis */
     if (WIFSIGNALED(estado) && buf[0] == '\0') return 0;
+    return 1;
+}
+#endif
+
+int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max) {
+    char buf[4096];
+    if (!analizar_aparte(texto, buf, sizeof buf)) return 0;
+    {   /* en Windows stderr sale con \r\n */
+        char *w = buf;
+        for (char *r = buf; *r; r++) if (*r != '\r') *w++ = *r;
+        *w = '\0';
+    }
 
     /* "❌ Error en línea N:\n   mensaje\n   mensaje" */
     *linea = 1;
@@ -768,7 +826,12 @@ static void atender(const char *msg, int *salir, int *apagado) {
 
 int lsp_servir(void) {
     int salir = 0, apagado = 0;
+#ifdef _WIN32
+    _setmode(_fileno(stdin), _O_BINARY);      /* sin traducir \r\n: Content-Length cuenta bytes */
+    _setmode(_fileno(stdout), _O_BINARY);
+#else
     signal(SIGPIPE, SIG_IGN);
+#endif
     for (;;) {
         char linea[256];
         long largo = -1;
@@ -789,4 +852,3 @@ int lsp_servir(void) {
     }
 }
 
-#endif /* _WIN32 */

@@ -1,9 +1,8 @@
 # 🐆 Lince — integración continua
 #
-# Dos trabajos: uno comprueba que el lenguaje se comporta como debe y el
-# otro repite las mismas suites con AddressSanitizer para cazar errores de
-# memoria. Se separan para que al ver un fallo se sepa de inmediato si es
-# de lógica o de memoria.
+# Tres trabajos: uno comprueba que el lenguaje se comporta como debe, otro
+# repite las mismas suites con AddressSanitizer para cazar errores de
+# memoria, y el tercero lo compila y lo prueba en Windows (MSYS2/MinGW).
 
 name: CI
 
@@ -70,3 +69,45 @@ jobs:
 
       - name: Suites bajo AddressSanitizer
         run: make test-asan
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-python-pillow
+            mingw-w64-x86_64-SDL2
+            mingw-w64-x86_64-SDL2_image
+
+      - name: Compilar
+        run: make
+
+      - name: Suite de integración
+        run: LINCE_BIN=./lince.exe ./lince.exe tests/runner.lince
+
+      - name: Ejecutables (lince compilar)
+        run: |
+          LINCE_BIN=./lince.exe ./lince.exe tests/runner_compilador.lince
+          LINCE_BIN=./lince.exe bash tests/compilador/probar_empaquetado.sh
+
+      - name: Servidor de lenguaje
+        run: python tests/lsp/smoke.py ./lince.exe
+
+      - name: Depurador
+        run: bash tests/depurador/smoke.sh ./lince.exe
+
+      - name: Juego y minijuegos (SDL2 sin pantalla)
+        run: |
+          bash tests/juego/smoke.sh ./lince.exe
+          bash tests/juego/ejemplos.sh ./lince.exe

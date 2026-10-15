@@ -24,6 +24,15 @@ sea dir_tests = "tests/compilador"
 # Binario a probar. Configurable para poder pasar la misma suite por el
 # build con AddressSanitizer (LINCE_BIN=./lince_debug).
 fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
+fijo WINDOWS = sistema.plataforma() == "windows"
+sea nulo_dev = "/dev/null"
+sea temporal = "lince_tmp_compilador"
+sea prefijo = "./"
+si WINDOWS {
+    nulo_dev = "nul"
+    prefijo = ""
+}
+archivos.crear_directorio(temporal)
 sea pasados = 0
 sea fallados = 0
 
@@ -36,10 +45,11 @@ escribir("")
 para cada texto nombre en tests {
     sea fuente   = dir_tests + "/" + nombre + ".lince"
     sea esperado = dir_tests + "/" + nombre + ".esperado"
-    sea binario  = "/tmp/lince_comp_" + nombre
+    sea binario  = temporal + "/" + nombre
+    si WINDOWS { binario = binario + ".exe" }
 
     # Compilar — verificar que el binario existe
-    sea cmd_comp = LINCE + " compilar " + fuente + " -o " + binario + " > /dev/null 2>&1"
+    sea cmd_comp = LINCE + " compilar " + fuente + " -o " + binario + " > " + nulo_dev + " 2>&1"
     sistema.ejecutar(cmd_comp)
     sea compilado = archivos.existe(binario)
 
@@ -47,12 +57,13 @@ para cada texto nombre en tests {
         escribir("  ❌ " + nombre + " — falló al compilar")
         fallados = fallados + 1
     } sino {
-        sea salida_tmp = "/tmp/lince_comp_out_" + nombre + ".txt"
-        sea cmd_run = binario + " > " + salida_tmp + " 2>&1"
+        sea salida_tmp = temporal + "/" + nombre + ".txt"
+        sea cmd_run = prefijo + binario + " > " + salida_tmp + " 2>&1"
+        si WINDOWS { cmd_run = binario.reemplazar("/", "\\") + " > " + salida_tmp + " 2>&1" }
         sistema.ejecutar(cmd_run)
 
         # Comparar con esperado
-        sea salida   = archivos.leer(salida_tmp)
+        sea salida   = archivos.leer(salida_tmp).reemplazar("\r", "")
         sea esperada = archivos.leer(esperado)
 
         si salida == esperada {
@@ -64,9 +75,12 @@ para cada texto nombre en tests {
         }
 
         # Limpiar temporales
-        sistema.ejecutar("rm -f " + salida_tmp + " " + binario)
+        archivos.eliminar(salida_tmp)
+        archivos.eliminar(binario)
     }
 }
+
+archivos.eliminar(temporal)
 
 escribir("")
 escribir("══════════════════════════════════════════════════")

@@ -2,7 +2,7 @@
 
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -Wno-maybe-uninitialized -Wno-format-truncation -Wno-stringop-truncation
-LDFLAGS = -lm -ldl
+LDFLAGS = -lm
 SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c
 
 # ── Detección de plataforma ───────────────
@@ -10,15 +10,14 @@ UNAME := $(shell uname 2>/dev/null || echo Windows)
 
 ifeq ($(OS),Windows_NT)
     BIN     = lince.exe
-    LDFLAGS += -lws2_32
-    RM      = del /Q
 else ifeq ($(UNAME),Darwin)
     BIN     = lince
-    RM      = rm -f
+    LDFLAGS += -ldl
 else
     BIN     = lince
-    RM      = rm -f
+    LDFLAGS += -ldl
 endif
+RM = rm -f
 
 # ── Compilar ──────────────────────────────
 all: $(BIN)
@@ -26,6 +25,13 @@ all: $(BIN)
 $(BIN): $(SRC) src/juego.h
 	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
 	@echo "✅ Lince compilado — usa: ./$(BIN) archivo.lince"
+
+# ── Windows desde Linux (compilación cruzada con MinGW) ──
+# Necesita x86_64-w64-mingw32-gcc (paquete gcc-mingw-w64-x86-64). Se prueba con wine.
+MINGW ?= x86_64-w64-mingw32-gcc
+windows: $(SRC) src/juego.h
+	$(MINGW) $(CFLAGS) -o lince.exe $(SRC) -lm
+	@echo "✅ lince.exe compilado para Windows"
 
 # ── Modo debug ────────────────────────────
 debug: $(SRC)
@@ -147,7 +153,7 @@ else
 	@echo "🗑️  Lince desinstalado"
 endif
 
-.PHONY: all debug ejemplo test test-compilador test-ejemplos \
+.PHONY: all windows debug ejemplo test test-compilador test-ejemplos \
         test-asan test-depurador test-lsp test-editores editores editores-check bench vsix \
         test-juego test-todo clean install uninstall docs docs-check
 

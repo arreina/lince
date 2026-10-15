@@ -6,7 +6,9 @@ importar "archivos"
 sea salida = sistema.ejecutar("echo Hola")
 escribir(salida.recortar())
 # Ejecutar y capturar salida multilinea
-sea salida2 = sistema.ejecutar("printf 'linea1\nlinea2\nlinea3\n'")
+sea orden = "printf 'linea1\nlinea2\nlinea3\n'"
+si sistema.plataforma() == "windows" { orden = "echo linea1& echo linea2& echo linea3" }
+sea salida2 = sistema.ejecutar(orden).reemplazar("\r", "")
 importar "texto"
 sea lineas = texto.dividir(salida2.recortar(), "\n")
 escribir(lineas.longitud())
@@ -14,14 +16,17 @@ escribir(lineas[0])
 escribir(lineas[2])
 
 # sistema.existe
-archivos.escribir("/tmp/lince_test_existe.txt", "prueba")
-escribir(sistema.existe("/tmp/lince_test_existe.txt"))
-escribir(sistema.existe("/tmp/archivo_que_no_existe_lince.txt"))
+archivos.escribir("lince_test_existe.txt", "prueba")
+escribir(sistema.existe("lince_test_existe.txt"))
+escribir(sistema.existe("archivo_que_no_existe_lince.txt"))
 
 # Ejecutar lince mismo
-sea resultado = sistema.ejecutar("./lince -v 2>&1 || echo 'ok'")
+sea resultado = sistema.ejecutar("echo ok")
 escribir(resultado.recortar().longitud() > 0)
 
 # Comando con salida de error redirigida
-sea ok = sistema.ejecutar("ls /tmp/lince_test_existe.txt 2>/dev/null")
+sea listar = "ls lince_test_existe.txt 2>/dev/null"
+si sistema.plataforma() == "windows" { listar = "dir /b lince_test_existe.txt 2>nul" }
+sea ok = sistema.ejecutar(listar)
 escribir(ok.recortar().longitud() > 0)
+archivos.eliminar("lince_test_existe.txt")

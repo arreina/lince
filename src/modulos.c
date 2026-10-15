@@ -1,10 +1,10 @@
 /*
  * 🐆 Lince — modulos.c
- * Módulos estándar: matematica, texto, archivos, tiempo
+ * Módulos estándar: matematica, texto, archivos, tiempo, sistema, json, pruebas y juego
  */
 
 #ifndef _WIN32
-#define _GNU_SOURCE      /* strptime, timegm */
+#define _GNU_SOURCE      /* timegm */
 #endif
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +19,7 @@
 #include <sys/ioctl.h>
 #else
 #include <windows.h>
+#include <direct.h>      /* _mkdir */
 #endif
 #include "modulos.h"
 #include "plataforma.h"
@@ -641,7 +642,8 @@ static Valor *fn_arc_existe(Valor **a, int n) {
 static Valor *fn_arc_eliminar(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) return valor_booleano(0);
-    return valor_booleano(remove(a[0]->texto) == 0);
+    if (remove(a[0]->texto) == 0) return valor_booleano(1);
+    return valor_booleano(rmdir(a[0]->texto) == 0);      /* carpeta vacía (Windows) */
 }
 
 static Valor *fn_arc_crear_directorio(Valor **a, int n) {
@@ -817,25 +819,59 @@ mal:
 static Valor *fn_tpo_crear(Valor **a, int n)     { return tpo_crear(a, n, 0); }
 static Valor *fn_tpo_crear_utc(Valor **a, int n) { return tpo_crear(a, n, 1); }
 
+/* Lee un número de hasta 'max' cifras; NULL si no hay ninguna */
+static const char *tpo_leer_num(const char *p, int max, int *out) {
+    int v = 0, k = 0;
+    while (k < max && isdigit((unsigned char)*p)) { v = v * 10 + (*p - '0'); p++; k++; }
+    if (!k) return NULL;
+    *out = v;
+    return p;
+}
+
+/* strptime propio (igual en todas las plataformas): %Y %y %m %d %H %M %S %%;
+   un espacio del formato acepta cualquier cantidad de espacios. */
+static int tpo_strptime(const char *t, const char *f, struct tm *tm) {
+    while (*f) {
+        if (*f == '%') {
+            int v, max = 2;
+            char c = f[1];
+            if (!c) return 0;
+            f += 2;
+            if (c == '%') { if (*t++ != '%') return 0; continue; }
+            if (c == 'Y') max = 4;
+            if (!strchr("YymdHMS", c) || !(t = tpo_leer_num(t, max, &v))) return 0;
+            switch (c) {
+                case 'Y': tm->tm_year = v - 1900; break;
+                case 'y': tm->tm_year = v < 69 ? v + 100 : v; break;
+                case 'm': if (v < 1 || v > 12) return 0; tm->tm_mon = v - 1; break;
+                case 'd': if (v < 1 || v > 31) return 0; tm->tm_mday = v; break;
+                case 'H': if (v > 23) return 0; tm->tm_hour = v; break;
+                case 'M': if (v > 59) return 0; tm->tm_min = v; break;
+                case 'S': if (v > 60) return 0; tm->tm_sec = v; break;
+            }
+        } else if (isspace((unsigned char)*f)) {
+            while (isspace((unsigned char)*t)) t++;
+            f++;
+        } else if (*t++ != *f++) {
+            return 0;
+        }
+    }
+    return *t == '\0';
+}
+
 static Valor *tpo_analizar(Valor **a, int n, int utc) {
     if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) {
         hay_error = 1;
         valor_error = valor_error_nuevo("ErrorTipo", "analizar() espera (texto, formato)", 0);
         return valor_nulo();
     }
-#ifdef _WIN32
-    (void)utc;
-    hay_error = 1;
-    valor_error = valor_error_nuevo("Error", "analizar() no está disponible en Windows", 0);
-    return valor_nulo();
-#else
     struct tm tmv;
     memset(&tmv, 0, sizeof tmv);
+    tmv.tm_mday = 1;
+    tmv.tm_year = 70;
     tmv.tm_isdst = -1;
-    char *fin = strptime(a[0]->texto, a[1]->texto, &tmv);
-    if (!fin || *fin) return valor_nulo();          /* no encaja con el formato */
+    if (!tpo_strptime(a[0]->texto, a[1]->texto, &tmv)) return valor_nulo();   /* no encaja */
     return valor_numero((double)(utc ? lince_timegm(&tmv) : mktime(&tmv)));
-#endif
 }
 static Valor *fn_tpo_analizar(Valor **a, int n)     { return tpo_analizar(a, n, 0); }
 static Valor *fn_tpo_analizar_utc(Valor **a, int n) { return tpo_analizar(a, n, 1); }
@@ -1349,7 +1385,9 @@ static void cargar_pruebas(Entorno *entorno) {
         fns, 5, NULL, NULL, 0);
 }
 
+#ifndef _WIN32
 #include <dlfcn.h>
+#endif
 #include "juego.h"
 
 static void cargar_matematica(Entorno *entorno) {

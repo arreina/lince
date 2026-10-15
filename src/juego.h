@@ -30,7 +30,7 @@ static struct {
     int  (*Init)(unsigned);
     void (*Quit)(void);
     const char *(*GetError)(void);
-    void *(*CreateWindow)(const char *, int, int, int, int, unsigned);
+    void *(*CrearVentana)(const char *, int, int, int, int, unsigned);
     void (*DestroyWindow)(void *);
     void *(*CreateRenderer)(void *, int, unsigned);
     void (*DestroyRenderer)(void *);
@@ -94,7 +94,7 @@ static int jg_cargar(void) {
     JG_FN(Init, "SDL_Init")
     JG_FN(Quit, "SDL_Quit")
     JG_FN(GetError, "SDL_GetError")
-    JG_FN(CreateWindow, "SDL_CreateWindow")
+    JG_FN(CrearVentana, "SDL_CreateWindow")
     JG_FN(DestroyWindow, "SDL_DestroyWindow")
     JG_FN(CreateRenderer, "SDL_CreateRenderer")
     JG_FN(DestroyRenderer, "SDL_DestroyRenderer")
@@ -125,9 +125,17 @@ static int jg_cargar(void) {
 }
 
 static double jg_ahora(void) {
+#ifdef _WIN32
+    static LARGE_INTEGER frecuencia;
+    LARGE_INTEGER t;
+    if (!frecuencia.QuadPart) QueryPerformanceFrequency(&frecuencia);
+    QueryPerformanceCounter(&t);
+    return (double)t.QuadPart / (double)frecuencia.QuadPart;
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec / 1e9;
+#endif
 }
 
 static int jg_num(Valor **a, int n, int i, double *out, const char *fn) {
@@ -208,7 +216,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         return jg_error("ErrorJuego", msg);
     }
     _jgs.abierta = 1;
-    _jgs.ventana = _jg.CreateWindow(a[0]->texto, 0x2FFF0000, 0x2FFF0000, (int)w, (int)h, 0);
+    _jgs.ventana = _jg.CrearVentana(a[0]->texto, 0x2FFF0000, 0x2FFF0000, (int)w, (int)h, 0);
     if (_jgs.ventana) {
         _jgs.render = _jg.CreateRenderer(_jgs.ventana, -1, 2 | 4);       /* acelerado + vsync */
         if (!_jgs.render) _jgs.render = _jg.CreateRenderer(_jgs.ventana, -1, 1);   /* por software */

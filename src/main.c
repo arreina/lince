@@ -153,10 +153,14 @@ int main(int argc, char *argv[]) {
             snprintf(ruta_bin, sizeof(ruta_bin), "%s", archivo);
             char *punto = strrchr(ruta_bin, '.');
             if (punto) *punto = '\0';
-#ifdef _WIN32
-            strncat(ruta_bin, ".exe", sizeof(ruta_bin) - strlen(ruta_bin) - 1);
-#endif
         }
+#ifdef _WIN32
+        {   /* en Windows un ejecutable necesita la extensión .exe */
+            size_t lr = strlen(ruta_bin);
+            if (lr < 4 || _stricmp(ruta_bin + lr - 4, ".exe") != 0)
+                strncat(ruta_bin, ".exe", sizeof(ruta_bin) - lr - 1);
+        }
+#endif
 
         printf("\n🐆 Lince — Compilador\n\n");
         printf("   Fuente  : %s\n", archivo);
