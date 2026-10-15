@@ -9,9 +9,9 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.5-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-0.6-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-31%2F31-C60B1E.svg)]()
-[![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Mac%20·%20Windows-6A2D72.svg)]()
+[![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows-6A2D72.svg)]()
 
 [🌐 lince-lang.github.io](https://arreina.github.io/lince)
 
@@ -40,6 +40,11 @@ mientras juego.abierto() {
 
 Ocho minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, memoria, tres en raya y un plataformas con cámara y sprites) están en [`examples/`](examples/).
 
+<p align="center">
+  <img src="docs/img/08_plataformas.png" width="320" alt="Plataformas">
+  <img src="docs/img/03_rompeladrillos.png" width="320" alt="Rompeladrillos">
+</p>
+
 ## ¿Por qué Lince?
 
 - **En español** — la programación no debería requerir saber inglés
@@ -50,22 +55,27 @@ Ocho minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, e
 
 ## Instalación
 
-### Linux y Mac
+### Linux
 
 ```bash
 git clone https://github.com/arreina/lince.git
 cd lince
 make
 sudo make install   # opcional
+sudo apt install libsdl2-2.0-0 libsdl2-image-2.0-0   # para abrir ventanas (la segunda, para PNG/JPG)
 ```
 
 ### Windows (MSYS2/MinGW)
 
 ```bash
-pacman -S mingw-w64-x86_64-gcc make
+pacman -S mingw-w64-x86_64-gcc make mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image
 git clone https://github.com/arreina/lince.git
 cd lince && make
 ```
+
+Para repartir un juego en Windows, pon `SDL2.dll` (y `SDL2_image.dll` si usa imágenes PNG/JPG) junto al ejecutable. Desde Linux también se puede crear `lince.exe` con `make windows` (necesita MinGW).
+
+En Mac debería funcionar con `make` y SDL2 de Homebrew, pero no está probado.
 
 ## Uso
 
@@ -204,7 +214,8 @@ lince compilar programa.lince
 
 ```bash
 make test                              # tests del intérprete
-./lince tests/runner_compilador.lince  # tests de los ejecutables
+make test-compilador                   # tests de los ejecutables
+make test-todo                         # todo: minijuegos, módulo juego, editores, LSP, depurador y AddressSanitizer
 ```
 
 ```
@@ -233,13 +244,16 @@ lince/
 │   ├── interprete.c/h      # evaluación
 │   ├── empaquetado.c/h     # lince compilar: crea ejecutables autónomos
 │   ├── modulos.c/h         # módulos estándar
+│   ├── juego.h             # módulo juego (SDL2 cargada en tiempo de ejecución, mezclador de sonido)
 │   ├── repl.c/h            # REPL con historial
 │   └── paquetes.c/h        # gestor de paquetes
 ├── tests/
 │   ├── runner.lince               # tests del intérprete
 │   ├── runner_compilador.lince    # tests de los ejecutables
 │   ├── lince/                     # tests del intérprete
-│   └── compilador/                # tests del compilador
+│   ├── compilador/                # tests del compilador
+│   └── juego/                     # tests del módulo juego y de los minijuegos
+├── examples/               # ocho minijuegos
 ├── editores/               # soporte para editores
 ├── ESPECIFICACION.md       # especificación completa
 └── Makefile

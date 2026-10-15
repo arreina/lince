@@ -1009,10 +1009,10 @@ make test                              # tests del intérprete
 
 | Plataforma | Estado | Compilar con |
 |------------|--------|--------------|
-| Linux | ✅ Nativo | `make` |
-| Mac | ✅ Nativo | `make` |
-| Windows (MSYS2/MinGW) | ✅ | `make` |
-| Windows (WSL) | ✅ | `make` |
+| Linux | ✅ Probado en la CI | `make` (para jugar: `libsdl2-2.0-0`, `libsdl2-image-2.0-0`) |
+| Windows (MSYS2/MinGW) | ✅ Probado en la CI | `make` (para jugar: `SDL2.dll` y `SDL2_image.dll` junto al ejecutable) |
+| Windows desde Linux | ✅ | `make windows` (compilación cruzada con MinGW) |
+| Mac | ⚠️ Debería funcionar, sin probar | `make` |
 
 ---
 

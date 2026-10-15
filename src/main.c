@@ -38,7 +38,7 @@ static void mostrar_ayuda(void) {
     printf("\n🐆 Lince v0.6\n\n");
     printf("Uso:\n");
     printf("  lince <archivo.lince>                    Ejecuta un programa\n");
-    printf("  lince compilar <archivo.lince>           Compila a binario nativo\n");
+    printf("  lince compilar <archivo.lince>           Crea un ejecutable autónomo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
     printf("  lince compilar <a.lince> --incluir <ruta> Incluye niveles, imágenes u otros archivos (varias veces)\n");
     printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");

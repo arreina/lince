@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lince — Lenguaje de programación en español</title>
+  <title>Lince — Videojuegos en español</title>
   <meta name="description" content="Lince es un lenguaje de programación para videojuegos escrito en español. C puro, sin dependencias para compilarlo, claro y accesible.">
-  <meta property="og:title" content="Lince — Lenguaje de programación en español">
+  <meta property="og:title" content="Lince — Videojuegos en español">
   <meta property="og:description" content="Programa en tu idioma. Lince es un lenguaje para hacer videojuegos escrito en español, en C puro y sin dependencias para compilarlo.">
   <meta property="og:type" content="website">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -508,8 +508,8 @@
     <text x="122" y="216" font-family="monospace" font-size="90" font-weight="500" fill="#6A2D72">ince</text>
   </svg>
 
-  <h1>Programa en <span>español</span></h1>
-  <p>Lince es un lenguaje para hacer videojuegos. Ventana, dibujo, teclado y sonido incluidos; C puro sin dependencias para compilarlo; mensajes de error claros y ejecutables autónomos.</p>
+  <h1>Haz videojuegos en <span>español</span></h1>
+  <p>Lince es un lenguaje para hacer videojuegos. Ventana, dibujo, sprites, teclado, ratón, mando y sonido incluidos; C puro sin dependencias para compilarlo; mensajes de error claros y ejecutables autónomos.</p>
 
   <div class="hero-btns">
     <a class="btn btn-primary" href="#instalar">
@@ -524,11 +524,11 @@
   </div>
 
   <div class="badges">
-    <span class="badge">versión <span>0.5</span></span>
-    <span class="badge">tests <span>30/30</span></span>
+    <span class="badge">versión <span>0.6</span></span>
+    <span class="badge">tests <span>31/31</span></span>
     <span class="badge">licencia <span>MIT</span></span>
     <span class="badge">C puro, sin deps</span>
-    <span class="badge">Linux · Mac · Windows</span>
+    <span class="badge">Linux · Windows</span>
   </div>
 </section>
 
@@ -539,17 +539,52 @@
   <div class="section-inner">
     <div class="section-label">El lenguaje</div>
     <h2>Todo lo que necesitas, en español</h2>
-    <p>Clases, herencia, interfaces, generadores, closures, manejo de errores y módulos estándar. Sin rodeos.</p>
+    <p>Una ventana y un bucle de juego en diez líneas; y debajo, un lenguaje completo: clases, herencia, interfaces, generadores, closures y manejo de errores.</p>
 
     <div class="code-tabs">
-      <button class="code-tab active" onclick="showTab('basico')">Básico</button>
+      <button class="code-tab active" onclick="showTab('modulo')">Juego</button>
+      <button class="code-tab" onclick="showTab('sprites')">Sprites y sonido</button>
+      <button class="code-tab" onclick="showTab('basico')">Básico</button>
       <button class="code-tab" onclick="showTab('clases')">Clases</button>
       <button class="code-tab" onclick="showTab('generadores')">Generadores</button>
       <button class="code-tab" onclick="showTab('errores')">Errores</button>
-      <button class="code-tab" onclick="showTab('modulo')">Módulos</button>
     </div>
 
-    <div id="tab-basico" class="code-panel active">
+    <div id="tab-sprites" class="code-panel">
+      <div class="code-block">
+        <div class="code-block-header">
+          <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
+          <span class="code-file">sprites.lince</span>
+        </div>
+        <pre><span class="k">importar</span> <span class="s">"juego"</span>
+
+juego.<span class="fn">abrir</span>(<span class="s">"Sprites"</span>, <span class="n">640</span>, <span class="n">480</span>)
+
+<span class="c"># Un sprite dibujado con texto: cada letra es un color</span>
+<span class="kw">sea</span> lince = juego.<span class="fn">sprite</span>([
+    <span class="s">"n....n"</span>,
+    <span class="s">"nnnnnn"</span>,
+    <span class="s">"nbnnbn"</span>,
+    <span class="s">"nnnnnn"</span>
+], {<span class="s">"n"</span>: <span class="s">"#e8892b"</span>, <span class="s">"b"</span>: <span class="s">"#ffffff"</span>})
+
+<span class="kw">sea</span> fondo = juego.<span class="fn">imagen</span>(<span class="s">"fondo.png"</span>)    <span class="c"># PNG, JPG o BMP</span>
+<span class="kw">sea</span> salto = juego.<span class="fn">sonido</span>(<span class="s">"salto.wav"</span>)
+juego.<span class="fn">musica</span>(juego.<span class="fn">sonido</span>(<span class="s">"tema.wav"</span>))    <span class="c"># en bucle</span>
+
+<span class="kw">sea</span> x = <span class="n">320</span>
+<span class="k">mientras</span> juego.<span class="fn">abierto</span>() {
+    x = x + juego.<span class="fn">eje</span>(<span class="s">"izq_x"</span>) * <span class="n">200</span> * juego.<span class="fn">dt</span>()   <span class="c"># mando</span>
+    <span class="k">si</span> juego.<span class="fn">tecla_pulsada</span>(<span class="s">"espacio"</span>) { juego.<span class="fn">reproducir</span>(salto) }
+
+    juego.<span class="fn">dibujar</span>(fondo, <span class="n">0</span>, <span class="n">0</span>)
+    juego.<span class="fn">dibujar</span>(lince, x, <span class="n">300</span>, {<span class="s">"escala"</span>: <span class="n">6</span>, <span class="s">"espejo"</span>: x &lt; <span class="n">320</span>})
+    juego.<span class="fn">presentar</span>()
+}</pre>
+      </div>
+    </div>
+
+    <div id="tab-basico" class="code-panel">
       <div class="code-block">
         <div class="code-block-header">
           <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
@@ -678,11 +713,11 @@
       </div>
     </div>
 
-    <div id="tab-modulo" class="code-panel">
+    <div id="tab-modulo" class="code-panel active">
       <div class="code-block">
         <div class="code-block-header">
           <span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span>
-          <span class="code-file">modulos.lince</span>
+          <span class="code-file">mi_juego.lince</span>
         </div>
         <pre><span class="k">importar</span> <span class="s">"juego"</span>
 <span class="k">importar</span> <span class="s">"matematica"</span>
@@ -700,6 +735,23 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
     juego.<span class="fn">presentar</span>()      <span class="c"># muestra y espera a 60 fps</span>
 }</pre>
       </div>
+    </div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ══ MINIJUEGOS ══ -->
+<section class="section" id="minijuegos">
+  <div class="section-inner">
+    <div class="section-label">Ejemplos</div>
+    <h2>Ocho minijuegos para leer y modificar</h2>
+    <p style="margin-bottom:2rem; color:var(--texto2); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, memoria, tres en raya y un plataformas con cámara y sprites. Cada uno es un solo archivo en <a href="https://github.com/arreina/lince/tree/main/examples" style="color:var(--amarillo)">examples/</a>.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
+      <figure style="margin:0"><img src="img/08_plataformas.png" alt="Plataformas" loading="lazy" style="width:100%;height:auto;border-radius:8px;display:block;image-rendering:pixelated"><figcaption style="color:var(--texto2);font-size:.85rem;margin-top:.4rem">08_plataformas.lince</figcaption></figure>
+      <figure style="margin:0"><img src="img/03_rompeladrillos.png" alt="Rompeladrillos" loading="lazy" style="width:100%;height:auto;border-radius:8px;display:block;image-rendering:pixelated"><figcaption style="color:var(--texto2);font-size:.85rem;margin-top:.4rem">03_rompeladrillos.lince</figcaption></figure>
+      <figure style="margin:0"><img src="img/01_pong.png" alt="Pong" loading="lazy" style="width:100%;height:auto;border-radius:8px;display:block;image-rendering:pixelated"><figcaption style="color:var(--texto2);font-size:.85rem;margin-top:.4rem">01_pong.lince</figcaption></figure>
+      <figure style="margin:0"><img src="img/02_serpiente.png" alt="Serpiente" loading="lazy" style="width:100%;height:auto;border-radius:8px;display:block;image-rendering:pixelated"><figcaption style="color:var(--texto2);font-size:.85rem;margin-top:.4rem">02_serpiente.lince</figcaption></figure>
     </div>
   </div>
 </section>
@@ -726,7 +778,7 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
       <div class="feature-card">
         <div class="feature-icon">📦</div>
         <h3>Sin dependencias</h3>
-        <p>Un solo binario compilado con gcc y make. Funciona en Linux, Mac y Windows (MSYS2). Nada más que instalar.</p>
+        <p>Un solo binario compilado con gcc y make, en Linux y en Windows. Para abrir ventanas usa SDL2, que se carga al ejecutar: no hace falta para compilar.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🔍</div>
@@ -736,7 +788,7 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
       <div class="feature-card">
         <div class="feature-icon">🧩</div>
         <h3>Módulos incluidos</h3>
-        <p>Ventana, dibujo 2D, teclado, ratón, sonido y colisiones; más matemáticas, texto, archivos y JSON para tus partidas guardadas.</p>
+        <p>Ventana, dibujo 2D, imágenes y sprites, teclado, ratón, mando, sonido, cámara y colisiones; más matemáticas, texto, archivos y JSON para tus partidas guardadas.</p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">📦</div>
@@ -765,8 +817,8 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
     <h2>Módulos incluidos</h2>
     <p style="margin-bottom:2rem; color:var(--texto2); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Importa lo que necesitas. Sin instalación adicional.</p>
     <div class="modulos-grid">
-      <div class="modulo-tag"><strong>juego</strong> <span>— abrir, dibujar, texto, teclas, ratón, pitido…</span></div>
-      <div class="modulo-tag"><strong>matematica</strong> <span>— raiz, seno, factorial, aleatorio…</span></div>
+      <div class="modulo-tag"><strong>juego</strong> <span>— ventana, sprites, imágenes, teclas, ratón, mando, sonido, cámara…</span></div>
+      <div class="modulo-tag"><strong>matematica</strong> <span>— aleatorio, semilla, distancia, angulo, interpolar…</span></div>
       <div class="modulo-tag"><strong>texto</strong> <span>— mayusculas, dividir, reemplazar…</span></div>
       <div class="modulo-tag"><strong>archivos</strong> <span>— leer, escribir, existe, listar…</span></div>
       <div class="modulo-tag"><strong>json</strong> <span>— parsear, texto, validar</span></div>
@@ -843,23 +895,29 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
   <div class="section-inner">
     <div class="section-label">Instalación</div>
     <h2>Empieza en dos comandos</h2>
-    <p style="margin-bottom:2.5rem; color:var(--texto2); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Solo necesitas gcc y make. Sin gestores de paquetes, sin dependencias.</p>
+    <p style="margin-bottom:2.5rem; color:var(--texto2); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">Para compilar solo necesitas gcc y make. Para jugar, SDL2.</p>
     <div class="install-grid">
       <div class="install-card">
-        <div class="install-card-header">🐧 Linux / 🍎 Mac</div>
+        <div class="install-card-header">🐧 Linux</div>
         <pre><span class="prompt">$</span> <span class="cmd">git clone https://github.com/arreina/lince.git</span>
 <span class="prompt">$</span> <span class="cmd">cd lince && make</span>
-<span class="prompt">$</span> <span class="cmd">./lince hola.lince</span>
+<span class="prompt">$</span> <span class="cmd">./lince examples/01_pong.lince</span>
+<span class="comment">
+# Para abrir ventanas (la segunda, para PNG/JPG)
+</span><span class="prompt">$</span> <span class="cmd">sudo apt install libsdl2-2.0-0 libsdl2-image-2.0-0</span>
 <span class="comment">
 # Opcional: instalar globalmente
 </span><span class="prompt">$</span> <span class="cmd">sudo make install</span></pre>
       </div>
       <div class="install-card">
         <div class="install-card-header">🪟 Windows (MSYS2/MinGW)</div>
-        <pre><span class="prompt">$</span> <span class="cmd">pacman -S mingw-w64-x86_64-gcc make</span>
+        <pre><span class="prompt">$</span> <span class="cmd">pacman -S mingw-w64-x86_64-gcc make mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image</span>
 <span class="prompt">$</span> <span class="cmd">git clone https://github.com/arreina/lince.git</span>
 <span class="prompt">$</span> <span class="cmd">cd lince && make</span>
-<span class="prompt">$</span> <span class="cmd">./lince hola.lince</span></pre>
+<span class="prompt">$</span> <span class="cmd">./lince examples/01_pong.lince</span>
+<span class="comment">
+# Para repartir un juego: SDL2.dll y SDL2_image.dll junto al .exe
+</span></pre>
       </div>
     </div>
 
@@ -872,7 +930,7 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
         </div>
         <div class="uso-card">
           <div class="uso-cmd">lince compilar prog.lince</div>
-          <div class="uso-desc">Compilar a binario nativo</div>
+          <div class="uso-desc">Crear un ejecutable autónomo</div>
         </div>
         <div class="uso-card">
           <div class="uso-cmd">lince</div>
@@ -890,13 +948,18 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
       <div class="tests-row">
         <div class="test-badge">
           <span class="test-check">✅</span>
-          <span class="test-count">34/34</span>
+          <span class="test-count">31/31</span>
           <span class="test-name">tests del intérprete</span>
         </div>
         <div class="test-badge">
           <span class="test-check">✅</span>
-          <span class="test-count">17/17</span>
+          <span class="test-count">15/15</span>
           <span class="test-name">tests de los ejecutables</span>
+        </div>
+        <div class="test-badge">
+          <span class="test-check">✅</span>
+          <span class="test-count">8/8</span>
+          <span class="test-name">minijuegos jugados solos en la CI</span>
         </div>
       </div>
     </div>
@@ -907,8 +970,8 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
 
 <!-- ══ CTA ══ -->
 <section class="cta">
-  <h2>¿Listo para programar en español?</h2>
-  <p>Clona el repositorio, ejecuta make y escribe tu primer programa.</p>
+  <h2>¿Listo para hacer tu primer juego?</h2>
+  <p>Clona el repositorio, ejecuta make y abre uno de los minijuegos para empezar a cambiarlo.</p>
   <div class="hero-btns">
     <a class="btn btn-primary" href="https://github.com/arreina/lince">
       Ver en GitHub
