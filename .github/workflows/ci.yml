@@ -94,11 +94,11 @@ jobs:
         run: make
 
       - name: Suite de integración
-        run: LINCE_BIN=./lince.exe ./lince.exe tests/runner.lince
+        run: LINCE_BIN=lince.exe ./lince.exe tests/runner.lince
 
       - name: Ejecutables (lince compilar)
         run: |
-          LINCE_BIN=./lince.exe ./lince.exe tests/runner_compilador.lince
+          LINCE_BIN=lince.exe ./lince.exe tests/runner_compilador.lince
           LINCE_BIN=./lince.exe bash tests/compilador/probar_empaquetado.sh
 
       - name: Servidor de lenguaje

@@ -116,13 +116,95 @@ static Valor *fn_mat_minimo(Valor **a, int n) {
     return valor_numero(a[0]->numero < a[1]->numero ? a[0]->numero : a[1]->numero);
 }
 
+/* Generador propio (xorshift64*): igual en todas las plataformas, con
+   semilla para repetir partidas. Se siembra con la hora la primera vez. */
+static uint64_t _mat_estado = 0;
+static double mat_azar(void) {
+    if (!_mat_estado) _mat_estado = (uint64_t)time(NULL) * 0x9E3779B97F4A7C15ULL | 1;
+    _mat_estado ^= _mat_estado >> 12;
+    _mat_estado ^= _mat_estado << 25;
+    _mat_estado ^= _mat_estado >> 27;
+    return (double)((_mat_estado * 0x2545F4914F6CDD1DULL) >> 11) / 9007199254740992.0;   /* [0, 1) */
+}
+
 static Valor *fn_mat_aleatorio(Valor **a, int n) {
-    if (n == 0) {
-        return valor_numero((double)rand() / RAND_MAX);
+    if (n == 0) return valor_numero(mat_azar());
+    if (n < 2 || a[0]->tipo != VAL_NUMERO || a[1]->tipo != VAL_NUMERO) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo", "aleatorio() espera nada o (mínimo, máximo)", 0);
+        return valor_nulo();
     }
-    int min = (int)a[0]->numero;
-    int max = (int)a[1]->numero;
-    return valor_numero(min + rand() % (max - min + 1));
+    double min = floor(a[0]->numero), max = floor(a[1]->numero);
+    if (max < min) { double t = min; min = max; max = t; }
+    return valor_numero(min + floor(mat_azar() * (max - min + 1)));
+}
+
+/* semilla(n): misma semilla, misma secuencia de aleatorio() */
+static Valor *fn_mat_semilla(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_NUMERO) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo", "semilla() espera un número", 0);
+        return valor_nulo();
+    }
+    uint64_t z = (uint64_t)(int64_t)a[0]->numero + 0x9E3779B97F4A7C15ULL;   /* splitmix64 */
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    _mat_estado = (z ^ (z >> 31)) | 1;
+    return valor_nulo();
+}
+
+static int mat_nums(Valor **a, int n, int k, double *v, const char *fn) {
+    for (int i = 0; i < k; i++) {
+        if (i >= n || a[i]->tipo != VAL_NUMERO) {
+            char msg[96];
+            snprintf(msg, sizeof msg, "%s() espera %d números", fn, k);
+            hay_error = 1;
+            valor_error = valor_error_nuevo("ErrorTipo", msg, 0);
+            return 0;
+        }
+        v[i] = a[i]->numero;
+    }
+    return 1;
+}
+
+/* distancia(x1, y1, x2, y2) */
+static Valor *fn_mat_distancia(Valor **a, int n) {
+    double v[4];
+    if (!mat_nums(a, n, 4, v, "distancia")) return valor_nulo();
+    return valor_numero(hypot(v[2] - v[0], v[3] - v[1]));
+}
+/* angulo(x1, y1, x2, y2): en grados, de (x1, y1) hacia (x2, y2); 0 = derecha, 90 = abajo */
+static Valor *fn_mat_angulo(Valor **a, int n) {
+    double v[4];
+    if (!mat_nums(a, n, 4, v, "angulo")) return valor_nulo();
+    return valor_numero(atan2(v[3] - v[1], v[2] - v[0]) * 180.0 / M_PI);
+}
+/* interpolar(a, b, t): de a (t = 0) a b (t = 1) */
+static Valor *fn_mat_interpolar(Valor **a, int n) {
+    double v[3];
+    if (!mat_nums(a, n, 3, v, "interpolar")) return valor_nulo();
+    return valor_numero(v[0] + (v[1] - v[0]) * v[2]);
+}
+/* limitar(v, minimo, maximo) */
+static Valor *fn_mat_limitar(Valor **a, int n) {
+    double v[3];
+    if (!mat_nums(a, n, 3, v, "limitar")) return valor_nulo();
+    return valor_numero(v[0] < v[1] ? v[1] : v[0] > v[2] ? v[2] : v[0]);
+}
+static Valor *fn_mat_radianes(Valor **a, int n) {
+    double v[1];
+    if (!mat_nums(a, n, 1, v, "radianes")) return valor_nulo();
+    return valor_numero(v[0] * M_PI / 180.0);
+}
+static Valor *fn_mat_grados(Valor **a, int n) {
+    double v[1];
+    if (!mat_nums(a, n, 1, v, "grados")) return valor_nulo();
+    return valor_numero(v[0] * 180.0 / M_PI);
+}
+static Valor *fn_mat_signo(Valor **a, int n) {
+    double v[1];
+    if (!mat_nums(a, n, 1, v, "signo")) return valor_nulo();
+    return valor_numero(v[0] > 0 ? 1 : v[0] < 0 ? -1 : 0);
 }
 
 static Valor *fn_mat_truncar(Valor **a, int n) {
@@ -1411,11 +1493,19 @@ static void cargar_matematica(Entorno *entorno) {
         {"combinaciones",  fn_mat_combinaciones, 2},
         {"log2",           fn_mat_log2,          1},
         {"log10",          fn_mat_log10,         1},
+        {"semilla",        fn_mat_semilla,       1},
+        {"distancia",      fn_mat_distancia,     4},
+        {"angulo",         fn_mat_angulo,        4},
+        {"interpolar",     fn_mat_interpolar,    3},
+        {"limitar",        fn_mat_limitar,       3},
+        {"radianes",       fn_mat_radianes,      1},
+        {"grados",         fn_mat_grados,        1},
+        {"signo",          fn_mat_signo,         1},
     };
     const char *cnames[] = {"PI", "E", "TAU"};
     double      cvals[]  = {M_PI, M_E, M_PI * 2};
     registrar_modulo_diccionario(entorno, "matematica",
-        fns, 19, cnames, cvals, 3);
+        fns, (int)(sizeof(fns) / sizeof(fns[0])), cnames, cvals, 3);
 }
 
 static void cargar_texto(Entorno *entorno) {
@@ -1522,7 +1612,6 @@ const char *modulo_estandar(int i) {
 }
 
 void modulo_cargar(const char *nombre, Entorno *entorno) {
-    srand((unsigned)time(NULL));
 
     for (int i = 0; i < NUM_MODULOS_ESTANDAR; i++) {
         if (strcmp(nombre, MODULOS_ESTANDAR[i].nombre) == 0) {
