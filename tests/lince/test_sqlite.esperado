@@ -1,6 +1,0 @@
-2
-[{"id": 1, "titulo": uno, "hecha": 0, "nota": nulo}, {"id": 2, "titulo": it's "dos", "hecha": 1, "nota": ñandú}]
-[{"titulo": it's "dos"}]
-2
-error: no such table: no_existe
-error: la conexión está cerrada o no existe

@@ -3732,10 +3732,7 @@ Interprete *interprete_crear(void) {
     registrar_error_predefinido(interp->global, "ErrorMatematico");
     registrar_error_predefinido(interp->global, "ErrorArgumento");
     registrar_error_predefinido(interp->global, "ErrorAcceso");
-    registrar_error_predefinido(interp->global, "ErrorBD");
-    registrar_error_predefinido(interp->global, "ErrorTarea");
     registrar_error_predefinido(interp->global, "ErrorJuego");
-    registrar_error_predefinido(interp->global, "ErrorPlantilla");
 
     /* Registrar funciones de conversión de tipos */
     registrar_fn_nativa(interp->global, "a_numero", fn_conv_numero, 1);
@@ -3808,8 +3805,8 @@ char *valor_a_texto_repl(Valor *v) {
 /* Quien llama cede la propiedad de args[]: los que adopta el entorno local
    de la función los libera entorno_destruir, pero los sobrantes (o todos, si
    ni siquiera llegamos a llamar) no los libera nadie. Importa porque estas
-   llamadas salen de bucles: una vez por petición en 'servidor', una vez por
-   frame en motor.al_actualizar. Un callback declarado sin parámetros fugaba
+   llamadas salen de bucles: una vez por
+   fotograma en el motor. Un callback declarado sin parámetros fugaba
    el delta de cada frame. */
 static void soltar_args(Valor **args, int desde, int nargs) {
     for (int i = desde; i < nargs; i++) valor_destruir(args[i]);
@@ -3855,8 +3852,7 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {
     /* Sostener la función mientras dura la llamada. Esta es la única ruta que
        ejecuta un cuerpo Lince sin tener referencia propia a la función: la de
        NODO_LLAMADA se apoya en su 'vfun'. Aquí quien llama puede ser el único
-       dueño — el módulo motor guarda el callback de al_actualizar, el módulo
-       servidor el manejador de la ruta — y ese cuerpo puede soltarlo desde
+       dueño — el módulo motor guarda el callback de al_actualizar — y ese cuerpo puede soltarlo desde
        dentro:
 
            motor.al_actualizar(funcion(val numero d): nulo {

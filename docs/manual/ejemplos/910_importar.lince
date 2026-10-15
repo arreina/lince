@@ -1,6 +1,6 @@
 # @seccion: Módulos y librerías
 # @titulo: Importar un módulo estándar
-# @nota: Hay diez: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red y expresiones.
+# @nota: Hay ocho: matematica, texto, archivos, tiempo, sistema, json, pruebas y juego.
 importar "matematica"
 importar "json"
 

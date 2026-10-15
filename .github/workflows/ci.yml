@@ -28,9 +28,6 @@ jobs:
       - name: Suite del compilador
         run: make test-compilador
 
-      - name: Test de humo del servidor
-        run: make test-servidor
-
       - name: Los ejercicios de examples/ se ejecutan
         run: make test-ejemplos
 
@@ -45,8 +42,10 @@ jobs:
       - name: Depurador
         run: make test-depurador
 
-      - name: Ventana (servidor.ventana)
-        run: make test-ventana
+      - name: Juego (SDL2 sin pantalla)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
+          make test-juego
 
       - name: Los editores están al día
         run: make editores-check
@@ -64,8 +63,7 @@ jobs:
       - uses: actions/checkout@v5
 
       # Las mismas suites sobre el binario instrumentado. Es lo que
-      # detecta los usos de memoria liberada del intérprete y del módulo
-      # 'servidor', que en un build normal pasan desapercibidos o se
+      # detecta los usos de memoria liberada del intérprete, que en un build normal pasan desapercibidos o se
       # manifiestan como fallos intermitentes.
       - name: Compilar con AddressSanitizer
         run: make debug

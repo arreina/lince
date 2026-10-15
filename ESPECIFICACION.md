@@ -2,7 +2,7 @@
 
 ## Filosofía
 
-Lince es un lenguaje de programación de **propósito general en español**, implementado en C puro sin dependencias externas. Tres pilares:
+Lince es un lenguaje de programación **para videojuegos, en español**, implementado en C puro sin dependencias para compilarlo (la ventana, el dibujo, la entrada y el sonido usan SDL2, que se carga al abrir la ventana). Tres pilares:
 
 1. **En español** — la programación no debería requerir saber inglés
 2. **Una sola forma** — sin excepciones a las reglas, sin comportamiento implícito
@@ -612,6 +612,7 @@ intentar {
 | `ErrorMatematico` | división por cero, etc. |
 | `ErrorArgumento` | argumentos incorrectos |
 | `ErrorRecursion` | recursión demasiado profunda |
+| `ErrorJuego` | fallo del módulo `juego` (sin SDL2, sin pantalla…) |
 
 ### Todos los errores se pueden capturar
 
@@ -644,8 +645,8 @@ importar "archivos"
 importar "tiempo"
 importar "sistema"
 importar "json"
-importar "red"
-importar "expresiones"
+importar "pruebas"
+importar "juego"
 ```
 
 ### `matematica`
@@ -725,36 +726,6 @@ escribir(datos["nombre"])
 escribir(json.texto({"clave": "valor"}))
 ```
 
-### `red`
-
-```lince
-sea r = red.obtener("https://api.com/datos")
-sea r = red.enviar("https://api.com/crear", "{\"nombre\": \"Ana\"}")
-sea r = red.actualizar("https://api.com/usuario/1", cuerpo)
-sea r = red.eliminar("https://api.com/usuario/1")
-
-# Con cabeceras
-sea r = red.obtener("https://api.com", {"Authorization": "Bearer token"})
-
-# La respuesta es un diccionario
-r["codigo"]   # 200, 404...
-r["cuerpo"]   # texto de la respuesta
-r["ok"]       # verdadero si codigo < 400
-```
-
-Requiere `curl` instalado. En Windows usa el subsistema de curl del sistema.
-
-### `expresiones`
-
-```lince
-expresiones.coincidir("hola123", "[0-9]+")         # verdadero
-expresiones.buscar("precio: 42 euros", "[0-9]+")   # "42"
-sea nums = expresiones.todos("a1 b2 c3", "[0-9]+") # ["1","2","3"]
-expresiones.reemplazar("hola mundo", "mundo", "Lince")  # "hola Lince"
-```
-
-En Linux/Mac usa regex POSIX completo. En Windows usa búsqueda de subcadena.
-
 ### Fechas (`tiempo`)
 
 ```lince
@@ -768,46 +739,6 @@ tiempo.analizar_utc("2024-02-29", "%Y-%m-%d")            # marca de tiempo, o nu
 `crear`, `formatear`, `partes` y `analizar` usan la hora local; las versiones
 `_utc` no dependen de la zona horaria. `dia_semana` va de 0 (domingo) a 6. Los
 formatos son los de `strftime`. `analizar` no está disponible en Windows.
-
-### `servidor`
-
-Servidor web. Cada petición se atiende en un proceso aparte (fork), así que lo
-que un manejador cambie en variables **no** llega a la siguiente petición:
-guarda los datos en una base de datos (`sqlite`) o en archivos, y abre la base
-dentro de cada manejador.
-
-```lince
-importar "servidor"
-servidor.obtener("/", funcion(val diccionario peticion): diccionario {
-    devolver servidor.html("<h1>Hola</h1>")
-})
-servidor.enviar("/anadir", funcion(val diccionario peticion): diccionario {   # POST
-    sea campos = servidor.formulario(peticion["cuerpo"])     # {"texto": "..."}
-    devolver servidor.redirigir("/")                         # 302 con Location
-})
-servidor.obtener("/tarea/:id", funcion(val diccionario p): diccionario {
-    devolver servidor.json("{\"id\": " + p["params"]["id"] + "}")
-})
-servidor.estaticos("publico")        # sirve ./publico/… para lo que no sea una ruta
-servidor.escuchar(8080)              # http://localhost:8080 (bloquea)
-servidor.ventana(8765, 520, 640)     # abre la aplicación en su propia ventana
-```
-
-Rutas: `obtener` (GET), `enviar` (POST), `actualizar` (PUT), `borrar` (DELETE),
-con parámetros `:nombre`. La petición trae `metodo`, `ruta`, `cuerpo`,
-`consulta` (la parte `?a=1`), `params` y `cookies`. Un manejador devuelve el
-resultado de `html`, `json`, `texto` o `redirigir`, o un diccionario con
-`codigo`, `tipo`, `cuerpo`, `cookies` y `ubicacion`. Si el manejador falla, el
-cliente recibe un 500 y el error sale por la consola del servidor.
-
-`servidor.ventana(puerto[, ancho, alto])` es como `escuchar`, pero atiende solo
-en `127.0.0.1` (y sin la cabecera CORS abierta, para que otras páginas no
-puedan hablar con tu aplicación), abre una ventana de aplicación del navegador
-(Chrome, Chromium, Edge o Brave, sin barra de direcciones) y **termina el
-programa al cerrarla**. Si no hay ninguno de esos navegadores abre el
-predeterminado y el servidor sigue hasta Ctrl+C. Con la variable de entorno
-`LINCE_NAVEGADOR` se elige el programa que se lanza (recibe la URL). Solo POSIX;
-en macOS usa las rutas de las aplicaciones de Chrome, Edge y Chromium, sin probar.
 
 ### `juego`
 
@@ -849,89 +780,6 @@ se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`,
 `"derecha"`, `"espacio"`, `"entrar"`, `"escape"`, `"borrar"`, `"tab"`, `"mayus"`, `"ctrl"`,
 `"alt"`, `"f1"`–`"f12"` (y los nombres de SDL). Los fallos son de tipo `ErrorJuego`
 (sin SDL2, sin pantalla) o `Error`. Ejemplo completo: `examples/juegos/pong.lince`.
-
----
-
-### `plantillas`
-
-Rellena HTML (o cualquier texto) con datos de Lince.
-
-```lince
-importar "plantillas"
-plantillas.renderizar("Hola {{ nombre }}", {"nombre": "Ana"})
-plantillas.archivo("plantillas/pagina.html", datos)       # desde un archivo
-```
-
-| Sintaxis | Qué hace |
-|----------|----------|
-| `{{ x }}` | inserta el valor escapando `& < > " '` (seguro con datos de usuarios) |
-| `{{{ x }}}` | lo inserta tal cual (HTML ya preparado) |
-| `{{ a.b }}`, `{{ lista.0 }}` | campo de un diccionario, elemento de una lista |
-| `{{ lista.longitud }}` | número de elementos (también en textos y diccionarios) |
-| `{{#si x}} … {{#sino}} … {{/si}}` | condicional; `{{#si no x}}` niega. Falsos: `nulo`, `falso`, `0`, `""`, lista o diccionario vacíos |
-| `{{#para x en lista}} … {{/para}}` | bucle; `{{ @indice }}` (desde 0) y `{{ @numero }}` (desde 1). En un diccionario recorre las claves |
-| `{{> otra.html}}` | incluye otra plantilla, buscada junto a la actual |
-| `{{! texto }}` | comentario |
-
-Las líneas que contienen solo una etiqueta de bloque no dejan líneas vacías en
-el resultado. Una variable que no existe da `ErrorPlantilla` con la línea.
-
-### `cripto`
-
-```lince
-importar "cripto"
-cripto.sha256("abc")                  # "ba7816bf..." (hexadecimal)
-cripto.sha1("abc")   cripto.md5("abc")
-cripto.hmac_sha256("clave", "texto")  # firma de un mensaje
-cripto.base64("Hola")                 # "SG9sYQ=="
-cripto.desbase64("SG9sYQ==")          # "Hola"; nulo si no es base64 válido
-cripto.hex("Lince")                   # "4c696e6365"
-cripto.deshex("4c696e6365")           # "Lince"; nulo si no es hexadecimal válido
-```
-
-Trabajan con texto, así que no admiten datos binarios con bytes nulos.
-`sha1` y `md5` están rotos para firmas y seguridad: úsalos solo para sumas de
-comprobación o por compatibilidad. Para guardar contraseñas, no basta un hash
-rápido.
-
-### `tareas`
-
-Concurrencia real con procesos (solo POSIX; no disponible en Windows).
-
-```lince
-importar "tareas"
-sea t = tareas.iniciar(trabajo, [arg1, arg2])   # lanza trabajo(arg1, arg2) en otro proceso
-tareas.listo(t)                                  # ¿ha terminado? (no bloquea)
-sea r = tareas.esperar(t)                        # espera y devuelve su resultado
-tareas.cancelar(t)                               # mata la tarea
-tareas.mapear(lista, funcion)                    # f(x) para cada x en paralelo, en orden
-tareas.mapear(lista, funcion, 4)                 # como mucho 4 a la vez
-tareas.cpus()                                    # núcleos disponibles
-```
-
-Cada tarea es un proceso hijo: no comparte memoria con el programa, así que no
-hay carreras de datos; los argumentos y el resultado viajan **copiados**. Solo
-se pueden enviar números, textos, lógicos, `nulo`, listas y diccionarios (no
-funciones ni objetos). Lo que la tarea escriba en pantalla sale directamente. Si
-la función falla, `esperar` lanza `ErrorTarea` con el mensaje. Cada tarea se
-recoge una sola vez con `esperar` o `cancelar`.
-
-### `sqlite`
-
-```lince
-importar "sqlite"
-sea bd = sqlite.abrir("datos.db")                      # ":memoria:" para una base temporal
-sqlite.ejecutar(bd, "CREATE TABLE t (id INTEGER PRIMARY KEY, nombre TEXT)")
-sqlite.ejecutar(bd, "INSERT INTO t (nombre) VALUES (?)", ["Ana"])   # devuelve las filas afectadas
-sqlite.ultimo_id(bd)                                   # id de la última fila insertada
-sqlite.consultar(bd, "SELECT * FROM t WHERE id = ?", [1])  # lista de diccionarios
-sqlite.cerrar(bd)
-```
-
-La conexión es un número. `ejecutar` admite varias sentencias separadas por `;` (sin
-parámetros). Los parámetros `?` pueden ser número, texto, lógico o `nulo`. Los errores
-son de tipo `ErrorBD`. El módulo carga `libsqlite3` al importarse: no hace falta para
-compilar Lince, pero sí en la máquina donde se ejecute el programa.
 
 ### `pruebas`
 
@@ -1026,23 +874,21 @@ instalar Lince, ni `gcc`, ni llevar los archivos originales. Los argumentos que
 se le pasan al ejecutable llegan al programa con `argumentos()`.
 
 Como el ejecutable lleva el mismo intérprete, soporta el **100 % del lenguaje**
-(POO completa, `es`, generadores, todos los módulos, el servidor...) y se
+(POO completa, `es`, generadores, todos los módulos...) y se
 comporta exactamente igual que `lince programa.lince`. Compilar es instantáneo.
 
-Una aplicación que lee archivos propios (plantillas, CSS, imágenes) los lleva
+Un juego que lee archivos propios (niveles, imágenes, sonidos) los lleva
 dentro con `--incluir`, que se puede repetir y acepta archivos o carpetas:
 
 ```bash
-lince compilar app.lince -o mi_app --incluir plantillas --incluir datos/semilla.json
+lince compilar juego.lince -o mi_juego --incluir niveles --incluir datos/semilla.json
 ```
 
-Con eso `plantillas.archivo("plantillas/pagina.html", …)` y `servidor.estaticos`
-leen del propio ejecutable, con la ruta relativa tal como se indicó. Ver
-`examples/tareas_web` para una aplicación completa.
+Con eso `archivos.leer("niveles/uno.json")` lee del propio ejecutable, con la
+ruta relativa tal como se indicó.
 
 Notas:
-- Las bibliotecas externas que use un módulo (por ejemplo `libsqlite3` en
-  `sqlite`) siguen haciendo falta en la máquina donde se ejecute.
+- SDL2 (que usa `juego`) sigue haciendo falta en la máquina donde se ejecute.
 - Un `importar` que no se puede resolver al compilar avisa con un ⚠ y el
   ejecutable fallará al llegar a esa línea, como lo haría el intérprete.
 - Los archivos se leen al compilar: si cambian después, hay que volver a compilar.
@@ -1108,13 +954,13 @@ Atajos: ↑/↓ historial, ←/→ cursor, Inicio/Fin, Supr.
 ## Tests
 
 ```bash
-make test                              # 22 tests del intérprete
+make test                              # tests del intérprete
 ./lince tests/runner_compilador.lince  # tests de los ejecutables empaquetados
 ```
 
-**Tests del intérprete (22):** `test_variables`, `test_operadores`, `test_condicionales`, `test_bucles`, `test_funciones`, `test_listas`, `test_diccionarios`, `test_texto`, `test_clases`, `test_errores`, `test_modulos`, `test_json`, `test_sistema`, `test_enumeraciones`, `test_interfaces`, `test_closures`, `test_recursion`, `test_casos_limite`, `test_generadores`, `test_matematica`, `test_archivos`, `test_expresiones`
+**Tests del intérprete:** los programas de `tests/lince/`, cada uno con su salida esperada (`.esperado`).
 
-**Tests de los ejecutables (17):** programas de `tests/compilador/` que se empaquetan, se ejecutan y se comparan con su salida esperada, más `probar_empaquetado.sh` (argumentos, código de salida, archivos importados).
+**Tests de los ejecutables:** programas de `tests/compilador/` que se empaquetan, se ejecutan y se comparan con su salida esperada, más `probar_empaquetado.sh` (argumentos, código de salida, archivos importados).
 
 ---
 
@@ -1133,7 +979,7 @@ make test                              # 22 tests del intérprete
 
 ```bash
 make              # compilar
-make test         # 22 tests del intérprete
+make test         # tests del intérprete
 make clean        # limpiar binarios
 make install      # instalar en el sistema
 ```
@@ -1157,7 +1003,7 @@ lince/
 ├── tests/
 │   ├── runner.lince           # runner de tests del intérprete
 │   ├── runner_compilador.lince # runner de tests de los ejecutables
-│   ├── lince/                 # 22 tests del intérprete
+│   ├── lince/                 # tests del intérprete
 │   └── compilador/            # tests de los ejecutables empaquetados
 ├── editores/           # soporte VSCode, Sublime, Notepad++
 ├── ejemplos/           # programas de ejemplo
@@ -1169,4 +1015,4 @@ lince/
 
 ---
 
-*🐆 Lince v0.5 — ágil, preciso, para todos.*
+*🐆 Lince — ágil, preciso, para hacer juegos.*

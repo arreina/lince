@@ -15,8 +15,6 @@ sea lista tests = [
     "test_pruebas",
     "test_fechas",
     "test_division_cero",
-    "test_sqlite",
-    "test_cripto",
     "test_poo_avanzada",
     "test_interfaces_defecto"
 ]

@@ -1,9 +1,0 @@
-# @seccion: Módulos y librerías
-# @titulo: Los módulos `red` y `servidor`
-# @nota: `servidor` levanta un servidor web con rutas y `red` hace peticiones HTTP. Aquí sólo se registran rutas (sin escuchar), para que el ejemplo termine.
-importar "servidor"
-
-servidor.obtener("/", funcion(val diccionario peticion): diccionario {
-    devolver {"codigo": 200, "tipo": "text/plain", "cuerpo": "hola desde Lince"}
-})
-escribir("ruta registrada")

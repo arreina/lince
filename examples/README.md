@@ -54,8 +54,11 @@ En la carpeta `ejemplos/` hay programas más completos (una agenda, una
 tienda, una calculadora). Estos de aquí son más pequeños y cada uno se
 centra en una idea.
 
-## Aplicaciones
+## Juegos
 
 | Carpeta | Qué es | Qué enseña |
 |---------|--------|------------|
-| `tareas_web/` | Gestor de tareas con interfaz web y base de datos | `servidor` (rutas, formularios, estáticos, `ventana`), `plantillas`, `sqlite`, y repartirla como un ejecutable con `lince compilar app.lince --incluir plantillas` |
+| `juegos/pong.lince` | Pong para uno o dos jugadores | el bucle `mientras juego.abierto()`, `dt()`, teclado, colisiones, texto y sonido |
+
+Se juegan con `lince examples/juegos/pong.lince` (necesitan SDL2) y se reparten
+como un ejecutable con `lince compilar`.

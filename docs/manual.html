@@ -147,13 +147,13 @@
 <div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
-<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `texto` y `expresiones`</a><a href="#modulos-y-librerias-5" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `tiempo` y `terminal`</a><a href="#modulos-y-librerias-7" class="sub">Los módulos `red` y `servidor`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-9" class="sub">Fechas con `tiempo`</a><a href="#modulos-y-librerias-10" class="sub">Bases de datos con `sqlite`</a><a href="#modulos-y-librerias-11" class="sub">Hashes y base64 con `cripto`</a><a href="#modulos-y-librerias-12" class="sub">Concurrencia con `tareas`</a><a href="#modulos-y-librerias-13" class="sub">HTML con datos: `plantillas`</a></div>
+<div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-5" class="sub">El módulo `tiempo`</a><a href="#modulos-y-librerias-6" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-7" class="sub">Fechas con `tiempo`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `juego`</a></div>
 </nav>
 
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>45 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>40 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -585,7 +585,7 @@ esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span>
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[ErrorArgumento] &#x27;agregar&#x27; necesita exactamente 1 argumento.
 [ErrorRango] Índice 5 fuera de rango. La lista tiene 2 elementos.
 [Error] El objeto no tiene el campo &#x27;contenido&#x27;.</pre></div><span class="fuente">840_errores_de_uso.lince</span></article></section>
-<section id="modulos-y-librerias"><h2>Módulos y librerías</h2><article class="ej" id="modulos-y-librerias-0"><h3>Importar un módulo estándar</h3><p class="nota">Hay diez: matematica, texto, archivos, tiempo, sistema, terminal, servidor, json, red y expresiones.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+<section id="modulos-y-librerias"><h2>Módulos y librerías</h2><article class="ej" id="modulos-y-librerias-0"><h3>Importar un módulo estándar</h3><p class="nota">Hay ocho: matematica, texto, archivos, tiempo, sistema, json, pruebas y juego.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
 <span class="k">importar</span> <span class="s">&quot;json&quot;</span>
 
 <span class="k">escribir</span>(matematica.raiz(<span class="n">144</span>))
@@ -602,24 +602,7 @@ esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span>
 m</pre></div><span class="fuente">930_como.lince</span></article><article class="ej" id="modulos-y-librerias-3"><h3>Clases de una librería con `como`</h3><p class="nota">Las clases de la librería se instancian por el alias: `figuras.Cuadrado(3)`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;./lib_figuras&quot;</span> <span class="k">como</span> figuras
 
 <span class="k">sea</span> c = figuras.Cuadrado(<span class="n">3</span>)
-<span class="k">escribir</span>(c.area())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>9</pre></div><span class="fuente">935_clases_con_como.lince</span></article><article class="ej" id="modulos-y-librerias-4"><h3>Los módulos `texto` y `expresiones`</h3><p class="nota">`texto` trocea, une y rellena; `expresiones` busca patrones (expresiones regulares).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
-<span class="k">importar</span> <span class="s">&quot;expresiones&quot;</span>
-
-<span class="k">sea</span> partes = <span class="t">texto</span>.dividir(<span class="s">&quot;a,b,c&quot;</span>, <span class="s">&quot;,&quot;</span>)
-<span class="k">escribir</span>(partes)
-<span class="k">escribir</span>(<span class="t">texto</span>.unir(partes, <span class="s">&quot; - &quot;</span>))
-<span class="k">escribir</span>(<span class="t">texto</span>.rellenar_izq(<span class="s">&quot;7&quot;</span>, <span class="n">3</span>, <span class="s">&quot;0&quot;</span>))
-<span class="k">escribir</span>(<span class="t">texto</span>.empieza_con(<span class="s">&quot;lince&quot;</span>, <span class="s">&quot;li&quot;</span>))
-
-<span class="k">escribir</span>(expresiones.coincidir(<span class="s">&quot;abc123&quot;</span>, <span class="s">&quot;[0-9]+&quot;</span>))
-<span class="k">escribir</span>(expresiones.buscar(<span class="s">&quot;precio: 42 euros&quot;</span>, <span class="s">&quot;[0-9]+&quot;</span>))
-<span class="k">escribir</span>(expresiones.reemplazar(<span class="s">&quot;a1b22c&quot;</span>, <span class="s">&quot;[0-9]+&quot;</span>, <span class="s">&quot;#&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]
-a - b - c
-007
-verdadero
-verdadero
-42
-a#b#c</pre></div><span class="fuente">940_texto_y_expresiones.lince</span></article><article class="ej" id="modulos-y-librerias-5"><h3>Los módulos `archivos` y `sistema`</h3><p class="nota">`archivos` lee y escribe en disco; `sistema` ejecuta órdenes del sistema y lee el entorno.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;archivos&quot;</span>
+<span class="k">escribir</span>(c.area())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>9</pre></div><span class="fuente">935_clases_con_como.lince</span></article><article class="ej" id="modulos-y-librerias-4"><h3>Los módulos `archivos` y `sistema`</h3><p class="nota">`archivos` lee y escribe en disco; `sistema` ejecuta órdenes del sistema y lee el entorno.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;archivos&quot;</span>
 <span class="k">importar</span> <span class="s">&quot;sistema&quot;</span>
 
 <span class="k">sea</span> ruta = <span class="s">&quot;/tmp/lince_manual_ejemplo.txt&quot;</span>
@@ -633,20 +616,11 @@ archivos.eliminar(ruta)
 <span class="k">escribir</span>(sistema.ejecutar(<span class="s">&quot;echo desde el sistema&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>hola mundo
 verdadero
 falso
-desde el sistema</pre></div><span class="fuente">950_archivos_y_sistema.lince</span></article><article class="ej" id="modulos-y-librerias-6"><h3>Los módulos `tiempo` y `terminal`</h3><p class="nota">`tiempo` da la hora y permite esperar (en milisegundos); `terminal` pinta la consola: colores, negrita, barras de progreso y tablas.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tiempo&quot;</span>
-<span class="k">importar</span> <span class="s">&quot;terminal&quot;</span>
+desde el sistema</pre></div><span class="fuente">950_archivos_y_sistema.lince</span></article><article class="ej" id="modulos-y-librerias-5"><h3>El módulo `tiempo`</h3><p class="nota">`tiempo` da la hora y permite esperar (en milisegundos). En un juego se usa poco: el tiempo de cada fotograma lo da `juego.dt()`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tiempo&quot;</span>
 
 <span class="k">sea</span> inicio = tiempo.ahora()
 tiempo.esperar(<span class="n">20</span>)
-<span class="k">escribir</span>(tiempo.ahora() - inicio &gt;= <span class="n">0</span>)
-
-<span class="k">escribir</span>(terminal.barra(<span class="n">5</span>, <span class="n">10</span>, <span class="n">10</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero
-[=====     ]</pre></div><span class="fuente">960_tiempo_y_terminal.lince</span></article><article class="ej" id="modulos-y-librerias-7"><h3>Los módulos `red` y `servidor`</h3><p class="nota">`servidor` levanta un servidor web con rutas y `red` hace peticiones HTTP. Aquí sólo se registran rutas (sin escuchar), para que el ejemplo termine.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;servidor&quot;</span>
-
-servidor.obtener(<span class="s">&quot;/&quot;</span>, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> peticion): <span class="t">diccionario</span> {
-    <span class="k">devolver</span> {<span class="s">&quot;codigo&quot;</span>: <span class="n">200</span>, <span class="s">&quot;tipo&quot;</span>: <span class="s">&quot;text/plain&quot;</span>, <span class="s">&quot;cuerpo&quot;</span>: <span class="s">&quot;hola desde Lince&quot;</span>}
-})
-<span class="k">escribir</span>(<span class="s">&quot;ruta registrada&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>ruta registrada</pre></div><span class="fuente">970_red_y_servidor.lince</span></article><article class="ej" id="modulos-y-librerias-8"><h3>El módulo `pruebas`</h3><p class="nota">Pruebas unitarias para tus programas: `afirmar` comprueba una condición, `igual` compara valores (también listas y diccionarios), `lanza` comprueba que una función da error y `resumen` imprime el total y termina con código 1 si algo falló, ideal para la integración continua.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;pruebas&quot;</span>
+<span class="k">escribir</span>(tiempo.ahora() - inicio &gt;= <span class="n">0</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero</pre></div><span class="fuente">960_tiempo.lince</span></article><article class="ej" id="modulos-y-librerias-6"><h3>El módulo `pruebas`</h3><p class="nota">Pruebas unitarias para tus programas: `afirmar` comprueba una condición, `igual` compara valores (también listas y diccionarios), `lanza` comprueba que una función da error y `resumen` imprime el total y termina con código 1 si algo falló, ideal para la integración continua.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;pruebas&quot;</span>
 
 <span class="k">funcion</span> doble(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">numero</span> {
     <span class="k">devolver</span> n * <span class="n">2</span>
@@ -661,7 +635,7 @@ pruebas.resumen()</code></pre></div><div class="salida"><span class="etiqueta">s
     ✅ una lista de dobles
     ✅ dividir por cero da error
 
-  3 pruebas: 3 correctas, 0 fallidas</pre></div><span class="fuente">980_pruebas.lince</span></article><article class="ej" id="modulos-y-librerias-9"><h3>Fechas con `tiempo`</h3><p class="nota">Una fecha es una marca de tiempo: segundos desde 1970, como `tiempo.ahora()`. `crear`, `formatear`, `partes` y `analizar` trabajan en hora local; sus versiones `_utc` no dependen de la zona horaria. `analizar` devuelve `nulo` si el texto no encaja con el formato.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tiempo&quot;</span>
+  3 pruebas: 3 correctas, 0 fallidas</pre></div><span class="fuente">980_pruebas.lince</span></article><article class="ej" id="modulos-y-librerias-7"><h3>Fechas con `tiempo`</h3><p class="nota">Una fecha es una marca de tiempo: segundos desde 1970, como `tiempo.ahora()`. `crear`, `formatear`, `partes` y `analizar` trabajan en hora local; sus versiones `_utc` no dependen de la zona horaria. `analizar` devuelve `nulo` si el texto no encaja con el formato.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tiempo&quot;</span>
 
 <span class="k">sea</span> t = tiempo.crear_utc(<span class="n">2024</span>, <span class="n">2</span>, <span class="n">29</span>, <span class="n">13</span>, <span class="n">5</span>, <span class="n">9</span>)
 <span class="k">escribir</span>(tiempo.formatear_utc(t, <span class="s">&quot;%d/%m/%Y %H:%M&quot;</span>))
@@ -677,83 +651,17 @@ pruebas.resumen()</code></pre></div><div class="salida"><span class="etiqueta">s
 2024
 60
 verdadero
-nulo</pre></div><span class="fuente">985_fechas.lince</span></article><article class="ej" id="modulos-y-librerias-10"><h3>Bases de datos con `sqlite`</h3><p class="nota">Necesita la biblioteca `libsqlite3` instalada en el sistema (Lince la carga al importar el módulo; si falta, da un `ErrorBD` claro). La conexión es un número; `consultar` devuelve una lista de diccionarios y los `?` se rellenan con la lista de parámetros, sin riesgo de inyección SQL. `&quot;:memoria:&quot;` crea una base temporal.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;sqlite&quot;</span>
+nulo</pre></div><span class="fuente">985_fechas.lince</span></article><article class="ej" id="modulos-y-librerias-8"><h3>El módulo `juego`</h3><p class="nota">Es el módulo central de Lince: ventana, dibujo, teclado, ratón y sonido sobre SDL2 (`examples/juegos/pong.lince` es un juego completo). Estas funciones de ayuda no necesitan abrir ventana.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
-<span class="k">sea</span> bd = sqlite.abrir(<span class="s">&quot;:memoria:&quot;</span>)
-sqlite.ejecutar(bd, <span class="s">&quot;CREATE TABLE personas (id INTEGER PRIMARY KEY, nombre TEXT, edad INTEGER)&quot;</span>)
-sqlite.ejecutar(bd, <span class="s">&quot;INSERT INTO personas (nombre, edad) VALUES (?, ?)&quot;</span>, [<span class="s">&quot;Ana&quot;</span>, <span class="n">31</span>])
-sqlite.ejecutar(bd, <span class="s">&quot;INSERT INTO personas (nombre, edad) VALUES (?, ?)&quot;</span>, [<span class="s">&quot;Luis&quot;</span>, <span class="n">25</span>])
-<span class="k">escribir</span>(sqlite.ultimo_id(bd))
+<span class="c"># ¿se tocan el jugador y el enemigo? (x, y, ancho, alto de cada uno)</span>
+<span class="k">escribir</span>(juego.colision(<span class="n">10</span>, <span class="n">10</span>, <span class="n">32</span>, <span class="n">32</span>, <span class="n">30</span>, <span class="n">30</span>, <span class="n">32</span>, <span class="n">32</span>))
+<span class="k">escribir</span>(juego.colision(<span class="n">10</span>, <span class="n">10</span>, <span class="n">32</span>, <span class="n">32</span>, <span class="n">100</span>, <span class="n">100</span>, <span class="n">32</span>, <span class="n">32</span>))
 
-<span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> fila <span class="k">en</span> sqlite.consultar(bd, <span class="s">&quot;SELECT nombre, edad FROM personas WHERE edad &gt; ? ORDER BY edad&quot;</span>, [<span class="n">20</span>]) {
-    <span class="k">escribir</span>(fila[<span class="s">&quot;nombre&quot;</span>] + <span class="s">&quot; tiene &quot;</span> + fila[<span class="s">&quot;edad&quot;</span>])
-}
-
-<span class="k">intentar</span> {
-    sqlite.consultar(bd, <span class="s">&quot;SELECT * FROM no_existe&quot;</span>)
-} <span class="k">capturar</span> (ErrorBD e) {
-    <span class="k">escribir</span>(<span class="s">&quot;error: &quot;</span> + e.mensaje)
-}
-sqlite.cerrar(bd)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>2
-Luis tiene 25
-Ana tiene 31
-error: no such table: no_existe</pre></div><span class="fuente">990_sqlite.lince</span></article><article class="ej" id="modulos-y-librerias-11"><h3>Hashes y base64 con `cripto`</h3><p class="nota">`sha256`, `sha1` y `md5` devuelven el resumen en hexadecimal; `hmac_sha256(clave, texto)` firma un mensaje. `base64` y `hex` codifican, y `desbase64` y `deshex` deshacen el cambio (devuelven `nulo` si el texto no es válido). Para contraseñas no uses estos hashes sueltos: son rápidos de adivinar.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;cripto&quot;</span>
-
-<span class="k">escribir</span>(cripto.sha256(<span class="s">&quot;abc&quot;</span>))
-<span class="k">escribir</span>(cripto.md5(<span class="s">&quot;abc&quot;</span>))
-<span class="k">escribir</span>(cripto.hmac_sha256(<span class="s">&quot;clave&quot;</span>, <span class="s">&quot;mensaje&quot;</span>))
-
-<span class="k">sea</span> codificado = cripto.base64(<span class="s">&quot;Hola, Lince&quot;</span>)
-<span class="k">escribir</span>(codificado)
-<span class="k">escribir</span>(cripto.desbase64(codificado))
-<span class="k">escribir</span>(cripto.hex(<span class="s">&quot;Lince&quot;</span>))
-<span class="k">escribir</span>(cripto.desbase64(<span class="s">&quot;esto no es base64&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
-900150983cd24fb0d6963f7d28e17f72
-17e8847a84636888af5a7abe0910e50a0fa28d6f1d3591a175e6e01fcf80b412
-SG9sYSwgTGluY2U=
-Hola, Lince
-4c696e6365
-nulo</pre></div><span class="fuente">995_cripto.lince</span></article><article class="ej" id="modulos-y-librerias-12"><h3>Concurrencia con `tareas`</h3><p class="nota">Cada tarea corre una función en un proceso aparte, así que varias pueden trabajar a la vez en distintos núcleos y no comparten memoria (no hay carreras de datos): lo que entra y sale viaja copiado. `iniciar` lanza una tarea y `esperar` recoge su resultado; `mapear` aplica una función a cada elemento de una lista en paralelo y devuelve los resultados en orden. Un error dentro de la tarea llega como `ErrorTarea`. No disponible en Windows.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tareas&quot;</span>
-
-<span class="k">funcion</span> cuadrado(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">numero</span> {
-    <span class="k">devolver</span> n * n
-}
-
-<span class="k">sea</span> a = tareas.iniciar(cuadrado, [<span class="n">6</span>])
-<span class="k">sea</span> b = tareas.iniciar(cuadrado, [<span class="n">7</span>])
-<span class="k">escribir</span>(tareas.esperar(a) + tareas.esperar(b))
-
-<span class="k">escribir</span>(tareas.mapear([<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>, <span class="n">5</span>], cuadrado))
-
-<span class="k">intentar</span> {
-    tareas.esperar(tareas.iniciar(<span class="k">funcion</span>(): <span class="k">nulo</span> { <span class="k">lanzar</span> Error(<span class="s">&quot;algo falló&quot;</span>) }))
-} <span class="k">capturar</span> (ErrorTarea e) {
-    <span class="k">escribir</span>(<span class="s">&quot;la tarea falló: &quot;</span> + e.mensaje)
-}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>85
-[1, 4, 9, 16, 25]
-la tarea falló: Error: algo falló</pre></div><span class="fuente">996_tareas.lince</span></article><article class="ej" id="modulos-y-librerias-13"><h3>HTML con datos: `plantillas`</h3><p class="nota">`{{ x }}` inserta un valor escapando el HTML (seguro con datos de usuarios) y `{{{ x }}}` lo inserta tal cual. `{{#si}}` / `{{#sino}}` y `{{#para x en lista}}` controlan qué sale; dentro de un bucle `{{ @numero }}` cuenta desde 1. `plantillas.archivo(ruta, datos)` hace lo mismo leyendo un archivo, que puede incluir otros con `{{&gt; parcial.html}}`. Una variable que no existe da `ErrorPlantilla`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;plantillas&quot;</span>
-
-<span class="k">sea</span> datos = {
-    <span class="s">&quot;titulo&quot;</span>: <span class="s">&quot;Mis tareas &lt;hoy&gt;&quot;</span>,
-    <span class="s">&quot;tareas&quot;</span>: [
-        {<span class="s">&quot;texto&quot;</span>: <span class="s">&quot;Comprar pan&quot;</span>, <span class="s">&quot;hecha&quot;</span>: <span class="k">falso</span>},
-        {<span class="s">&quot;texto&quot;</span>: <span class="s">&quot;Escribir el informe&quot;</span>, <span class="s">&quot;hecha&quot;</span>: <span class="k">verdadero</span>}
-    ]
-}
-
-<span class="k">sea</span> plantilla = <span class="s">&quot;&lt;h1&gt;{{ titulo }}&lt;/h1&gt;
-&lt;ul&gt;
-{{#para t en tareas}}
-  &lt;li&gt;{{ @numero }}. {{ t.texto }}{{#si t.hecha}} ✔{{/si}}&lt;/li&gt;
-{{/para}}
-&lt;/ul&gt;
-{{#si no tareas}}&lt;p&gt;No hay tareas.&lt;/p&gt;{{/si}}&quot;</span>
-
-<span class="k">escribir</span>(plantillas.renderizar(plantilla, datos))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>&lt;h1&gt;Mis tareas &amp;lt;hoy&amp;gt;&lt;/h1&gt;
-&lt;ul&gt;
-  &lt;li&gt;1. Comprar pan&lt;/li&gt;
-  &lt;li&gt;2. Escribir el informe ✔&lt;/li&gt;
-&lt;/ul&gt;</pre></div><span class="fuente">997_plantillas.lince</span></article></section>
+<span class="c"># ancho en píxeles de un texto, para centrarlo en la pantalla</span>
+<span class="k">sea</span> ancho_pantalla = <span class="n">800</span>
+<span class="k">escribir</span>((ancho_pantalla - juego.ancho_texto(<span class="s">&quot;GAME OVER&quot;</span>, <span class="n">4</span>)) / <span class="n">2</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero
+falso
+294</pre></div><span class="fuente">990_juego.lince</span></article></section>
 </main>
 </div>
 

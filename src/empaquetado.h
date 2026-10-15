@@ -11,7 +11,7 @@
 #include <stddef.h>
 
 /* Crea 'salida' a partir de 'archivo', con los archivos o carpetas 'extras'
-   (plantillas, estáticos…) dentro. 0 si va bien. */
+   (niveles, imágenes…) dentro. 0 si va bien. */
 int empaquetado_crear(const char *archivo, const char *salida, const char *const *extras, int num_extras);
 
 /* ¿Lleva este ejecutable un programa dentro? Si es así lo carga y devuelve 1.

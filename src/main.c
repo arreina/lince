@@ -40,7 +40,7 @@ static void mostrar_ayuda(void) {
     printf("  lince <archivo.lince>                    Ejecuta un programa\n");
     printf("  lince compilar <archivo.lince>           Compila a binario nativo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
-    printf("  lince compilar <a.lince> --incluir <ruta> Incluye plantillas o archivos (varias veces)\n");
+    printf("  lince compilar <a.lince> --incluir <ruta> Incluye niveles, imágenes u otros archivos (varias veces)\n");
     printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");

@@ -23,7 +23,7 @@ endif
 # ── Compilar ──────────────────────────────
 all: $(BIN)
 
-$(BIN): $(SRC) src/juego.h src/cripto.h
+$(BIN): $(SRC) src/juego.h
 	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
 	@echo "✅ Lince compilado — usa: ./$(BIN) archivo.lince"
 
@@ -49,11 +49,6 @@ test-compilador: $(BIN)
 	@./$(BIN) tests/runner_compilador.lince
 	@bash tests/compilador/probar_empaquetado.sh
 
-# Test de humo del servidor: levanta un servidor real y le hace
-# peticiones. Es la única cobertura del módulo 'servidor'.
-test-servidor: $(BIN)
-	@tests/servidor/smoke.sh ./$(BIN) 8123
-
 # Comprueba que los ejercicios de examples/ siguen ejecutándose. No
 # compara la salida: sólo evita que se queden obsoletos en silencio si
 # cambia el lenguaje.
@@ -78,7 +73,6 @@ ASAN_ENV = ASAN_OPTIONS=detect_leaks=0 LINCE_BIN=./lince_debug
 test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner.lince'
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner_compilador.lince'
-	@bash -c 'ulimit -s 65536; $(ASAN_ENV) tests/servidor/smoke.sh ./lince_debug 8124'
 	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/depurador/smoke.sh ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/juego/smoke.sh ./lince_debug'
@@ -88,13 +82,13 @@ test-lsp: $(BIN)
 	@python3 tests/lsp/smoke.py ./$(BIN)
 
 # Soporte de editores: cada snippet es Lince válido, y la extensión de VS Code
-# (con un 'vscode' de mentira) habla bien con el servidor.
+# (con un 'vscode' de mentira) habla bien con el servidor de lenguaje.
 test-editores: $(BIN)
 	@python3 tests/editores/comprobar_snippets.py ./$(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-servidor test-ejemplos test-lsp test-editores editores-check test-depurador test-ventana test-juego test-asan
+test-todo: test test-compilador test-ejemplos test-lsp test-editores editores-check test-depurador test-juego test-asan
 
 test-juego: $(BIN)
 	@bash tests/juego/smoke.sh ./$(BIN)
@@ -123,10 +117,6 @@ editores-check:
 
 test-depurador: $(BIN)
 	@bash tests/depurador/smoke.sh ./$(BIN)
-
-test-ventana: $(BIN)
-	@bash tests/ventana/smoke.sh ./$(BIN)
-	@bash tests/ventana/app_web.sh ./$(BIN)
 
 # Medidas de rendimiento del intérprete (bench/*.lince): tiempo y memoria de cada una
 bench: all
@@ -161,7 +151,7 @@ else
 	@echo "🗑️  Lince desinstalado"
 endif
 
-.PHONY: all debug ejemplo test test-compilador test-servidor test-ejemplos \
-        test-asan test-depurador test-ventana test-lsp test-editores editores editores-check bench vsix \
+.PHONY: all debug ejemplo test test-compilador test-ejemplos \
+        test-asan test-depurador test-lsp test-editores editores editores-check bench vsix \
         test-juego test-todo clean install uninstall docs docs-check
 

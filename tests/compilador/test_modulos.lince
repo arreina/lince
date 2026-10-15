@@ -32,11 +32,3 @@ escribir(c)
 archivos.eliminar("/tmp/lince_comp_mod.txt")
 escribir(archivos.existe("/tmp/lince_comp_mod.txt"))
 
-importar "expresiones"
-escribir(expresiones.coincidir("hola123", "[0-9]+"))
-escribir(expresiones.coincidir("hola", "^[0-9]+$"))
-sea r = expresiones.buscar("precio 42 euros", "[0-9]+")
-escribir(r)
-sea nums = expresiones.todos("a1 b2 c3", "[0-9]+")
-escribir(nums.longitud())
-escribir(expresiones.reemplazar("hola mundo", "mundo", "Lince"))

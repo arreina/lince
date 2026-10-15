@@ -2,7 +2,7 @@
 
 # 🐆 Lince
 
-**Un lenguaje de programación de propósito general en español**
+**Un lenguaje para hacer videojuegos, en español**
 
 *Perspicaz · Preciso · Para todos*
 
@@ -10,7 +10,7 @@
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
 [![Versión](https://img.shields.io/badge/versión-0.5-F1BF00.svg)]()
-[![Tests](https://img.shields.io/badge/tests-30%2F30-C60B1E.svg)]()
+[![Tests](https://img.shields.io/badge/tests-31%2F31-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Mac%20·%20Windows-6A2D72.svg)]()
 
 [🌐 lince-lang.github.io](https://arreina.github.io/lince)
@@ -19,34 +19,32 @@
 
 ---
 
-Lince es un lenguaje de programación **escrito en C puro**, **sin dependencias externas**, diseñado para que programar en español sea natural, claro y accesible.
+Lince es un lenguaje de programación **para videojuegos**, **escrito en C puro** y **sin dependencias para compilarlo**, diseñado para que crear juegos en español sea natural, claro y accesible. La ventana, el dibujo, el teclado y el sonido vienen incluidos (SDL2, que se carga al abrir la ventana).
 
 ```lince
-# El clásico hola mundo
-escribir("¡Hola, Mundo!")
+importar "juego"
 
-# Con clases y tipos
-clase Persona {
-    funcion crear(val texto nombre, val numero edad): nulo {
-        mi.nombre = nombre
-        mi.edad   = edad
-    }
-    funcion saludar(): texto {
-        devolver "Hola, soy " + mi.nombre + " y tengo " + mi.edad + " años"
-    }
-}
+juego.abrir("Mi primer juego", 800, 600)
+sea x = 100
 
-sea lista personas = [Persona("Ana", 22), Persona("Luis", 30)]
-para cada elemento p en personas {
-    escribir(p.saludar())
+mientras juego.abierto() {
+    si juego.tecla("derecha") { x = x + 300 * juego.dt() }
+    si juego.tecla("izquierda") { x = x - 300 * juego.dt() }
+
+    juego.limpiar([20, 20, 30])
+    juego.circulo(x, 300, 20, "#ffc850")
+    juego.texto("Flechas para mover", 10, 10, 3)
+    juego.presentar()          # muestra, espera a 60 fps y lee el teclado
 }
 ```
+
+Un juego completo, un Pong para dos jugadores, está en [`examples/juegos/pong.lince`](examples/juegos/pong.lince).
 
 ## ¿Por qué Lince?
 
 - **En español** — la programación no debería requerir saber inglés
-- **Propósito general** — scripts, herramientas, automatización, aprendizaje
-- **Sin dependencias** — un solo binario, compilado con `gcc` y `make`
+- **Hecho para juegos** — ventana, dibujo 2D, texto, teclado, ratón, sonido y colisiones en un solo módulo (`juego`)
+- **Sin dependencias para compilar** — un solo binario, compilado con `gcc` y `make` (SDL2 se carga al abrir la ventana)
 - **Errores claros** — mensajes literales con número de línea exacto
 - **Ejecutables autónomos** — `lince compilar` empaqueta tu programa en un único ejecutable, sin instalar nada en destino
 
@@ -167,7 +165,7 @@ elegir c {
 
 ```lince
 intentar {
-    sea datos = json.parsear(archivos.leer("config.json"))
+    sea datos = json.parsear(archivos.leer("partida.json"))
     escribir(datos["version"])
 } capturar (ErrorRango e) {
     escribir("Clave no encontrada: " + e.mensaje)
@@ -183,16 +181,13 @@ intentar {
 ```lince
 importar "matematica"
 importar "archivos"
-importar "red"
-importar "expresiones"
+importar "json"
 
-escribir(matematica.factorial(10))          # 3628800
-archivos.escribir("log.txt", "inicio")
-sea r = red.obtener("https://api.com/datos")
-sea nums = expresiones.todos("a1 b2 c3", "[0-9]+")
+escribir(matematica.raiz(144))                          # 12
+archivos.escribir("partida.json", json.texto({"nivel": 3}))
 ```
 
-**Módulos disponibles:** `matematica` · `texto` · `archivos` · `tiempo` · `sistema` · `json` · `red` · `expresiones` · `terminal` · `servidor` · `pruebas` · `sqlite` · `cripto` · `tareas` · `plantillas` · `juego`
+**Módulos disponibles:** `juego` (ventana, dibujo, entrada, sonido) · `matematica` · `texto` · `archivos` · `tiempo` · `sistema` · `json` (partidas guardadas) · `pruebas`
 
 ## Ejecutables autónomos
 
@@ -201,20 +196,20 @@ lince compilar programa.lince
 ./programa
 ```
 
-`lince compilar` crea un único ejecutable con tu programa y los archivos que importa dentro: se puede copiar a otra máquina sin instalar Lince ni nada más. Soporta el 100 % del lenguaje y tarda milisegundos, porque el ejecutable lleva el propio intérprete.
+`lince compilar` crea un único ejecutable con tu programa y los archivos que importa dentro (con `--incluir` también imágenes, niveles o sonidos): se puede copiar a otra máquina sin instalar Lince; solo hace falta SDL2 si el juego abre una ventana. Soporta el 100 % del lenguaje y tarda milisegundos, porque el ejecutable lleva el propio intérprete.
 
 **Rendimiento** (`make bench`, en segundos): `fib(30)` 0,3 · bucle de 5 millones de iteraciones 0,5 · diccionario de 50.000 claves 0,04.
 
 ## Tests
 
 ```bash
-make test                              # 22 tests del intérprete
+make test                              # tests del intérprete
 ./lince tests/runner_compilador.lince  # tests de los ejecutables
 ```
 
 ```
-✅ 34/34 tests del intérprete pasaron
-✅  17/17  tests del compilador pasaron
+✅ 31/31 tests del intérprete pasaron
+✅ 15/15 tests del compilador pasaron
 ```
 
 ## Soporte para editores
@@ -241,7 +236,7 @@ lince/
 │   ├── repl.c/h            # REPL con historial
 │   └── paquetes.c/h        # gestor de paquetes
 ├── tests/
-│   ├── runner.lince               # 22 tests del intérprete
+│   ├── runner.lince               # tests del intérprete
 │   ├── runner_compilador.lince    # tests de los ejecutables
 │   ├── lince/                     # tests del intérprete
 │   └── compilador/                # tests del compilador
@@ -258,6 +253,6 @@ MIT — libre para usar, modificar y distribuir.
 
 <div align="center">
 
-*🐆 Lince v0.5 — ágil, preciso, para todos*
+*🐆 Lince — ágil, preciso, para hacer juegos*
 
 </div>
