@@ -1,0 +1,158 @@
+# 🐆 Lince — Tres en raya
+#
+# Juegas con la X y haces clic en una casilla; la máquina juega con la O y no
+# se equivoca nunca (usa minimax). Con suerte empatarás. Clic para reiniciar.
+#
+# Muestra: recursión (el algoritmo minimax), listas como tablero y el ratón.
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 480
+fijo ALTO = 560
+fijo CASILLA = 140
+fijo ORIGEN_X = 30
+fijo ORIGEN_Y = 100
+fijo LINEAS = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
+
+# El tablero tiene 9 casillas: 0 vacía, 1 la X (tú), 2 la O (la máquina)
+sea tablero = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+sea turno = 1
+sea fin = ""                    # "", "gana1", "gana2" o "empate"
+sea pausa = 0                   # la máquina «piensa» un momento
+sea victorias = 0
+sea derrotas = 0
+sea empates = 0
+
+# Devuelve 1 o 2 si alguien tiene tres en raya, 0 si nadie
+funcion ganador(val lista t): numero {
+    para cada lista l en LINEAS {
+        si t[l[0]] != 0 y t[l[0]] == t[l[1]] y t[l[1]] == t[l[2]] { devolver t[l[0]] }
+    }
+    devolver 0
+}
+
+funcion hay_hueco(val lista t): logico {
+    devolver t.contiene(0)
+}
+
+# Valor de la jugada para la O: +1 si acaba ganando, -1 si pierde, 0 si empata
+funcion minimax(val lista t, val numero quien): numero {
+    sea g = ganador(t)
+    si g == 2 { devolver 1 }
+    si g == 1 { devolver -1 }
+    si no hay_hueco(t) { devolver 0 }
+    sea mejor = 0
+    sea primera = verdadero
+    para cada numero i en rango(0, 9) {
+        si t[i] == 0 {
+            sea copia = t.copiar()
+            copia[i] = quien
+            sea v = minimax(copia, 3 - quien)
+            si primera o (quien == 2 y v > mejor) o (quien == 1 y v < mejor) {
+                mejor = v
+                primera = falso
+            }
+        }
+    }
+    devolver mejor
+}
+
+funcion mejor_jugada(): numero {
+    sea mejor_valor = -2
+    sea mejor_casilla = -1
+    para cada numero i en rango(0, 9) {
+        si tablero[i] == 0 {
+            sea copia = tablero.copiar()
+            copia[i] = 2
+            sea v = minimax(copia, 1)
+            si v > mejor_valor {
+                mejor_valor = v
+                mejor_casilla = i
+            }
+        }
+    }
+    devolver mejor_casilla
+}
+
+funcion comprobar_fin(): nulo {
+    sea g = ganador(tablero)
+    si g == 1 {
+        fin = "gana1"
+        victorias = victorias + 1
+    } sino si g == 2 {
+        fin = "gana2"
+        derrotas = derrotas + 1
+    } sino si no hay_hueco(tablero) {
+        fin = "empate"
+        empates = empates + 1
+    }
+    si fin != "" { juego.pitido(300, 200) }
+}
+
+funcion reiniciar(): nulo {
+    tablero = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    turno = 1
+    fin = ""
+}
+
+juego.abrir("Tres en raya", ANCHO, ALTO)
+
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    si juego.tecla_pulsada("escape") { juego.salir() }
+
+    si fin != "" {
+        si juego.clic(1) { reiniciar() }
+    } sino si turno == 1 {
+        si juego.clic(1) {
+            sea pos = juego.raton()
+            sea col = matematica.piso((pos[0] - ORIGEN_X) / CASILLA)
+            sea fila = matematica.piso((pos[1] - ORIGEN_Y) / CASILLA)
+            si col >= 0 y col < 3 y fila >= 0 y fila < 3 y tablero[fila * 3 + col] == 0 {
+                tablero[fila * 3 + col] = 1
+                juego.pitido(520, 60)
+                comprobar_fin()
+                turno = 2
+                pausa = 0.4
+            }
+        }
+    } sino {
+        pausa = pausa - dt
+        si pausa <= 0 {
+            tablero[mejor_jugada()] = 2
+            juego.pitido(390, 60)
+            comprobar_fin()
+            turno = 1
+        }
+    }
+
+    juego.limpiar([24, 26, 36])
+    # la cuadrícula
+    para cada numero i en rango(1, 3) {
+        juego.rectangulo(ORIGEN_X + i * CASILLA - 2, ORIGEN_Y, 4, 3 * CASILLA, [90, 96, 130])
+        juego.rectangulo(ORIGEN_X, ORIGEN_Y + i * CASILLA - 2, 3 * CASILLA, 4, [90, 96, 130])
+    }
+    # las fichas
+    para cada numero i en rango(0, 9) {
+        sea cx = ORIGEN_X + (i % 3) * CASILLA + CASILLA / 2
+        sea cy = ORIGEN_Y + matematica.piso(i / 3) * CASILLA + CASILLA / 2
+        si tablero[i] == 1 {
+            juego.linea(cx - 38, cy - 38, cx + 38, cy + 38, [255, 120, 110])
+            juego.linea(cx - 38, cy + 38, cx + 38, cy - 38, [255, 120, 110])
+            juego.linea(cx - 37, cy - 38, cx + 39, cy + 38, [255, 120, 110])
+            juego.linea(cx - 37, cy + 38, cx + 39, cy - 38, [255, 120, 110])
+        } sino si tablero[i] == 2 {
+            juego.circulo(cx, cy, 40, [110, 190, 255])
+            juego.circulo(cx, cy, 32, [24, 26, 36])
+        }
+    }
+    juego.texto("TRES EN RAYA", 30, 30, 3, [230, 230, 245])
+    juego.texto("TU " + a_texto(victorias) + "  EMPATES " + a_texto(empates) + "  MAQUINA " + a_texto(derrotas), 30, 66, 2, [160, 165, 190])
+    sea mensaje = "TU TURNO (X)"
+    si turno == 2 { mensaje = "PIENSA..." }
+    si fin == "gana1" { mensaje = "GANASTE - CLIC PARA OTRA" }
+    si fin == "gana2" { mensaje = "GANA LA MAQUINA - CLIC PARA OTRA" }
+    si fin == "empate" { mensaje = "EMPATE - CLIC PARA OTRA" }
+    juego.texto(mensaje, (ANCHO - juego.ancho_texto(mensaje, 2)) / 2, ALTO - 36, 2, [255, 200, 80])
+    juego.presentar()
+}

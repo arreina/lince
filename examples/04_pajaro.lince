@@ -1,0 +1,130 @@
+# 🐆 Lince — Pájaro saltarín
+#
+# Espacio (o flecha arriba) hace saltar al pájaro; pasa entre las tuberías.
+# El récord se guarda en un archivo JSON y sobrevive entre partidas. Esc sale.
+#
+# Muestra: gravedad y velocidad, una lista de obstáculos que se crean y se
+#          descartan, y guardar/cargar datos con 'archivos' y 'json'.
+importar "juego"
+importar "matematica"
+importar "archivos"
+importar "json"
+
+fijo ANCHO = 480
+fijo ALTO = 640
+fijo GRAVEDAD = 1500
+fijo SALTO = -460
+fijo HUECO = 170
+fijo TUBO_ANCHO = 64
+fijo VELOCIDAD = 170
+fijo ARCHIVO_RECORD = "pajaro_record.json"
+
+sea alto_pajaro = 300
+sea vy = 0
+sea tubos = []
+sea hasta_tubo = 0                  # segundos hasta el siguiente tubo
+sea puntos = 0
+sea record = 0
+sea vivo = verdadero
+sea empezado = falso
+
+funcion cargar_record(): numero {
+    si no archivos.existe(ARCHIVO_RECORD) { devolver 0 }
+    intentar {
+        sea datos = json.parsear(archivos.leer(ARCHIVO_RECORD))
+        devolver datos["record"]
+    } capturar (error e) {
+        devolver 0          # archivo estropeado: se empieza de cero
+    }
+}
+
+funcion guardar_record(): nulo {
+    archivos.escribir(ARCHIVO_RECORD, json.texto({"record": record}))
+}
+
+funcion reiniciar(): nulo {
+    alto_pajaro = 300
+    vy = 0
+    tubos = []
+    hasta_tubo = 0
+    puntos = 0
+    vivo = verdadero
+    empezado = falso
+}
+
+funcion morir(): nulo {
+    vivo = falso
+    juego.pitido(120, 350)
+    si puntos > record {
+        record = puntos
+        guardar_record()
+    }
+}
+
+funcion salta(): logico {
+    devolver juego.tecla_pulsada("espacio") o juego.tecla_pulsada("arriba")
+}
+
+record = cargar_record()
+juego.abrir("Pájaro saltarín", ANCHO, ALTO)
+
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    si juego.tecla_pulsada("escape") { juego.salir() }
+
+    si salta() {
+        si no vivo {
+            reiniciar()
+        } sino {
+            empezado = verdadero
+            vy = SALTO
+            juego.pitido(520, 40)
+        }
+    }
+
+    si vivo y empezado {
+        vy = vy + GRAVEDAD * dt
+        alto_pajaro = alto_pajaro + vy * dt
+        si alto_pajaro < 0 o alto_pajaro > ALTO - 12 { morir() }
+
+        hasta_tubo = hasta_tubo - dt
+        si hasta_tubo <= 0 {
+            tubos.agregar({"x": ANCHO, "hueco": matematica.aleatorio(110, ALTO - 110 - HUECO), "pasado": falso})
+            hasta_tubo = 1.7
+        }
+        para cada diccionario t en tubos {
+            t["x"] = t["x"] - VELOCIDAD * dt
+            sea choca_x = 90 + 12 > t["x"] y 90 - 12 < t["x"] + TUBO_ANCHO
+            si choca_x y (alto_pajaro - 12 < t["hueco"] o alto_pajaro + 12 > t["hueco"] + HUECO) { morir() }
+            si no t["pasado"] y t["x"] + TUBO_ANCHO < 90 {
+                t["pasado"] = verdadero
+                puntos = puntos + 1
+                juego.pitido(880, 60)
+            }
+        }
+        # los tubos que salieron por la izquierda se descartan
+        si tubos.longitud() > 0 y tubos[0]["x"] < -TUBO_ANCHO { tubos.eliminar(0) }
+    }
+
+    juego.limpiar([112, 200, 230])
+    para cada diccionario t en tubos {
+        juego.rectangulo(t["x"], 0, TUBO_ANCHO, t["hueco"], [70, 170, 80])
+        juego.rectangulo(t["x"], t["hueco"] + HUECO, TUBO_ANCHO, ALTO, [70, 170, 80])
+        juego.contorno(t["x"], 0, TUBO_ANCHO, t["hueco"], [40, 110, 50])
+        juego.contorno(t["x"], t["hueco"] + HUECO, TUBO_ANCHO, ALTO, [40, 110, 50])
+    }
+    juego.rectangulo(0, ALTO - 12, ANCHO, 12, [200, 170, 110])
+    juego.circulo(90, alto_pajaro, 12, [255, 210, 60])
+    juego.circulo(95, alto_pajaro - 4, 3, [30, 30, 30])
+    juego.texto(a_texto(puntos), (ANCHO - juego.ancho_texto(a_texto(puntos), 6)) / 2, 40, 6, [255, 255, 255])
+    sea r = "RECORD " + a_texto(record)
+    juego.texto(r, ANCHO - juego.ancho_texto(r, 2) - 10, 10, 2, [30, 60, 90])
+    si no empezado {
+        juego.texto("ESPACIO PARA SALTAR", (ANCHO - juego.ancho_texto("ESPACIO PARA SALTAR", 2)) / 2, 400, 2, [30, 60, 90])
+    }
+    si no vivo {
+        juego.texto("HAS CHOCADO", (ANCHO - juego.ancho_texto("HAS CHOCADO", 4)) / 2, 260, 4, [255, 255, 255])
+        juego.texto("ESPACIO PARA REINTENTAR", (ANCHO - juego.ancho_texto("ESPACIO PARA REINTENTAR", 2)) / 2, 320, 2, [30, 60, 90])
+    }
+    juego.presentar()
+}

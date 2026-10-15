@@ -68,7 +68,16 @@ static struct {
     int rx, ry, rueda;
     double t_ultimo, dt, fps, t_fps;
     int cuadros;
+    /* Modo de prueba (sin pantalla ni espera): LINCE_JUEGO_FOTOGRAMAS=N cierra tras N
+       fotogramas con dt fijo; LINCE_JUEGO_PULSAR=a,espacio,... pulsa esas teclas en los
+       fotogramas impares; LINCE_JUEGO_CLIC=x,y hace clic ahí en los fotogramas impares;
+       LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma. */
+    long limite, total;
+    int pulsar[16], npulsar, clic_x, clic_y, hay_clic;
 } _jgs;
+
+static int jg_tecla_codigo(const char *nombre);
+static int jg_guardar_bmp(const char *ruta);
 
 static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
@@ -213,6 +222,20 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     memset(_jgs.teclas, 0, sizeof(_jgs.teclas));
     memset(_jgs.previas, 0, sizeof(_jgs.previas));
     _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.cierre = 0;
+    _jgs.limite = 0; _jgs.total = 0; _jgs.npulsar = 0; _jgs.hay_clic = 0;
+    const char *e = getenv("LINCE_JUEGO_FOTOGRAMAS");
+    if (e && atol(e) > 0) _jgs.limite = atol(e);
+    e = getenv("LINCE_JUEGO_PULSAR");
+    if (e) {
+        char buf[200];
+        snprintf(buf, sizeof buf, "%s", e);
+        for (char *t = strtok(buf, ","); t && _jgs.npulsar < 16; t = strtok(NULL, ",")) {
+            int c = jg_tecla_codigo(t);
+            if (c >= 0) _jgs.pulsar[_jgs.npulsar++] = c;
+        }
+    }
+    e = getenv("LINCE_JUEGO_CLIC");
+    if (e && sscanf(e, "%d,%d", &_jgs.clic_x, &_jgs.clic_y) == 2) _jgs.hay_clic = 1;
     _jgs.dt = 1.0 / 60; _jgs.t_ultimo = jg_ahora(); _jgs.t_fps = _jgs.t_ultimo; _jgs.cuadros = 0; _jgs.fps = 0;
     return valor_nulo();
 }
@@ -470,12 +493,17 @@ static Valor *fn_jg_rueda(Valor **a, int n) { (void)a; (void)n; return valor_num
 static Valor *fn_jg_presentar(Valor **a, int n) {
     (void)a; (void)n;
     JG_ABIERTA();
+    if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))
+        jg_guardar_bmp(getenv("LINCE_JUEGO_CAPTURA"));      /* prueba: guarda el último fotograma */
     _jg.RenderPresent(_jgs.render);
     double t = jg_ahora();
     double espera = 1.0 / 60 - (t - _jgs.t_ultimo);
-    if (espera > 0.0015) { _jg.Delay((unsigned)((espera - 0.001) * 1000)); t = jg_ahora(); }
+    if (!_jgs.limite && espera > 0.0015) { _jg.Delay((unsigned)((espera - 0.001) * 1000)); t = jg_ahora(); }
     _jgs.dt = t - _jgs.t_ultimo;
     if (_jgs.dt > 0.1) _jgs.dt = 0.1;
+    if (_jgs.limite) _jgs.dt = 1.0 / 60;
+    _jgs.total++;
+    if (_jgs.limite && _jgs.total >= _jgs.limite) _jgs.cierre = 1;
     _jgs.t_ultimo = t;
     _jgs.cuadros++;
     if (t - _jgs.t_fps >= 0.5) { _jgs.fps = _jgs.cuadros / (t - _jgs.t_fps); _jgs.cuadros = 0; _jgs.t_fps = t; }
@@ -495,26 +523,35 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     if (nt > 512) nt = 512;
     memcpy(_jgs.teclas, k, (size_t)nt);
     _jgs.raton = _jg.MouseState(&_jgs.rx, &_jgs.ry);
+    if (_jgs.total & 1) {
+        for (int i = 0; i < _jgs.npulsar; i++) _jgs.teclas[_jgs.pulsar[i]] = 1;
+        if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; _jgs.raton |= 1; }
+    } else if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; }
     return valor_nulo();
 }
 
-/* captura(ruta): guarda la imagen actual de la ventana como BMP */
-static Valor *fn_jg_captura(Valor **a, int n) {
-    JG_ABIERTA();
-    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "captura() espera la ruta del archivo .bmp");
+/* Guarda la imagen actual de la ventana como BMP; 1 si va bien */
+static int jg_guardar_bmp(const char *ruta) {
     size_t tam = (size_t)_jgs.ancho * _jgs.alto * 4;
     unsigned char *px = malloc(tam);
-    if (!px) return jg_error("Error", "sin memoria");
+    if (!px) return 0;
     int ok = 0;
     if (_jg.ReadPixels(_jgs.render, NULL, 0x16362004, px, _jgs.ancho * 4) == 0) {
         void *sup = _jg.SurfaceFrom(px, _jgs.ancho, _jgs.alto, 32, _jgs.ancho * 4,
                                     0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-        void *rw = _jg.RWFromFile(a[0]->texto, "wb");
+        void *rw = _jg.RWFromFile(ruta, "wb");
         if (sup && rw) ok = _jg.SaveBMP_RW(sup, rw, 1) == 0;
         if (sup) _jg.FreeSurface(sup);
     }
     free(px);
-    if (!ok) return jg_error("ErrorJuego", "no se pudo guardar la captura");
+    return ok;
+}
+
+/* captura(ruta): guarda la ventana como BMP */
+static Valor *fn_jg_captura(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "captura() espera la ruta del archivo .bmp");
+    if (!jg_guardar_bmp(a[0]->texto)) return jg_error("ErrorJuego", "no se pudo guardar la captura");
     return valor_nulo();
 }
 

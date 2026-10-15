@@ -779,7 +779,7 @@ Los colores son `[r, g, b]`, `[r, g, b, a]` (0–255) o texto `"#rrggbb"` / `"#r
 se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`, `"izquierda"`,
 `"derecha"`, `"espacio"`, `"entrar"`, `"escape"`, `"borrar"`, `"tab"`, `"mayus"`, `"ctrl"`,
 `"alt"`, `"f1"`–`"f12"` (y los nombres de SDL). Los fallos son de tipo `ErrorJuego`
-(sin SDL2, sin pantalla) o `Error`. Ejemplo completo: `examples/juegos/pong.lince`.
+(sin SDL2, sin pantalla) o `Error`. Ejemplos completos: los siete minijuegos de `examples/`.
 
 ### `pruebas`
 
@@ -1006,7 +1006,7 @@ lince/
 │   ├── lince/                 # tests del intérprete
 │   └── compilador/            # tests de los ejecutables empaquetados
 ├── editores/           # soporte VSCode, Sublime, Notepad++
-├── ejemplos/           # programas de ejemplo
+├── examples/           # minijuegos de ejemplo
 ├── ESPECIFICACION.md
 ├── README.md
 ├── LICENSE

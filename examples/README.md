@@ -1,64 +1,37 @@
-# 🐆 Ejercicios de ejemplo
+# 🐆 Minijuegos de ejemplo
 
-Ejercicios pequeños y clásicos resueltos en Lince, pensados para ver el
-lenguaje en casos concretos. Cada archivo es independiente, no pide nada
-por teclado y se ejecuta así:
-
-```sh
-make                          # compilar el intérprete
-./lince examples/01_fizzbuzz.lince
-```
-
-Todos de una vez:
+Siete juegos pequeños y completos, cada uno pensado para enseñar una parte de
+Lince. Se juegan así (necesitan SDL2; en Debian/Ubuntu: `sudo apt install libsdl2-2.0-0`):
 
 ```sh
-for f in examples/*.lince; do echo "== $f"; ./lince "$f"; done
+make                                  # compilar el intérprete
+./lince examples/01_pong.lince
 ```
 
-## Los ejercicios
+Y se reparten como un único ejecutable:
 
-| Archivo | Ejercicio | Qué enseña |
-|---------|-----------|------------|
-| `01_fizzbuzz.lince` | FizzBuzz del 1 al 20 | bucle `para`, `si` / `sino si` / `sino`, módulo `%` |
-| `02_factorial_y_fibonacci.lince` | Factorial y Fibonacci, recursivos e iterativos | funciones, recursión, acumuladores, `matematica` |
-| `03_numeros_primos.lince` | Primos y factorización | funciones que devuelven `logico`, salida temprana, listas |
-| `04_palindromos.lince` | Detectar palíndromos | métodos de texto, recorrer texto, índices negativos |
-| `05_listas_y_estadisticas.lince` | Mínimo, máximo, media y mediana | listas, `mapear` / `filtrar` / `reducir` |
-| `06_diccionarios_contar.lince` | Contar palabras y letras | diccionarios como contador, `.contiene()`, recorrerlos |
-| `07_ordenar_y_buscar.lince` | Burbuja, selección, búsqueda binaria | bucles anidados, intercambios, qué se copia y qué se comparte |
-| `08_clases_figuras.lince` | Áreas de figuras geométricas | clases, `mi`, herencia con `extiende`, `padre()`, polimorfismo |
-| `09_errores.lince` | División segura y validación | `intentar` / `capturar` / `finalmente`, `lanzar` |
-| `10_tablas_y_figuras.lince` | Tabla de multiplicar y pirámides | bucles anidados, `texto.repetir()`, generadores propios |
+```sh
+./lince compilar examples/02_serpiente.lince -o serpiente
+./serpiente
+```
 
-Van de menos a más: los primeros sólo usan bucles y condicionales, y los
-últimos ya entran en clases, errores y generadores.
+| Juego | Cómo se juega | Qué enseña |
+|-------|---------------|------------|
+| `01_pong.lince` | W / S y flechas; 1 o 2 jugadores | el bucle `mientras juego.abierto()`, `dt()`, teclado, colisiones, texto y sonido |
+| `02_serpiente.lince` | flechas o WASD | listas de listas, tiempo acumulado con `dt`, funciones con variables globales |
+| `03_rompeladrillos.lince` | flechas o A / D, espacio lanza | lista de diccionarios, rebotes y colisiones con rectángulos, estados de juego |
+| `04_pajaro.lince` | espacio salta | gravedad, obstáculos que se crean y descartan, **guardar el récord** con `archivos` y `json` |
+| `05_esquiva.lince` | flechas o A / D | **clases, herencia y polimorfismo** (`Objeto` → `Meteorito` y `Estrella`), `es` |
+| `06_memoria.lince` | ratón | el ratón, una máquina de estados y temporizadores sin bloquear el bucle |
+| `07_tres_en_raya.lince` | ratón | **recursión** (minimax): la máquina nunca pierde |
 
-## Una cosa que conviene saber
+Todos terminan con **Esc**.
 
-Aparece comentada dentro de los ejemplos, pero se resume aquí porque
-sorprende la primera vez:
+## Probarlos sin pantalla
 
-- **Las listas y los diccionarios se comparten.** Los números, textos y
-  lógicos se copian al pasarlos a una función, pero una lista no: si la
-  función cambia su contenido, el cambio se ve fuera. Para eso está
-  `copiar()`, que usa `07_ordenar_y_buscar.lince` antes de ordenar.
-
-El texto, en cambio, se cuenta por caracteres y no por bytes, así que
-`"niño".longitud()` da 4 y `"el niño".mayusculas()` da `EL NIÑO`. Una
-tilde sí cuenta como letra distinta: `"á" != "a"`, cosa que se ve al
-final de `04_palindromos.lince`.
-
-## Y también
-
-En la carpeta `ejemplos/` hay programas más completos (una agenda, una
-tienda, una calculadora). Estos de aquí son más pequeños y cada uno se
-centra en una idea.
-
-## Juegos
-
-| Carpeta | Qué es | Qué enseña |
-|---------|--------|------------|
-| `juegos/pong.lince` | Pong para uno o dos jugadores | el bucle `mientras juego.abierto()`, `dt()`, teclado, colisiones, texto y sonido |
-
-Se juegan con `lince examples/juegos/pong.lince` (necesitan SDL2) y se reparten
-como un ejecutable con `lince compilar`.
+Para los tests, el módulo `juego` tiene un modo automático controlado con
+variables de entorno: `LINCE_JUEGO_FOTOGRAMAS=N` cierra la ventana tras N
+fotogramas (sin esperas), `LINCE_JUEGO_PULSAR=espacio,a` pulsa esas teclas en
+los fotogramas impares, `LINCE_JUEGO_CLIC=x,y` hace clic ahí y
+`LINCE_JUEGO_CAPTURA=salida.bmp` guarda el último fotograma. Junto con
+`SDL_VIDEODRIVER=dummy` no hace falta ni monitor (`make test-ejemplos`).

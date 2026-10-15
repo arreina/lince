@@ -1,0 +1,118 @@
+# 🐆 Lince — Memoria (como el juego «Simon»)
+#
+# La máquina ilumina una secuencia de colores; repítela con el ratón. Cada
+# ronda añade un color más. Haz clic para empezar de nuevo si fallas. Esc sale.
+#
+# Muestra: el ratón, una máquina de estados ("mirar", "repetir", "fallo")
+#          y temporizadores con dt, sin bloquear el bucle.
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 480
+fijo ALTO = 560
+fijo LADO = 200
+fijo NOMBRES = ["ROJO", "VERDE", "AZUL", "AMARILLO"]
+fijo APAGADOS = [[140, 40, 40], [40, 120, 50], [40, 70, 150], [150, 130, 40]]
+fijo ENCENDIDOS = [[255, 90, 90], [90, 240, 110], [100, 150, 255], [255, 230, 90]]
+fijo TONOS = [262, 330, 392, 523]
+
+sea secuencia = []
+sea estado = "inicio"           # "inicio", "mirar", "repetir" o "fallo"
+sea indice = 0                  # a qué paso de la secuencia vamos
+sea encendido = -1              # casilla iluminada ahora (-1: ninguna)
+sea reloj = 0
+sea record = 0
+
+# Posición de la casilla n (0 y 1 arriba, 2 y 3 abajo)
+funcion casilla_x(val numero n): numero {
+    devolver 30 + (n % 2) * (LADO + 20)
+}
+funcion casilla_y(val numero n): numero {
+    devolver 100 + matematica.piso(n / 2) * (LADO + 20)
+}
+
+funcion casilla_en(val numero px, val numero py): numero {
+    para cada numero n en rango(0, 4) {
+        si juego.colision(px, py, 1, 1, casilla_x(n), casilla_y(n), LADO, LADO) { devolver n }
+    }
+    devolver -1
+}
+
+funcion nueva_ronda(): nulo {
+    secuencia.agregar(matematica.aleatorio(0, 3))
+    estado = "mirar"
+    indice = 0
+    encendido = -1
+    reloj = 0.8
+}
+
+funcion encender(val numero n): nulo {
+    encendido = n
+    reloj = 0.35
+    juego.pitido(TONOS[n], 300)
+}
+
+juego.abrir("Memoria", ANCHO, ALTO)
+
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    si juego.tecla_pulsada("escape") { juego.salir() }
+    reloj = reloj - dt
+
+    si estado == "inicio" o estado == "fallo" {
+        si juego.clic(1) {
+            secuencia = []
+            nueva_ronda()
+        }
+    } sino si estado == "mirar" {
+        # un paso se enseña 0,35 s y luego hay 0,2 s de pausa
+        si reloj <= 0 {
+            si encendido >= 0 {
+                encendido = -1
+                reloj = 0.2
+                indice = indice + 1
+            } sino si indice < secuencia.longitud() {
+                encender(secuencia[indice])
+            } sino {
+                estado = "repetir"
+                indice = 0
+            }
+        }
+    } sino si estado == "repetir" {
+        si encendido >= 0 y reloj <= 0 { encendido = -1 }
+        si juego.clic(1) {
+            sea pos = juego.raton()
+            sea n = casilla_en(pos[0], pos[1])
+            si n >= 0 {
+                encender(n)
+                si n == secuencia[indice] {
+                    indice = indice + 1
+                    si indice == secuencia.longitud() {
+                        si secuencia.longitud() > record { record = secuencia.longitud() }
+                        nueva_ronda()
+                    }
+                } sino {
+                    estado = "fallo"
+                    juego.pitido(110, 500)
+                }
+            }
+        }
+    }
+
+    juego.limpiar([20, 20, 30])
+    para cada numero n en rango(0, 4) {
+        sea color = APAGADOS[n]
+        si n == encendido { color = ENCENDIDOS[n] }
+        juego.rectangulo(casilla_x(n), casilla_y(n), LADO, LADO, color)
+    }
+    juego.texto("RONDA " + a_texto(secuencia.longitud()), 30, 30, 3, [230, 230, 245])
+    sea r = "RECORD " + a_texto(record)
+    juego.texto(r, ANCHO - juego.ancho_texto(r, 2) - 30, 36, 2, [255, 200, 80])
+    sea mensaje = ""
+    si estado == "inicio" { mensaje = "HAZ CLIC PARA EMPEZAR" }
+    si estado == "mirar" { mensaje = "MIRA LA SECUENCIA..." }
+    si estado == "repetir" { mensaje = "AHORA TU: " + a_texto(indice) + " DE " + a_texto(secuencia.longitud()) }
+    si estado == "fallo" { mensaje = "FALLASTE - CLIC PARA REINTENTAR" }
+    juego.texto(mensaje, (ANCHO - juego.ancho_texto(mensaje, 2)) / 2, ALTO - 36, 2, [180, 180, 200])
+    juego.presentar()
+}

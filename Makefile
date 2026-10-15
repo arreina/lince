@@ -35,11 +35,11 @@ debug: $(SRC)
 # ── Valgrind — detectar leaks de memoria ──
 valgrind: debug
 	valgrind --leak-check=full --show-leak-kinds=all \
-		./lince_debug ejemplos/01_hola_mundo.lince 2>&1 | head -40
+		./lince_debug examples/01_pong.lince 2>&1 | head -40
 
 # ── Ejecutar un ejemplo ───────────────────
 ejemplo: $(BIN)
-	./$(BIN) ejemplos/01_hola_mundo.lince
+	./$(BIN) examples/01_pong.lince
 
 # ── Tests ─────────────────────────────────
 test: $(BIN)
@@ -49,14 +49,9 @@ test-compilador: $(BIN)
 	@./$(BIN) tests/runner_compilador.lince
 	@bash tests/compilador/probar_empaquetado.sh
 
-# Comprueba que los ejercicios de examples/ siguen ejecutándose. No
-# compara la salida: sólo evita que se queden obsoletos en silencio si
-# cambia el lenguaje.
+# Ejecuta cada minijuego de examples/ sin pantalla (con teclas y clics automáticos).
 test-ejemplos: $(BIN)
-	@for f in examples/*.lince; do \
-		./$(BIN) "$$f" > /dev/null || { echo "❌ falla $$f"; exit 1; }; \
-	done
-	@echo "✅ Los ejercicios de examples/ se ejecutan sin errores"
+	@bash tests/juego/ejemplos.sh ./$(BIN)
 
 # ── Tests bajo AddressSanitizer ───────────
 # Las mismas suites, pero ejecutando el binario instrumentado:
@@ -76,6 +71,7 @@ test-asan: debug
 	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/depurador/smoke.sh ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/juego/smoke.sh ./lince_debug'
+	@bash -c '$(ASAN_ENV) bash tests/juego/ejemplos.sh ./lince_debug 400'
 
 # Servidor de lenguaje ('lince lsp'): habla el protocolo de verdad.
 test-lsp: $(BIN)

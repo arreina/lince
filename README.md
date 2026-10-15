@@ -38,7 +38,7 @@ mientras juego.abierto() {
 }
 ```
 
-Un juego completo, un Pong para dos jugadores, está en [`examples/juegos/pong.lince`](examples/juegos/pong.lince).
+Siete minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, memoria y tres en raya) están en [`examples/`](examples/).
 
 ## ¿Por qué Lince?
 

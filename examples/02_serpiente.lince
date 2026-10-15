@@ -1,0 +1,119 @@
+# 🐆 Lince — Serpiente
+#
+# Flechas (o WASD) para girar; come para crecer; no te muerdas ni toques el borde.
+# Espacio reinicia tras perder. Esc sale.
+#
+# Muestra: listas de listas, un bucle de juego con tiempo acumulado (dt),
+#          funciones que usan variables globales y texto en pantalla.
+importar "juego"
+importar "matematica"
+
+fijo CELDA = 20
+fijo COLUMNAS = 32
+fijo FILAS = 22
+fijo MARGEN = 40               # franja superior para el marcador
+fijo PASO = 0.11               # segundos entre movimientos
+
+sea cuerpo = []
+sea dx = 1
+sea dy = 0
+sea comida = [0, 0]
+sea puntos = 0
+sea record = 0
+sea vivo = verdadero
+sea acumulado = 0
+
+funcion ocupada(val numero c, val numero f): logico {
+    para cada lista seg en cuerpo {
+        si seg[0] == c y seg[1] == f { devolver verdadero }
+    }
+    devolver falso
+}
+
+funcion nueva_comida(): lista {
+    mientras verdadero {
+        sea c = matematica.aleatorio(0, COLUMNAS - 1)
+        sea f = matematica.aleatorio(0, FILAS - 1)
+        si no ocupada(c, f) { devolver [c, f] }
+    }
+}
+
+funcion reiniciar(): nulo {
+    cuerpo = [[8, 11], [7, 11], [6, 11]]
+    dx = 1
+    dy = 0
+    puntos = 0
+    vivo = verdadero
+    acumulado = 0
+    comida = nueva_comida()
+}
+
+funcion avanzar(): nulo {
+    sea c = cuerpo[0][0] + dx
+    sea f = cuerpo[0][1] + dy
+    si c < 0 o c >= COLUMNAS o f < 0 o f >= FILAS o ocupada(c, f) {
+        vivo = falso
+        si puntos > record { record = puntos }
+        juego.pitido(120, 400)
+        devolver nulo
+    }
+    cuerpo.insertar(0, [c, f])
+    si c == comida[0] y f == comida[1] {
+        puntos = puntos + 1
+        comida = nueva_comida()
+        juego.pitido(700, 60)
+    } sino {
+        cuerpo.eliminar(cuerpo.longitud() - 1)
+    }
+}
+
+juego.abrir("Serpiente", COLUMNAS * CELDA, FILAS * CELDA + MARGEN)
+reiniciar()
+
+mientras juego.abierto() {
+    si juego.tecla_pulsada("escape") { juego.salir() }
+
+    si vivo {
+        si (juego.tecla("arriba") o juego.tecla("w")) y dy == 0 {
+            dx = 0
+            dy = -1
+        }
+        si (juego.tecla("abajo") o juego.tecla("s")) y dy == 0 {
+            dx = 0
+            dy = 1
+        }
+        si (juego.tecla("izquierda") o juego.tecla("a")) y dx == 0 {
+            dx = -1
+            dy = 0
+        }
+        si (juego.tecla("derecha") o juego.tecla("d")) y dx == 0 {
+            dx = 1
+            dy = 0
+        }
+        acumulado = acumulado + juego.dt()
+        mientras acumulado >= PASO y vivo {
+            acumulado = acumulado - PASO
+            avanzar()
+        }
+    } sino si juego.tecla_pulsada("espacio") {
+        reiniciar()
+    }
+
+    # ── dibujo ──
+    juego.limpiar([16, 24, 20])
+    juego.rectangulo(0, 0, COLUMNAS * CELDA, MARGEN, [10, 16, 13])
+    juego.texto("PUNTOS " + a_texto(puntos), 12, 12, 2, [230, 240, 230])
+    sea r = "RECORD " + a_texto(record)
+    juego.texto(r, COLUMNAS * CELDA - juego.ancho_texto(r, 2) - 12, 12, 2, [255, 200, 80])
+    juego.rectangulo(comida[0] * CELDA + 3, MARGEN + comida[1] * CELDA + 3, CELDA - 6, CELDA - 6, [230, 70, 70])
+    sea color = [140, 240, 140]                  # la cabeza, más clara
+    para cada lista seg en cuerpo {
+        juego.rectangulo(seg[0] * CELDA + 1, MARGEN + seg[1] * CELDA + 1, CELDA - 2, CELDA - 2, color)
+        color = [60, 190, 90]
+    }
+    si no vivo {
+        sea m = "HAS PERDIDO - ESPACIO PARA REINTENTAR"
+        juego.texto(m, (COLUMNAS * CELDA - juego.ancho_texto(m, 2)) / 2, MARGEN + FILAS * CELDA / 2, 2, [255, 255, 255])
+    }
+    juego.presentar()
+}

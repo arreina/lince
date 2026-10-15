@@ -1,0 +1,151 @@
+# 🐆 Lince — Esquiva
+#
+# Flechas (o A / D) mueven la nave. Esquiva los meteoritos rojos y recoge las
+# estrellas amarillas. Tres vidas. Espacio reinicia. Esc sale.
+#
+# Muestra: clases, herencia y polimorfismo — Meteorito y Estrella extienden
+#          Objeto y se tratan igual en el bucle, cada uno a su manera.
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 480
+fijo ALTO = 640
+
+clase Objeto {
+    funcion crear(val numero px, val numero py, val numero radio, val numero velocidad): nulo {
+        mi.px = px
+        mi.py = py
+        mi.radio = radio
+        mi.velocidad = velocidad
+    }
+
+    funcion mover(val numero dt): nulo {
+        mi.py = mi.py + mi.velocidad * dt
+    }
+
+    funcion fuera(): logico {
+        devolver mi.py > ALTO + mi.radio
+    }
+
+    funcion toca(val numero nx, val numero ny, val numero nradio): logico {
+        sea dx = mi.px - nx
+        sea dy = mi.py - ny
+        devolver dx * dx + dy * dy < (mi.radio + nradio) * (mi.radio + nradio)
+    }
+
+    funcion dibujar(): nulo {
+        juego.circulo(mi.px, mi.py, mi.radio, [255, 255, 255])
+    }
+}
+
+clase Meteorito extiende Objeto {
+    funcion crear(val numero velocidad): nulo {
+        padre(matematica.aleatorio(20, ANCHO - 20), -30, matematica.aleatorio(12, 26), velocidad)
+    }
+    funcion dibujar(): nulo {
+        juego.circulo(mi.px, mi.py, mi.radio, [200, 70, 60])
+        juego.circulo(mi.px - mi.radio / 3, mi.py - mi.radio / 3, mi.radio / 3, [150, 45, 40])
+    }
+}
+
+clase Estrella extiende Objeto {
+    funcion crear(val numero velocidad): nulo {
+        padre(matematica.aleatorio(20, ANCHO - 20), -30, 11, velocidad)
+    }
+    funcion dibujar(): nulo {
+        juego.circulo(mi.px, mi.py, mi.radio, [255, 215, 70])
+        juego.circulo(mi.px, mi.py, mi.radio / 2, [255, 245, 180])
+    }
+}
+
+sea nave_x = ANCHO / 2
+sea objetos = []
+sea vidas = 3
+sea puntos = 0
+sea tiempo_jugado = 0
+sea hasta_objeto = 0
+sea parpadeo = 0                    # invulnerable tras un golpe
+sea fondo = []                      # estrellitas del fondo
+
+funcion reiniciar(): nulo {
+    nave_x = ANCHO / 2
+    objetos = []
+    vidas = 3
+    puntos = 0
+    tiempo_jugado = 0
+    hasta_objeto = 0.5
+    parpadeo = 0
+}
+
+juego.abrir("Esquiva", ANCHO, ALTO)
+para cada numero i en rango(0, 60) {
+    fondo.agregar([matematica.aleatorio(0, ANCHO), matematica.aleatorio(0, ALTO), matematica.aleatorio(1, 3)])
+}
+reiniciar()
+
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    si juego.tecla_pulsada("escape") { juego.salir() }
+
+    si vidas > 0 {
+        si juego.tecla("izquierda") o juego.tecla("a") { nave_x = nave_x - 380 * dt }
+        si juego.tecla("derecha") o juego.tecla("d") { nave_x = nave_x + 380 * dt }
+        nave_x = matematica.maximo(18, matematica.minimo(ANCHO - 18, nave_x))
+        tiempo_jugado = tiempo_jugado + dt
+        parpadeo = matematica.maximo(0, parpadeo - dt)
+
+        hasta_objeto = hasta_objeto - dt
+        si hasta_objeto <= 0 {
+            # cada vez cae más deprisa y más seguido
+            sea velocidad = 160 + tiempo_jugado * 6
+            si matematica.aleatorio() < 0.2 {
+                objetos.agregar(Estrella(velocidad))
+            } sino {
+                objetos.agregar(Meteorito(velocidad))
+            }
+            hasta_objeto = matematica.maximo(0.25, 0.8 - tiempo_jugado / 120)
+        }
+
+        sea quedan = []
+        para cada Objeto objeto en objetos {
+            objeto.mover(dt)
+            sea conservar = no objeto.fuera()
+            si objeto.toca(nave_x, ALTO - 50, 14) {
+                conservar = falso
+                si objeto es Estrella {
+                    puntos = puntos + 10
+                    juego.pitido(880, 70)
+                } sino si parpadeo == 0 {
+                    vidas = vidas - 1
+                    parpadeo = 1.2
+                    juego.pitido(110, 300)
+                }
+            }
+            si conservar { quedan.agregar(objeto) }
+        }
+        objetos = quedan
+        puntos = puntos + dt * 2
+    } sino si juego.tecla_pulsada("espacio") {
+        reiniciar()
+    }
+
+    juego.limpiar([10, 10, 28])
+    para cada lista e en fondo {
+        e[1] = e[1] + e[2] * 20 * dt
+        si e[1] > ALTO { e[1] = 0 }
+        juego.rectangulo(e[0], e[1], e[2], e[2], [90, 90, 130])
+    }
+    para cada Objeto objeto en objetos { objeto.dibujar() }
+    si vidas > 0 y (parpadeo == 0 o matematica.piso(parpadeo * 10) % 2 == 0) {
+        juego.rectangulo(nave_x - 16, ALTO - 38, 32, 14, [120, 200, 240])
+        juego.rectangulo(nave_x - 6, ALTO - 62, 12, 26, [190, 230, 250])
+    }
+    juego.texto("PUNTOS " + a_texto(matematica.piso(puntos)), 10, 10, 2, [230, 230, 245])
+    sea v = "VIDAS " + a_texto(vidas)
+    juego.texto(v, ANCHO - juego.ancho_texto(v, 2) - 10, 10, 2, [255, 200, 80])
+    si vidas == 0 {
+        juego.texto("FIN DEL JUEGO", (ANCHO - juego.ancho_texto("FIN DEL JUEGO", 4)) / 2, 260, 4, [255, 255, 255])
+        juego.texto("ESPACIO PARA REINTENTAR", (ANCHO - juego.ancho_texto("ESPACIO PARA REINTENTAR", 2)) / 2, 320, 2, [180, 180, 200])
+    }
+    juego.presentar()
+}

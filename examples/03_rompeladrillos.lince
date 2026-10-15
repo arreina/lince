@@ -1,0 +1,148 @@
+# 🐆 Lince — Rompeladrillos
+#
+# Flechas (o A / D) mueven la pala; el ratón también. Espacio lanza la bola.
+# Rompe todos los ladrillos; tienes 3 vidas. Esc sale.
+#
+# Muestra: una lista de diccionarios (cada ladrillo es un diccionario),
+#          colisiones con rectángulos y estados de juego.
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 640
+fijo ALTO = 480
+fijo PALA_ANCHO = 90
+fijo PALA_ALTO = 12
+fijo LADRILLO_W = 56
+fijo LADRILLO_H = 20
+fijo COLORES = [[230, 70, 70], [240, 150, 60], [240, 220, 80], [90, 200, 110], [80, 150, 240]]
+
+sea ladrillos = []
+sea pala_x = (ANCHO - PALA_ANCHO) / 2
+sea bola_x = 0
+sea bola_y = 0
+sea vx = 0
+sea vy = 0
+sea pegada = verdadero             # la bola sigue a la pala hasta que se lanza
+sea vidas = 3
+sea puntos = 0
+sea estado = "jugando"             # "jugando", "ganado" o "perdido"
+
+funcion crear_ladrillos(): nulo {
+    ladrillos = []
+    para cada numero fila en rango(0, 5) {
+        para cada numero col en rango(0, 10) {
+            ladrillos.agregar({"x": 10 + col * (LADRILLO_W + 4), "y": 50 + fila * (LADRILLO_H + 4),
+                               "vivo": verdadero, "fila": fila})
+        }
+    }
+}
+
+funcion nueva_partida(): nulo {
+    crear_ladrillos()
+    vidas = 3
+    puntos = 0
+    estado = "jugando"
+    pegada = verdadero
+}
+
+funcion quedan(): numero {
+    sea n = 0
+    para cada diccionario l en ladrillos {
+        si l["vivo"] { n = n + 1 }
+    }
+    devolver n
+}
+
+funcion limitar(val numero v, val numero minimo, val numero maximo): numero {
+    si v < minimo { devolver minimo }
+    si v > maximo { devolver maximo }
+    devolver v
+}
+
+juego.abrir("Rompeladrillos", ANCHO, ALTO)
+nueva_partida()
+
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    si juego.tecla_pulsada("escape") { juego.salir() }
+
+    si estado == "jugando" {
+        si juego.tecla("izquierda") o juego.tecla("a") { pala_x = pala_x - 480 * dt }
+        si juego.tecla("derecha") o juego.tecla("d") { pala_x = pala_x + 480 * dt }
+        pala_x = limitar(pala_x, 0, ANCHO - PALA_ANCHO)
+
+        si pegada {
+            bola_x = pala_x + PALA_ANCHO / 2
+            bola_y = ALTO - 50
+            si juego.tecla_pulsada("espacio") {
+                pegada = falso
+                vx = (matematica.aleatorio() - 0.5) * 240
+                vy = -300
+            }
+        } sino {
+            bola_x = bola_x + vx * dt
+            bola_y = bola_y + vy * dt
+            si bola_x < 6 {
+                bola_x = 6
+                vx = -vx
+            }
+            si bola_x > ANCHO - 6 {
+                bola_x = ANCHO - 6
+                vx = -vx
+            }
+            si bola_y < 6 {
+                bola_y = 6
+                vy = -vy
+            }
+
+            # pala: el ángulo depende de dónde la toca
+            si vy > 0 y juego.colision(bola_x - 6, bola_y - 6, 12, 12, pala_x, ALTO - 40, PALA_ANCHO, PALA_ALTO) {
+                sea dist = (bola_x - (pala_x + PALA_ANCHO / 2)) / (PALA_ANCHO / 2)
+                vx = dist * 280
+                vy = -matematica.abs(vy) * 1.02
+                juego.pitido(440, 40)
+            }
+
+            # ladrillos: al tocar uno, se rompe y la bola rebota
+            para cada diccionario l en ladrillos {
+                si l["vivo"] y juego.colision(bola_x - 6, bola_y - 6, 12, 12, l["x"], l["y"], LADRILLO_W, LADRILLO_H) {
+                    l["vivo"] = falso
+                    vy = -vy
+                    puntos = puntos + 10 * (5 - l["fila"])
+                    juego.pitido(600 + l["fila"] * 80, 40)
+                }
+            }
+
+            si bola_y > ALTO {
+                vidas = vidas - 1
+                pegada = verdadero
+                juego.pitido(130, 300)
+                si vidas == 0 { estado = "perdido" }
+            }
+            si quedan() == 0 { estado = "ganado" }
+        }
+    } sino si juego.tecla_pulsada("espacio") {
+        nueva_partida()
+    }
+
+    juego.limpiar([14, 16, 28])
+    para cada diccionario l en ladrillos {
+        si l["vivo"] {
+            juego.rectangulo(l["x"], l["y"], LADRILLO_W, LADRILLO_H, COLORES[l["fila"]])
+        }
+    }
+    juego.rectangulo(pala_x, ALTO - 40, PALA_ANCHO, PALA_ALTO, [230, 230, 245])
+    juego.circulo(bola_x, bola_y, 6, [255, 255, 255])
+    juego.texto("PUNTOS " + a_texto(puntos), 10, 10, 2, [230, 230, 245])
+    sea v = "VIDAS " + a_texto(vidas)
+    juego.texto(v, ANCHO - juego.ancho_texto(v, 2) - 10, 10, 2, [255, 200, 80])
+    si estado != "jugando" {
+        sea m = "HAS GANADO" 
+        si estado == "perdido" { m = "FIN DEL JUEGO" }
+        juego.texto(m, (ANCHO - juego.ancho_texto(m, 4)) / 2, 220, 4, [255, 255, 255])
+        juego.texto("ESPACIO PARA JUGAR OTRA VEZ", (ANCHO - juego.ancho_texto("ESPACIO PARA JUGAR OTRA VEZ", 2)) / 2, 270, 2, [180, 180, 200])
+    } sino si pegada {
+        juego.texto("ESPACIO PARA LANZAR", (ANCHO - juego.ancho_texto("ESPACIO PARA LANZAR", 2)) / 2, 300, 2, [180, 180, 200])
+    }
+    juego.presentar()
+}

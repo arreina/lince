@@ -28,9 +28,6 @@ jobs:
       - name: Suite del compilador
         run: make test-compilador
 
-      - name: Los ejercicios de examples/ se ejecutan
-        run: make test-ejemplos
-
       - name: Servidor de lenguaje (lince lsp)
         run: make test-lsp
 
@@ -45,7 +42,7 @@ jobs:
       - name: Juego (SDL2 sin pantalla)
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
-          make test-juego
+          make test-juego test-ejemplos
 
       - name: Los editores están al día
         run: make editores-check
