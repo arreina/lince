@@ -1,0 +1,48 @@
+# Prueba de las animaciones generadas (animar) y de guardar_imagen
+importar "juego"
+juego.abrir("Animar", 64, 32)
+# 4×6: cuerpo arriba y dos piernas de 3 filas separadas por un hueco
+fijo PJ = juego.sprite([
+    "XXXX",
+    "XXXX",
+    "XXXX",
+    "X..X",
+    "X..X",
+    "X..X"
+], {"X": [255, 0, 0]})
+sea andar = juego.animar(PJ, "andar")
+escribir("andar: " + a_texto(andar["cuadros"]) + " " + a_texto(andar["celda"][0]) + "x" + a_texto(andar["celda"][1]) +
+         " relleno " + a_texto(andar["relleno"][0]))
+escribir("misma hoja: " + a_texto(juego.animar(PJ, "andar")["imagen"] == andar["imagen"]))
+para cada texto t en ["respirar", "correr", "saltar", "golpe", "morir", "flotar", "girar"] {
+    sea h = juego.animar(PJ, t, {"cuadros": 4})
+    escribir(t + ": " + a_texto(h["cuadros"]))
+}
+escribir("frente: " + a_texto(juego.animar(PJ, "andar", {"vista": "frente"})["relleno"][0]))
+# el cuadro 0 de andar: la pierna izquierda levantada (sin pie abajo), la derecha apoyada
+juego.limpiar([0, 0, 0])
+juego.dibujar(andar, 0, 0, {"cuadro": 0, "escala": 4})
+juego.captura("andar.bmp")
+juego.presentar()
+# guardar_imagen escribe un PNG que se vuelve a leer igual
+juego.guardar_imagen(andar, "andar.png")
+sea leida = juego.imagen("andar.png")
+escribir("png: " + a_texto(leida["ancho"]) + "x" + a_texto(leida["alto"]))
+escribir("desde archivo: " + a_texto(juego.animar("andar.png", "girar", {"cuadros": 2})["cuadros"]))
+para cada lista intento en [["saltar", {"cuadro": 3}], ["bailar", nulo], ["andar", {"vista": "arriba"}], ["andar", {"cuadros": 0}]] {
+    intentar {
+        juego.animar(PJ, intento[0], intento[1])
+    } capturar (error e) {
+        escribir("error: " + e.mensaje)
+    }
+}
+intentar {
+    juego.animar(juego.sprite(["..."], {"X": [1, 1, 1]}), "andar")
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.guardar_imagen(PJ, "pj.bmp")
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}

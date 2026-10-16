@@ -1,0 +1,184 @@
+# 🐆 Lince — Paseo
+#
+# Pasea por el campo: flechas o A / D (o el stick del mando) para andar, y
+# manteniendo Mayús (o el botón B) para correr. Esc sale.
+#
+# Muestra: animaciones generadas a partir de un solo dibujo. El personaje
+# está dibujado una vez, quieto y de perfil; juego.animar() saca de él los
+# cuadros de andar y de correr (encuentra las piernas y las mueve por turnos)
+# y los de estar quieto (respirar). Arriba se ve la hoja que ha generado, con
+# el cuadro que toca marcado. Con juego.guardar_imagen() se puede guardar esa
+# hoja como PNG para retocarla en un editor de dibujo.
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 800
+fijo ALTO = 450
+fijo MUNDO = 3200                       # el campo es más ancho que la pantalla
+fijo SUELO = 360                        # altura del suelo
+fijo ESCALA = 4
+fijo VELOCIDAD_ANDAR = 130              # píxeles por segundo
+fijo VELOCIDAD_CORRER = 300
+
+juego.abrir("Paseo", ANCHO, ALTO)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("correr", ["mayus", "mando:b", "mando:x"])
+
+# El único dibujo del personaje: quieto y mirando a la derecha
+fijo PERSONAJE = juego.sprite([
+    ".....KKKKK......",
+    "....KHHHHHK.....",
+    "...KHHHHHHHK....",
+    "...KHHHSSSSK....",
+    "...KHHSSSKSK....",
+    "...KHSSSSSSSK...",
+    "....KSSSSSSK....",
+    ".....KKSSKK.....",
+    "....KRRRRRRK....",
+    "...KRRRRRRRRK...",
+    "...KRRRrrRRRK...",
+    "...KRRRrrRRRK...",
+    "...KRRRSSRRRK...",
+    "..KBBBBBBBBBK...",
+    "..KBBBBKKBBBK...",
+    "..KBBK..KBBK....",
+    "..KBBK..KBBK....",
+    "..KBBK..KBBK....",
+    "..KMMMK.KMMMK...",
+    "..KKKKK.KKKKK..."
+], {"K": [30, 24, 40], "H": [120, 70, 40], "S": [250, 200, 160], "R": [200, 50, 60], "r": [160, 36, 50],
+    "B": [50, 70, 160], "M": [90, 50, 30]})
+
+# Las animaciones, generadas a partir de ese dibujo
+fijo QUIETO = juego.animar(PERSONAJE, "respirar")
+fijo ANDAR = juego.animar(PERSONAJE, "andar")
+fijo CORRER = juego.animar(PERSONAJE, "correr")
+
+# Tiles del suelo (hierba y tierra) y adornos
+fijo TILES = juego.hoja(juego.sprite([
+    "GGGGGGGGtttttttt",
+    "GgGGGgGGtTtttttt",
+    "gtgGgtgGtttttTtt",
+    "ttgtttgttttttttt",
+    "tttttttttTtttttt",
+    "tTtttttttttttttT",
+    "ttttttTttttttttt",
+    "tttttttttttTtttt"
+], {"G": [110, 190, 80], "g": [80, 150, 60], "t": [130, 90, 60], "T": [110, 72, 48]}), 8)
+fijo ARBOL = juego.sprite([
+    "....LLLLL....",
+    "..LLLLLlLLL..",
+    ".LLlLLLLLLLL.",
+    "LLLLLLLLlLLLL",
+    "LLLLlLLLLLLlL",
+    ".LLLLLLlLLLL.",
+    "..LLLLLLLLL..",
+    "....LmmmL....",
+    ".....mmm.....",
+    ".....mmm.....",
+    ".....mmm.....",
+    "....mmmmm...."
+], {"L": [60, 140, 70], "l": [90, 175, 90], "m": [100, 66, 40]})
+fijo NUBE = juego.sprite([
+    "...WWW......",
+    ".WWWWWWW.WW.",
+    "WWWWWWWWWWWW",
+    ".WWWWWWWWWW."
+], {"W": [250, 250, 255]})
+
+# ── Estado ──────────────────────────────────────────────────────────
+sea x = 400                             # el centro del personaje
+sea mira_izquierda = falso
+sea estado = "quieto"                   # "quieto", "andar" o "correr"
+sea cuadro_anterior = -1
+
+# ── Dibujo ──────────────────────────────────────────────────────────
+# Resto siempre positivo (para repetir el paisaje)
+funcion ciclo(val numero a, val numero m): numero { devolver ((a % m) + m) % m }
+
+funcion dibujar_campo(val numero cam): nulo {
+    juego.limpiar([140, 200, 240])
+    # nubes y colinas lejanas: se mueven más despacio que el suelo (parece que están lejos)
+    para cada numero i en rango(0, 8) {
+        sea nx = i * 520 + juego.tiempo() * 8 - cam * 0.3
+        juego.dibujar(NUBE, cam + ciclo(nx, 4160) - 300, 40 + (i * 37) % 90, {"escala": 5})
+    }
+    para cada numero i en rango(0, 12) {
+        juego.circulo(cam + ciclo(i * 330 - cam * 0.5, 3960) - 200, SUELO + 40, 170, [120, 180, 110])
+    }
+    # árboles
+    para cada numero i en rango(0, 14) {
+        juego.dibujar(ARBOL, 120 + i * 230 + (i * 71) % 90, SUELO - 12 * 6, {"escala": 6})
+    }
+    # suelo: una fila de hierba y debajo tierra, con tiles de 8×8 a escala 4
+    para cada numero c en rango(matematica.piso(cam / 32), matematica.piso(cam / 32) + 27) {
+        juego.dibujar(TILES, c * 32, SUELO, {"cuadro": 0, "escala": ESCALA})
+        para cada numero f en rango(1, 4) {
+            juego.dibujar(TILES, c * 32, SUELO + f * 32, {"cuadro": 1, "escala": ESCALA})
+        }
+    }
+}
+
+# La hoja que se está usando, arriba a la izquierda, con el cuadro actual marcado
+funcion dibujar_hoja(val diccionario hoja, val numero actual): nulo {
+    juego.camara()
+    sea n = hoja["cuadros"]
+    sea cw = hoja["celda"][0] * 2
+    sea ch = hoja["celda"][1] * 2
+    juego.rectangulo(8, 8, n * (cw + 4) + 132, ch + 34, [0, 0, 0, 120])
+    juego.texto("1 DIBUJO", 16, 14, 2, [255, 255, 255])
+    juego.dibujar(PERSONAJE, 40, 34, {"escala": 2})
+    juego.texto(">", 96, 46, 3, [255, 220, 120])
+    juego.texto(a_texto(n) + " CUADROS: " + estado, 124, 14, 2, [255, 220, 120])
+    para cada numero i en rango(0, n) {
+        sea fx = 124 + i * (cw + 4)
+        si i == actual { juego.rectangulo(fx - 2, 32, cw + 4, ch + 4, [255, 220, 120, 160]) }
+        juego.dibujar(hoja, fx, 34, {"cuadro": i, "escala": 2})
+    }
+}
+
+# ── El bucle ────────────────────────────────────────────────────────
+mientras juego.abierto() {
+    si juego.tecla_pulsada("escape") { juego.salir() }
+    sea dt = juego.dt()
+    sea dir = juego.direccion("izquierda", "derecha")
+    estado = "quieto"
+    si dir != 0 {
+        mira_izquierda = dir < 0
+        estado = "andar"
+        si juego.accion("correr") { estado = "correr" }
+    }
+    sea velocidad = VELOCIDAD_ANDAR
+    si estado == "correr" { velocidad = VELOCIDAD_CORRER }
+    x = matematica.limitar(x + dir * velocidad * dt, 40, MUNDO - 40)
+    sea cam = matematica.limitar(x - ANCHO / 2, 0, MUNDO - ANCHO)
+    juego.camara(cam, 0)
+
+    # qué hoja y qué cuadro tocan; los pasos van al ritmo de lo que avanza
+    sea hoja = QUIETO
+    sea cuadro = juego.cuadro(QUIETO["cuadros"], 5)
+    si estado == "andar" {
+        hoja = ANDAR
+        cuadro = juego.cuadro(ANDAR["cuadros"], 10)
+    } sino si estado == "correr" {
+        hoja = CORRER
+        cuadro = juego.cuadro(CORRER["cuadros"], 14)
+    }
+
+    # un paso suena cuando el pie apoya (los cuadros con los dos pies en el suelo)
+    si cuadro != cuadro_anterior {
+        si (estado == "andar" y (cuadro == 2 o cuadro == 6)) o (estado == "correr" y (cuadro == 1 o cuadro == 4)) {
+            juego.efecto("golpe", {"tono": 1.8, "largo": 0.4, "volumen": 0.35})
+        }
+        cuadro_anterior = cuadro
+    }
+
+    dibujar_campo(cam)
+    # sombra y personaje: x, y es el centro del dibujo, con los pies en el suelo
+    juego.rectangulo(x - 28, SUELO - 2, 56, 6, [0, 0, 0, 50])
+    juego.dibujar(hoja, x, SUELO - 10 * ESCALA, {"cuadro": cuadro, "escala": ESCALA,
+                                                "centrado": verdadero, "espejo": mira_izquierda})
+    dibujar_hoja(hoja, cuadro)
+    juego.presentar()
+}

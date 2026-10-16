@@ -38,11 +38,12 @@ mientras juego.abierto() {
 }
 ```
 
-Nueve minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, memoria, tres en raya, un plataformas con cámara y sprites, y una mazmorra de tiles con fantasmas que te persiguen) están en [`examples/`](examples/).
+Diez minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, memoria, tres en raya, un plataformas con cámara y sprites, una mazmorra de tiles con fantasmas que te persiguen y un paseo con animaciones generadas a partir de un solo dibujo) están en [`examples/`](examples/).
 
 <p align="center">
   <img src="docs/img/08_plataformas.png" width="320" alt="Plataformas">
   <img src="docs/img/09_mazmorra.png" width="320" alt="Mazmorra">
+  <img src="docs/img/10_paseo.png" width="320" alt="Paseo">
 </p>
 
 ## ¿Por qué Lince?
@@ -266,7 +267,7 @@ lince/
 │   ├── lince/                     # tests del intérprete
 │   ├── compilador/                # tests del compilador
 │   └── juego/                     # tests del módulo juego y de los minijuegos
-├── examples/               # nueve minijuegos
+├── examples/               # diez minijuegos
 ├── editores/               # soporte para editores
 ├── ESPECIFICACION.md       # especificación completa
 └── Makefile

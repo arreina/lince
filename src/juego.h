@@ -108,7 +108,13 @@ typedef struct { int freq; unsigned short formato; unsigned char canales, silenc
                  void *datos; } JgAudioSpec;
 
 /* mtime/tam: huella del archivo al cargarlo, para recargarlo si cambia */
-typedef struct { void *tex; int ancho, alto; char *ruta; long long mtime, tam; } JgImagen;
+/* Cómo se generó una animación con animar(): para rehacerla si cambia la imagen */
+typedef struct { char tipo[16]; int cuadros, piernas, centro, frente; double intensidad; } JgReceta;
+/* px: copia de los píxeles (RGBA) de las imágenes que no salen de un archivo
+   (sprites y animaciones generadas); las de archivo se vuelven a leer si hace
+   falta. origen: la imagen de la que se generó la animación, o -1. */
+typedef struct { void *tex; int ancho, alto; char *ruta; long long mtime, tam;
+                 unsigned char *px; int origen; JgReceta receta; } JgImagen;
 typedef struct { short *datos; int muestras; char *ruta; long long mtime, tam; } JgSonido;   /* muestras por canal */
 typedef struct {
     const short *datos; int muestras, pos, bucle, activa, id;
@@ -233,6 +239,7 @@ static void jg_escenas(void);
 static void jg_aviso_error(const char *msg, int pantalla);
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
+static void jg_rehacer_animaciones(int origen);
 
 static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
@@ -406,7 +413,11 @@ static void jg_cerrar_todo(void) {
     _jgs.nsonidos = 0;
     for (int i = 0; i < _jgs.nmapas; i++) { free(_jgs.mapas[i].celdas); _jgs.mapas[i].celdas = NULL; }
     _jgs.nmapas = 0;
-    for (int i = 0; i < _jgs.nimagenes; i++) { _jg.DestroyTexture(_jgs.imagenes[i].tex); free(_jgs.imagenes[i].ruta); }
+    for (int i = 0; i < _jgs.nimagenes; i++) {
+        _jg.DestroyTexture(_jgs.imagenes[i].tex);
+        free(_jgs.imagenes[i].ruta);
+        free(_jgs.imagenes[i].px);
+    }
     _jgs.nimagenes = 0;
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
     if (_jgs.render) _jg.DestroyRenderer(_jgs.render);
@@ -913,6 +924,7 @@ static void jg_recargar_recursos(void) {
         im->tex = tex;
         _jg.QueryTexture(tex, NULL, NULL, &im->ancho, &im->alto);
         im->mtime = m; im->tam = t;
+        jg_rehacer_animaciones(i);              /* las generadas con animar() a partir de ella */
     }
     for (int i = 0; i < _jgs.nsonidos; i++) {
         JgSonido *so = &_jgs.sonidos[i];
@@ -1538,11 +1550,57 @@ static Valor *fn_jg_imagen(Valor **a, int n) {
     void *tex;
     if (!jg_leer_textura(a[0]->texto, &tex, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
     int k = _jgs.nimagenes++;
+    memset(&_jgs.imagenes[k], 0, sizeof _jgs.imagenes[k]);
+    _jgs.imagenes[k].origen = -1;
     _jgs.imagenes[k].tex = tex;
     _jgs.imagenes[k].ruta = strdup(a[0]->texto);
     recarga_huella(a[0]->texto, &_jgs.imagenes[k].mtime, &_jgs.imagenes[k].tam);
     _jg.QueryTexture(tex, NULL, NULL, &_jgs.imagenes[k].ancho, &_jgs.imagenes[k].alto);
     return jg_imagen_valor(k);
+}
+
+/* Textura a partir de píxeles RGBA (que pasan a ser de la imagen) */
+static void *jg_textura_rgba(const unsigned char *rgba, int ancho, int alto) {
+    void *sup = _jg.SurfaceFrom((void *)rgba, ancho, alto, 32, ancho * 4, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+    void *tex = sup ? _jg.TextureFromSurface(_jgs.render, sup) : NULL;
+    if (sup) _jg.FreeSurface(sup);
+    if (tex) _jg.TextureBlend(tex, 1);
+    return tex;
+}
+
+/* Nueva imagen hecha en memoria (sprite, animación): se queda con 'rgba'.
+   Devuelve su número, o -1 (y libera 'rgba'). */
+static int jg_nueva_imagen(const char *nombre, unsigned char *rgba, int ancho, int alto) {
+    void *tex = _jgs.nimagenes < JG_MAX_IMAGENES ? jg_textura_rgba(rgba, ancho, alto) : NULL;
+    if (!tex) { free(rgba); return -1; }
+    int k = _jgs.nimagenes++;
+    memset(&_jgs.imagenes[k], 0, sizeof _jgs.imagenes[k]);
+    _jgs.imagenes[k].tex = tex;
+    _jgs.imagenes[k].ruta = strdup(nombre);
+    _jgs.imagenes[k].ancho = ancho;
+    _jgs.imagenes[k].alto = alto;
+    _jgs.imagenes[k].px = rgba;
+    _jgs.imagenes[k].origen = -1;
+    return k;
+}
+
+/* Los píxeles RGBA de una imagen (copia nueva, liberar con free) */
+static unsigned char *jg_pixeles(int k) {
+    JgImagen *im = &_jgs.imagenes[k];
+    size_t n = (size_t)im->ancho * im->alto * 4;
+    if (im->px) {
+        unsigned char *c = malloc(n);
+        if (c) memcpy(c, im->px, n);
+        return c;
+    }
+    size_t largo = 0;
+    char *bytes = interprete_leer_bytes(im->ruta, &largo);
+    if (!bytes) return NULL;
+    int w = 0, h = 0;
+    unsigned char *px = imagen_decodificar((const unsigned char *)bytes, largo, &w, &h, NULL);
+    free(bytes);
+    if (px && (w != im->ancho || h != im->alto)) { free(px); px = NULL; }
+    return px;
 }
 
 /* sprite(filas, colores): imagen hecha con texto, un carácter por píxel.
@@ -1595,17 +1653,15 @@ static Valor *fn_jg_sprite(Valor **a, int n) {
             px[y * ancho + x] = (unsigned)c[3] << 24 | (unsigned)c[0] << 16 | (unsigned)c[1] << 8 | c[2];
         }
     }
-    void *sup = _jg.SurfaceFrom(px, ancho, alto, 32, ancho * 4, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-    void *tex = sup ? _jg.TextureFromSurface(_jgs.render, sup) : NULL;
-    if (sup) _jg.FreeSurface(sup);
+    unsigned char *rgba = malloc((size_t)ancho * alto * 4);        /* copia para animar() y guardar_imagen() */
+    if (!rgba) { free(px); return jg_error("Error", "sin memoria"); }
+    for (int i = 0; i < ancho * alto; i++) {
+        rgba[i * 4] = (unsigned char)(px[i] >> 16); rgba[i * 4 + 1] = (unsigned char)(px[i] >> 8);
+        rgba[i * 4 + 2] = (unsigned char)px[i]; rgba[i * 4 + 3] = (unsigned char)(px[i] >> 24);
+    }
     free(px);
-    if (!tex) return jg_error("ErrorJuego", "no se pudo crear el sprite");
-    int k = _jgs.nimagenes++;
-    _jgs.imagenes[k].tex = tex;
-    _jgs.imagenes[k].ruta = strdup(nombre);
-    _jgs.imagenes[k].ancho = ancho;
-    _jgs.imagenes[k].alto = alto;
-    _jg.TextureBlend(tex, 1);
+    int k = jg_nueva_imagen(nombre, rgba, ancho, alto);
+    if (k < 0) return jg_error("ErrorJuego", "no se pudo crear el sprite");
     return jg_imagen_valor(k);
 }
 
@@ -1720,6 +1776,333 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     valor_diccionario_agregar(d, "columnas", valor_numero(cols));
     valor_diccionario_agregar(d, "cuadros", valor_numero(total));
     return d;
+}
+
+/* ── Animaciones generadas ──
+   animar(imagen, "andar") hace, a partir de un solo dibujo, una hoja con los
+   cuadros de una animación. Hay dos maneras:
+   - andar y correr mueven las piernas: busca dónde se separan (las filas de
+     abajo con hueco en medio), las parte en izquierda y derecha y las balancea
+     por turnos (la que avanza se encoge para levantar el pie) mientras el
+     cuerpo baja un píxel cuando apoya los dos pies. Es el truco clásico del
+     pixel art; con un dibujo sin piernas separadas se toma el 30 % de abajo.
+   - las demás deforman el dibujo entero (estirar, aplastar, girar, mover,
+     teñir de blanco), con el ancla en los pies o en el centro.
+   Los cuadros son algo mayores que el dibujo (lo que asoma al moverse); el
+   dibujo queda en el centro, así que con "centrado" se dibuja en el mismo
+   sitio que la imagen original. */
+static const char *const JG_ANIMACIONES[] = {
+    "respirar", "andar", "correr", "saltar", "golpe", "morir", "flotar", "girar", NULL };
+
+typedef struct { double sx, sy, ang, dx, dy, blanco, alfa; } JgPose;
+
+static int jg_opaco(const unsigned char *px, int w, int h, int x, int y) {
+    return x >= 0 && y >= 0 && x < w && y < h && px[((size_t)y * w + x) * 4 + 3] > 0;
+}
+
+/* Tramos opacos de la fila y (con x en [x0, x1]); 'ini'/'fin' de los dos primeros */
+static int jg_tramos(const unsigned char *px, int w, int h, int y, int x0, int x1, int *fin1, int *ini2) {
+    int n = 0, dentro = 0;
+    for (int x = x0; x <= x1; x++) {
+        int o = jg_opaco(px, w, h, x, y);
+        if (o && !dentro) { n++; if (n == 2 && ini2) *ini2 = x; }
+        if (!o && dentro && n == 1 && fin1) *fin1 = x - 1;
+        dentro = o;
+    }
+    return n;
+}
+
+/* Valor entre fotogramas clave (t de 0 a 1): k[i] = {t, a, b} */
+static void jg_clave(const double (*k)[3], int n, double t, double *a, double *b) {
+    int i = 0;
+    while (i < n - 2 && t > k[i + 1][0]) i++;
+    double f = (t - k[i][0]) / (k[i + 1][0] - k[i][0]);
+    if (f < 0) f = 0;
+    if (f > 1) f = 1;
+    *a = k[i][1] + (k[i + 1][1] - k[i][1]) * f;
+    *b = k[i][2] + (k[i + 1][2] - k[i][2]) * f;
+}
+
+static JgPose jg_pose(const char *tipo, int i, int n, double k, double u, int bw, int bh) {
+    JgPose p = {1, 1, 0, 0, 0, 0, 1};
+    double t = 2 * M_PI * i / n, lineal = n > 1 ? (double)i / (n - 1) : 1;
+    if (!strcmp(tipo, "respirar")) {
+        double a = fmax(0.05, 1.0 / bh) * k;
+        p.sy = 1 + a * sin(t); p.sx = 1 - a / 2 * sin(t);
+    } else if (!strcmp(tipo, "flotar")) {
+        p.dy = -fmax(u, bh * 0.1) * k * sin(t);
+    } else if (!strcmp(tipo, "saltar")) {           /* se agacha, sale estirado y vuelve */
+        static const double c[][3] = {{0, 1, 1}, {0.2, 1.25, 0.75}, {0.45, 0.85, 1.2}, {0.75, 0.95, 1.06}, {1, 1, 1}};
+        jg_clave(c, 5, lineal, &p.sx, &p.sy);
+        p.sx = 1 + (p.sx - 1) * k; p.sy = 1 + (p.sy - 1) * k;
+    } else if (!strcmp(tipo, "golpe")) {            /* destello blanco y sacudida */
+        double f = 1 - (double)i / n;
+        p.blanco = f;
+        p.dx = 2 * u * k * f * (i % 2 ? -1 : 1);
+    } else if (!strcmp(tipo, "morir")) {            /* salta un poco y cae de lado */
+        double e = 1 - (1 - lineal) * (1 - lineal);
+        p.ang = 90 * e;
+        p.dy = -bh * 0.25 * k * sin(M_PI * lineal) - bw / 2.0 * sin(p.ang * M_PI / 180);
+        p.blanco = i == 0 ? 0.8 : 0;
+    } else if (!strcmp(tipo, "girar")) {
+        p.ang = 360.0 * i / n;
+    }
+    return p;
+}
+
+/* Hace la hoja: los cuadros en una fila, cada uno de (*cw)×(*ch). Devuelve los
+   píxeles RGBA (con malloc) o NULL con el motivo en 'msg'. */
+static unsigned char *jg_generar_animacion(const unsigned char *px, int w, int h, const JgReceta *r,
+                                           int *cw, int *ch, char *msg, size_t max) {
+    int bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+            if (jg_opaco(px, w, h, x, y)) {
+                if (x < bx0) bx0 = x;
+                if (x > bx1) bx1 = x;
+                if (y < by0) by0 = y;
+                if (y > by1) by1 = y;
+            }
+    if (bx1 < 0) { snprintf(msg, max, "animar(): la imagen es transparente del todo"); return NULL; }
+    int bw = bx1 - bx0 + 1, bh = by1 - by0 + 1;
+    double k = r->intensidad, u = fmax(1, round(bh / 16.0));
+    int andar = !strcmp(r->tipo, "andar"), correr = !strcmp(r->tipo, "correr");
+    int n = r->cuadros;
+    int rx = 0, ry = 0;
+
+    /* piernas: filas de abajo con hueco en medio, partidas por la columna 'corte' */
+    int pie = by1 + 1, cadera = pie, corte = (bx0 + bx1 + 1) / 2;
+    double paso = 0, alza = 0, bote = 0;
+    if (andar || correr) {
+        if (r->piernas > 0) cadera = pie - r->piernas;
+        else {
+            for (int y = by1; y > by0; y--) {
+                if (jg_tramos(px, w, h, y, bx0, bx1, NULL, NULL) < 2) break;
+                cadera = y;
+            }
+            if (pie - cadera < 2) cadera = pie - (int)fmax(2, round(bh * 0.3));
+        }
+        if (cadera <= by0) cadera = by0 + 1;
+        int fin1 = -1, ini2 = -1;
+        if (r->centro >= 0) corte = r->centro;
+        else if (jg_tramos(px, w, h, by1, bx0, bx1, &fin1, &ini2) >= 2) corte = (fin1 + 1 + ini2) / 2;
+        int alto_piernas = pie - cadera;
+        paso = r->frente ? 0 : (correr ? 2.5 : 1.5) * u * k;          /* de frente, los pies solo suben */
+        alza = fmin(alto_piernas - 1, round((correr ? 3 : r->frente ? 1 : 2) * u * k));
+        bote = round((correr ? 1.5 : 1) * u * k);
+        rx = (int)ceil(paso);
+    } else {
+        /* lo que ocupa el dibujo en el peor cuadro, para el tamaño de la celda */
+        double ax = (bx0 + bx1 + 1) / 2.0, ay = !strcmp(r->tipo, "girar") ? (by0 + by1 + 1) / 2.0 : by1 + 1;
+        double esq[4][2] = {{bx0, by0}, {bx1 + 1, by0}, {bx0, by1 + 1}, {bx1 + 1, by1 + 1}};
+        double mx = 0, my = 0;
+        for (int i = 0; i < n; i++) {
+            JgPose p = jg_pose(r->tipo, i, n, k, u, bw, bh);
+            double c = cos(p.ang * M_PI / 180), s = sin(p.ang * M_PI / 180);
+            for (int e = 0; e < 4; e++) {
+                double vx = (esq[e][0] - ax) * p.sx, vy = (esq[e][1] - ay) * p.sy;
+                double X = ax + p.dx + c * vx - s * vy, Y = ay + p.dy + s * vx + c * vy;
+                mx = fmax(mx, fmax(-X, X - w));
+                my = fmax(my, fmax(-Y, Y - h));
+            }
+        }
+        rx = (int)ceil(mx - 1e-9); ry = (int)ceil(my - 1e-9);
+    }
+    *cw = w + 2 * rx; *ch = h + 2 * ry;
+    if ((long)*cw * n > 16384 || *ch > 16384) { snprintf(msg, max, "animar(): la hoja saldría demasiado grande"); return NULL; }
+    int ancho = *cw * n;
+    unsigned char *hoja = calloc((size_t)ancho * *ch, 4);
+    if (!hoja) { snprintf(msg, max, "sin memoria"); return NULL; }
+
+    for (int i = 0; i < n; i++) {
+        JgPose p = jg_pose(r->tipo, i, n, k, u, bw, bh);
+        double t = 2 * M_PI * i / n;
+        int baja = (int)round(bote * fabs(sin(t)));                      /* el cuerpo, al apoyar los dos pies */
+        double avance[2] = {paso * sin(t), -paso * sin(t)};
+        int sube[2] = {(int)round(alza * fmax(0, cos(t))), (int)round(alza * fmax(0, -cos(t)))};
+        int delante = sube[0] >= sube[1] ? 0 : 1;                       /* la pierna que se levanta, encima */
+        double ax = (bx0 + bx1 + 1) / 2.0, ay = !strcmp(r->tipo, "girar") ? (by0 + by1 + 1) / 2.0 : by1 + 1;
+        double c = cos(p.ang * M_PI / 180), s = sin(p.ang * M_PI / 180);
+        for (int oy = 0; oy < *ch; oy++)
+            for (int ox = 0; ox < *cw; ox++) {
+                int x = ox - rx, y = oy - ry, sx = -1, sy = -1;
+                if (andar || correr) {
+                    if (y - baja < cadera && jg_opaco(px, w, h, x, y - baja)) { sx = x; sy = y - baja; }
+                    else
+                        for (int o = 0; o < 2 && sx < 0; o++) {
+                            /* la pierna sube entera (lo de arriba queda tapado por el cuerpo) y
+                               se inclina desde la cadera: el pie es lo que más avanza */
+                            int pierna = o == 0 ? delante : 1 - delante;
+                            int fila = y + sube[pierna];
+                            if (fila < cadera || fila >= pie) continue;
+                            double f = (fila + 0.5 - cadera) / (pie - cadera);
+                            int col = x - (int)round(avance[pierna] * f);
+                            if ((col < corte ? 0 : 1) == pierna && jg_opaco(px, w, h, col, fila)) { sx = col; sy = fila; }
+                        }
+                } else {
+                    double vx = x + 0.5 - ax - p.dx, vy = y + 0.5 - ay - p.dy;
+                    double qx = (c * vx + s * vy) / p.sx, qy = (-s * vx + c * vy) / p.sy;
+                    int X = (int)floor(ax + qx), Y = (int)floor(ay + qy);
+                    if (jg_opaco(px, w, h, X, Y)) { sx = X; sy = Y; }
+                }
+                if (sx < 0) continue;
+                const unsigned char *o = px + ((size_t)sy * w + sx) * 4;
+                unsigned char *d = hoja + ((size_t)oy * ancho + i * *cw + ox) * 4;
+                for (int j = 0; j < 3; j++) d[j] = (unsigned char)(o[j] + (255 - o[j]) * p.blanco);
+                d[3] = (unsigned char)(o[3] * p.alfa);
+            }
+    }
+    return hoja;
+}
+
+/* La hoja de una animación, como la devuelve hoja(), más "relleno": cuánto
+   más ancha y alta es cada celda que el dibujo, por cada lado */
+static Valor *jg_animacion_valor(int k) {
+    JgImagen *im = &_jgs.imagenes[k], *o = &_jgs.imagenes[im->origen];
+    int n = im->receta.cuadros, cw = im->ancho / n;
+    Valor *d = jg_imagen_valor(k);
+    Valor *celda = valor_lista_crear();
+    lista_agregar(celda, valor_numero(cw));
+    lista_agregar(celda, valor_numero(im->alto));
+    valor_diccionario_agregar(d, "celda", celda);
+    valor_diccionario_agregar(d, "separacion", valor_numero(0));
+    valor_diccionario_agregar(d, "margen", valor_numero(0));
+    valor_diccionario_agregar(d, "columnas", valor_numero(n));
+    valor_diccionario_agregar(d, "cuadros", valor_numero(n));
+    Valor *rel = valor_lista_crear();
+    lista_agregar(rel, valor_numero((cw - o->ancho) / 2));
+    lista_agregar(rel, valor_numero((im->alto - o->alto) / 2));
+    valor_diccionario_agregar(d, "relleno", rel);
+    return d;
+}
+
+/* Rehace las animaciones generadas a partir de la imagen 'origen' (que acaba
+   de cambiar en el disco), si siguen midiendo lo mismo */
+static void jg_rehacer_animaciones(int origen) {
+    for (int j = 0; j < _jgs.nimagenes; j++) {
+        JgImagen *im = &_jgs.imagenes[j];
+        if (im->origen != origen) continue;
+        unsigned char *px = jg_pixeles(origen);
+        if (!px) continue;
+        int cw, ch;
+        char msg[200];
+        unsigned char *hoja = jg_generar_animacion(px, _jgs.imagenes[origen].ancho, _jgs.imagenes[origen].alto,
+                                                   &im->receta, &cw, &ch, msg, sizeof msg);
+        free(px);
+        if (!hoja) continue;
+        void *tex = cw * im->receta.cuadros == im->ancho && ch == im->alto ? jg_textura_rgba(hoja, im->ancho, im->alto) : NULL;
+        if (!tex) { free(hoja); continue; }
+        _jg.DestroyTexture(im->tex);
+        free(im->px);
+        im->tex = tex;
+        im->px = hoja;
+    }
+}
+
+/* animar(imagen o ruta, tipo[, opciones]) */
+static Valor *fn_jg_animar(Valor **a, int n) {
+    JG_ABIERTA();
+    int src = -1;
+    if (n >= 1 && a[0]->tipo == VAL_TEXTO) {
+        Valor *img = fn_jg_imagen(a, 1);
+        if (hay_error) return img;
+        src = jg_id_de(img, "imagen");
+        valor_destruir(img);
+    } else if (n >= 1) src = jg_id_de(a[0], "imagen");
+    char msg[400];
+    if (src < 0 || src >= _jgs.nimagenes || n < 2 || a[1]->tipo != VAL_TEXTO)
+        return jg_error("ErrorTipo", "animar() espera (imagen o ruta, tipo[, opciones]), por ejemplo animar(\"pj.png\", \"andar\")");
+    JgReceta r;
+    memset(&r, 0, sizeof r);
+    r.intensidad = 1; r.centro = -1;
+    int valido = 0;
+    for (int i = 0; JG_ANIMACIONES[i]; i++) if (!strcmp(a[1]->texto, JG_ANIMACIONES[i])) valido = 1;
+    if (!valido) {
+        snprintf(msg, sizeof msg, "animar(): no conozco la animación '%s'; hay respirar, andar, correr, saltar, "
+                 "golpe, morir, flotar y girar", a[1]->texto);
+        return jg_error("Error", msg);
+    }
+    snprintf(r.tipo, sizeof r.tipo, "%s", a[1]->texto);
+    r.cuadros = !strcmp(r.tipo, "golpe") ? 4 : !strcmp(r.tipo, "correr") || !strcmp(r.tipo, "saltar") ? 6 : 8;
+    if (n > 2 && a[2]->tipo != VAL_NULO) {
+        if (a[2]->tipo != VAL_DICCIONARIO)
+            return jg_error("ErrorTipo", "animar(): las opciones van en un diccionario, por ejemplo {\"cuadros\": 6}");
+        Valor *op = a[2];
+        for (int j = 0; j < op->diccionario.cantidad; j++) {
+            const char *c = op->diccionario.claves[j];
+            Valor *v = op->diccionario.valores[j];
+            if (strcmp(c, "cuadros") && strcmp(c, "intensidad") && strcmp(c, "piernas") && strcmp(c, "centro") &&
+                strcmp(c, "vista")) {
+                snprintf(msg, sizeof msg, "animar(): no conozco la opción '%s' (hay \"cuadros\", \"intensidad\", "
+                         "\"vista\", \"piernas\" y \"centro\")", c);
+                return jg_error("Error", msg);
+            }
+            if (!strcmp(c, "vista")) {
+                if (v->tipo != VAL_TEXTO || (strcmp(v->texto, "lado") && strcmp(v->texto, "frente")))
+                    return jg_error("Error", "animar(): \"vista\" es \"lado\" (de perfil) o \"frente\"");
+                r.frente = !strcmp(v->texto, "frente");
+                continue;
+            }
+            if (v->tipo != VAL_NUMERO) {
+                snprintf(msg, sizeof msg, "animar(): la opción '%s' es un número", c);
+                return jg_error("ErrorTipo", msg);
+            }
+        }
+        double v;
+        if (jg_opcion(op, "cuadros", &v)) {
+            if (v < 1 || v > 64) return jg_error("Error", "animar(): \"cuadros\" va de 1 a 64");
+            r.cuadros = (int)v;
+        }
+        if (jg_opcion(op, "intensidad", &v)) {
+            if (v <= 0 || v > 10) return jg_error("Error", "animar(): \"intensidad\" es mayor que 0 (1 es lo normal)");
+            r.intensidad = v;
+        }
+        if (jg_opcion(op, "piernas", &v)) {
+            if (v < 2 || v >= _jgs.imagenes[src].alto)
+                return jg_error("Error", "animar(): \"piernas\" es cuántas filas de abajo son las piernas (al menos 2)");
+            r.piernas = (int)v;
+        }
+        if (jg_opcion(op, "centro", &v)) {
+            if (v < 0 || v >= _jgs.imagenes[src].ancho)
+                return jg_error("Error", "animar(): \"centro\" es la columna que separa las dos piernas");
+            r.centro = (int)v;
+        }
+    }
+    /* la misma animación de la misma imagen ya está hecha (por ejemplo, al recargar en caliente) */
+    char nombre[160];
+    snprintf(nombre, sizeof nombre, "<animar %d %s %d %g %d %d %d>", src, r.tipo, r.cuadros, r.intensidad, r.piernas,
+             r.centro, r.frente);
+    for (int i = 0; i < _jgs.nimagenes; i++)
+        if (strcmp(_jgs.imagenes[i].ruta, nombre) == 0) return jg_animacion_valor(i);
+    unsigned char *px = jg_pixeles(src);
+    if (!px) return jg_error("ErrorJuego", "animar(): no se pudieron leer los píxeles de la imagen");
+    int cw, ch;
+    unsigned char *hoja = jg_generar_animacion(px, _jgs.imagenes[src].ancho, _jgs.imagenes[src].alto, &r, &cw, &ch, msg, sizeof msg);
+    free(px);
+    if (!hoja) return jg_error("Error", msg);
+    int k = jg_nueva_imagen(nombre, hoja, cw * r.cuadros, ch);
+    if (k < 0) return jg_error("ErrorJuego", "animar(): no se pudo crear la hoja (¿demasiadas imágenes?)");
+    _jgs.imagenes[k].origen = src;
+    _jgs.imagenes[k].receta = r;
+    return jg_animacion_valor(k);
+}
+
+/* guardar_imagen(imagen, ruta): guarda una imagen (un sprite, una hoja
+   generada con animar()...) como PNG, por ejemplo para retocarla en un editor */
+static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
+    JG_ABIERTA();
+    int k = n > 0 ? jg_id_de(a[0], "imagen") : -1;
+    if (k < 0 || k >= _jgs.nimagenes || n < 2 || a[1]->tipo != VAL_TEXTO)
+        return jg_error("ErrorTipo", "guardar_imagen() espera (imagen, ruta del .png)");
+    size_t l = strlen(a[1]->texto);
+    if (l < 4 || (strcmp(a[1]->texto + l - 4, ".png") && strcmp(a[1]->texto + l - 4, ".PNG")))
+        return jg_error("Error", "guardar_imagen(): la ruta debe acabar en .png");
+    unsigned char *px = jg_pixeles(k);
+    if (!px) return jg_error("ErrorJuego", "guardar_imagen(): no se pudieron leer los píxeles de la imagen");
+    int ok = imagen_guardar_png(a[1]->texto, px, _jgs.imagenes[k].ancho, _jgs.imagenes[k].alto);
+    free(px);
+    if (!ok) return jg_error("Error", "guardar_imagen(): no se pudo escribir el archivo");
+    return valor_nulo();
 }
 
 /* dibujar(imagen, x, y[, opciones]). Opciones (todas opcionales):
@@ -3047,6 +3430,8 @@ static void cargar_juego(Entorno *entorno) {
         {"dibujar",         fn_jg_dibujar,         -1},
         {"sprite",          fn_jg_sprite,           2},
         {"hoja",            fn_jg_hoja,            -1},
+        {"animar",          fn_jg_animar,          -1},
+        {"guardar_imagen",  fn_jg_guardar_imagen,   2},
         {"sonido",          fn_jg_sonido,           1},
         {"reproducir",      fn_jg_reproducir,      -1},
         {"detener",         fn_jg_detener,         -1},
