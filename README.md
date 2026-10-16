@@ -52,7 +52,7 @@ Ocho minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, e
 - **Recarga en caliente** — guarda el archivo con el juego en marcha y se actualiza sin cerrar la ventana, con el jugador donde estaba; si hay un error, sale en la propia ventana
 - **Sin dependencias para compilar** — un solo binario, compilado con `gcc` y `make` (SDL2 se carga al abrir la ventana)
 - **Errores claros** — mensajes literales con número de línea exacto
-- **Ejecutables autónomos** — `lince compilar` empaqueta tu programa en un único ejecutable, sin instalar nada en destino
+- **Ejecutables autónomos** — `lince compilar` empaqueta tu programa en un único ejecutable, y `lince repartir` prepara un `.zip` con el juego y SDL2 para pasárselo a quien sea
 
 ## Instalación
 
@@ -63,18 +63,26 @@ git clone https://github.com/arreina/lince.git
 cd lince
 make
 sudo make install   # opcional
-sudo apt install libsdl2-2.0-0 libsdl2-image-2.0-0   # para abrir ventanas (la segunda, para PNG/JPG)
+sudo apt install libsdl2-2.0-0   # para abrir ventanas
 ```
 
-### Windows (MSYS2/MinGW)
+### Windows (MSYS2, terminal UCRT64)
 
 ```bash
-pacman -S mingw-w64-x86_64-gcc make mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image
+pacman -S mingw-w64-ucrt-x86_64-gcc make mingw-w64-ucrt-x86_64-SDL2
 git clone https://github.com/arreina/lince.git
 cd lince && make
 ```
 
-Para repartir un juego en Windows, pon `SDL2.dll` (y `SDL2_image.dll` si usa imágenes PNG/JPG) junto al ejecutable. Desde Linux también se puede crear `lince.exe` con `make windows` (necesita MinGW).
+Desde Linux también se puede crear `lince.exe` con `make windows` (necesita MinGW).
+
+### Compartir un juego
+
+```bash
+lince repartir mi_juego.lince
+```
+
+Crea la carpeta `mi_juego-linux` (o `mi_juego-windows`) y un `.zip` con ella: el juego con sus imágenes y sonidos dentro, SDL2 y un `LEEME.txt`. Quien lo reciba lo descomprime y juega, sin instalar Lince. Las imágenes y sonidos que nombra el código van dentro solos; los niveles u otros archivos, con `--incluir`.
 
 En Mac debería funcionar con `make` y SDL2 de Homebrew, pero no está probado.
 
@@ -83,6 +91,7 @@ En Mac debería funcionar con `make` y SDL2 de Homebrew, pero no está probado.
 ```bash
 lince programa.lince              # ejecutar
 lince compilar programa.lince     # crear un ejecutable autónomo
+lince repartir juego.lince        # carpeta y .zip para compartir el juego
 lince depurar programa.lince      # depurar paso a paso
 lince comprobar programa.lince    # sólo comprobar la sintaxis
 lince lsp                         # servidor de lenguaje para tu editor
@@ -207,7 +216,7 @@ lince compilar programa.lince
 ./programa
 ```
 
-`lince compilar` crea un único ejecutable con tu programa y los archivos que importa dentro (con `--incluir` también imágenes, niveles o sonidos): se puede copiar a otra máquina sin instalar Lince; solo hace falta SDL2 si el juego abre una ventana. Soporta el 100 % del lenguaje y tarda milisegundos, porque el ejecutable lleva el propio intérprete.
+`lince compilar` crea un único ejecutable con tu programa, los archivos que importa y las imágenes y sonidos que nombra dentro (con `--incluir`, también niveles u otros archivos): se puede copiar a otra máquina sin instalar Lince; solo hace falta SDL2 si el juego abre una ventana. Soporta el 100 % del lenguaje y tarda milisegundos, porque el ejecutable lleva el propio intérprete.
 
 **Rendimiento** (`make bench`, en segundos): `fib(30)` 0,3 · bucle de 5 millones de iteraciones 0,5 · diccionario de 50.000 claves 0,04.
 
@@ -244,6 +253,8 @@ lince/
 │   ├── parser.c/h          # análisis sintáctico
 │   ├── interprete.c/h      # evaluación
 │   ├── empaquetado.c/h     # lince compilar: crea ejecutables autónomos
+│   ├── repartir.c/h        # lince repartir: carpeta y .zip para compartir un juego
+│   ├── recarga.c/h         # recarga en caliente
 │   ├── modulos.c/h         # módulos estándar
 │   ├── juego.h             # módulo juego (SDL2 cargada en tiempo de ejecución, mezclador de sonido)
 │   ├── repl.c/h            # REPL con historial

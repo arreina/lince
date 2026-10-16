@@ -1,16 +1,15 @@
 /* ─────────────────────────────────────────
    MÓDULO: juego  (se incluye desde modulos.c)
-   Ventana 2D, dibujo, imágenes, texto, teclado, ratón, mando y sonido. Usa SDL2
-   (y SDL2_image para PNG/JPG, si está) cargadas en tiempo de ejecución
-   (dlopen / LoadLibrary): Lince no las necesita para compilarse, y si faltan
-   solo falla juego.abrir().
+   Ventana 2D, dibujo, imágenes, texto, teclado, ratón, mando y sonido. Usa SDL2,
+   cargada en tiempo de ejecución (dlopen / LoadLibrary): Lince no la necesita
+   para compilarse, y si falta solo falla juego.abrir(). Las imágenes (stb_image)
+   y el OGG (stb_vorbis) los lee el propio Lince.
    Estructura típica:
        juego.abrir("Mi juego", 800, 600)
        mientras juego.abierto() { ...dibujar...; juego.presentar() }
 ───────────────────────────────────────── */
 #ifdef _WIN32
 #define JG_ABRIR_LIB()   ((void *)LoadLibraryA("SDL2.dll"))
-#define JG_ABRIR_IMG()   ((void *)LoadLibraryA("SDL2_image.dll"))
 #define JG_SIMBOLO(h, n) ((void *)GetProcAddress((HMODULE)(h), n))
 #else
 static void *jg_abrir_lib(void) {
@@ -20,19 +19,15 @@ static void *jg_abrir_lib(void) {
         void *h = dlopen(nombres[i], RTLD_NOW);
         if (h) return h;
     }
-    return NULL;
-}
-static void *jg_abrir_img(void) {
-    static const char *const nombres[] = {
-        "libSDL2_image-2.0.so.0", "libSDL2_image.so", "libSDL2_image-2.0.0.dylib", "libSDL2_image.dylib", NULL };
-    for (int i = 0; nombres[i]; i++) {
-        void *h = dlopen(nombres[i], RTLD_NOW);
-        if (h) return h;
-    }
-    return NULL;
+    /* Si no está instalada, la que lleva el juego al lado (lince repartir) */
+    char ruta[4096];
+    if (!empaquetado_ruta_ejecutable(ruta, sizeof ruta - 32)) return NULL;
+    char *barra = strrchr(ruta, '/');
+    if (!barra) return NULL;
+    strcpy(barra + 1, "libSDL2-2.0.so.0");
+    return dlopen(ruta, RTLD_NOW);
 }
 #define JG_ABRIR_LIB()   jg_abrir_lib()
-#define JG_ABRIR_IMG()   jg_abrir_img()
 #define JG_SIMBOLO(h, n) dlsym(h, n)
 #endif
 
@@ -101,7 +96,6 @@ static struct {
     int  (*RelativeMouse)(int);
     void (*StartTextInput)(void);
     void (*SetWindowSize)(void *, int, int);
-    void *(*IMG_Load_RW)(void *, int);                               /* SDL2_image */
 } _jg;
 
 /* Formato de audio de Lince: 16 bits con signo, estéreo, 44100 Hz */
@@ -279,8 +273,6 @@ static int jg_cargar(void) {
     *(void **)(&_jg.RelativeMouse) = JG_SIMBOLO(h, "SDL_SetRelativeMouseMode");
     *(void **)(&_jg.StartTextInput) = JG_SIMBOLO(h, "SDL_StartTextInput");
     *(void **)(&_jg.SetWindowSize) = JG_SIMBOLO(h, "SDL_SetWindowSize");
-    void *hi = JG_ABRIR_IMG();
-    if (hi) *(void **)(&_jg.IMG_Load_RW) = JG_SIMBOLO(hi, "IMG_Load_RW");
     return 1;
 }
 
@@ -1279,7 +1271,8 @@ static Valor *jg_imagen_valor(int k) {
     return d;
 }
 
-/* Lee la imagen 'ruta' como textura; 1 si va bien, 0 con el motivo en msg */
+/* Lee la imagen 'ruta' como textura; 1 si va bien, 0 con el motivo en msg.
+   Lee PNG, JPG, BMP, GIF y TGA con stb_image. */
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) {
     size_t largo = 0;
     char *bytes = interprete_leer_bytes(ruta, &largo);
@@ -1287,20 +1280,22 @@ static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) 
         snprintf(msg, max, "no se encuentra la imagen '%s'", ruta);
         return 0;
     }
-    int es_bmp = largo > 2 && bytes[0] == 'B' && bytes[1] == 'M';
+    int w = 0, h = 0;
+    const char *motivo = NULL;
+    unsigned char *px = imagen_decodificar((const unsigned char *)bytes, largo, &w, &h, &motivo);
     void *sup = NULL;
-    void *rw = _jg.RWFromConstMem(bytes, (int)largo);
-    if (rw) sup = es_bmp || !_jg.IMG_Load_RW ? _jg.LoadBMP_RW(rw, 1) : _jg.IMG_Load_RW(rw, 1);
+    if (px)       /* RGBA byte a byte: en little endian, R es el byte bajo */
+        sup = _jg.SurfaceFrom(px, w, h, 32, w * 4, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
     free(bytes);
     if (!sup) {
-        if (!es_bmp && !_jg.IMG_Load_RW)
-            snprintf(msg, max, "para cargar '%s' hace falta SDL2_image (por ejemplo 'sudo apt install libsdl2-image-2.0-0'); sin ella solo se leen .bmp", ruta);
-        else
-            snprintf(msg, max, "no se pudo leer la imagen '%s': %s", ruta, _jg.GetError());
+        free(px);
+        snprintf(msg, max, "no se pudo leer la imagen '%s' (%s); Lince lee PNG, JPG, BMP, GIF y TGA",
+                 ruta, px ? _jg.GetError() : motivo);
         return 0;
     }
     *tex = _jg.TextureFromSurface(_jgs.render, sup);
     _jg.FreeSurface(sup);
+    free(px);
     if (!*tex) {
         snprintf(msg, max, "no se pudo preparar la imagen '%s': %s", ruta, _jg.GetError());
         return 0;
@@ -1309,7 +1304,7 @@ static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) 
     return 1;
 }
 
-/* imagen(ruta): PNG/JPG (con SDL2_image) o BMP; devuelve {"imagen", "ancho", "alto"} */
+/* imagen(ruta): PNG, JPG, BMP, GIF o TGA; devuelve {"imagen", "ancho", "alto"} */
 static Valor *fn_jg_imagen(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "imagen() espera la ruta de una imagen");

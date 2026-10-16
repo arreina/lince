@@ -2,7 +2,7 @@
 #
 # Tres trabajos: uno comprueba que el lenguaje se comporta como debe, otro
 # repite las mismas suites con AddressSanitizer para cazar errores de
-# memoria, y el tercero lo compila y lo prueba en Windows (MSYS2/MinGW).
+# memoria, y el tercero lo compila y lo prueba en Windows (MSYS2/UCRT64).
 
 name: CI
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: Juego (SDL2 sin pantalla)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0 libsdl2-image-2.0-0
+          sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
           make test-juego test-ejemplos
 
       - name: Los editores están al día
@@ -62,7 +62,7 @@ jobs:
       # detecta los usos de memoria liberada del intérprete, que en un build normal pasan desapercibidos o se
       # manifiestan como fallos intermitentes.
       - name: SDL2 para los tests del módulo juego
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0 libsdl2-image-2.0-0
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
 
       - name: Compilar con AddressSanitizer
         run: make debug
@@ -83,14 +83,13 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           install: >-
             make
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-python
-            mingw-w64-x86_64-python-pillow
-            mingw-w64-x86_64-SDL2
-            mingw-w64-x86_64-SDL2_image
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-pillow
+            mingw-w64-ucrt-x86_64-SDL2
 
       - name: Compilar
         run: make

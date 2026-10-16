@@ -58,6 +58,8 @@ static int ruta_ejecutable(const char *argv0, char *out, size_t max) {
 #endif
 }
 
+int empaquetado_ruta_ejecutable(char *out, size_t max) { return ruta_ejecutable(NULL, out, max); }
+
 static void poner_u32(unsigned char *p, uint32_t v) { for (int i = 0; i < 4; i++) p[i] = (unsigned char)(v >> (8 * i)); }
 static void poner_u64(unsigned char *p, uint64_t v) { for (int i = 0; i < 8; i++) p[i] = (unsigned char)(v >> (8 * i)); }
 static uint32_t leer_u32(const unsigned char *p) { uint32_t v = 0; for (int i = 3; i >= 0; i--) v = v << 8 | p[i]; return v; }
@@ -146,7 +148,25 @@ static int anadir_extra(const char *ruta) {
         fprintf(stderr, "\n❌ No existe '%s' (indicado con --incluir).\n\n", ruta);
         return 0;
     }
-#ifndef _WIN32
+#ifdef _WIN32
+    if (st.st_mode & _S_IFDIR) {
+        char patron[2048];
+        snprintf(patron, sizeof patron, "%s\\*", ruta);
+        WIN32_FIND_DATAA fd;
+        HANDLE h = FindFirstFileA(patron, &fd);
+        if (h == INVALID_HANDLE_VALUE) return 1;
+        int ok = 1;
+        do {
+            if (fd.cFileName[0] == '.') continue;
+            char sub[2048];
+            size_t l = strlen(ruta);
+            snprintf(sub, sizeof sub, "%s%s%s", ruta, (l && (ruta[l - 1] == '/' || ruta[l - 1] == '\\')) ? "" : "/", fd.cFileName);
+            ok = anadir_extra(sub);
+        } while (ok && FindNextFileA(h, &fd));
+        FindClose(h);
+        return ok;
+    }
+#else
     if (S_ISDIR(st.st_mode)) {
         DIR *d = opendir(ruta);
         if (!d) return 0;
@@ -181,6 +201,28 @@ static void recoger(const char *codigo, const char *actual) {
     Token  *tok = lexer_tokenizar(lx, &cnt);
     Parser *pa  = parser_crear(tok, cnt);
     parser_parsear(pa);
+    /* Imágenes y sonidos nombrados en el código: van dentro sin --incluir.
+       Sólo estos tipos: un .txt o un .json puede ser un archivo que el juego
+       escribe (récords), y empaquetado taparía la versión del disco. */
+    static const char *const MEDIOS[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".wav", ".ogg", NULL };
+    for (int i = 0; i < cnt; i++) {
+        if (tok[i].tipo != TOK_TEXTO || !tok[i].valor) continue;
+        const char *v = tok[i].valor, *ext = strrchr(v, '.');
+        if (!ext || strchr(ext, '/')) continue;
+        int medio = 0;
+        for (int k = 0; MEDIOS[k]; k++) {
+            const char *a = ext, *b = MEDIOS[k];
+            while (*a && *b && (*a | 32) == *b) { a++; b++; }
+            if (!*a && !*b) medio = 1;
+        }
+        if (!medio || ya_esta(sin_punto(v))) continue;
+        struct stat st;
+        if (stat(v, &st) != 0 || (st.st_mode & S_IFDIR)) {
+            fprintf(stderr, "⚠  '%s' aparece en el código pero no existe aquí: no va dentro.\n", v);
+            continue;
+        }
+        if (anadir_extra(v)) printf("   + %s\n", sin_punto(v));
+    }
     for (int i = 0; i + 1 < cnt; i++) {
         if (tok[i].tipo != TOK_IMPORTAR || tok[i + 1].tipo != TOK_TEXTO) continue;
         const char *nombre = tok[i + 1].valor;

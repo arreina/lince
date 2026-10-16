@@ -908,21 +908,21 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
 <span class="prompt">$</span> <span class="cmd">cd lince && make</span>
 <span class="prompt">$</span> <span class="cmd">./lince examples/01_pong.lince</span>
 <span class="comment">
-# Para abrir ventanas (la segunda, para PNG/JPG)
-</span><span class="prompt">$</span> <span class="cmd">sudo apt install libsdl2-2.0-0 libsdl2-image-2.0-0</span>
+# Para abrir ventanas
+</span><span class="prompt">$</span> <span class="cmd">sudo apt install libsdl2-2.0-0</span>
 <span class="comment">
 # Opcional: instalar globalmente
 </span><span class="prompt">$</span> <span class="cmd">sudo make install</span></pre>
       </div>
       <div class="install-card">
-        <div class="install-card-header">🪟 Windows (MSYS2/MinGW)</div>
-        <pre><span class="prompt">$</span> <span class="cmd">pacman -S mingw-w64-x86_64-gcc make mingw-w64-x86_64-SDL2 mingw-w64-x86_64-SDL2_image</span>
+        <div class="install-card-header">🪟 Windows (MSYS2, terminal UCRT64)</div>
+        <pre><span class="prompt">$</span> <span class="cmd">pacman -S mingw-w64-ucrt-x86_64-gcc make mingw-w64-ucrt-x86_64-SDL2</span>
 <span class="prompt">$</span> <span class="cmd">git clone https://github.com/arreina/lince.git</span>
 <span class="prompt">$</span> <span class="cmd">cd lince && make</span>
 <span class="prompt">$</span> <span class="cmd">./lince examples/01_pong.lince</span>
 <span class="comment">
-# Para repartir un juego: SDL2.dll y SDL2_image.dll junto al .exe
-</span></pre>
+# Para compartir un juego: carpeta y .zip con todo
+</span><span class="prompt">$</span> <span class="cmd">./lince repartir mi_juego.lince</span></pre>
       </div>
     </div>
 

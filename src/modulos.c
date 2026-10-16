@@ -1554,6 +1554,8 @@ static void cargar_pruebas(Entorno *entorno) {
 #include <dlfcn.h>
 #endif
 #include "ogg.h"
+#include "imagen.h"
+#include "empaquetado.h"
 #include "recarga.h"
 #include "juego.h"
 

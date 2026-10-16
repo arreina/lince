@@ -22,6 +22,9 @@ int empaquetado_cargar(const char *argv0);
 const char *empaquetado_ruta_principal(void);
 const char *empaquetado_codigo_principal(void);
 
+/* Ruta del ejecutable que está corriendo; 1 si se pudo saber */
+int empaquetado_ruta_ejecutable(char *out, size_t max);
+
 /* Lector para interprete_fijar_lector: contenido empaquetado de una ruta */
 const char *empaquetado_buscar(const char *ruta, size_t *largo);
 

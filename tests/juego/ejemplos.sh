@@ -6,7 +6,7 @@ LINCE="$(cd "$(dirname "${1:-./lince}")" && pwd)/$(basename "${1:-./lince}")"
 FOTOGRAMAS="${2:-1500}"
 RAIZ="$(cd "$(dirname "$0")/../.." && pwd)"
 echo "🐆 Minijuegos de examples/"
-if ! ldconfig -p 2>/dev/null | grep -q "libSDL2-2.0.so.0" && [ ! -f /mingw64/bin/SDL2.dll ]; then
+if ! ldconfig -p 2>/dev/null | grep -q "libSDL2-2.0.so.0" && [ ! -f /mingw64/bin/SDL2.dll ] && [ ! -f /ucrt64/bin/SDL2.dll ]; then
     echo "  ⏭  SDL2 no está instalada: se omiten"
     exit 0
 fi

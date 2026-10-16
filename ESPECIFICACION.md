@@ -745,9 +745,9 @@ formatos son los de `strftime`; `analizar` entiende `%Y %y %m %d %H %M %S`.
 
 Ventana 2D con dibujo, imágenes, teclado, ratón, mando y sonido, para hacer
 videojuegos. Usa SDL2, que se carga al abrir la ventana (no hace falta para compilar
-Lince). Para PNG y JPG hace falta además SDL2_image. En Debian/Ubuntu:
-`sudo apt install libsdl2-2.0-0 libsdl2-image-2.0-0`; en Windows, `SDL2.dll` y
-`SDL2_image.dll` junto al juego. El bucle lo escribes tú:
+Lince). Las imágenes y el OGG los lee el propio Lince. En Debian/Ubuntu:
+`sudo apt install libsdl2-2.0-0`; en Windows, `SDL2.dll` junto al juego (`lince repartir`
+la pone). El bucle lo escribes tú:
 
 ```lince
 importar "juego"
@@ -787,7 +787,7 @@ mientras juego.abierto() {
 
 | Función | Qué hace |
 |---|---|
-| `imagen(ruta)` | carga un PNG o JPG (necesita SDL2_image) o un BMP; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo |
+| `imagen(ruta)` | carga un PNG, JPG, BMP, GIF o TGA; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo |
 | `sprite(filas, colores)` | crea una imagen a partir de texto, un carácter por píxel: `juego.sprite([".X.", "XXX"], {"X": [255, 0, 0]})`; los caracteres sin color son transparentes |
 | `dibujar(imagen, x, y[, opciones])` | dibuja la imagen; `opciones` es un diccionario con cualquiera de: `escala`, `ancho`, `alto`, `angulo` (grados), `espejo`, `voltear`, `centrado` (x, y es el centro), `alfa` (0–255), `color` (tinte), `recorte` (`[x, y, ancho, alto]`), y para hojas de sprites `celda` (`[ancho, alto]` de cada cuadro) con `cuadro` (número de cuadro) |
 
@@ -898,7 +898,7 @@ ventana**, y las imágenes y sonidos cargados que cambien se recargan solos.
 Los ejecutables de `lince compilar` no se recargan.
 
 Las imágenes y los sonidos se leen también desde dentro de un ejecutable de `lince compilar`
-si se incluyeron con `--incluir`.
+o `lince repartir`: los que el código nombra con su ruta (`"img/lince.png"`) van dentro solos.
 
 Los colores son `[r, g, b]`, `[r, g, b, a]` (0–255) o texto `"#rrggbb"` / `"#rrggbbaa"`; si
 se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`, `"izquierda"`,
@@ -1008,8 +1008,11 @@ Como el ejecutable lleva el mismo intérprete, soporta el **100 % del lenguaje**
 (POO completa, `es`, generadores, todos los módulos...) y se
 comporta exactamente igual que `lince programa.lince`. Compilar es instantáneo.
 
-Un juego que lee archivos propios (niveles, imágenes, sonidos) los lleva
-dentro con `--incluir`, que se puede repetir y acepta archivos o carpetas:
+Las imágenes y los sonidos (`.png`, `.jpg`, `.bmp`, `.gif`, `.tga`, `.wav`, `.ogg`) que
+el código nombra con un texto (`juego.imagen("img/lince.png")`) van dentro solos; si
+alguno no existe al compilar, avisa con un ⚠. Lo demás (niveles, rutas que se construyen
+al ejecutar como `"nivel" + n + ".txt"`) se incluye con `--incluir`, que se puede repetir
+y acepta archivos o carpetas:
 
 ```bash
 lince compilar juego.lince -o mi_juego --incluir niveles --incluir datos/semilla.json
@@ -1019,10 +1022,31 @@ Con eso `archivos.leer("niveles/uno.json")` lee del propio ejecutable, con la
 ruta relativa tal como se indicó.
 
 Notas:
-- SDL2 (que usa `juego`) sigue haciendo falta en la máquina donde se ejecute.
+- SDL2 (que usa `juego`) sigue haciendo falta en la máquina donde se ejecute:
+  `lince repartir` (abajo) la lleva junto al juego.
+- Un `.txt` o `.json` no se incluye solo, aunque el código lo nombre: puede ser un
+  archivo que el juego escribe (récords) y la copia de dentro taparía la del disco.
 - Un `importar` que no se puede resolver al compilar avisa con un ⚠ y el
   ejecutable fallará al llegar a esa línea, como lo haría el intérprete.
 - Los archivos se leen al compilar: si cambian después, hay que volver a compilar.
+
+### Compartir un juego (`lince repartir`)
+
+```bash
+lince repartir juego.lince                   # crea juego-linux/ y juego-linux.zip
+lince repartir juego.lince -o carpeta --incluir niveles
+```
+
+Prepara un juego para pasárselo a alguien: una carpeta (`juego-linux` o `juego-windows`)
+con el ejecutable (como el de `lince compilar`, con sus imágenes y sonidos dentro), SDL2
+y un `LEEME.txt`, y un `.zip` con esa carpeta. Quien lo reciba lo descomprime y juega.
+
+- **Windows**: lleva `SDL2.dll` y las DLL de las que dependa (si las hay en su carpeta).
+- **Linux**: lleva `libSDL2-2.0.so.0`. El juego usa la SDL2 del sistema si está
+  instalada y, si no, la de su carpeta.
+- **macOS**: sin probar; SDL2 no se incluye (`brew install sdl2`).
+- El ejecutable es para el sistema en el que se crea: para Windows, se reparte desde
+  Windows (o con el `lince.exe` de `make windows` bajo Wine).
 
 ### Rendimiento
 
@@ -1064,6 +1088,7 @@ lince          # abre el REPL
 lince prog.lince               # ejecuta archivo
 lince prog.lince arg1 arg2     # con argumentos
 lince compilar prog.lince      # crea un ejecutable autónomo
+lince repartir juego.lince     # carpeta y .zip para compartir el juego
 lince depurar prog.lince       # depurador paso a paso
 ```
 
@@ -1099,8 +1124,8 @@ make test                              # tests del intérprete
 
 | Plataforma | Estado | Compilar con |
 |------------|--------|--------------|
-| Linux | ✅ Probado en la CI | `make` (para jugar: `libsdl2-2.0-0`, `libsdl2-image-2.0-0`) |
-| Windows (MSYS2/MinGW) | ✅ Probado en la CI | `make` (para jugar: `SDL2.dll` y `SDL2_image.dll` junto al ejecutable) |
+| Linux | ✅ Probado en la CI | `make` (para jugar: `libsdl2-2.0-0`) |
+| Windows (MSYS2 UCRT64) | ✅ Probado en la CI | `make` (para jugar: `SDL2.dll` junto al ejecutable) |
 | Windows desde Linux | ✅ | `make windows` (compilación cruzada con MinGW) |
 | Mac | ⚠️ Debería funcionar, sin probar | `make` |
 
@@ -1128,6 +1153,12 @@ lince/
 │   ├── interprete.c/h  # ejecución del AST
 │   ├── modulos.c/h     # módulos estándar
 │   ├── empaquetado.c/h # lince compilar: ejecutables autónomos
+│   ├── repartir.c/h    # lince repartir: carpeta y .zip con el juego y SDL2
+│   ├── recarga.c/h     # recarga en caliente de los juegos
+│   ├── imagen.c/h      # PNG, JPG... (stb_image)
+│   ├── ogg.c/h         # Ogg Vorbis (stb_vorbis)
+│   ├── juego.h         # módulo juego (SDL2 cargada al ejecutar)
+│   ├── terceros/       # stb_image y stb_vorbis, tal cual
 │   ├── repl.c/h        # REPL interactivo con historial
 │   ├── paquetes.c/h    # gestor de paquetes
 │   └── plataforma.h    # compatibilidad multiplataforma

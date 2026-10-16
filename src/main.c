@@ -16,6 +16,7 @@
 #include "lsp.h"
 #include "modulos.h"
 #include "recarga.h"
+#include "repartir.h"
 
 static char *leer_archivo(const char *ruta) {
     FILE *f = fopen(ruta, "r");
@@ -42,7 +43,8 @@ static void mostrar_ayuda(void) {
     printf("  lince <archivo.lince>                    Ejecuta un programa\n");
     printf("  lince compilar <archivo.lince>           Crea un ejecutable autónomo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
-    printf("  lince compilar <a.lince> --incluir <ruta> Incluye niveles, imágenes u otros archivos (varias veces)\n");
+    printf("  lince compilar <a.lince> --incluir <ruta> Incluye niveles u otros archivos (varias veces)\n");
+    printf("  lince repartir <juego.lince>             Carpeta y .zip para compartir el juego (con SDL2)\n");
     printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");
@@ -219,6 +221,31 @@ int main(int argc, char *argv[]) {
         if (resultado == 0)
             printf("✅ Compilado correctamente → %s\n\n", ruta_bin);
         return resultado;
+    }
+
+    /* Repartir: carpeta y .zip con el juego y SDL2, listos para compartir */
+    if (strcmp(cmd, "repartir") == 0) {
+        const char *uso = "   Uso: lince repartir <juego.lince> [-o carpeta] [--incluir carpeta_o_archivo]...\n\n";
+        if (argc < 3) { fprintf(stderr, "\n❌ Falta el juego.\n%s", uso); return 1; }
+        const char *ext = strrchr(argv[2], '.');
+        if (!ext || strcmp(ext, ".lince") != 0) {
+            fprintf(stderr, "\n❌ El archivo '%s' no tiene la extensión '.lince'.\n\n", argv[2]);
+            return 1;
+        }
+        const char *carpeta = NULL;
+        const char *extras[64];
+        int num_extras = 0;
+        for (int i = 3; i < argc; i++) {
+            if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) carpeta = argv[++i];
+            else if (strcmp(argv[i], "--incluir") == 0 && i + 1 < argc) {
+                if (num_extras < 64) extras[num_extras++] = argv[++i];
+                else i++;
+            } else {
+                fprintf(stderr, "\n❌ Opción desconocida: %s\n%s", argv[i], uso);
+                return 1;
+            }
+        }
+        return repartir_crear(argv[2], carpeta, extras, num_extras);
     }
 
     /* Subcomandos del gestor de paquetes */
