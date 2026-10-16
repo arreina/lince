@@ -5,12 +5,13 @@
 # Salta encima de los escarabajos para quitarlos de en medio y recoge monedas.
 # F11 pantalla completa. Esc sale.
 #
-# Muestra: un nivel escrito como texto (cada carácter es una casilla), sprites
-# dibujados con texto y animados como hoja de sprites, gravedad y un mapa de
-# casillas (juego.mapa) que mueve al lince sin atravesar paredes, una cámara que sigue al jugador con un marcador fijo, acciones
-# (cada control se define una vez para teclado y mando a la vez), partículas
-# escenas con fundido (la portada y el nivel) y efectos de sonido generados
-# (juego.efecto).
+# Muestra: un nivel escrito como texto (cada carácter es una casilla) que
+# juego.mapa convierte en un mapa: juego.mover_en_mapa mueve al lince con
+# gravedad sin atravesar paredes y con plataformas que se cruzan desde abajo.
+# Sprites dibujados con texto y animados como hoja de sprites, una cámara que
+# sigue al jugador con un marcador fijo, acciones (cada control se define una
+# vez para teclado y mando a la vez), partículas, escenas con fundido (la
+# portada y el nivel) y efectos de sonido generados (juego.efecto).
 importar "juego"
 importar "matematica"
 
