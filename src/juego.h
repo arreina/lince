@@ -113,10 +113,11 @@ typedef struct { char tipo[16]; int cuadros, piernas, centro, frente; double int
 /* px: copia de los píxeles (RGBA) de las imágenes que no salen de un archivo
    (sprites y animaciones generadas); las de archivo se vuelven a leer si hace
    falta. origen: la imagen de la que se generó la animación, o -1. */
+/* Cómo se prepara una imagen descargada: quitar el fondo (modo 0 nada, 1 auto,
+   2 color) y reducirla (ver jg_preparar) */
+typedef struct { int modo; unsigned char color[3]; double escala; } JgPreparar;
 typedef struct { void *tex; int ancho, alto; char *ruta; long long mtime, tam;
-                 unsigned char *px; int origen; JgReceta receta;
-                 int *partes, npartes, celda_w, celda_h; } JgImagen;   /* de una hoja dividida sola: cuadros
-                                                                          por fila y lo que mide la celda */
+                 unsigned char *px; int origen; JgReceta receta; JgPreparar prep; } JgImagen;
 typedef struct { short *datos; int muestras; char *ruta; long long mtime, tam; } JgSonido;   /* muestras por canal */
 typedef struct {
     const short *datos; int muestras, pos, bucle, activa, id;
@@ -242,6 +243,9 @@ static void jg_aviso_error(const char *msg, int pantalla);
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
+static void jg_hojas_liberar(void);
+static int _jg_recargar_codigo;          /* una hoja cambió de forma: volver a ejecutar el programa */
+static double jg_reloj(void);
 static int jg_opcion(Valor *op, const char *clave, double *out);
 static Valor *jg_opcion_valor(Valor *op, const char *clave);
 static void jg_dic_poner(Valor *d, const char *clave, Valor *v);
@@ -422,9 +426,9 @@ static void jg_cerrar_todo(void) {
         _jg.DestroyTexture(_jgs.imagenes[i].tex);
         free(_jgs.imagenes[i].ruta);
         free(_jgs.imagenes[i].px);
-        free(_jgs.imagenes[i].partes);
     }
     _jgs.nimagenes = 0;
+    jg_hojas_liberar();
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
     if (_jgs.render) _jg.DestroyRenderer(_jgs.render);
     if (_jgs.ventana) _jg.DestroyWindow(_jgs.ventana);
@@ -965,6 +969,7 @@ static int jg_vigilar(void) {
     jg_recargar_recursos();
     int r = recarga_comprobar(f5);
     recarga_pedir_completa(r && f5);
+    if (_jg_recargar_codigo) { _jg_recargar_codigo = 0; r = 1; }   /* una hoja cambió de forma */
     return r;
 }
 
@@ -1618,7 +1623,6 @@ static unsigned char *jg_pixeles(int k) {
    filo, los píxeles a medio camino se vuelven semitransparentes y se les quita
    el tinte del fondo. "escala" la reduce al cargarla haciendo la media de los
    píxeles, que queda mucho mejor que reducirla al dibujar. */
-typedef struct { int modo; unsigned char color[3]; double escala; } JgPreparar;   /* modo: 0 nada, 1 auto, 2 color */
 #define JG_TOLERANCIA_FONDO 48
 
 static int jg_dif_color(const unsigned char *p, const unsigned char *c) {
@@ -1766,7 +1770,10 @@ static int jg_preparar(int k, const JgPreparar *p, char *msg, size_t max) {
         px = r; w = nw; h = nh;
     }
     int nk = jg_nueva_imagen(nombre, px, w, h);
-    if (nk < 0) snprintf(msg, max, "no se pudo crear la imagen (¿demasiado grande o demasiadas imágenes?)");
+    if (nk < 0) { snprintf(msg, max, "no se pudo crear la imagen (¿demasiado grande o demasiadas imágenes?)"); return -1; }
+    _jgs.imagenes[nk].origen = k;                       /* para rehacerla si la imagen cambia en el disco */
+    snprintf(_jgs.imagenes[nk].receta.tipo, sizeof _jgs.imagenes[nk].receta.tipo, "preparar");
+    _jgs.imagenes[nk].prep = *p;
     return nk;
 }
 
@@ -1897,77 +1904,6 @@ static JgRect jg_rejilla_rect(const JgImagen *img, const JgRejilla *g, int cuadr
     if (cuadro < 0) cuadro += total;
     JgRect r = {g->margen + (cuadro % cols) * (g->cw + g->sep), g->margen + (cuadro / cols) * (g->ch + g->sep), g->cw, g->ch};
     return r;
-}
-
-/* La rejilla que lleva una imagen hecha con juego.hoja(); 0 si no la lleva */
-static int jg_rejilla_de(Valor *v, JgRejilla *g) {
-    if (v->tipo != VAL_DICCIONARIO) return 0;
-    int k = valor_diccionario_buscar(v, "celda");
-    if (k < 0) return 0;
-    Valor *c = v->diccionario.valores[k];
-    if (c->tipo != VAL_LISTA || c->lista.cantidad != 2 || c->lista.elementos[0]->tipo != VAL_NUMERO ||
-        c->lista.elementos[1]->tipo != VAL_NUMERO) return 0;
-    g->cw = (int)c->lista.elementos[0]->numero;
-    g->ch = (int)c->lista.elementos[1]->numero;
-    double s = 0, m = 0;
-    jg_opcion(v, "separacion", &s);
-    jg_opcion(v, "margen", &m);
-    g->sep = (int)s; g->margen = (int)m;
-    return g->cw >= 1 && g->ch >= 1 && g->sep >= 0 && g->margen >= 0;
-}
-
-static int jg_resto(int a, int m) { int r = a % m; return r < 0 ? r + m : r; }
-
-/* Dónde está un cuadro de una hoja de hoja() (o de animar()).
-   'fila' >= 0 cuenta los cuadros dentro de esa fila (cada fila, una
-   animación); -1, todos seguidos. Un número fuera de rango da la vuelta.
-   Deja en 'src' el trozo de imagen, en 'cw'×'ch' la celda (lo que mide el
-   mayor cuadro) y en 'ox', 'oy' dónde va el trozo dentro de ella: los cuadros
-   de distinto tamaño (hojas divididas solas) van centrados y apoyados abajo.
-   Devuelve 1 si es una hoja, 0 si no, y -1 si la fila no existe (con 'msg'). */
-static int jg_hoja_cuadro(Valor *v, const JgImagen *img, int fila, int cuadro, JgRect *src,
-                          int *ox, int *oy, int *cw, int *ch, char *msg, size_t max) {
-    JgRejilla g;
-    if (!jg_rejilla_de(v, &g)) return 0;
-    *cw = g.cw; *ch = g.ch; *ox = *oy = 0;
-    int kr = valor_diccionario_buscar(v, "recortes"), kf = valor_diccionario_buscar(v, "por_fila");
-    Valor *recortes = kr >= 0 ? v->diccionario.valores[kr] : NULL, *por_fila = kf >= 0 ? v->diccionario.valores[kf] : NULL;
-    int filas, cols, total;
-    if (recortes && recortes->tipo == VAL_LISTA && recortes->lista.cantidad > 0) {
-        total = recortes->lista.cantidad;
-        filas = por_fila && por_fila->tipo == VAL_LISTA ? por_fila->lista.cantidad : 1;
-        cols = total;
-    } else {
-        recortes = NULL;
-        total = jg_rejilla_cuadros(img, &g, &cols);
-        filas = total / cols;
-    }
-    int i = jg_resto(cuadro, total);
-    if (fila >= 0) {
-        if (fila >= filas) {
-            snprintf(msg, max, "la hoja tiene %d fila%s (de 0 a %d); no hay fila %d", filas, filas == 1 ? "" : "s", filas - 1, fila);
-            return -1;
-        }
-        if (recortes) {
-            int base = 0, en_fila = total;
-            for (int f = 0; f <= fila && f < por_fila->lista.cantidad; f++) {
-                Valor *e = por_fila->lista.elementos[f];
-                en_fila = e->tipo == VAL_NUMERO && e->numero >= 1 ? (int)e->numero : 1;
-                if (f < fila) base += en_fila;
-            }
-            i = jg_resto(base + jg_resto(cuadro, en_fila), total);
-        } else i = fila * cols + jg_resto(cuadro, cols);
-    }
-    if (!recortes) { *src = jg_rejilla_rect(img, &g, i); return 1; }
-    Valor *r = recortes->lista.elementos[i];
-    int q[4] = {0, 0, 1, 1};
-    for (int j = 0; j < 4 && r->tipo == VAL_LISTA && j < r->lista.cantidad; j++)
-        if (r->lista.elementos[j]->tipo == VAL_NUMERO) q[j] = (int)r->lista.elementos[j]->numero;
-    JgRect s = {q[0], q[1], q[2], q[3]};
-    *src = s;
-    *ox = (g.cw - s.w) / 2;
-    *oy = g.ch - s.h;
-    return 1;
 }
 
 /* Divide sola una hoja de sprites. Cada figura es un trozo de píxeles
@@ -2113,124 +2049,269 @@ fin:
     return hoja;
 }
 
-static void jg_poner_filas(Valor *d, int filas, int por_fila_igual, const int *por_fila) {
-    valor_diccionario_agregar(d, "filas", valor_numero(filas));
-    Valor *l = valor_lista_crear();
-    for (int f = 0; f < filas; f++) lista_agregar(l, valor_numero(por_fila ? por_fila[f] : por_fila_igual));
-    valor_diccionario_agregar(d, "por_fila", l);
+/* ── Hojas ──
+   Cada hoja vive aquí: su receta (de qué imagen sale, cómo se prepara y se
+   divide, qué cuadros se quitan) y el resultado (dónde está cada cuadro). El
+   diccionario que recibe el programa lleva su número ("hoja") y un resumen
+   para leer ("cuadros", "celda", "filas"...). Si la imagen cambia en el disco
+   con el juego en marcha, la hoja se rehace y todo lo que la usa (dibujar,
+   los animadores guardados en variables, los mapas) ve los cuadros nuevos;
+   si además cambió de forma (otro número de cuadros, otra celda), el programa
+   se vuelve a ejecutar como al guardar el código, para que el resumen también
+   se ponga al día. */
+#define JG_MAX_HOJAS 512
+enum { JG_HOJA_SOLA, JG_HOJA_TAMANO, JG_HOJA_CUENTA };
+typedef struct {
+    /* receta */
+    int base, modo, columnas, filas, *quitar, nquitar;
+    JgPreparar prep;
+    JgRejilla g;                /* por tamaño: en píxeles de la imagen original */
+    /* resultado */
+    int fuente;                 /* la imagen preparada (o la base, si no hay que prepararla) */
+    int imagen;                 /* la imagen de la que se recortan los cuadros */
+    int total, nf, cw, ch, cols, *por_fila;
+    JgRect *rec;
+    int version;
+} JgHoja;
+static JgHoja _jg_hojas[JG_MAX_HOJAS];
+static int _jg_nhojas;
+
+static int jg_resto(int a, int m) { int r = a % m; return r < 0 ? r + m : r; }
+
+static void jg_hojas_liberar(void) {
+    for (int i = 0; i < _jg_nhojas; i++) {
+        free(_jg_hojas[i].quitar); free(_jg_hojas[i].por_fila); free(_jg_hojas[i].rec);
+    }
+    memset(_jg_hojas, 0, sizeof _jg_hojas);
+    _jg_nhojas = 0;
 }
 
-/* Quita de la hoja 'd' los cuadros de la lista 'quitar' (números de cuadro,
-   contando desde 0 como siempre): los demás se vuelven a numerar seguidos y
-   las filas que se quedan sin cuadros desaparecen. La hoja pasa a llevar la
-   lista de "recortes" de los cuadros que quedan. */
-static Valor *jg_hoja_quitar(Valor *d, Valor *quitar) {
-    if (!quitar) return d;
-    JgImagen *img = &_jgs.imagenes[jg_id_de(d, "imagen")];
-    Valor *pf = d->diccionario.valores[valor_diccionario_buscar(d, "por_fila")];
-    int total = (int)d->diccionario.valores[valor_diccionario_buscar(d, "cuadros")]->numero;
-    char *fuera = calloc((size_t)total, 1);
-    int *por_fila = malloc(sizeof(int) * (pf->lista.cantidad + 1));
-    char msg[200];
-    if (!fuera || !por_fila) { free(fuera); free(por_fila); valor_destruir(d); return jg_error("Error", "sin memoria"); }
-    for (int i = 0; i < quitar->lista.cantidad; i++) {
-        Valor *e = quitar->lista.elementos[i];
-        if (e->tipo != VAL_NUMERO || e->numero != floor(e->numero) || e->numero < 0 || e->numero >= total) {
-            snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número de 0 a %d", total - 1);
-            free(fuera); free(por_fila); valor_destruir(d);
-            return jg_error("Error", msg);
+/* Calcula (o rehace) el resultado de la hoja i a partir de su receta. 0 si
+   no se pudo, con el motivo en 'msg' (la hoja se queda como estaba). */
+static int jg_hoja_calcular(int hi, char *msg, size_t max) {
+    JgHoja *h = &_jg_hojas[hi];
+    int fuente = jg_preparar(h->base, &h->prep, msg, max);
+    if (fuente < 0) return 0;
+    JgImagen *im = &_jgs.imagenes[fuente];
+    int total = 0, nf = 0, cw = 0, ch = 0, imagen = fuente;
+    JgRect *rec = NULL;
+    int *pf = NULL;
+    if (h->modo == JG_HOJA_SOLA) {
+        static int por_fila[JG_MAX_RECORTES];
+        unsigned char *px = jg_pixeles(fuente);
+        if (!px) { snprintf(msg, max, "no se pudieron leer los píxeles de la imagen"); return 0; }
+        unsigned char *nueva = jg_dividir_hoja(px, im->ancho, im->alto, &cw, &ch, &total, por_fila, &nf, msg, max);
+        free(px);
+        if (!nueva) return 0;
+        if (total == 1 && cw * 10 >= im->ancho * 9 && ch * 10 >= im->alto * 9) {
+            free(nueva);
+            snprintf(msg, max, "no encuentro huecos transparentes entre los cuadros; di cuántos hay, por ejemplo "
+                     "hoja(imagen, {\"columnas\": 6}), o cuánto mide cada uno: hoja(imagen, 32)");
+            return 0;
         }
-        fuera[(int)e->numero] = 1;
-    }
-    Valor *recortes = valor_lista_crear();
-    int quedan = 0, nf = 0, cols = 0, global = 0;
-    for (int f = 0; f < pf->lista.cantidad; f++) {
-        int en_fila = (int)pf->lista.elementos[f]->numero, cuenta = 0;
-        for (int e = 0; e < en_fila; e++, global++) {
-            if (fuera[global]) continue;
-            JgRect src;
-            int ox, oy, cw, ch;
-            jg_hoja_cuadro(d, img, f, e, &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
-            Valor *r = valor_lista_crear();
-            lista_agregar(r, valor_numero(src.x)); lista_agregar(r, valor_numero(src.y));
-            lista_agregar(r, valor_numero(src.w)); lista_agregar(r, valor_numero(src.h));
-            lista_agregar(recortes, r);
-            cuenta++;
+        int cols = 0;
+        for (int f = 0; f < nf; f++) if (por_fila[f] > cols) cols = por_fila[f];
+        int W = cw * cols, H = ch * nf;
+        /* la imagen de la hoja: nueva, o la de antes rehecha en su sitio */
+        if (h->imagen >= 0 && h->imagen != h->fuente && h->imagen < _jgs.nimagenes) {
+            void *tex = jg_textura_rgba(nueva, W, H);
+            if (!tex) { free(nueva); snprintf(msg, max, "no se pudo crear la hoja"); return 0; }
+            JgImagen *hm = &_jgs.imagenes[h->imagen];
+            _jg.DestroyTexture(hm->tex);
+            free(hm->px);
+            hm->tex = tex; hm->px = nueva; hm->ancho = W; hm->alto = H;
+            imagen = h->imagen;
+        } else {
+            char nombre[48];
+            snprintf(nombre, sizeof nombre, "<hoja %d>", hi);
+            imagen = jg_nueva_imagen(nombre, nueva, W, H);
+            if (imagen < 0) { snprintf(msg, max, "no se pudo crear la hoja (¿demasiado grande? prueba con \"escala\")"); return 0; }
         }
-        if (cuenta) { por_fila[nf++] = cuenta; if (cuenta > cols) cols = cuenta; quedan += cuenta; }
+        rec = malloc(sizeof(JgRect) * total);
+        pf = malloc(sizeof(int) * nf);
+        if (!rec || !pf) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+        for (int f = 0, c = 0; f < nf; f++) {
+            pf[f] = por_fila[f];
+            for (int e = 0; e < por_fila[f]; e++, c++) { JgRect r = {e * cw, f * ch, cw, ch}; rec[c] = r; }
+        }
+    } else {
+        JgRejilla g = h->g;
+        if (h->modo == JG_HOJA_TAMANO && h->prep.escala < 1) {    /* los tamaños se dan en la imagen original */
+            g.cw = (int)round(g.cw * h->prep.escala); g.ch = (int)round(g.ch * h->prep.escala);
+            g.sep = (int)round(g.sep * h->prep.escala); g.margen = (int)round(g.margen * h->prep.escala);
+        } else if (h->modo == JG_HOJA_CUENTA) {
+            if (h->prep.escala < 1) { g.sep = (int)round(g.sep * h->prep.escala); g.margen = (int)round(g.margen * h->prep.escala); }
+            g.cw = (im->ancho - 2 * g.margen - (h->columnas - 1) * g.sep) / h->columnas;
+            g.ch = (im->alto - 2 * g.margen - (h->filas - 1) * g.sep) / h->filas;
+        }
+        if (g.cw < 1 || g.ch < 1 || g.sep < 0 || g.margen < 0) {
+            snprintf(msg, max, "los cuadros miden al menos 1×1 y la separación y el margen no son negativos");
+            return 0;
+        }
+        if (g.cw + 2 * g.margen > im->ancho || g.ch + 2 * g.margen > im->alto) {
+            snprintf(msg, max, "la imagen mide %d×%d, no cabe ni un cuadro de %d×%d", im->ancho, im->alto, g.cw, g.ch);
+            return 0;
+        }
+        int cols;
+        total = jg_rejilla_cuadros(im, &g, &cols);
+        nf = total / cols;
+        rec = malloc(sizeof(JgRect) * total);
+        pf = malloc(sizeof(int) * nf);
+        if (!rec || !pf) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+        for (int i = 0; i < total; i++) rec[i] = jg_rejilla_rect(im, &g, i);
+        for (int f = 0; f < nf; f++) pf[f] = cols;
+        cw = g.cw; ch = g.ch;
     }
-    free(fuera);
-    if (quedan == 0) {
-        free(por_fila); valor_destruir(recortes); valor_destruir(d);
-        return jg_error("Error", "hoja(): con \"quitar\" no queda ningún cuadro");
+    /* quitar: los demás se numeran seguidos; las filas vacías desaparecen */
+    if (h->nquitar > 0) {
+        char *fuera = calloc((size_t)total, 1);
+        if (!fuera) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+        for (int q = 0; q < h->nquitar; q++) if (h->quitar[q] >= 0 && h->quitar[q] < total) fuera[h->quitar[q]] = 1;
+        int n = 0, f2 = 0;
+        for (int f = 0, c = 0; f < nf; f++) {
+            int quedan = 0;
+            for (int e = 0; e < pf[f]; e++, c++) if (!fuera[c]) { rec[n++] = rec[c]; quedan++; }
+            if (quedan) pf[f2++] = quedan;
+        }
+        free(fuera);
+        if (n == 0) { free(rec); free(pf); snprintf(msg, max, "con \"quitar\" no queda ningún cuadro"); return 0; }
+        total = n; nf = f2;
     }
+    int cols = 0;
+    for (int f = 0; f < nf; f++) if (pf[f] > cols) cols = pf[f];
+    /* si cambia de forma, el programa se vuelve a ejecutar para poner al día los diccionarios */
+    int forma = h->version > 0 && (total != h->total || nf != h->nf || cw != h->cw || ch != h->ch);
+    for (int f = 0; f < nf && h->version > 0 && !forma; f++) forma = pf[f] != h->por_fila[f];
+    if (forma) _jg_recargar_codigo = 1;
+    free(h->rec); free(h->por_fila);
+    h->rec = rec; h->por_fila = pf;
+    h->total = total; h->nf = nf; h->cw = cw; h->ch = ch; h->cols = cols;
+    h->fuente = fuente; h->imagen = imagen;
+    h->version++;
+    return 1;
+}
+
+/* La hoja con esa receta (la misma receta da la misma hoja: así al recargar en
+   caliente no se repite el trabajo); -1 con 'msg' si no se pudo hacer */
+static int jg_hoja_obtener(const JgHoja *receta, char *msg, size_t max) {
+    for (int i = 0; i < _jg_nhojas; i++) {
+        JgHoja *h = &_jg_hojas[i];
+        if (h->base != receta->base || h->modo != receta->modo || h->columnas != receta->columnas ||
+            h->filas != receta->filas || h->nquitar != receta->nquitar ||
+            memcmp(&h->prep, &receta->prep, sizeof h->prep) || memcmp(&h->g, &receta->g, sizeof h->g)) continue;
+        if (h->nquitar && memcmp(h->quitar, receta->quitar, sizeof(int) * h->nquitar)) continue;
+        return i;
+    }
+    if (_jg_nhojas == JG_MAX_HOJAS) { snprintf(msg, max, "demasiadas hojas"); return -1; }
+    int i = _jg_nhojas;
+    JgHoja *h = &_jg_hojas[i];
+    *h = *receta;
+    h->quitar = NULL;
+    if (receta->nquitar) {
+        h->quitar = malloc(sizeof(int) * receta->nquitar);
+        if (!h->quitar) { snprintf(msg, max, "sin memoria"); return -1; }
+        memcpy(h->quitar, receta->quitar, sizeof(int) * receta->nquitar);
+    }
+    h->imagen = -1; h->fuente = -1; h->rec = NULL; h->por_fila = NULL; h->version = 0;
+    if (!jg_hoja_calcular(i, msg, max)) { free(h->quitar); memset(h, 0, sizeof *h); return -1; }
+    _jg_nhojas++;
+    return i;
+}
+
+/* El diccionario de la hoja i: la imagen, su número y el resumen */
+static Valor *jg_hoja_valor(int hi) {
+    JgHoja *h = &_jg_hojas[hi];
+    Valor *d = jg_imagen_valor(h->imagen);
+    valor_diccionario_agregar(d, "hoja", valor_numero(hi));
+    Valor *celda = valor_lista_crear();
+    lista_agregar(celda, valor_numero(h->cw));
+    lista_agregar(celda, valor_numero(h->ch));
+    valor_diccionario_agregar(d, "celda", celda);
+    valor_diccionario_agregar(d, "cuadros", valor_numero(h->total));
+    valor_diccionario_agregar(d, "columnas", valor_numero(h->cols));
+    valor_diccionario_agregar(d, "filas", valor_numero(h->nf));
     Valor *l = valor_lista_crear();
-    for (int f = 0; f < nf; f++) lista_agregar(l, valor_numero(por_fila[f]));
-    free(por_fila);
-    jg_dic_poner(d, "recortes", recortes);
-    jg_dic_poner(d, "cuadros", valor_numero(quedan));
-    jg_dic_poner(d, "columnas", valor_numero(cols));
-    jg_dic_poner(d, "filas", valor_numero(nf));
-    jg_dic_poner(d, "por_fila", l);
+    for (int f = 0; f < h->nf; f++) lista_agregar(l, valor_numero(h->por_fila[f]));
+    valor_diccionario_agregar(d, "por_fila", l);
     return d;
 }
 
-/* pisadas(hoja[, fila]): los cuadros en que un pie toca el suelo, para que
-   suenen los pasos a su tiempo. En cada cuadro mira qué hay pegado al suelo
-   (las filas de abajo de la celda) y lo compara con el cuadro anterior (el
-   del final cuenta como anterior del primero, porque las animaciones de andar
-   dan la vuelta). Supone que el personaje mira a la derecha. Con 'fila', los
-   números son dentro de esa fila. */
-#define JG_MAX_APOYOS 16
-static Valor *fn_jg_pisadas(Valor **a, int n) {
-    JG_ABIERTA();
-    JgRejilla g;
-    int k = n > 0 ? jg_id_de(a[0], "imagen") : -1;
-    if (k < 0 || k >= _jgs.nimagenes || !jg_rejilla_de(a[0], &g))
-        return jg_error("ErrorTipo", "pisadas() espera una hoja de juego.hoja() (y, si quieres, una fila)");
-    int fila = -1;
-    char msg[200];
-    if (n > 1) {
-        if (a[1]->tipo != VAL_NUMERO || a[1]->numero < 0) return jg_error("ErrorTipo", "pisadas(): la fila es un número desde 0");
-        fila = (int)a[1]->numero;
-    }
-    JgImagen *img = &_jgs.imagenes[k];
-    int cuantos = (int)a[0]->diccionario.valores[valor_diccionario_buscar(a[0], "cuadros")]->numero;
+/* La hoja de un diccionario de hoja(), o NULL */
+static JgHoja *jg_hoja_de(Valor *v) {
+    if (!v || v->tipo != VAL_DICCIONARIO) return NULL;
+    int k = valor_diccionario_buscar(v, "hoja");
+    if (k < 0 || v->diccionario.valores[k]->tipo != VAL_NUMERO) return NULL;
+    int i = (int)v->diccionario.valores[k]->numero;
+    return i >= 0 && i < _jg_nhojas ? &_jg_hojas[i] : NULL;
+}
+
+/* Dónde está un cuadro de la hoja. 'fila' >= 0 cuenta dentro de esa fila
+   (cada fila, una animación); -1, todos seguidos. Un número fuera de rango
+   da la vuelta. 'src' es el trozo de la imagen y 'ox', 'oy' dónde va dentro
+   de la celda (h->cw × h->ch). Devuelve el número de cuadro en la hoja, o -1
+   si la fila no existe (con 'msg'). */
+static int jg_hoja_cuadro(const JgHoja *h, int fila, int cuadro, JgRect *src, int *ox, int *oy, char *msg, size_t max) {
+    int i;
     if (fila >= 0) {
-        int kp = valor_diccionario_buscar(a[0], "por_fila");
-        Valor *pf = kp >= 0 ? a[0]->diccionario.valores[kp] : NULL;
-        if (!pf || pf->tipo != VAL_LISTA || fila >= pf->lista.cantidad) {
-            snprintf(msg, sizeof msg, "pisadas(): la hoja no tiene fila %d", fila);
-            return jg_error("Error", msg);
+        if (fila >= h->nf) {
+            snprintf(msg, max, "la hoja tiene %d fila%s (de 0 a %d); no hay fila %d", h->nf, h->nf == 1 ? "" : "s", h->nf - 1, fila);
+            return -1;
         }
-        cuantos = (int)pf->lista.elementos[fila]->numero;
+        int base = 0;
+        for (int f = 0; f < fila; f++) base += h->por_fila[f];
+        i = base + jg_resto(cuadro, h->por_fila[fila]);
+    } else i = jg_resto(cuadro, h->total);
+    *src = h->rec[i];
+    *ox = (h->cw - src->w) / 2;
+    *oy = h->ch - src->h;
+    return i;
+}
+
+/* Pisadas de una secuencia de cuadros de la hoja (fila[i], cuadro[i]): deja en
+   pisa[i] si en el cuadro i un pie toca el suelo. En cada cuadro mira qué hay
+   pegado al suelo (las filas de abajo de la celda) y lo compara con el cuadro
+   anterior (el último cuenta como anterior del primero, porque las animaciones
+   de andar dan la vuelta). Supone que el personaje mira a la derecha. */
+#define JG_MAX_APOYOS 16
+static int jg_pisadas_secuencia(const JgHoja *h, const int *filas, const int *cuadros, int n, char *pisa) {
+    memset(pisa, 0, (size_t)n);
+    if (n < 2) return 1;
+    /* una hoja de animar("andar"/"correr"): se sabe dónde apoya, porque la hizo Lince
+       (con las piernas más abiertas: a un cuarto y a tres cuartos de la vuelta) */
+    const JgReceta *rc = &_jgs.imagenes[h->base].receta;
+    if (h->modo == JG_HOJA_TAMANO && _jgs.imagenes[h->base].origen >= 0 &&
+        (!strcmp(rc->tipo, "andar") || !strcmp(rc->tipo, "correr"))) {
+        for (int i = 0; i < n; i++) pisa[i] = cuadros[i] == rc->cuadros / 4 || cuadros[i] == 3 * rc->cuadros / 4;
+        return 1;
     }
-    unsigned char *px = jg_pixeles(k);
-    if (!px) return jg_error("ErrorJuego", "pisadas(): no se pudieron leer los píxeles de la hoja");
-    /* lo más bajo de cada cuadro, en coordenadas de la celda; el suelo es lo más bajo de todos */
-    int *abajo = malloc(sizeof(int) * cuantos), (*apoyo)[JG_MAX_APOYOS][2] = malloc(sizeof *apoyo * cuantos);
-    int *napoyos = calloc((size_t)cuantos, sizeof(int));
-    if (!abajo || !apoyo || !napoyos) { free(px); free(abajo); free(apoyo); free(napoyos); return jg_error("Error", "sin memoria"); }
-    int suelo = -1, cw = 1, ch = 1;
-    for (int i = 0; i < cuantos; i++) {
+    JgImagen *img = &_jgs.imagenes[h->imagen];
+    unsigned char *px = jg_pixeles(h->imagen);
+    int (*apoyo)[JG_MAX_APOYOS][2] = malloc(sizeof *apoyo * n);
+    int *napoyos = calloc((size_t)n, sizeof(int));
+    if (!px || !apoyo || !napoyos) { free(px); free(apoyo); free(napoyos); return 0; }
+    char msg[160];
+    /* el suelo: lo más bajo de todos los cuadros, en coordenadas de la celda */
+    int suelo = -1;
+    for (int i = 0; i < n; i++) {
         JgRect src;
         int ox, oy;
-        jg_hoja_cuadro(a[0], img, fila, i, &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
-        abajo[i] = -1;
-        for (int y = src.y; y < src.y + src.h; y++)
-            for (int x = src.x; x < src.x + src.w; x++)
-                if (x >= 0 && y >= 0 && x < img->ancho && y < img->alto && px[((size_t)y * img->ancho + x) * 4 + 3] > 64)
-                    if (oy + y - src.y > abajo[i]) abajo[i] = oy + y - src.y;
-        if (abajo[i] > suelo) suelo = abajo[i];
+        if (jg_hoja_cuadro(h, filas[i], cuadros[i], &src, &ox, &oy, msg, sizeof msg) < 0) continue;
+        for (int y = src.y + src.h - 1; y >= src.y; y--) {
+            int hay = 0;
+            for (int x = src.x; x < src.x + src.w && !hay; x++)
+                hay = x >= 0 && y >= 0 && x < img->ancho && y < img->alto && px[((size_t)y * img->ancho + x) * 4 + 3] > 64;
+            if (hay) { if (oy + y - src.y > suelo) suelo = oy + y - src.y; break; }
+        }
     }
-    int margen = (int)floor(ch * 0.04);              /* los pies no siempre llegan justo al mismo suelo */
-    int junta = (int)fmax(1, round(cw * 0.025));     /* huecos más pequeños no separan dos apoyos */
-    for (int i = 0; i < cuantos; i++) {
+    int margen = (int)floor(h->ch * 0.04);              /* los pies no siempre llegan justo al mismo suelo */
+    int junta = (int)fmax(1, round(h->cw * 0.025));     /* huecos más pequeños no separan dos apoyos */
+    int salto = (int)fmax(2, round(h->cw * 0.06));
+    for (int i = 0; i < n; i++) {
         JgRect src;
         int ox, oy;
-        jg_hoja_cuadro(a[0], img, fila, i, &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
+        if (jg_hoja_cuadro(h, filas[i], cuadros[i], &src, &ox, &oy, msg, sizeof msg) < 0) continue;
         int desde = -1, hueco = 0;
-        for (int x = 0; x <= src.w; x++) {                  /* columnas con algo pegado al suelo */
+        for (int x = 0; x <= src.w; x++) {              /* columnas con algo pegado al suelo */
             int toca = 0;
             for (int y = suelo - margen; y <= suelo && x < src.w && !toca; y++) {
                 int sy = src.y + y - oy, sx = src.x + x;
@@ -2250,27 +2331,53 @@ static Valor *fn_jg_pisadas(Valor **a, int n) {
     /* hay pisada si ahora hay más apoyos que antes (un pie aterriza: tras ir por el aire, o
        al lado del otro) o si el apoyo de delante salta hacia delante (andando con los dos
        pies casi siempre en el suelo, el que avanzaba aterriza por delante del otro) */
-    char *pisa = calloc((size_t)cuantos, 1);
-    int salto = (int)fmax(2, round(cw * 0.06));
-    for (int i = 0; i < cuantos && cuantos > 1; i++) {
-        int p = (i + cuantos - 1) % cuantos, nuevo = 0, delante_i = -1, delante_p = -1;
+    char *candidata = calloc((size_t)n, 1);
+    if (!candidata) { free(apoyo); free(napoyos); return 0; }
+    for (int i = 0; i < n; i++) {
+        int p = (i + n - 1) % n, delante_i = -1, delante_p = -1;
         for (int s = 0; s < napoyos[i]; s++) if (apoyo[i][s][1] > delante_i) delante_i = apoyo[i][s][1];
         for (int s = 0; s < napoyos[p]; s++) if (apoyo[p][s][1] > delante_p) delante_p = apoyo[p][s][1];
-        nuevo = napoyos[i] > napoyos[p];
-        pisa[i] = nuevo || (delante_p >= 0 && delante_i - delante_p > salto);
+        candidata[i] = napoyos[i] > napoyos[p] || (delante_p >= 0 && delante_i - delante_p > salto);
     }
     /* una pisada puede tardar dos cuadros en asentarse (la punta y luego el pie): cuenta una */
-    Valor *l = valor_lista_crear();
     int primera = -1, ultima = -1000;
-    for (int i = 0; i < cuantos; i++) {
-        if (!pisa[i] || i - ultima < 2) continue;
-        if (primera >= 0 && i + cuantos - primera < 2) continue;      /* pegada a la primera, dando la vuelta */
+    for (int i = 0; i < n; i++) {
+        if (!candidata[i] || i - ultima < 2) continue;
+        if (primera >= 0 && i + n - primera < 2) continue;          /* pegada a la primera, dando la vuelta */
         if (primera < 0) primera = i;
         ultima = i;
-        lista_agregar(l, valor_numero(i));
+        pisa[i] = 1;
     }
-    free(pisa);
-    free(abajo); free(apoyo); free(napoyos);
+    free(candidata); free(apoyo); free(napoyos);
+    return 1;
+}
+
+/* pisadas(hoja[, fila]): los cuadros en que un pie toca el suelo, para que
+   suenen los pasos a su tiempo. Con 'fila', los números son dentro de esa fila. */
+static Valor *fn_jg_pisadas(Valor **a, int n) {
+    JG_ABIERTA();
+    JgHoja *h = n > 0 ? jg_hoja_de(a[0]) : NULL;
+    if (!h) return jg_error("ErrorTipo", "pisadas() espera una hoja de juego.hoja() (y, si quieres, una fila)");
+    int fila = -1;
+    if (n > 1) {
+        if (a[1]->tipo != VAL_NUMERO || a[1]->numero < 0) return jg_error("ErrorTipo", "pisadas(): la fila es un número desde 0");
+        fila = (int)a[1]->numero;
+        if (fila >= h->nf) {
+            char msg[120];
+            snprintf(msg, sizeof msg, "pisadas(): la hoja no tiene fila %d (tiene %d)", fila, h->nf);
+            return jg_error("Error", msg);
+        }
+    }
+    int cuantos = fila >= 0 ? h->por_fila[fila] : h->total;
+    int *filas = malloc(sizeof(int) * cuantos), *cuadros = malloc(sizeof(int) * cuantos);
+    char *pisa = malloc((size_t)cuantos);
+    if (!filas || !cuadros || !pisa) { free(filas); free(cuadros); free(pisa); return jg_error("Error", "sin memoria"); }
+    for (int i = 0; i < cuantos; i++) { filas[i] = fila; cuadros[i] = i; }
+    int ok = jg_pisadas_secuencia(h, filas, cuadros, cuantos, pisa);
+    Valor *l = valor_lista_crear();
+    for (int i = 0; ok && i < cuantos; i++) if (pisa[i]) lista_agregar(l, valor_numero(i));
+    free(filas); free(cuadros); free(pisa);
+    if (!ok) { valor_destruir(l); return jg_error("Error", "sin memoria"); }
     return l;
 }
 
@@ -2281,13 +2388,13 @@ static Valor *fn_jg_pisadas(Valor **a, int n) {
      hoja("andar.png", {"columnas": 6[, "filas": 2]}) en cuadros iguales, por número
      hoja("tiles.png", 16[, alto])                   en cuadros iguales, por tamaño
    Las dos últimas admiten "separacion" y "margen". Todas admiten "fondo" y
-   "escala" (ver jg_preparar); la primera quita sola el fondo de una imagen sin
-   transparencia (por ejemplo, un JPG con fondo blanco). Devuelve la imagen con
-   "celda", "cuadros", "columnas", "filas" y "por_fila"; así
-   dibujar(hoja, x, y, {"cuadro": 3}) y dibujar_mapa(mapa, {"#": [hoja, 3]})
-   ya saben dónde está cada cuadro. */
+   "escala" (ver jg_preparar) y "quitar"; la primera quita sola el fondo de
+   una imagen sin transparencia (por ejemplo, un JPG con fondo blanco).
+   hoja(otra_hoja, {"quitar": [...]}) quita cuadros de una hoja ya hecha. */
 static Valor *fn_jg_hoja(Valor **a, int n) {
     JG_ABIERTA();
+    char msg[400];
+    JgHoja *otra = n > 0 ? jg_hoja_de(a[0]) : NULL;
     Valor *img = NULL;
     if (n >= 1 && a[0]->tipo == VAL_TEXTO) { img = fn_jg_imagen(a, 1); if (hay_error) return img; }
     else if (n >= 1 && jg_id_de(a[0], "imagen") >= 0 && jg_id_de(a[0], "imagen") < _jgs.nimagenes) img = a[0];
@@ -2298,29 +2405,16 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     }
     int k = jg_id_de(img, "imagen");
     if (img != a[0]) valor_destruir(img);
-    JgRejilla g = {0, 0, 0, 0};
-    /* hoja(otra_hoja, {"quitar": [...]}): no se vuelve a dividir, solo se quitan cuadros */
-    if (img == a[0] && jg_rejilla_de(a[0], &g) && n == 2 && a[1]->tipo == VAL_DICCIONARIO &&
-        a[1]->diccionario.cantidad == 1 && valor_diccionario_buscar(a[1], "quitar") >= 0) {
-        Valor *q = jg_opcion_valor(a[1], "quitar");
-        if (q->tipo != VAL_LISTA)
-            return jg_error("ErrorTipo", "hoja(): \"quitar\" es la lista de los cuadros que no se usan, por ejemplo [0, 1, 2]");
-        Valor *d = valor_diccionario_crear();
-        for (int j = 0; j < a[0]->diccionario.cantidad; j++) {
-            Valor *v = a[0]->diccionario.valores[j];
-            v->refs++;
-            valor_diccionario_agregar(d, a[0]->diccionario.claves[j], v);
-        }
-        return jg_hoja_quitar(d, q);
-    }
-    memset(&g, 0, sizeof g);
-    char msg[300];
-    int i = 1, por_tamano = 0;
+    JgHoja r;
+    memset(&r, 0, sizeof r);
+    r.base = k;
+    r.modo = JG_HOJA_SOLA;
+    int i = 1;
     if (n > 1 && a[1]->tipo == VAL_NUMERO) {
-        por_tamano = 1;
-        g.cw = g.ch = (int)a[1]->numero;
+        r.modo = JG_HOJA_TAMANO;
+        r.g.cw = r.g.ch = (int)a[1]->numero;
         i = 2;
-        if (n > i && a[i]->tipo == VAL_NUMERO) g.ch = (int)a[i++]->numero;
+        if (n > i && a[i]->tipo == VAL_NUMERO) r.g.ch = (int)a[i++]->numero;
     }
     Valor *op = NULL;
     if (n > i) {
@@ -2329,121 +2423,376 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
         op = a[i];
         for (int j = 0; j < op->diccionario.cantidad; j++) {
             const char *c = op->diccionario.claves[j];
-            int de_cuenta = !strcmp(c, "columnas") || !strcmp(c, "filas");
+            Valor *v = op->diccionario.valores[j];
             if (!strcmp(c, "fondo") || !strcmp(c, "escala")) continue;      /* se leen abajo */
             if (!strcmp(c, "quitar")) {
-                if (op->diccionario.valores[j]->tipo != VAL_LISTA)
+                if (v->tipo != VAL_LISTA)
                     return jg_error("ErrorTipo", "hoja(): \"quitar\" es la lista de los cuadros que no se usan, por ejemplo [0, 1, 2]");
                 continue;
             }
+            int de_cuenta = !strcmp(c, "columnas") || !strcmp(c, "filas");
             if (strcmp(c, "separacion") && strcmp(c, "margen") && !de_cuenta) {
                 snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"columnas\", \"filas\", "
                          "\"separacion\", \"margen\", \"quitar\", \"fondo\" y \"escala\")", c);
                 return jg_error("Error", msg);
             }
-            if (de_cuenta && por_tamano)
+            if (de_cuenta && r.modo == JG_HOJA_TAMANO)
                 return jg_error("Error", "hoja(): di el tamaño de los cuadros o cuántos hay (\"columnas\", \"filas\"), no las dos cosas");
-            if (op->diccionario.valores[j]->tipo != VAL_NUMERO) {
+            if (v->tipo != VAL_NUMERO) {
                 snprintf(msg, sizeof msg, "hoja(): \"%s\" es un número", c);
                 return jg_error("ErrorTipo", msg);
             }
         }
         double v;
-        if (jg_opcion(op, "separacion", &v)) g.sep = (int)v;
-        if (jg_opcion(op, "margen", &v)) g.margen = (int)v;
+        if (jg_opcion(op, "separacion", &v)) r.g.sep = (int)v;
+        if (jg_opcion(op, "margen", &v)) r.g.margen = (int)v;
+        double columnas = 0, filas = 0;
+        if (jg_opcion(op, "columnas", &columnas) | jg_opcion(op, "filas", &filas)) {
+            if (columnas == 0) columnas = 1;
+            if (filas == 0) filas = 1;
+            if (columnas < 1 || filas < 1 || columnas > 4096 || filas > 4096)
+                return jg_error("Error", "hoja(): \"columnas\" y \"filas\" son al menos 1");
+            r.modo = JG_HOJA_CUENTA;
+            r.columnas = (int)columnas; r.filas = (int)filas;
+        }
     }
-    double columnas = 0, filas = 0;
-    int por_cuenta = jg_opcion(op, "columnas", &columnas) | jg_opcion(op, "filas", &filas);
-    /* sin fondo y reducida, si se pide (al dividirla sola, el fondo se quita solo) */
-    JgPreparar prep = {!por_tamano && !por_cuenta ? 1 : 0, {0, 0, 0}, 1};
-    if (!jg_leer_preparar(op, &prep, "hoja", msg, sizeof msg)) return hay_error ? valor_nulo() : jg_error("Error", msg);
-    k = jg_preparar(k, &prep, msg, sizeof msg);
-    if (k < 0) { char m2[340]; snprintf(m2, sizeof m2, "hoja(): %s", msg); return jg_error("ErrorJuego", m2); }
-    if (prep.escala < 1) {                          /* los tamaños se dan en píxeles de la imagen original */
-        g.cw = (int)round(g.cw * prep.escala); g.ch = (int)round(g.ch * prep.escala);
-        g.sep = (int)round(g.sep * prep.escala); g.margen = (int)round(g.margen * prep.escala);
+    Valor *quitar = jg_opcion_valor(op, "quitar");
+    /* de una hoja ya hecha solo se quitan cuadros: se parte de su receta */
+    int solo_quitar = otra && op && op->diccionario.cantidad == 1 && quitar;
+    if (solo_quitar) {
+        r = *otra;
+        r.quitar = NULL; r.nquitar = 0;
+    } else {
+        r.prep.modo = r.modo == JG_HOJA_SOLA ? 1 : 0;     /* al dividirla sola, el fondo se quita solo */
+        if (!jg_leer_preparar(op, &r.prep, "hoja", msg, sizeof msg)) return hay_error ? valor_nulo() : jg_error("Error", msg);
     }
-    JgImagen *im = &_jgs.imagenes[k];
+    /* los cuadros que se quitan, en la numeración de la hoja sin quitar nada */
+    int *lista = NULL, nlista = 0;
+    if (quitar) {
+        int total_antes = solo_quitar ? otra->total + otra->nquitar : -1;
+        int *quedaban = NULL;               /* de la otra hoja: qué cuadro original es cada uno */
+        if (solo_quitar) {
+            quedaban = malloc(sizeof(int) * (total_antes > 0 ? total_antes : 1));
+            char *fuera = calloc((size_t)(total_antes > 0 ? total_antes : 1), 1);
+            if (!quedaban || !fuera) { free(quedaban); free(fuera); return jg_error("Error", "sin memoria"); }
+            for (int q = 0; q < otra->nquitar; q++) if (otra->quitar[q] < total_antes) fuera[otra->quitar[q]] = 1;
+            for (int c = 0, m = 0; c < total_antes; c++) if (!fuera[c]) quedaban[m++] = c;
+            free(fuera);
+        }
+        int cuenta = (solo_quitar ? otra->nquitar : 0) + quitar->lista.cantidad;
+        lista = malloc(sizeof(int) * (cuenta > 0 ? cuenta : 1));
+        if (!lista) { free(quedaban); return jg_error("Error", "sin memoria"); }
+        if (solo_quitar) for (int q = 0; q < otra->nquitar; q++) lista[nlista++] = otra->quitar[q];
+        int maximo = solo_quitar ? otra->total : -1;
+        for (int q = 0; q < quitar->lista.cantidad; q++) {
+            Valor *e = quitar->lista.elementos[q];
+            if (e->tipo != VAL_NUMERO || e->numero != floor(e->numero) || e->numero < 0 || (maximo >= 0 && e->numero >= maximo)) {
+                if (maximo >= 0) snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número de 0 a %d", maximo - 1);
+                else snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número desde 0");
+                free(lista); free(quedaban);
+                return jg_error("Error", msg);
+            }
+            lista[nlista++] = solo_quitar ? quedaban[(int)e->numero] : (int)e->numero;
+        }
+        free(quedaban);
+        /* ordenados y sin repetir: así la misma receta se reconoce */
+        for (int x = 1; x < nlista; x++)
+            for (int y = x; y > 0 && lista[y] < lista[y - 1]; y--) { int t = lista[y]; lista[y] = lista[y - 1]; lista[y - 1] = t; }
+        int m = 0;
+        for (int x = 0; x < nlista; x++) if (m == 0 || lista[x] != lista[m - 1]) lista[m++] = lista[x];
+        nlista = m;
+    }
+    r.quitar = lista; r.nquitar = nlista;
+    int hi = jg_hoja_obtener(&r, msg, sizeof msg);
+    free(lista);
+    if (hi < 0) {
+        char m2[460];
+        snprintf(m2, sizeof m2, "hoja(): %s", msg);
+        return jg_error("Error", m2);
+    }
+    /* un cuadro de "quitar" que no existe: se avisa (la primera vez se calculó con él) */
+    JgHoja *h = &_jg_hojas[hi];
+    for (int q = 0; q < h->nquitar && !solo_quitar; q++)
+        if (h->quitar[q] >= h->total + h->nquitar) {
+            snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número de 0 a %d", h->total + h->nquitar - 1);
+            return jg_error("Error", msg);
+        }
+    return jg_hoja_valor(hi);
+}
 
-    if (!por_tamano && !por_cuenta) {
-        /* sola: busca las figuras y las pone en rejilla en una hoja nueva */
-        char nombre[64];
-        snprintf(nombre, sizeof nombre, "<hoja %d>", k);
-        int hk = -1;
-        for (int j = 0; j < _jgs.nimagenes && hk < 0; j++) if (!strcmp(_jgs.imagenes[j].ruta, nombre)) hk = j;
-        int W, H, total = 0, nf = 0;
-        static int por_fila[JG_MAX_RECORTES];
-        if (hk < 0) {
-            unsigned char *px = jg_pixeles(k);
-            if (!px) return jg_error("ErrorJuego", "hoja(): no se pudieron leer los píxeles de la imagen");
-            unsigned char *nueva = jg_dividir_hoja(px, im->ancho, im->alto, &W, &H, &total, por_fila, &nf, msg, sizeof msg);
-            free(px);
-            if (!nueva) { char m2[340]; snprintf(m2, sizeof m2, "hoja(): %s", msg); return jg_error("Error", m2); }
-            if (total == 1 && W * 10 >= im->ancho * 9 && H * 10 >= im->alto * 9) {
-                free(nueva);
-                return jg_error("Error", "hoja(): no encuentro huecos transparentes entre los cuadros; di cuántos hay, "
-                                "por ejemplo hoja(imagen, {\"columnas\": 6}), o cuánto mide cada uno: hoja(imagen, 32)");
-            }
-            int cols = 0;
-            for (int f = 0; f < nf; f++) if (por_fila[f] > cols) cols = por_fila[f];
-            hk = jg_nueva_imagen(nombre, nueva, W * cols, H * nf);
-            if (hk < 0) return jg_error("ErrorJuego", "hoja(): no se pudo crear la hoja (¿demasiado grande? prueba con \"escala\")");
-            /* se guarda cómo quedó, para devolverla igual la próxima vez (al recargar en caliente) */
-            JgImagen *hi = &_jgs.imagenes[hk];
-            hi->receta.cuadros = total; hi->celda_w = W; hi->celda_h = H;
-            hi->partes = malloc(sizeof(int) * nf);
-            if (hi->partes) { memcpy(hi->partes, por_fila, sizeof(int) * nf); hi->npartes = nf; }
-        }
-        JgImagen *hi = &_jgs.imagenes[hk];
-        total = hi->receta.cuadros; W = hi->celda_w; H = hi->celda_h; nf = hi->npartes;
-        int cols = 0;
-        Valor *recortes = valor_lista_crear();
-        for (int f = 0, c = 0; f < nf; f++) {
-            if (hi->partes[f] > cols) cols = hi->partes[f];
-            for (int e = 0; e < hi->partes[f]; e++, c++) {
-                Valor *r = valor_lista_crear();
-                lista_agregar(r, valor_numero(e * W)); lista_agregar(r, valor_numero(f * H));
-                lista_agregar(r, valor_numero(W)); lista_agregar(r, valor_numero(H));
-                lista_agregar(recortes, r);
-            }
-        }
-        Valor *d = jg_imagen_valor(hk);
-        Valor *celda = valor_lista_crear();
-        lista_agregar(celda, valor_numero(W));
-        lista_agregar(celda, valor_numero(H));
-        valor_diccionario_agregar(d, "celda", celda);
-        valor_diccionario_agregar(d, "cuadros", valor_numero(total));
-        valor_diccionario_agregar(d, "columnas", valor_numero(cols));
-        jg_poner_filas(d, nf, 0, hi->partes);
-        valor_diccionario_agregar(d, "recortes", recortes);
-        return jg_hoja_quitar(d, jg_opcion_valor(op, "quitar"));
+/* ── Animador ──
+   Lleva por ti qué animación toca, desde cuándo, si se repite o se queda en
+   el último cuadro (y cuál va después), y cuándo hay una pisada:
+     sea pj = juego.animador(HOJA, {"andar": {"fila": 0, "por_segundo": 10},
+                                    "saltar": {"fila": 2, "repetir": falso, "siguiente": "quieto"},
+                                    "quieto": {"fila": 2, "cuadros": [0]}})
+     juego.animacion(pj, "andar")           (cambia solo si no estaba ya)
+     juego.dibujar(pj, x, y, opciones)
+     si juego.pisada(pj) { ... }            (un pie acaba de tocar el suelo)
+   Cada animación puede ir en otra hoja ("hoja": OTRA), por ejemplo las que
+   hace animar(). Todo su estado va en el diccionario (se puede leer:
+   "actual", "cuadro"), así que sobrevive a la recarga en caliente. */
+static Valor *jg_dic(Valor *d, const char *clave) {
+    int k = valor_diccionario_buscar(d, clave);
+    return k < 0 ? NULL : d->diccionario.valores[k];
+}
+
+/* La secuencia de cuadros de una animación: fila (o -1) y cuadro de cada uno */
+static int jg_anim_secuencia(const JgHoja *h, Valor *cfg, int *fila, int *cuadros, int max) {
+    Valor *f = jg_dic(cfg, "fila"), *c = jg_dic(cfg, "cuadros");
+    int fl = f ? (int)f->numero : -1, n = 0;
+    *fila = fl < h->nf ? fl : h->nf - 1;
+    if (c) {
+        for (int i = 0; i < c->lista.cantidad && n < max; i++) cuadros[n++] = (int)c->lista.elementos[i]->numero;
+    } else {
+        int total = fl >= 0 ? h->por_fila[*fila] : h->total;
+        for (int i = 0; i < total && n < max; i++) cuadros[n++] = i;
     }
-    if (por_cuenta) {
-        if (columnas == 0) columnas = 1;
-        if (filas == 0) filas = 1;
-        if (columnas < 1 || filas < 1 || columnas > 4096 || filas > 4096)
-            return jg_error("Error", "hoja(): \"columnas\" y \"filas\" son al menos 1");
-        g.cw = (int)((im->ancho - 2 * g.margen - (columnas - 1) * g.sep) / columnas);
-        g.ch = (int)((im->alto - 2 * g.margen - (filas - 1) * g.sep) / filas);
+    return n;
+}
+
+#define JG_MAX_SECUENCIA 1024
+typedef struct {
+    JgHoja *h;
+    Valor *cfg;
+    int fila, n, cuadros[JG_MAX_SECUENCIA];
+    long k;                 /* cuántos cuadros han pasado desde que empezó (sin dar la vuelta) */
+    int pos, acabada, repetir;
+    double por_segundo;
+} JgAnimEstado;
+
+/* Dónde va el animador ahora; pasa a la siguiente animación si la que había acabó */
+static int jg_anim_estado(Valor *pj, JgAnimEstado *e) {
+    e->h = jg_hoja_de(jg_dic(pj, "hoja"));
+    Valor *anims = jg_dic(pj, "animaciones");
+    if (!e->h || !anims) return 0;
+    for (int vueltas = 0; vueltas < 8; vueltas++) {
+        Valor *actual = jg_dic(pj, "actual"), *desde = jg_dic(pj, "desde");
+        e->cfg = actual && actual->tipo == VAL_TEXTO ? jg_dic(anims, actual->texto) : NULL;
+        if (!e->cfg || !desde) return 0;
+        Valor *ps = jg_dic(e->cfg, "por_segundo"), *rep = jg_dic(e->cfg, "repetir"), *sig = jg_dic(e->cfg, "siguiente");
+        JgHoja *propia = jg_hoja_de(jg_dic(e->cfg, "hoja"));      /* una animación puede ir en otra hoja */
+        e->h = propia ? propia : jg_hoja_de(jg_dic(pj, "hoja"));
+        e->por_segundo = ps ? ps->numero : 10;
+        e->repetir = rep ? rep->booleano : !sig;
+        e->n = jg_anim_secuencia(e->h, e->cfg, &e->fila, e->cuadros, JG_MAX_SECUENCIA);
+        if (e->n < 1) return 0;
+        double t = jg_reloj() - desde->numero;
+        e->k = (long)floor(t * e->por_segundo + 1e-9);
+        if (e->k < 0) e->k = 0;
+        e->acabada = !e->repetir && e->k >= e->n;
+        if (e->acabada && sig && sig->tipo == VAL_TEXTO && jg_dic(anims, sig->texto)) {
+            /* sigue la siguiente, como si hubiera empezado justo al acabar esta */
+            jg_dic_poner(pj, "actual", valor_texto(sig->texto));
+            jg_dic_poner(pj, "desde", valor_numero(desde->numero + e->n / e->por_segundo));
+            continue;
+        }
+        e->pos = e->repetir ? (int)(e->k % e->n) : (int)(e->k < e->n ? e->k : e->n - 1);
+        return 1;
     }
-    if (g.cw < 1 || g.ch < 1 || g.sep < 0 || g.margen < 0)
-        return jg_error("Error", "hoja(): los cuadros miden al menos 1×1 y la separación y el margen no son negativos");
-    if (g.cw + 2 * g.margen > im->ancho || g.ch + 2 * g.margen > im->alto) {
-        snprintf(msg, sizeof msg, "hoja(): la imagen mide %d×%d, no cabe ni un cuadro de %d×%d", im->ancho, im->alto, g.cw, g.ch);
+    return 0;
+}
+
+static Valor *jg_animador_arg(Valor **a, int n, const char *fn) {
+    if (n < 1 || a[0]->tipo != VAL_DICCIONARIO || !jg_dic(a[0], "animador")) {
+        char msg[120];
+        snprintf(msg, sizeof msg, "%s() espera un animador de juego.animador()", fn);
+        jg_error("ErrorTipo", msg);
+        return NULL;
+    }
+    return a[0];
+}
+
+/* animador(hoja, animaciones[, inicial]) */
+static Valor *fn_jg_animador(Valor **a, int n) {
+    JG_ABIERTA();
+    JgHoja *h = n > 0 ? jg_hoja_de(a[0]) : NULL;
+    char msg[300];
+    if (!h || n < 2 || a[1]->tipo != VAL_DICCIONARIO || a[1]->diccionario.cantidad == 0)
+        return jg_error("ErrorTipo", "animador() espera (hoja, {nombre: {\"fila\": n, \"por_segundo\": n, ...}, ...}[, inicial])");
+    Valor *anims = a[1];
+    for (int i = 0; i < anims->diccionario.cantidad; i++) {
+        const char *nombre = anims->diccionario.claves[i];
+        Valor *cfg = anims->diccionario.valores[i];
+        if (cfg->tipo != VAL_DICCIONARIO) {
+            snprintf(msg, sizeof msg, "animador(): \"%s\" va con un diccionario, por ejemplo {\"fila\": 0}", nombre);
+            return jg_error("ErrorTipo", msg);
+        }
+        int fila = -1;
+        JgHoja *hc = jg_dic(cfg, "hoja") ? jg_hoja_de(jg_dic(cfg, "hoja")) : h;
+        if (!hc) {
+            snprintf(msg, sizeof msg, "animador(): en \"%s\", \"hoja\" es una hoja de juego.hoja() o juego.animar()", nombre);
+            return jg_error("ErrorTipo", msg);
+        }
+        for (int j = 0; j < cfg->diccionario.cantidad; j++) {
+            const char *c = cfg->diccionario.claves[j];
+            Valor *v = cfg->diccionario.valores[j];
+            int ok = 1;
+            if (!strcmp(c, "hoja")) continue;
+            if (!strcmp(c, "fila")) {
+                ok = v->tipo == VAL_NUMERO && v->numero >= 0 && v->numero < hc->nf && v->numero == floor(v->numero);
+                if (ok) fila = (int)v->numero;
+                else snprintf(msg, sizeof msg, "animador(): en \"%s\", \"fila\" va de 0 a %d", nombre, hc->nf - 1);
+            } else if (!strcmp(c, "por_segundo")) {
+                ok = v->tipo == VAL_NUMERO && v->numero > 0;
+                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"por_segundo\" es un número mayor que 0", nombre);
+            } else if (!strcmp(c, "repetir")) {
+                ok = v->tipo == VAL_BOOLEANO;
+                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"repetir\" es verdadero o falso", nombre);
+            } else if (!strcmp(c, "siguiente")) {
+                ok = v->tipo == VAL_TEXTO && jg_dic(anims, v->texto);
+                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"siguiente\" es el nombre de otra de las animaciones", nombre);
+            } else if (!strcmp(c, "pisadas")) {
+                ok = v->tipo == VAL_BOOLEANO || v->tipo == VAL_LISTA;
+                for (int q = 0; ok && v->tipo == VAL_LISTA && q < v->lista.cantidad; q++) ok = v->lista.elementos[q]->tipo == VAL_NUMERO;
+                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"pisadas\" es verdadero, falso o la lista de cuadros con pisada", nombre);
+            } else if (!strcmp(c, "cuadros")) {
+                ok = v->tipo == VAL_LISTA && v->lista.cantidad > 0 && v->lista.cantidad <= JG_MAX_SECUENCIA;
+                for (int q = 0; ok && q < v->lista.cantidad; q++) ok = v->lista.elementos[q]->tipo == VAL_NUMERO;
+                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"cuadros\" es la lista de cuadros que se van mostrando", nombre);
+            } else {
+                snprintf(msg, sizeof msg, "animador(): en \"%s\", no conozco '%s' (hay \"fila\", \"cuadros\", \"por_segundo\", "
+                         "\"repetir\", \"siguiente\", \"pisadas\" y \"hoja\")", nombre, c);
+                return jg_error("Error", msg);
+            }
+            if (!ok) return jg_error("Error", msg);
+        }
+        Valor *c = jg_dic(cfg, "cuadros");
+        int limite = fila >= 0 ? hc->por_fila[fila] : hc->total;
+        for (int q = 0; c && q < c->lista.cantidad; q++) {
+            double v = c->lista.elementos[q]->numero;
+            if (v < 0 || v >= limite || v != floor(v)) {
+                snprintf(msg, sizeof msg, "animador(): en \"%s\", los cuadros van de 0 a %d%s", nombre, limite - 1,
+                         fila >= 0 ? " (contando dentro de su fila)" : "");
+                return jg_error("Error", msg);
+            }
+        }
+    }
+    const char *inicial = anims->diccionario.claves[0];
+    if (n > 2) {
+        if (a[2]->tipo != VAL_TEXTO || !jg_dic(anims, a[2]->texto))
+            return jg_error("Error", "animador(): la animación inicial es el nombre de una de las animaciones");
+        inicial = a[2]->texto;
+    }
+    Valor *pj = valor_diccionario_crear();
+    valor_diccionario_agregar(pj, "animador", valor_booleano(1));
+    a[0]->refs++;
+    valor_diccionario_agregar(pj, "hoja", a[0]);
+    anims->refs++;
+    valor_diccionario_agregar(pj, "animaciones", anims);
+    valor_diccionario_agregar(pj, "actual", valor_texto(inicial));
+    valor_diccionario_agregar(pj, "desde", valor_numero(jg_reloj()));
+    valor_diccionario_agregar(pj, "cuadro", valor_numero(0));
+    return pj;
+}
+
+/* animacion(animador, nombre[, desde_el_principio]): pone esa animación; si ya
+   estaba puesta sigue por donde iba, salvo que se pida empezar de nuevo */
+static Valor *fn_jg_animacion(Valor **a, int n) {
+    JG_ABIERTA();
+    Valor *pj = jg_animador_arg(a, n, "animacion");
+    if (!pj) return valor_nulo();
+    Valor *anims = jg_dic(pj, "animaciones");
+    if (n < 2 || a[1]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "animacion() espera (animador, nombre)");
+    if (!jg_dic(anims, a[1]->texto)) {
+        char msg[400];
+        int l = snprintf(msg, sizeof msg, "animacion(): no hay ninguna animación '%s'; hay", a[1]->texto);
+        for (int i = 0; i < anims->diccionario.cantidad && l < (int)sizeof msg - 40; i++)
+            l += snprintf(msg + l, sizeof msg - l, "%s \"%s\"", i == 0 ? "" : (i == anims->diccionario.cantidad - 1 ? " y" : ","),
+                          anims->diccionario.claves[i]);
         return jg_error("Error", msg);
     }
-    int cols, total = jg_rejilla_cuadros(im, &g, &cols);
-    Valor *d = jg_imagen_valor(k);
-    Valor *celda = valor_lista_crear();
-    lista_agregar(celda, valor_numero(g.cw));
-    lista_agregar(celda, valor_numero(g.ch));
-    valor_diccionario_agregar(d, "celda", celda);
-    valor_diccionario_agregar(d, "separacion", valor_numero(g.sep));
-    valor_diccionario_agregar(d, "margen", valor_numero(g.margen));
-    valor_diccionario_agregar(d, "columnas", valor_numero(cols));
-    valor_diccionario_agregar(d, "cuadros", valor_numero(total));
-    jg_poner_filas(d, total / cols, cols, NULL);
-    return jg_hoja_quitar(d, jg_opcion_valor(op, "quitar"));
+    JgAnimEstado e;
+    jg_anim_estado(pj, &e);                  /* por si acabó una con "siguiente" */
+    Valor *actual = jg_dic(pj, "actual");
+    int reiniciar = n > 2 && a[2]->tipo == VAL_BOOLEANO && a[2]->booleano;
+    if (reiniciar || !actual || strcmp(actual->texto, a[1]->texto)) {
+        jg_dic_poner(pj, "actual", valor_texto(a[1]->texto));
+        jg_dic_poner(pj, "desde", valor_numero(jg_reloj()));
+    }
+    return valor_nulo();
+}
+
+/* acabada(animador): ¿ha llegado al final una animación que no se repite? */
+static Valor *fn_jg_acabada(Valor **a, int n) {
+    JG_ABIERTA();
+    Valor *pj = jg_animador_arg(a, n, "acabada");
+    if (!pj) return valor_nulo();
+    JgAnimEstado e;
+    if (!jg_anim_estado(pj, &e)) return valor_booleano(0);
+    return valor_booleano(e.acabada);
+}
+
+/* Los cuadros con pisada de la animación actual (posiciones en su secuencia):
+   los que diga su "pisadas", o calculados (y guardados) si se repite */
+static char *jg_anim_pasos(Valor *pj, JgAnimEstado *e) {
+    char *pisa = calloc((size_t)e->n, 1);
+    if (!pisa) return NULL;
+    Valor *p = jg_dic(e->cfg, "pisadas");
+    if (p && p->tipo == VAL_LISTA) {
+        for (int i = 0; i < p->lista.cantidad; i++) {
+            int q = (int)p->lista.elementos[i]->numero;
+            if (q >= 0 && q < e->n) pisa[q] = 1;
+        }
+        return pisa;
+    }
+    if (p ? !p->booleano : !e->repetir) return pisa;
+    /* calculadas: se guardan en el animador, con la versión de la hoja */
+    Valor *actual = jg_dic(pj, "actual");
+    Valor *cache = jg_dic(pj, "pisadas_calculadas");
+    if (!cache) { cache = valor_diccionario_crear(); jg_dic_poner(pj, "pisadas_calculadas", cache); }
+    Valor *g = jg_dic(cache, actual->texto);
+    if (g && g->tipo == VAL_LISTA && g->lista.cantidad == 2 && g->lista.elementos[0]->numero == e->h->version &&
+        g->lista.elementos[1]->tipo == VAL_LISTA) {
+        Valor *l = g->lista.elementos[1];
+        for (int i = 0; i < l->lista.cantidad; i++) {
+            int q = (int)l->lista.elementos[i]->numero;
+            if (q >= 0 && q < e->n) pisa[q] = 1;
+        }
+        return pisa;
+    }
+    int *filas = malloc(sizeof(int) * e->n);
+    if (!filas) return pisa;
+    for (int i = 0; i < e->n; i++) filas[i] = e->fila;
+    jg_pisadas_secuencia(e->h, filas, e->cuadros, e->n, pisa);
+    free(filas);
+    Valor *l = valor_lista_crear();
+    for (int i = 0; i < e->n; i++) if (pisa[i]) lista_agregar(l, valor_numero(i));
+    Valor *par = valor_lista_crear();
+    lista_agregar(par, valor_numero(e->h->version));
+    lista_agregar(par, l);
+    jg_dic_poner(cache, actual->texto, par);
+    return pisa;
+}
+
+/* pisada(animador): ¿ha tocado un pie el suelo desde la última vez que se
+   preguntó? (llámala una vez por fotograma) */
+static Valor *fn_jg_pisada(Valor **a, int n) {
+    JG_ABIERTA();
+    Valor *pj = jg_animador_arg(a, n, "pisada");
+    if (!pj) return valor_nulo();
+    JgAnimEstado e;
+    if (!jg_anim_estado(pj, &e)) return valor_booleano(0);
+    /* desde dónde mirar: lo último visto de esta misma animación, o justo antes de empezar */
+    Valor *actual = jg_dic(pj, "actual"), *desde = jg_dic(pj, "desde");
+    Valor *visto = jg_dic(pj, "visto"), *visto_de = jg_dic(pj, "visto_de"), *visto_desde = jg_dic(pj, "visto_desde");
+    long ultimo = e.k - 1;
+    if (visto && visto_de && visto_desde && !strcmp(visto_de->texto, actual->texto) && visto_desde->numero == desde->numero)
+        ultimo = (long)visto->numero;
+    int hay = 0;
+    if (e.k > ultimo) {
+        char *pisa = jg_anim_pasos(pj, &e);
+        long desde_k = e.k - ultimo > e.n ? e.k - e.n + 1 : ultimo + 1;
+        for (long j = desde_k; pisa && j <= e.k && !hay; j++) {
+            if (!e.repetir && j >= e.n) break;
+            hay = pisa[e.repetir ? j % e.n : j];
+        }
+        free(pisa);
+    }
+    jg_dic_poner(pj, "visto", valor_numero((double)e.k));
+    jg_dic_poner(pj, "visto_de", valor_texto(actual->texto));
+    jg_dic_poner(pj, "visto_desde", valor_numero(desde->numero));
+    return valor_booleano(hay);
 }
 
 /* ── Animaciones generadas ──
@@ -2623,24 +2972,19 @@ static unsigned char *jg_generar_animacion(const unsigned char *px, int w, int h
     return hoja;
 }
 
-/* La hoja de una animación, como la devuelve hoja(); las generadas con
-   animar() llevan además "relleno": cuánto más ancha y alta es cada celda que
-   el dibujo, por cada lado */
+/* La hoja de una animación generada con animar(): como las de hoja() (es una
+   hoja por tamaño de su imagen), más "relleno": cuánto más ancha y alta es
+   cada celda que el dibujo, por cada lado */
 static Valor *jg_animacion_valor(int k) {
-    JgImagen *im = &_jgs.imagenes[k];
+    JgImagen *im = &_jgs.imagenes[k], *o = &_jgs.imagenes[im->origen];
     int n = im->receta.cuadros, cw = im->ancho / n;
-    Valor *d = jg_imagen_valor(k);
-    Valor *celda = valor_lista_crear();
-    lista_agregar(celda, valor_numero(cw));
-    lista_agregar(celda, valor_numero(im->alto));
-    valor_diccionario_agregar(d, "celda", celda);
-    valor_diccionario_agregar(d, "separacion", valor_numero(0));
-    valor_diccionario_agregar(d, "margen", valor_numero(0));
-    valor_diccionario_agregar(d, "columnas", valor_numero(n));
-    valor_diccionario_agregar(d, "cuadros", valor_numero(n));
-    jg_poner_filas(d, 1, n, NULL);
-    if (im->origen < 0) return d;
-    JgImagen *o = &_jgs.imagenes[im->origen];
+    JgHoja r;
+    memset(&r, 0, sizeof r);
+    r.base = k; r.modo = JG_HOJA_TAMANO; r.g.cw = cw; r.g.ch = im->alto; r.prep.escala = 1;
+    char msg[300];
+    int hi = jg_hoja_obtener(&r, msg, sizeof msg);
+    if (hi < 0) return jg_error("Error", msg);
+    Valor *d = jg_hoja_valor(hi);
     Valor *rel = valor_lista_crear();
     lista_agregar(rel, valor_numero((cw - o->ancho) / 2));
     lista_agregar(rel, valor_numero((im->alto - o->alto) / 2));
@@ -2648,27 +2992,47 @@ static Valor *jg_animacion_valor(int k) {
     return d;
 }
 
-/* Rehace las animaciones generadas a partir de la imagen 'origen' (que acaba
-   de cambiar en el disco), si siguen midiendo lo mismo */
-static void jg_rehacer_animaciones(int origen) {
-    for (int j = 0; j < _jgs.nimagenes; j++) {
-        JgImagen *im = &_jgs.imagenes[j];
-        if (im->origen != origen) continue;
-        unsigned char *px = jg_pixeles(origen);
-        if (!px) continue;
+/* La imagen j se rehace a partir de su origen (que acaba de cambiar): una
+   preparada (sin fondo, reducida) o una animación generada. 1 si cambió. */
+static int jg_rehacer_imagen(int j) {
+    JgImagen *im = &_jgs.imagenes[j];
+    int origen = im->origen, w = _jgs.imagenes[origen].ancho, h = _jgs.imagenes[origen].alto;
+    unsigned char *px = jg_pixeles(origen);
+    if (!px) return 0;
+    if (!strcmp(im->receta.tipo, "preparar")) {
+        jg_quitar_fondo(px, w, h, im->prep.modo, im->prep.color);
+        if (im->prep.escala < 1) {
+            int nw, nh;
+            unsigned char *r = jg_reducir(px, w, h, im->prep.escala, &nw, &nh);
+            free(px);
+            if (!r) return 0;
+            px = r; w = nw; h = nh;
+        }
+    } else {
         int cw, ch;
         char msg[200];
-        unsigned char *hoja = jg_generar_animacion(px, _jgs.imagenes[origen].ancho, _jgs.imagenes[origen].alto,
-                                                   &im->receta, &cw, &ch, msg, sizeof msg);
+        unsigned char *hoja = jg_generar_animacion(px, w, h, &im->receta, &cw, &ch, msg, sizeof msg);
         free(px);
-        if (!hoja) continue;
-        void *tex = cw * im->receta.cuadros == im->ancho && ch == im->alto ? jg_textura_rgba(hoja, im->ancho, im->alto) : NULL;
-        if (!tex) { free(hoja); continue; }
-        _jg.DestroyTexture(im->tex);
-        free(im->px);
-        im->tex = tex;
-        im->px = hoja;
+        if (!hoja) return 0;
+        px = hoja; w = cw * im->receta.cuadros; h = ch;
     }
+    void *tex = jg_textura_rgba(px, w, h);
+    if (!tex) { free(px); return 0; }
+    _jg.DestroyTexture(im->tex);
+    free(im->px);
+    im->tex = tex; im->px = px; im->ancho = w; im->alto = h;
+    return 1;
+}
+
+/* La imagen 'origen' acaba de cambiar en el disco (o de rehacerse): se rehacen
+   las imágenes que salen de ella (preparadas, animaciones generadas), y luego
+   las que salen de esas, y las hojas que se recortan de cualquiera de ellas */
+static void jg_rehacer_animaciones(int origen) {
+    for (int j = 0; j < _jgs.nimagenes; j++)
+        if (j != origen && _jgs.imagenes[j].origen == origen && jg_rehacer_imagen(j)) jg_rehacer_animaciones(j);
+    char msg[300];
+    for (int i = 0; i < _jg_nhojas; i++)
+        if (_jg_hojas[i].fuente == origen) jg_hoja_calcular(i, msg, sizeof msg);   /* si falla, se queda como estaba */
 }
 
 /* animar(imagen o ruta, tipo[, opciones]) */
@@ -2786,7 +3150,18 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
    cuadros de distinto tamaño quedan en su sitio. */
 static Valor *fn_jg_dibujar(Valor **a, int n) {
     JG_ABIERTA();
-    int k = n > 0 ? jg_id_de(a[0], "imagen") : -1;
+    /* una hoja, o un animador (que dice qué cuadro de su hoja toca) */
+    JgHoja *hoja = NULL;
+    int anim_fila = -1, anim_cuadro = 0, es_animador = n > 0 && a[0]->tipo == VAL_DICCIONARIO && jg_dic(a[0], "animador");
+    if (es_animador) {
+        JgAnimEstado *e = malloc(sizeof *e);
+        if (!e) return jg_error("Error", "sin memoria");
+        int ok = jg_anim_estado(a[0], e);
+        if (ok) { hoja = e->h; anim_fila = e->fila; anim_cuadro = e->cuadros[e->pos]; }
+        free(e);
+        if (!ok) return jg_error("Error", "dibujar(): el animador no tiene una animación que se pueda dibujar");
+    } else if (n > 0) hoja = jg_hoja_de(a[0]);
+    int k = hoja ? hoja->imagen : n > 0 ? jg_id_de(a[0], "imagen") : -1;
     if (k < 0 || k >= _jgs.nimagenes) return jg_error("ErrorTipo", "dibujar() espera una imagen cargada con juego.imagen()");
     double x, y;
     if (!jg_num(a, n, 1, &x, "dibujar") || !jg_num(a, n, 2, &y, "dibujar")) return valor_nulo();
@@ -2817,14 +3192,18 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
         JgRejilla g = {(int)celda->lista.elementos[0]->numero, (int)celda->lista.elementos[1]->numero, 0, 0};
         if (g.cw < 1 || g.ch < 1) return jg_error("Error", "dibujar(): la celda debe medir al menos 1×1");
         src = jg_rejilla_rect(img, &g, (int)floor(cuadro));
-    } else {                                        /* una hoja: ya sabe dónde está cada cuadro */
+    } else if (hoja) {                              /* una hoja: ya sabe dónde está cada cuadro */
         char msg[200];
-        es_hoja = jg_hoja_cuadro(a[0], img, fila, (int)floor(cuadro), &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
-        if (es_hoja < 0) {
+        if (es_animador) { fila = anim_fila; cuadro = anim_cuadro; }
+        int i = jg_hoja_cuadro(hoja, fila, (int)floor(cuadro), &src, &ox, &oy, msg, sizeof msg);
+        if (i < 0) {
             char m2[260];
             snprintf(m2, sizeof m2, "dibujar(): %s", msg);
             return jg_error("Error", m2);
         }
+        es_hoja = 1;
+        cw = hoja->cw; ch = hoja->ch;
+        if (es_animador) jg_dic_poner(a[0], "cuadro", valor_numero(i));
     }
     if (fila >= 0 && es_hoja != 1)
         return jg_error("Error", "dibujar(): \"fila\" es para hojas de juego.hoja() (cada fila, una animación)");
@@ -3900,10 +4279,9 @@ static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
 static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
     char msg[300];
     int id = jg_id_de(v, "imagen");
-    JgRejilla g;
-    int ox, oy, cw, ch;
+    int ox, oy;
     if (id >= 0 && id < _jgs.nimagenes) {
-        if (jg_rejilla_de(v, &g)) {
+        if (jg_hoja_de(v)) {
             snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" es una hoja de tiles; di qué cuadro, por ejemplo [hoja, 3]", car);
             jg_error("ErrorTipo", msg);
             return -1;
@@ -3914,8 +4292,9 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
     }
     int nl = v->tipo == VAL_LISTA ? v->lista.cantidad : 0;
     Valor *hoja = nl >= 2 ? v->lista.elementos[0] : NULL;
-    id = hoja ? jg_id_de(hoja, "imagen") : -1;
-    if (id < 0 || id >= _jgs.nimagenes || !jg_rejilla_de(hoja, &g)) {
+    JgHoja *h = hoja ? jg_hoja_de(hoja) : NULL;
+    id = h ? h->imagen : -1;
+    if (!h) {
         snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" debe ser un color, una imagen o [hoja, cuadro] "
                  "(la hoja se hace con juego.hoja(\"tiles.png\", 16))", car);
         jg_error("ErrorTipo", msg);
@@ -3949,7 +4328,7 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
         jg_error("ErrorTipo", msg);
         return -1;
     }
-    jg_hoja_cuadro(hoja, &_jgs.imagenes[id], -1, cuadro, src, &ox, &oy, &cw, &ch, msg, sizeof msg);
+    jg_hoja_cuadro(h, -1, cuadro, src, &ox, &oy, msg, sizeof msg);
     return id;
 }
 
@@ -4124,6 +4503,10 @@ static void cargar_juego(Entorno *entorno) {
         {"sprite",          fn_jg_sprite,           2},
         {"hoja",            fn_jg_hoja,            -1},
         {"pisadas",         fn_jg_pisadas,         -1},
+        {"animador",        fn_jg_animador,        -1},
+        {"animacion",       fn_jg_animacion,       -1},
+        {"acabada",         fn_jg_acabada,          1},
+        {"pisada",          fn_jg_pisada,           1},
         {"animar",          fn_jg_animar,          -1},
         {"guardar_imagen",  fn_jg_guardar_imagen,   2},
         {"sonido",          fn_jg_sonido,           1},

@@ -1,0 +1,62 @@
+# Prueba del animador: cambiar de animación, una que no se repite y pasa sola
+# a la siguiente, otra que se queda en el último cuadro (acabada) y las
+# pisadas, que llegan una vez cada una y a su tiempo.
+importar "juego"
+juego.abrir("Animador", 100, 60)
+# fila 0: correr (en el aire, aterriza delante, apoyado, aterriza detrás); fila 1: saltar
+fijo HOJA = juego.hoja(juego.sprite([
+    "XXXXXX.XXXXXX.XXXXXX.XXXXXX",
+    "X....X.X....X.X....X.X....X",
+    "X....X.X....X.X....X.X....X",
+    "............X.....X..X...X.",
+    "...........................",
+    "RRR.GGG.BBB................",
+    "RRR.GGG.BBB................"
+], {"X": [200, 100, 50], "R": [255, 0, 0], "G": [0, 255, 0], "B": [0, 0, 255]}))
+sea pj = juego.animador(HOJA, {
+    "correr": {"fila": 0, "por_segundo": 6},
+    "saltar": {"fila": 1, "por_segundo": 6, "repetir": falso, "siguiente": "quieto"},
+    "quieto": {"fila": 1, "cuadros": [0]},
+    "una_vez": {"fila": 1, "por_segundo": 6, "repetir": falso}
+})
+sea n = 0
+sea pisadas = ""
+sea registro = ""
+mientras juego.abierto() {
+    n = n + 1
+    si n == 60 { juego.animacion(pj, "saltar") }
+    si n == 65 { juego.animacion(pj, "saltar") }          # ya estaba: sigue por donde iba
+    si n == 100 { juego.animacion(pj, "una_vez") }
+    si juego.pisada(pj) { pisadas = pisadas + " " + a_texto(n) }
+    juego.limpiar([0, 0, 0])
+    juego.dibujar(pj, 10, 10, {"escala": 2})
+    si n % 10 == 0 { registro = registro + " " + pj["actual"] + ":" + a_texto(pj["cuadro"]) + ":" + a_texto(juego.acabada(pj)) }
+    juego.presentar()
+}
+escribir("pisadas:" + pisadas)
+escribir("registro:" + registro)
+intentar {
+    juego.animacion(pj, "volar")
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.animador(HOJA, {"x": {"fila": 7}})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.animador(HOJA, {"x": {"filas": 0}})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.animador(HOJA, {"x": {"fila": 1, "siguiente": "nada"}})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.pisada(HOJA)
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}

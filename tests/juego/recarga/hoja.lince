@@ -1,0 +1,23 @@
+# Recarga en caliente de una hoja: con el juego en marcha, la imagen de la hoja
+# se sustituye por otra con un cuadro menos. La hoja se rehace, el programa se
+# vuelve a ejecutar (el resumen dice 3 cuadros) y el animador, que se conserva
+# en su 'sea', dibuja ya la hoja nueva.
+importar "juego"
+juego.abrir("Hoja", 100, 60)
+fijo CUATRO = juego.sprite(["RR.GG.BB.YY", "RR.GG.BB.YY"], {"R": [255, 0, 0], "G": [0, 255, 0], "B": [0, 0, 255], "Y": [255, 255, 0]})
+fijo TRES = juego.sprite(["MM.CC.WW", "MM.CC.WW"], {"M": [255, 0, 255], "C": [0, 255, 255], "W": [255, 255, 255]})
+sea vez = 0
+si vez == 0 { juego.guardar_imagen(CUATRO, "hoja.png") }
+vez = vez + 1
+fijo H = juego.hoja("hoja.png")
+escribir("hoja: ejecución " + a_texto(vez) + ", " + a_texto(H["cuadros"]) + " cuadros")
+sea pj = juego.animador(H, {"ciclo": {"por_segundo": 6}})
+sea n = 0
+mientras juego.abierto() {
+    n = n + 1
+    si n == 10 { juego.guardar_imagen(TRES, "hoja.png") }
+    juego.limpiar([0, 0, 0])
+    juego.dibujar(pj, 0, 0, {"escala": 4})
+    si n == 50 { juego.captura("hoja.bmp") }        # cuadro 1 de la hoja nueva: cian
+    juego.presentar()
+}

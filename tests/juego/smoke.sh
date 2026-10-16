@@ -140,6 +140,18 @@ cp rec/a10.bmp rec/img.bmp
 for l in "util: 1, imagen: 10" "imagen cambiada: 20" "util: 2, imagen: 10"; do
     grep -qxF "$l" salida5.txt && ok "recarga: $l" || mal "falta la línea: $l"
 done
+# una hoja cuya imagen cambia con el juego en marcha (y un animador que la usa)
+(cd rec && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=60 timeout 30 "$LINCE" hoja.lince > ../salida5b.txt 2>&1)
+for l in "hoja: ejecución 1, 4 cuadros" "hoja: ejecución 2, 3 cuadros"; do
+    grep -qxF "$l" salida5b.txt && ok "recarga de hojas: $l" || mal "falta la línea: $l"
+done
+python3 -c "
+import struct
+d = open('rec/hoja.bmp', 'rb').read()
+off = struct.unpack_from('<I', d, 10)[0]; w, h = struct.unpack_from('<ii', d, 18)
+fila = abs(h) - 1 - 3 if h > 0 else 3
+b, g, r, a = d[off + (fila * w + 3) * 4: off + (fila * w + 3) * 4 + 4]
+exit(0 if (r, g, b) == (0, 255, 255) else 1)" && ok "recarga de hojas: el animador dibuja la hoja nueva" || mal "el animador no dibuja la hoja nueva"
 (cd rec && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=6 LINCE_JUEGO_PULSAR=f5 timeout 30 "$LINCE" f5.lince > ../salida6.txt 2>&1)
 [ "$(grep -cxF "recargado: falso, veces: 0" salida6.txt)" -ge 2 ] && grep -qF "(desde cero)" salida6.txt \
     && ok "F5 empieza desde cero" || mal "F5 no empieza desde cero"
@@ -240,6 +252,16 @@ d = w.readframes(w.getnframes())
 assert w.getnframes() == 90 * 735, w.getnframes()
 assert max(abs(x) for x in struct.unpack("<%dh" % (len(d) // 2), d)) > 1000
 PY
+# ── El animador ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=140 timeout 20 "$LINCE" "$DIR/prueba9.lince" > salida13.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba del animador termina bien" || mal "la prueba del animador falló"
+for l in "pisadas: 11 31 51" \
+         "registro: correr:0:falso correr:1:falso correr:2:falso correr:3:falso correr:0:falso saltar:4:falso saltar:5:falso saltar:6:falso quieto:4:falso una_vez:4:falso una_vez:5:falso una_vez:6:falso una_vez:6:verdadero una_vez:6:verdadero"; do
+    grep -qxF "$l" salida13.txt && ok "animador: ${l:0:40}" || mal "falta la línea: $l"
+done
+for e in "no hay ninguna animación 'volar'" '"fila" va de 0 a 1' "no conozco 'filas'" '"siguiente" es el nombre' "pisada() espera un animador"; do
+    grep -qF "$e" salida13.txt && ok "animador: error «$e»" || mal "falta el error: $e"
+done
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
@@ -286,4 +308,4 @@ if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt; exit 1; }
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida5b.txt; exit 1; }

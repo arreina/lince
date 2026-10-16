@@ -906,6 +906,51 @@ La otra manera de tener una animación es generarla a partir de un solo dibujo c
 (abajo), que también da una hoja y se dibuja igual. Así se puede empezar con una generada y
 cambiarla después por la dibujada a mano sin tocar el resto del juego.
 
+**Recarga en caliente de las hojas.** Si cambia en el disco la imagen de una hoja con el juego
+en marcha (la retocas en un editor, o la vuelves a generar), la hoja se rehace sola: se vuelve a
+quitar el fondo, a reducir y a dividir como se pidió. Todo lo que la usa ve los cuadros nuevos al
+momento, también los animadores guardados en variables. Si cambió de forma (otro número de
+cuadros, otro tamaño de celda), el programa se vuelve a ejecutar como al guardar el código,
+conservando las variables, para que `["cuadros"]`, `["celda"]` y lo demás se pongan al día.
+
+**Animador.** Lleva por ti qué animación toca, desde cuándo, si se repite o se queda en el último
+cuadro, cuál va después y cuándo pisa un pie. Todo su estado va dentro, así que no hay que
+llevar tiempos ni números de cuadro:
+
+```lince
+fijo NINO = juego.hoja("explorador.png")
+sea pj = juego.animador(NINO, {
+    "andar":  {"fila": 0, "por_segundo": 10},
+    "saltar": {"fila": 2, "por_segundo": 12, "repetir": falso, "siguiente": "quieto"},
+    "quieto": {"fila": 2, "cuadros": [0]}
+})
+fijo PASO = juego.sonido("paso.wav")
+
+# en cada fotograma:
+si juego.accion_pulsada("saltar") {
+    juego.animacion(pj, "saltar")                   # al acabar pasa sola a "quieto"
+} sino si pj["actual"] != "saltar" {
+    si andando {
+        juego.animacion(pj, "andar")                # si ya estaba andando, sigue por donde iba
+    } sino {
+        juego.animacion(pj, "quieto")
+    }
+}
+si juego.pisada(pj) { juego.reproducir(PASO) }       # un pie acaba de tocar el suelo
+juego.dibujar(pj, x, y, {"centrado": verdadero, "espejo": mira_izquierda})
+```
+
+| Función | Qué hace |
+|---|---|
+| `animador(hoja, animaciones[, inicial])` | crea el animador. Cada animación tiene un nombre y un diccionario con: `fila` (de la hoja; si no se dice, todos los cuadros), `cuadros` (cuáles y en qué orden, contando dentro de la fila: `[0, 1, 2, 1]`), `por_segundo` (10), `repetir` (verdadero; falso: se queda en el último cuadro), `siguiente` (la que va después de una que no se repite), `pisadas` (verdadero, falso o la lista de cuadros con pisada; si no se dice, se calculan en las que se repiten) y `hoja` (si esa animación está en otra hoja, por ejemplo una de `animar()`). Empieza con `inicial`, o con la primera |
+| `animacion(animador, nombre[, desde_el_principio])` | pone esa animación. Si ya estaba puesta sigue por donde iba (se puede llamar en cada fotograma), salvo que se pida `desde_el_principio` |
+| `dibujar(animador, x, y[, opciones])` | dibuja el cuadro que toca, con las mismas opciones que una imagen |
+| `pisada(animador)` | ¿ha tocado un pie el suelo desde la última vez que se preguntó? Llámala una vez por fotograma |
+| `acabada(animador)` | ¿ha llegado al final una animación que no se repite? |
+
+Se pueden leer `pj["actual"]` (el nombre de la animación) y `pj["cuadro"]` (el cuadro de la hoja
+que se dibujó). Ejemplo: `10_paseo`, con las tres animaciones generadas por `animar()`.
+
 **Animaciones generadas.** Con un solo dibujo del personaje (quieto y, para andar, de perfil
 mirando a la derecha), `animar()` hace los cuadros de una animación:
 
@@ -932,7 +977,9 @@ Funciona mejor con pixel art pequeño (de 16 a 48 píxeles de alto) y con las pi
 por al menos un píxel transparente. Cada cuadro es algo mayor que el dibujo (lo que asoma al
 moverse; la hoja dice cuánto en `"relleno"`, `[x, y]` por cada lado) y el dibujo queda en el centro,
 así que con `"centrado"` se dibuja en el mismo sitio que el original. Si la imagen cambia en el
-disco con el juego en marcha, sus animaciones se rehacen solas. Ejemplo: `10_paseo`, que usa
+disco con el juego en marcha, sus animaciones se rehacen solas. En las de andar y correr,
+`pisadas()` y el animador saben exactamente en qué cuadros apoya el pie (los hizo Lince).
+Ejemplo: `10_paseo`, que usa
 las dos maneras (el personaje, generado; los pájaros, con una hoja dibujada a mano que se divide sola).
 
 **Mapas de casillas.** Un nivel escrito con texto, un carácter por casilla, para cualquier juego 2D:

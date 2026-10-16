@@ -60,6 +60,13 @@ fijo QUIETO = juego.animar(PERSONAJE, "respirar")
 fijo ANDAR = juego.animar(PERSONAJE, "andar")
 fijo CORRER = juego.animar(PERSONAJE, "correr")
 
+# El animador lleva qué animación toca, desde cuándo y cuándo pisa un pie
+sea pj = juego.animador(QUIETO, {
+    "quieto": {"hoja": QUIETO, "por_segundo": 5},
+    "andar": {"hoja": ANDAR, "por_segundo": 10},
+    "correr": {"hoja": CORRER, "por_segundo": 14}
+})
+
 # Tiles del suelo (hierba y tierra) y adornos
 fijo TILES = juego.hoja(juego.sprite([
     "GGGGGGGGtttttttt",
@@ -105,7 +112,6 @@ fijo PAJARO = juego.hoja(juego.sprite([
 sea x = 400                             # el centro del personaje
 sea mira_izquierda = falso
 sea estado = "quieto"                   # "quieto", "andar" o "correr"
-sea cuadro_anterior = -1
 
 # ── Dibujo ──────────────────────────────────────────────────────────
 # Resto siempre positivo (para repetir el paisaje)
@@ -175,30 +181,13 @@ mientras juego.abierto() {
     sea cam = matematica.limitar(x - ANCHO / 2, 0, MUNDO - ANCHO)
     juego.camara(cam, 0)
 
-    # qué hoja y qué cuadro tocan; los pasos van al ritmo de lo que avanza
-    sea hoja = QUIETO
-    sea cuadro = juego.cuadro(QUIETO["cuadros"], 5)
-    si estado == "andar" {
-        hoja = ANDAR
-        cuadro = juego.cuadro(ANDAR["cuadros"], 10)
-    } sino si estado == "correr" {
-        hoja = CORRER
-        cuadro = juego.cuadro(CORRER["cuadros"], 14)
-    }
-
-    # un paso suena cuando el pie apoya (los cuadros con los dos pies en el suelo)
-    si cuadro != cuadro_anterior {
-        si (estado == "andar" y (cuadro == 2 o cuadro == 6)) o (estado == "correr" y (cuadro == 1 o cuadro == 4)) {
-            juego.efecto("golpe", {"tono": 1.8, "largo": 0.4, "volumen": 0.35})
-        }
-        cuadro_anterior = cuadro
-    }
+    juego.animacion(pj, estado)                  # si ya era esa, sigue por donde iba
+    si juego.pisada(pj) { juego.efecto("golpe", {"tono": 1.8, "largo": 0.4, "volumen": 0.35}) }
 
     dibujar_campo(cam)
     # sombra y personaje: x, y es el centro del dibujo, con los pies en el suelo
     juego.rectangulo(x - 28, SUELO - 2, 56, 6, [0, 0, 0, 50])
-    juego.dibujar(hoja, x, SUELO - 10 * ESCALA, {"cuadro": cuadro, "escala": ESCALA,
-                                                "centrado": verdadero, "espejo": mira_izquierda})
-    dibujar_hoja(hoja, cuadro)
+    juego.dibujar(pj, x, SUELO - 10 * ESCALA, {"escala": ESCALA, "centrado": verdadero, "espejo": mira_izquierda})
+    dibujar_hoja(pj["animaciones"][estado]["hoja"], pj["cuadro"])
     juego.presentar()
 }
