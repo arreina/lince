@@ -177,4 +177,9 @@ for (x, y), esp, nombre in casos:
     else: print("  ❌ dibujar_mapa:", nombre, "→", px(x, y)); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt; exit 1; }
+# ── Séptima parte: lince nuevo crea un juego que se puede jugar ──
+"$LINCE" nuevo mi_juego > salida9.txt 2>&1 && [ -f mi_juego/mi_juego.lince ] && ok "lince nuevo crea el juego" || mal "lince nuevo falló"
+(cd mi_juego && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2400 LINCE_JUEGO_PULSAR=espacio,derecha,abajo \
+    timeout 60 "$LINCE" mi_juego.lince >> ../salida9.txt 2>&1) && ok "el juego nuevo se juega entero (portada, partida y fin)" || mal "el juego nuevo falla"
+"$LINCE" nuevo mi_juego >> salida9.txt 2>&1 && mal "lince nuevo pisa una carpeta que existe" || ok "lince nuevo no pisa una carpeta que existe"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt; exit 1; }

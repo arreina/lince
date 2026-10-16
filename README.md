@@ -90,6 +90,7 @@ En Mac debería funcionar con `make` y SDL2 de Homebrew, pero no está probado.
 
 ```bash
 lince programa.lince              # ejecutar
+lince nuevo mi_juego              # crear un juego nuevo listo para cambiarlo
 lince compilar programa.lince     # crear un ejecutable autónomo
 lince repartir juego.lince        # carpeta y .zip para compartir el juego
 lince depurar programa.lince      # depurar paso a paso

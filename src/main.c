@@ -17,6 +17,7 @@
 #include "modulos.h"
 #include "recarga.h"
 #include "repartir.h"
+#include "nuevo.h"
 
 static char *leer_archivo(const char *ruta) {
     FILE *f = fopen(ruta, "r");
@@ -40,6 +41,7 @@ static char *leer_archivo(const char *ruta) {
 static void mostrar_ayuda(void) {
     printf("\n🐆 Lince v0.6\n\n");
     printf("Uso:\n");
+    printf("  lince nuevo <nombre>                     Crea un juego nuevo listo para cambiarlo\n");
     printf("  lince <archivo.lince>                    Ejecuta un programa\n");
     printf("  lince compilar <archivo.lince>           Crea un ejecutable autónomo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
@@ -221,6 +223,15 @@ int main(int argc, char *argv[]) {
         if (resultado == 0)
             printf("✅ Compilado correctamente → %s\n\n", ruta_bin);
         return resultado;
+    }
+
+    /* Juego nuevo a partir de una plantilla */
+    if (strcmp(cmd, "nuevo") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "\n❌ Uso: lince nuevo <nombre>   (por ejemplo: lince nuevo mi_juego)\n\n");
+            return 1;
+        }
+        return nuevo_crear(argv[2]);
     }
 
     /* Repartir: carpeta y .zip con el juego y SDL2, listos para compartir */

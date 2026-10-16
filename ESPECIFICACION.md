@@ -1118,6 +1118,7 @@ Si no hay más entrada (stdin cerrado), el programa sigue hasta el final.
 lince          # abre el REPL
 lince prog.lince               # ejecuta archivo
 lince prog.lince arg1 arg2     # con argumentos
+lince nuevo mi_juego           # carpeta con un juego pequeño listo para cambiar
 lince compilar prog.lince      # crea un ejecutable autónomo
 lince repartir juego.lince     # carpeta y .zip para compartir el juego
 lince depurar prog.lince       # depurador paso a paso
