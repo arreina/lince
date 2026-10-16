@@ -243,11 +243,11 @@ PY
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
-for l in "andar: 8 8x6 relleno 2" "misma hoja: verdadero" "respirar: 4" "girar: 4" "frente: 0" "png: 64x6" "desde archivo: 2" "sola: 5 filas 2 3+2 celda 2x3" "por cuenta: 3 2x2"; do
+for l in "andar: 8 8x6 relleno 2" "misma hoja: verdadero" "respirar: 4" "girar: 4" "frente: 0" "png: 64x6" "desde archivo: 2" "sola: 5 filas 2 3+2 celda 2x3" "por cuenta: 3 2x2" "con fondo: 2 filas 1 celda 4x6" "reducida: 7"; do
     grep -qxF "$l" salida12.txt && ok "animar: $l" || mal "falta la línea: $l"
 done
 for e in "no conozco la opción 'cuadro'" "no conozco la animación 'bailar'" '"vista" es "lado"' '"cuadros" va de 1 a 64' \
-         "transparente del todo" "debe acabar en .png" "no hay fila 5" "no encuentro huecos transparentes"; do
+         "transparente del todo" "debe acabar en .png" "no hay fila 5" "no encuentro huecos transparentes" '"fondo" es "auto"' '"escala" reduce la imagen'; do
     grep -qF "$e" salida12.txt && ok "animar: error «$e»" || mal "falta el error: $e"
 done
 python3 - <<'PY' || fallos=$((fallos+1))
@@ -272,6 +272,15 @@ for (x, y), esp, nombre in [((2, 2), (0, 0, 0), "cuadro bajo: arriba vacío"), (
                             ((22, 6), (255, 0, 255), "fila 1, el cuadro da la vuelta"), ((42, 2), (0, 0, 255), "por cuenta: el cuadro 2")]:
     if px(x, y) == esp: print("  ✅ hoja:", nombre)
     else: print("  ❌ hoja:", nombre, "→", px(x, y)); mal += 1
+d = open("fondo.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+for (x, y), esp, nombre in [((6, 6), (255, 255, 255), "el blanco de dentro de la figura se queda"),
+                            ((2, 18), (0, 0, 0), "el fondo blanco de alrededor se quita"),
+                            ((2, 2), (20, 20, 20), "la figura se ve"),
+                            ((21, 1), (0, 0, 0), "imagen() con \"fondo\": el borde, transparente")]:
+    if px(x, y) == esp: print("  ✅ fondo:", nombre)
+    else: print("  ❌ fondo:", nombre, "→", px(x, y)); mal += 1
 d = open("andar.png", "rb").read(8)
 if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1

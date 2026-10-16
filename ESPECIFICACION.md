@@ -788,7 +788,7 @@ mientras juego.abierto() {
 
 | Función | Qué hace |
 |---|---|
-| `imagen(ruta)` | carga un PNG, JPG, BMP, GIF o TGA; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo |
+| `imagen(ruta[, opciones])` | carga un PNG, JPG, BMP, GIF o TGA; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo. Opciones para imágenes descargadas: `fondo` (`"auto"`: el color de las esquinas, si la imagen no tiene transparencia; o un color, `[255, 255, 255]`) lo vuelve transparente, y `escala` (de 0 a 1) la reduce al cargarla, que queda mucho mejor que reducirla al dibujar |
 | `sprite(filas, colores)` | crea una imagen a partir de texto, un carácter por píxel: `juego.sprite([".X.", "XXX"], {"X": [255, 0, 0]})`; los caracteres sin color son transparentes |
 | `hoja(imagen o ruta[, cómo dividirla])` | una imagen con varios cuadros (los fotogramas de una animación, los tiles de un mapa) partida en esos cuadros; ver **Hojas de sprites** más abajo. También vale una imagen hecha con `sprite()` |
 | `animar(imagen o ruta, tipo[, opciones])` | genera una animación a partir de un solo dibujo y la devuelve como hoja (ver abajo) |
@@ -858,12 +858,16 @@ juego.dibujar(HEROE, x, y, {"cuadro": juego.cuadro(HEROE["cuadros"], 8)})   # 8 
 
 | Cómo dividirla | Qué hace |
 |---|---|
-| `hoja("heroe.png")` | sola: los cuadros son los trozos separados por huecos transparentes (filas y columnas sin nada). Pueden medir distinto: cada uno se dibuja centrado y apoyado abajo en una celda del tamaño del mayor, así no baila. Sirve para casi todas las hojas con fondo transparente |
+| `hoja("heroe.png")` | sola: busca las figuras (cada trozo de dibujo separado de los demás por fondo), las agrupa en filas y las ordena de izquierda a derecha. Pueden medir distinto y estar desordenadas: se copian a una hoja nueva en rejilla, cada una centrada en su celda y, dentro de su fila, a la misma altura que en la original (los pies alineados, y un salto sigue en el aire). Los trocitos sueltos (una gota, una chispa) se unen a la figura más cercana. Si la imagen no tiene transparencia (un JPG con fondo blanco), quita el fondo sola |
 | `hoja("heroe.png", {"columnas": 6, "filas": 2})` | en cuadros iguales, diciendo cuántos hay (`filas` es 1 si no se dice). Para hojas en rejilla, sobre todo si un fotograma toca al de al lado o el personaje cambia de sitio dentro de su cuadro |
 | `hoja("tiles.png", 16)` · `hoja("tiles.png", 16, 24)` | en cuadros iguales, diciendo lo que mide cada uno (lo normal en los tiles) |
 
 Las dos últimas admiten `separacion` (píxeles entre cuadros) y `margen` (alrededor), como en muchas
-hojas descargadas: `hoja("tiles.png", 16, {"separacion": 1})`. Un número de cuadro fuera de rango
+hojas descargadas: `hoja("tiles.png", 16, {"separacion": 1})`. Las tres admiten `fondo` y `escala`,
+como `imagen()`: para una hoja enorme, `hoja("explorador.jpg", {"escala": 0.15})` (los tamaños de la
+última se dan en píxeles de la imagen original). Quitar el fondo rellena desde los bordes de la
+imagen, así lo que es del mismo color pero está dentro del dibujo (ojos, calcetines blancos) se
+queda. Un número de cuadro fuera de rango
 da la vuelta (−1 es el último). La hoja devuelta lleva `"cuadros"`, `"celda"` (`[ancho, alto]` de
 cada cuadro), `"columnas"`, `"filas"` y `"por_fila"` (cuántos cuadros hay en cada fila).
 

@@ -114,7 +114,9 @@ typedef struct { char tipo[16]; int cuadros, piernas, centro, frente; double int
    (sprites y animaciones generadas); las de archivo se vuelven a leer si hace
    falta. origen: la imagen de la que se generó la animación, o -1. */
 typedef struct { void *tex; int ancho, alto; char *ruta; long long mtime, tam;
-                 unsigned char *px; int origen; JgReceta receta; } JgImagen;
+                 unsigned char *px; int origen; JgReceta receta;
+                 int *partes, npartes, celda_w, celda_h; } JgImagen;   /* de una hoja dividida sola: cuadros
+                                                                          por fila y lo que mide la celda */
 typedef struct { short *datos; int muestras; char *ruta; long long mtime, tam; } JgSonido;   /* muestras por canal */
 typedef struct {
     const short *datos; int muestras, pos, bucle, activa, id;
@@ -240,6 +242,8 @@ static void jg_aviso_error(const char *msg, int pantalla);
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
+static int jg_opcion(Valor *op, const char *clave, double *out);
+static Valor *jg_opcion_valor(Valor *op, const char *clave);
 
 static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
@@ -417,6 +421,7 @@ static void jg_cerrar_todo(void) {
         _jg.DestroyTexture(_jgs.imagenes[i].tex);
         free(_jgs.imagenes[i].ruta);
         free(_jgs.imagenes[i].px);
+        free(_jgs.imagenes[i].partes);
     }
     _jgs.nimagenes = 0;
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
@@ -1539,8 +1544,9 @@ static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) 
     return 1;
 }
 
-/* imagen(ruta): PNG, JPG, BMP, GIF o TGA; devuelve {"imagen", "ancho", "alto"} */
-static Valor *fn_jg_imagen(Valor **a, int n) {
+/* Carga la imagen de la ruta a[0] tal cual (PNG, JPG, BMP, GIF o TGA);
+   devuelve {"imagen", "ancho", "alto", "ruta"}. Ver fn_jg_imagen. */
+static Valor *jg_imagen_archivo(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "imagen() espera la ruta de una imagen");
     for (int i = 0; i < _jgs.nimagenes; i++)
@@ -1601,6 +1607,195 @@ static unsigned char *jg_pixeles(int k) {
     free(bytes);
     if (px && (w != im->ancho || h != im->alto)) { free(px); px = NULL; }
     return px;
+}
+
+/* ── Imágenes descargadas: quitar el fondo y reducirlas ──
+   Muchas hojas de sprites (y dibujos sueltos) vienen en JPG con fondo blanco,
+   y a menudo muy grandes. "fondo" lo vuelve transparente: rellena desde los
+   bordes de la imagen todo lo que se parece al color del fondo, así lo blanco
+   de dentro del dibujo (ojos, calcetines) no se toca si tiene contorno; en el
+   filo, los píxeles a medio camino se vuelven semitransparentes y se les quita
+   el tinte del fondo. "escala" la reduce al cargarla haciendo la media de los
+   píxeles, que queda mucho mejor que reducirla al dibujar. */
+typedef struct { int modo; unsigned char color[3]; double escala; } JgPreparar;   /* modo: 0 nada, 1 auto, 2 color */
+#define JG_TOLERANCIA_FONDO 48
+
+static int jg_dif_color(const unsigned char *p, const unsigned char *c) {
+    int d = 0;
+    for (int i = 0; i < 3; i++) { int e = abs(p[i] - c[i]); if (e > d) d = e; }
+    return d;
+}
+
+/* Quita el fondo; 1 si había fondo que quitar */
+static int jg_quitar_fondo(unsigned char *px, int w, int h, int modo, const unsigned char *color) {
+    unsigned char bg[3];
+    if (modo == 0 || w < 2 || h < 2) return 0;
+    if (modo == 1) {
+        /* auto: solo si no tiene nada transparente y las cuatro esquinas son del mismo color */
+        for (size_t i = 0; i < (size_t)w * h; i++) if (px[i * 4 + 3] < 255) return 0;
+        const unsigned char *esq[4] = {px, px + (size_t)(w - 1) * 4, px + (size_t)(h - 1) * w * 4, px + ((size_t)h * w - 1) * 4};
+        for (int i = 1; i < 4; i++) if (jg_dif_color(esq[i], esq[0]) > JG_TOLERANCIA_FONDO / 2) return 0;
+        memcpy(bg, esq[0], 3);
+    } else memcpy(bg, color, 3);
+    size_t total = (size_t)w * h, n = 0;
+    int *pila = malloc(sizeof(int) * total);
+    unsigned char *fuera = calloc(total, 1);
+    if (!pila || !fuera) { free(pila); free(fuera); return 0; }
+    for (int x = 0; x < w; x++) { pila[n++] = x; pila[n++] = (h - 1) * w + x; }
+    for (int y = 1; y < h - 1; y++) { pila[n++] = y * w; pila[n++] = y * w + w - 1; }
+    while (n > 0) {
+        int i = pila[--n];
+        if (fuera[i] || px[(size_t)i * 4 + 3] == 0 || jg_dif_color(px + (size_t)i * 4, bg) > JG_TOLERANCIA_FONDO) {
+            if (px[(size_t)i * 4 + 3] == 0 && !fuera[i]) fuera[i] = 1;     /* ya transparente: también es fondo */
+            else continue;
+        }
+        fuera[i] = 1;
+        int x = i % w, y = i / w;
+        if (x > 0 && !fuera[i - 1]) pila[n++] = i - 1;
+        if (x < w - 1 && !fuera[i + 1]) pila[n++] = i + 1;
+        if (y > 0 && !fuera[i - w]) pila[n++] = i - w;
+        if (y < h - 1 && !fuera[i + w]) pila[n++] = i + w;
+        if (n + 4 > total) n = total - 4;                   /* no debería pasar: cada píxel entra pocas veces */
+    }
+    free(pila);
+    for (size_t i = 0; i < total; i++) if (fuera[i]) px[i * 4 + 3] = 0;
+    /* el filo: lo que se parece al fondo y lo toca, semitransparente y sin el tinte del fondo */
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+            size_t i = (size_t)y * w + x;
+            if (fuera[i]) continue;
+            int toca = (x > 0 && fuera[i - 1]) || (x < w - 1 && fuera[i + 1]) || (y > 0 && fuera[i - w]) || (y < h - 1 && fuera[i + w]);
+            if (!toca) continue;
+            unsigned char *p = px + i * 4;
+            int d = jg_dif_color(p, bg);
+            if (d >= 3 * JG_TOLERANCIA_FONDO) continue;
+            double al = (double)d / (3 * JG_TOLERANCIA_FONDO);
+            if (al < 0.05) al = 0.05;
+            for (int c = 0; c < 3; c++) {
+                double v = (p[c] - bg[c] * (1 - al)) / al;
+                p[c] = (unsigned char)(v < 0 ? 0 : v > 255 ? 255 : v);
+            }
+            p[3] = (unsigned char)(p[3] * al);
+        }
+    free(fuera);
+    return 1;
+}
+
+/* Reduce la imagen al factor 'f' (0 < f < 1) con la media de los píxeles
+   (pesada por la transparencia, para que el filo no se oscurezca) */
+static unsigned char *jg_reducir(const unsigned char *px, int w, int h, double f, int *nw, int *nh) {
+    *nw = (int)round(w * f); *nh = (int)round(h * f);
+    if (*nw < 1) *nw = 1;
+    if (*nh < 1) *nh = 1;
+    unsigned char *o = calloc((size_t)*nw * *nh, 4);
+    if (!o) return NULL;
+    double sx = (double)w / *nw, sy = (double)h / *nh;
+    for (int y = 0; y < *nh; y++) {
+        int y0 = (int)(y * sy), y1 = (int)((y + 1) * sy);
+        if (y1 <= y0) y1 = y0 + 1;
+        if (y1 > h) y1 = h;
+        for (int x = 0; x < *nw; x++) {
+            int x0 = (int)(x * sx), x1 = (int)((x + 1) * sx);
+            if (x1 <= x0) x1 = x0 + 1;
+            if (x1 > w) x1 = w;
+            double r = 0, g = 0, b = 0, a = 0;
+            for (int yy = y0; yy < y1; yy++)
+                for (int xx = x0; xx < x1; xx++) {
+                    const unsigned char *p = px + ((size_t)yy * w + xx) * 4;
+                    r += p[0] * p[3]; g += p[1] * p[3]; b += p[2] * p[3]; a += p[3];
+                }
+            unsigned char *q = o + ((size_t)y * *nw + x) * 4;
+            int cuantos = (x1 - x0) * (y1 - y0);
+            if (a > 0) { q[0] = (unsigned char)(r / a); q[1] = (unsigned char)(g / a); q[2] = (unsigned char)(b / a); }
+            q[3] = (unsigned char)(a / cuantos + 0.5);
+        }
+    }
+    return o;
+}
+
+/* Lee "fondo" y "escala" de unas opciones ('p->modo' trae el fondo por
+   defecto). 0 si están mal: el motivo en 'msg', o ya puesto (hay_error). */
+static int jg_leer_preparar(Valor *op, JgPreparar *p, const char *fn, char *msg, size_t max) {
+    p->escala = 1;
+    Valor *f = jg_opcion_valor(op, "fondo");
+    if (f) {
+        if (f->tipo == VAL_BOOLEANO && !f->booleano) p->modo = 0;
+        else if (f->tipo == VAL_TEXTO && !strcmp(f->texto, "auto")) p->modo = 1;
+        else {
+            unsigned char c[4];
+            Valor *arg[1] = {f};
+            if (f->tipo != VAL_LISTA) {
+                snprintf(msg, max, "%s(): \"fondo\" es \"auto\", un color como [255, 255, 255] o falso", fn);
+                return 0;
+            }
+            if (!jg_color(arg, 1, 0, c)) return 0;          /* el error ya lo puso jg_color */
+            p->modo = 2;
+            memcpy(p->color, c, 3);
+        }
+    }
+    Valor *e = jg_opcion_valor(op, "escala");
+    if (e) {
+        if (e->tipo != VAL_NUMERO || e->numero <= 0 || e->numero > 1) {
+            snprintf(msg, max, "%s(): \"escala\" reduce la imagen al cargarla: un número mayor que 0 y hasta 1 (0.5 es la mitad)", fn);
+            return 0;
+        }
+        p->escala = e->numero;
+    }
+    return 1;
+}
+
+/* La imagen k preparada (sin fondo y reducida), como imagen nueva; la misma
+   preparación de la misma imagen se reutiliza. Devuelve su número (k si no
+   hay nada que hacer) o -1 con el motivo en 'msg'. */
+static int jg_preparar(int k, const JgPreparar *p, char *msg, size_t max) {
+    if (p->modo == 0 && p->escala >= 1) return k;
+    char nombre[160];
+    snprintf(nombre, sizeof nombre, "<preparada %d %d %d,%d,%d %g>", k, p->modo, p->color[0], p->color[1], p->color[2], p->escala);
+    for (int i = 0; i < _jgs.nimagenes; i++)
+        if (strcmp(_jgs.imagenes[i].ruta, nombre) == 0) return i;
+    unsigned char *px = jg_pixeles(k);
+    if (!px) { snprintf(msg, max, "no se pudieron leer los píxeles de la imagen"); return -1; }
+    int w = _jgs.imagenes[k].ancho, h = _jgs.imagenes[k].alto;
+    jg_quitar_fondo(px, w, h, p->modo, p->color);
+    if (p->escala < 1) {
+        int nw, nh;
+        unsigned char *r = jg_reducir(px, w, h, p->escala, &nw, &nh);
+        free(px);
+        if (!r) { snprintf(msg, max, "sin memoria"); return -1; }
+        px = r; w = nw; h = nh;
+    }
+    int nk = jg_nueva_imagen(nombre, px, w, h);
+    if (nk < 0) snprintf(msg, max, "no se pudo crear la imagen (¿demasiado grande o demasiadas imágenes?)");
+    return nk;
+}
+
+/* imagen(ruta[, opciones]): carga un PNG, JPG, BMP, GIF o TGA. Opciones:
+   "fondo" ("auto": el color de las esquinas, si no tiene transparencia;
+   o un color) lo vuelve transparente, y "escala" (hasta 1) la reduce. */
+static Valor *fn_jg_imagen(Valor **a, int n) {
+    Valor *img = jg_imagen_archivo(a, n < 1 ? 0 : 1);
+    if (hay_error || n < 2 || a[1]->tipo == VAL_NULO) return img;
+    char msg[300];
+    if (a[1]->tipo != VAL_DICCIONARIO)
+        return jg_error("ErrorTipo", "imagen(): las opciones van en un diccionario, por ejemplo {\"fondo\": \"auto\"}");
+    for (int j = 0; j < a[1]->diccionario.cantidad; j++) {
+        const char *c = a[1]->diccionario.claves[j];
+        if (strcmp(c, "fondo") && strcmp(c, "escala")) {
+            snprintf(msg, sizeof msg, "imagen(): no conozco la opción '%s' (hay \"fondo\" y \"escala\")", c);
+            valor_destruir(img);
+            return jg_error("Error", msg);
+        }
+    }
+    JgPreparar p = {0, {0, 0, 0}, 1};
+    if (!jg_leer_preparar(a[1], &p, "imagen", msg, sizeof msg)) {
+        valor_destruir(img);
+        return hay_error ? valor_nulo() : jg_error("Error", msg);
+    }
+    int k = jg_id_de(img, "imagen");
+    valor_destruir(img);
+    int nk = jg_preparar(k, &p, msg, sizeof msg);
+    if (nk < 0) return jg_error("ErrorJuego", msg);
+    return jg_imagen_valor(nk);
 }
 
 /* sprite(filas, colores): imagen hecha con texto, un carácter por píxel.
@@ -1774,49 +1969,147 @@ static int jg_hoja_cuadro(Valor *v, const JgImagen *img, int fila, int cuadro, J
     return 1;
 }
 
-/* Divide sola una hoja: los cuadros son los trozos separados por filas y
-   columnas transparentes. Primero busca las bandas horizontales (filas de la
-   hoja) y en cada una los trozos; cada cuadro ocupa todo el alto de su banda,
-   así los pies de una misma fila siguen a la misma altura. Devuelve cuántos
-   cuadros hay (0 si la imagen no tiene huecos transparentes). */
+/* Divide sola una hoja de sprites. Cada figura es un trozo de píxeles
+   conectados (sin contar lo casi transparente); los trocitos sueltos (una gota,
+   una chispa) se unen a la figura grande más cercana, y si están lejos de
+   todas se descartan. Las figuras se agrupan en filas (por su altura en la
+   hoja) y de izquierda a derecha, y se copian a una hoja nueva en rejilla:
+   cada una centrada en su celda, y dentro de su fila a la misma altura que en
+   la original (los pies de una fila siguen alineados y un salto sigue en el
+   aire). Devuelve los píxeles de la hoja nueva, o NULL con 'msg'. */
 #define JG_MAX_RECORTES 1024
-static int jg_dividir_hoja(const unsigned char *px, int w, int h, JgRect *rec, int *por_fila, int *nfilas) {
-    int n = 0, nf = 0, y = 0;
-    char *col = malloc((size_t)w);
-    if (!col) return 0;
-    while (y < h && n < JG_MAX_RECORTES) {
-        int y0 = y, hay = 0;
-        for (; y0 < h && !hay; y0++)
-            for (int x = 0; x < w && !hay; x++) hay = px[((size_t)y0 * w + x) * 4 + 3] > 0;
-        if (!hay) break;
-        y0--;
-        int y1 = y0;
-        for (;;) {                                  /* la banda acaba en la primera fila vacía */
-            int lleno = 0;
-            if (y1 + 1 < h)
-                for (int x = 0; x < w && !lleno; x++) lleno = px[((size_t)(y1 + 1) * w + x) * 4 + 3] > 0;
-            if (!lleno) break;
-            y1++;
+typedef struct { int x0, y0, x1, y1; long area; int dueno, fila; double cy; } JgPieza;
+
+static int jg_pieza_cmp_y(const void *a, const void *b) {
+    double d = ((const JgPieza *)a)->cy - ((const JgPieza *)b)->cy;
+    return d < 0 ? -1 : d > 0;
+}
+
+static unsigned char *jg_dividir_hoja(const unsigned char *px, int w, int h, int *cw, int *ch, int *ncuadros,
+                                      int *por_fila, int *nfilas, char *msg, size_t max) {
+    size_t total = (size_t)w * h;
+    int *etiqueta = calloc(total, sizeof(int)), *pila = malloc(total * sizeof(int));
+    int cap = 256, np = 0;
+    JgPieza *pz = malloc(sizeof(JgPieza) * cap);
+    unsigned char *hoja = NULL;
+    int *orden = NULL;
+    if (!etiqueta || !pila || !pz) { snprintf(msg, max, "sin memoria"); goto fin; }
+    /* 1. trozos conectados (también en diagonal) */
+    for (size_t i0 = 0; i0 < total; i0++) {
+        if (etiqueta[i0] || px[i0 * 4 + 3] < 32) continue;
+        if (np == cap) {
+            JgPieza *m = realloc(pz, sizeof(JgPieza) * cap * 2);
+            if (!m) { snprintf(msg, max, "sin memoria"); goto fin; }
+            pz = m; cap *= 2;
         }
-        for (int x = 0; x < w; x++) {
-            col[x] = 0;
-            for (int yy = y0; yy <= y1 && !col[x]; yy++) col[x] = px[((size_t)yy * w + x) * 4 + 3] > 0;
+        JgPieza q = {w, h, -1, -1, 0, np, 0, 0};
+        size_t n = 0;
+        pila[n++] = (int)i0;
+        etiqueta[i0] = np + 1;
+        while (n > 0) {
+            int i = pila[--n], x = i % w, y = i / w;
+            q.area++;
+            if (x < q.x0) q.x0 = x;
+            if (x > q.x1) q.x1 = x;
+            if (y < q.y0) q.y0 = y;
+            if (y > q.y1) q.y1 = y;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++) {
+                    int xx = x + dx, yy = y + dy;
+                    if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+                    size_t j = (size_t)yy * w + xx;
+                    if (etiqueta[j] || px[j * 4 + 3] < 32) continue;
+                    etiqueta[j] = np + 1;
+                    pila[n++] = (int)j;
+                }
         }
-        int en_fila = 0;
-        for (int x = 0; x < w && n < JG_MAX_RECORTES;) {
-            if (!col[x]) { x++; continue; }
-            int x0 = x;
-            while (x < w && col[x]) x++;
-            JgRect r = {x0, y0, x - x0, y1 - y0 + 1};
-            rec[n++] = r;
-            en_fila++;
-        }
-        por_fila[nf++] = en_fila;
-        y = y1 + 1;
+        pz[np++] = q;
     }
-    free(col);
-    *nfilas = nf;
-    return n;
+    if (np == 0) { snprintf(msg, max, "la imagen es transparente del todo"); goto fin; }
+    /* 2. las figuras grandes; los trocitos, con la más cercana */
+    long mayor = 0;
+    for (int i = 0; i < np; i++) if (pz[i].area > mayor) mayor = pz[i].area;
+    int grandes = 0;
+    double alto_medio = 0;
+    for (int i = 0; i < np; i++)
+        if (pz[i].area * 10 >= mayor) { grandes++; alto_medio += pz[i].y1 - pz[i].y0 + 1; }
+    alto_medio /= grandes;
+    if (grandes > JG_MAX_RECORTES) { snprintf(msg, max, "hay demasiadas figuras (más de %d)", JG_MAX_RECORTES); goto fin; }
+    double cerca = fmax(2, alto_medio * 0.1);
+    for (int i = 0; i < np; i++) {
+        if (pz[i].area * 10 >= mayor) continue;
+        int mejor = -1;
+        double dmin = cerca;
+        for (int j = 0; j < np; j++) {
+            if (pz[j].area * 10 < mayor) continue;
+            double dx = fmax(0, fmax(pz[j].x0 - pz[i].x1, pz[i].x0 - pz[j].x1));
+            double dy = fmax(0, fmax(pz[j].y0 - pz[i].y1, pz[i].y0 - pz[j].y1));
+            double d = fmax(dx, dy);
+            if (d <= dmin) { dmin = d; mejor = j; }
+        }
+        pz[i].dueno = mejor;
+    }
+    for (int i = 0; i < np; i++) {                      /* las figuras crecen con sus trocitos */
+        int d = pz[i].dueno;
+        if (d == i || d < 0) continue;
+        if (pz[i].x0 < pz[d].x0) pz[d].x0 = pz[i].x0;
+        if (pz[i].y0 < pz[d].y0) pz[d].y0 = pz[i].y0;
+        if (pz[i].x1 > pz[d].x1) pz[d].x1 = pz[i].x1;
+        if (pz[i].y1 > pz[d].y1) pz[d].y1 = pz[i].y1;
+    }
+    /* 3. filas: por la altura del centro; una figura cuyo centro cae dentro de la fila es de ella */
+    orden = malloc(sizeof(int) * grandes);
+    JgPieza *g = malloc(sizeof(JgPieza) * grandes);
+    if (!orden || !g) { free(g); snprintf(msg, max, "sin memoria"); goto fin; }
+    int ng = 0;
+    for (int i = 0; i < np; i++)
+        if (pz[i].dueno == i) { g[ng] = pz[i]; g[ng].cy = (pz[i].y0 + pz[i].y1) / 2.0; ng++; }
+    qsort(g, ng, sizeof(JgPieza), jg_pieza_cmp_y);
+    int nf = 0, fondo_fila = -1;
+    int arriba[JG_MAX_RECORTES], abajo[JG_MAX_RECORTES];
+    for (int i = 0; i < ng; i++) {
+        if (nf == 0 || g[i].cy > fondo_fila) { arriba[nf] = g[i].y0; abajo[nf] = g[i].y1; nf++; }
+        g[i].fila = nf - 1;
+        if (g[i].y0 < arriba[nf - 1]) arriba[nf - 1] = g[i].y0;
+        if (g[i].y1 > abajo[nf - 1]) abajo[nf - 1] = g[i].y1;
+        fondo_fila = abajo[nf - 1];
+    }
+    /* dentro de cada fila, de izquierda a derecha */
+    for (int i = 1; i < ng; i++)
+        for (int j = i; j > 0 && (g[j].fila < g[j - 1].fila || (g[j].fila == g[j - 1].fila && g[j].x0 < g[j - 1].x0)); j--) {
+            JgPieza t = g[j]; g[j] = g[j - 1]; g[j - 1] = t;
+        }
+    /* 4. la hoja nueva */
+    int W = 0, H = 0, cols = 0;
+    for (int f = 0; f < nf; f++) { por_fila[f] = 0; if (abajo[f] - arriba[f] + 1 > H) H = abajo[f] - arriba[f] + 1; }
+    for (int i = 0; i < ng; i++) {
+        if (g[i].x1 - g[i].x0 + 1 > W) W = g[i].x1 - g[i].x0 + 1;
+        if (++por_fila[g[i].fila] > cols) cols = por_fila[g[i].fila];
+    }
+    if ((long)W * cols > 16384 || (long)H * nf > 16384) { free(g); snprintf(msg, max, "la hoja saldría demasiado grande; redúcela con \"escala\""); goto fin; }
+    int ancho = W * cols;
+    hoja = calloc((size_t)ancho * H * nf, 4);
+    if (!hoja) { free(g); snprintf(msg, max, "sin memoria"); goto fin; }
+    int col = 0;
+    for (int i = 0; i < ng; i++) {
+        if (i > 0 && g[i].fila != g[i - 1].fila) col = 0;
+        int f = g[i].fila, fw = g[i].x1 - g[i].x0 + 1, bh = abajo[f] - arriba[f] + 1;
+        int dx = col * W + (W - fw) / 2 - g[i].x0, dy = f * H + (H - bh) - arriba[f];
+        for (int y = g[i].y0; y <= g[i].y1; y++)
+            for (int x = g[i].x0; x <= g[i].x1; x++) {
+                size_t j = (size_t)y * w + x;
+                int e = etiqueta[j];
+                int suyo = e ? pz[e - 1].dueno == g[i].dueno : px[j * 4 + 3] > 0;    /* lo casi transparente, del que esté */
+                if (!suyo) continue;
+                memcpy(hoja + ((size_t)(y + dy) * ancho + x + dx) * 4, px + j * 4, 4);
+            }
+        col++;
+    }
+    free(g);
+    *cw = W; *ch = H; *ncuadros = ng; *nfilas = nf;
+fin:
+    free(etiqueta); free(pila); free(pz); free(orden);
+    return hoja;
 }
 
 static void jg_poner_filas(Valor *d, int filas, int por_fila_igual, const int *por_fila) {
@@ -1828,12 +2121,13 @@ static void jg_poner_filas(Valor *d, int filas, int por_fila_igual, const int *p
 
 /* hoja(imagen o ruta[, cómo dividirla]): una imagen con varios cuadros (los
    de una animación, o los tiles de un mapa) partida en esos cuadros:
-     hoja("andar.png")                               sola: los cuadros son los
-                                                     trozos separados por huecos
-                                                     transparentes
+     hoja("andar.png")                               sola: busca las figuras
+                                                     (ver jg_dividir_hoja)
      hoja("andar.png", {"columnas": 6[, "filas": 2]}) en cuadros iguales, por número
      hoja("tiles.png", 16[, alto])                   en cuadros iguales, por tamaño
-   Las dos últimas admiten "separacion" y "margen". Devuelve la imagen con
+   Las dos últimas admiten "separacion" y "margen". Todas admiten "fondo" y
+   "escala" (ver jg_preparar); la primera quita sola el fondo de una imagen sin
+   transparencia (por ejemplo, un JPG con fondo blanco). Devuelve la imagen con
    "celda", "cuadros", "columnas", "filas" y "por_fila"; así
    dibujar(hoja, x, y, {"cuadro": 3}) y dibujar_mapa(mapa, {"#": [hoja, 3]})
    ya saben dónde está cada cuadro. */
@@ -1849,7 +2143,6 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     }
     int k = jg_id_de(img, "imagen");
     if (img != a[0]) valor_destruir(img);
-    JgImagen *im = &_jgs.imagenes[k];
     char msg[300];
     JgRejilla g = {0, 0, 0, 0};
     int i = 1, por_tamano = 0;
@@ -1867,9 +2160,10 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
         for (int j = 0; j < op->diccionario.cantidad; j++) {
             const char *c = op->diccionario.claves[j];
             int de_cuenta = !strcmp(c, "columnas") || !strcmp(c, "filas");
+            if (!strcmp(c, "fondo") || !strcmp(c, "escala")) continue;      /* se leen abajo */
             if (strcmp(c, "separacion") && strcmp(c, "margen") && !de_cuenta) {
                 snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"columnas\", \"filas\", "
-                         "\"separacion\" y \"margen\")", c);
+                         "\"separacion\", \"margen\", \"fondo\" y \"escala\")", c);
                 return jg_error("Error", msg);
             }
             if (de_cuenta && por_tamano)
@@ -1885,38 +2179,67 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     }
     double columnas = 0, filas = 0;
     int por_cuenta = jg_opcion(op, "columnas", &columnas) | jg_opcion(op, "filas", &filas);
+    /* sin fondo y reducida, si se pide (al dividirla sola, el fondo se quita solo) */
+    JgPreparar prep = {!por_tamano && !por_cuenta ? 1 : 0, {0, 0, 0}, 1};
+    if (!jg_leer_preparar(op, &prep, "hoja", msg, sizeof msg)) return hay_error ? valor_nulo() : jg_error("Error", msg);
+    k = jg_preparar(k, &prep, msg, sizeof msg);
+    if (k < 0) { char m2[340]; snprintf(m2, sizeof m2, "hoja(): %s", msg); return jg_error("ErrorJuego", m2); }
+    if (prep.escala < 1) {                          /* los tamaños se dan en píxeles de la imagen original */
+        g.cw = (int)round(g.cw * prep.escala); g.ch = (int)round(g.ch * prep.escala);
+        g.sep = (int)round(g.sep * prep.escala); g.margen = (int)round(g.margen * prep.escala);
+    }
+    JgImagen *im = &_jgs.imagenes[k];
 
     if (!por_tamano && !por_cuenta) {
-        /* sola: por los huecos transparentes */
-        unsigned char *px = jg_pixeles(k);
-        if (!px) return jg_error("ErrorJuego", "hoja(): no se pudieron leer los píxeles de la imagen");
-        static JgRect rec[JG_MAX_RECORTES];
+        /* sola: busca las figuras y las pone en rejilla en una hoja nueva */
+        char nombre[64];
+        snprintf(nombre, sizeof nombre, "<hoja %d>", k);
+        int hk = -1;
+        for (int j = 0; j < _jgs.nimagenes && hk < 0; j++) if (!strcmp(_jgs.imagenes[j].ruta, nombre)) hk = j;
+        int W, H, total = 0, nf = 0;
         static int por_fila[JG_MAX_RECORTES];
-        int nf = 0, total = jg_dividir_hoja(px, im->ancho, im->alto, rec, por_fila, &nf);
-        free(px);
-        if (total == 0) return jg_error("Error", "hoja(): la imagen es transparente del todo");
-        if (total == 1 && rec[0].w == im->ancho && rec[0].h == im->alto)
-            return jg_error("Error", "hoja(): no encuentro huecos transparentes entre los cuadros; di cuántos hay, "
-                            "por ejemplo hoja(imagen, {\"columnas\": 6}), o cuánto mide cada uno: hoja(imagen, 32)");
-        int mw = 0, mh = 0, mc = 0;
-        Valor *recortes = valor_lista_crear();
-        for (int j = 0; j < total; j++) {
-            if (rec[j].w > mw) mw = rec[j].w;
-            if (rec[j].h > mh) mh = rec[j].h;
-            Valor *r = valor_lista_crear();
-            lista_agregar(r, valor_numero(rec[j].x)); lista_agregar(r, valor_numero(rec[j].y));
-            lista_agregar(r, valor_numero(rec[j].w)); lista_agregar(r, valor_numero(rec[j].h));
-            lista_agregar(recortes, r);
+        if (hk < 0) {
+            unsigned char *px = jg_pixeles(k);
+            if (!px) return jg_error("ErrorJuego", "hoja(): no se pudieron leer los píxeles de la imagen");
+            unsigned char *nueva = jg_dividir_hoja(px, im->ancho, im->alto, &W, &H, &total, por_fila, &nf, msg, sizeof msg);
+            free(px);
+            if (!nueva) { char m2[340]; snprintf(m2, sizeof m2, "hoja(): %s", msg); return jg_error("Error", m2); }
+            if (total == 1 && W * 10 >= im->ancho * 9 && H * 10 >= im->alto * 9) {
+                free(nueva);
+                return jg_error("Error", "hoja(): no encuentro huecos transparentes entre los cuadros; di cuántos hay, "
+                                "por ejemplo hoja(imagen, {\"columnas\": 6}), o cuánto mide cada uno: hoja(imagen, 32)");
+            }
+            int cols = 0;
+            for (int f = 0; f < nf; f++) if (por_fila[f] > cols) cols = por_fila[f];
+            hk = jg_nueva_imagen(nombre, nueva, W * cols, H * nf);
+            if (hk < 0) return jg_error("ErrorJuego", "hoja(): no se pudo crear la hoja (¿demasiado grande? prueba con \"escala\")");
+            /* se guarda cómo quedó, para devolverla igual la próxima vez (al recargar en caliente) */
+            JgImagen *hi = &_jgs.imagenes[hk];
+            hi->receta.cuadros = total; hi->celda_w = W; hi->celda_h = H;
+            hi->partes = malloc(sizeof(int) * nf);
+            if (hi->partes) { memcpy(hi->partes, por_fila, sizeof(int) * nf); hi->npartes = nf; }
         }
-        for (int f = 0; f < nf; f++) if (por_fila[f] > mc) mc = por_fila[f];
-        Valor *d = jg_imagen_valor(k);
+        JgImagen *hi = &_jgs.imagenes[hk];
+        total = hi->receta.cuadros; W = hi->celda_w; H = hi->celda_h; nf = hi->npartes;
+        int cols = 0;
+        Valor *recortes = valor_lista_crear();
+        for (int f = 0, c = 0; f < nf; f++) {
+            if (hi->partes[f] > cols) cols = hi->partes[f];
+            for (int e = 0; e < hi->partes[f]; e++, c++) {
+                Valor *r = valor_lista_crear();
+                lista_agregar(r, valor_numero(e * W)); lista_agregar(r, valor_numero(f * H));
+                lista_agregar(r, valor_numero(W)); lista_agregar(r, valor_numero(H));
+                lista_agregar(recortes, r);
+            }
+        }
+        Valor *d = jg_imagen_valor(hk);
         Valor *celda = valor_lista_crear();
-        lista_agregar(celda, valor_numero(mw));
-        lista_agregar(celda, valor_numero(mh));
+        lista_agregar(celda, valor_numero(W));
+        lista_agregar(celda, valor_numero(H));
         valor_diccionario_agregar(d, "celda", celda);
         valor_diccionario_agregar(d, "cuadros", valor_numero(total));
-        valor_diccionario_agregar(d, "columnas", valor_numero(mc));
-        jg_poner_filas(d, nf, 0, por_fila);
+        valor_diccionario_agregar(d, "columnas", valor_numero(cols));
+        jg_poner_filas(d, nf, 0, hi->partes);
         valor_diccionario_agregar(d, "recortes", recortes);
         return d;
     }

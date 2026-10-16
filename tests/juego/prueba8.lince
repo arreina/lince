@@ -69,6 +69,37 @@ intentar {
 } capturar (error e) {
     escribir("error: " + e.mensaje)
 }
+# una hoja descargada típica: sin transparencia, con fondo blanco (como un JPG).
+# La figura 1 tiene un hueco blanco dentro (como unos calcetines): no es fondo.
+# El puntito suelto de abajo a la derecha se une a la figura 2.
+juego.guardar_imagen(juego.sprite([
+    "WWWWWWWWWWWWW",
+    "WKKKKWWWWWWWW",
+    "WKWWKWWKKKWWW",
+    "WKWWKWWKKKWWW",
+    "WKKKKWWKKKWWW",
+    "WWWWWWWWWWWWW",
+    "WWWWWWWWWWKWW",
+    "WWWWWWWWWWWWW"
+], {"W": [255, 255, 255], "K": [20, 20, 20]}), "con_fondo.png")
+fijo BLANCA = juego.hoja("con_fondo.png")
+escribir("con fondo: " + a_texto(BLANCA["cuadros"]) + " filas " + a_texto(BLANCA["filas"]) + " celda " +
+         a_texto(BLANCA["celda"][0]) + "x" + a_texto(BLANCA["celda"][1]))
+escribir("reducida: " + a_texto(juego.imagen("con_fondo.png", {"escala": 0.5})["ancho"]))
+juego.limpiar([0, 0, 0])
+juego.dibujar(BLANCA, 0, 0, {"cuadro": 0, "escala": 4})
+juego.dibujar(juego.imagen("con_fondo.png", {"fondo": [255, 255, 255]}), 20, 0, {"escala": 2})
+juego.captura("fondo.bmp")
+intentar {
+    juego.imagen("con_fondo.png", {"fondo": "azul"})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.imagen("con_fondo.png", {"escala": 2})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
 intentar {
     juego.guardar_imagen(PJ, "pj.bmp")
 } capturar (error e) {
