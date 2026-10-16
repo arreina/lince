@@ -10,9 +10,10 @@
 #   y los de estar quieto (respirar). Arriba se ve la hoja que ha generado, con
 #   el cuadro que toca marcado. juego.guardar_imagen() la guarda como PNG para
 #   retocarla en un editor de dibujo.
-# - la tradicional, un dibujo por fotograma: los pájaros tienen tres, hechos a
-#   mano, que juego.juntar() junta en una hoja. Con archivos sería igual:
-#   juego.juntar(["pajaro_1.png", "pajaro_2.png", "pajaro_3.png"]).
+# - la tradicional, dibujando cada fotograma: los pájaros tienen tres, uno al
+#   lado del otro en la misma imagen (una hoja de sprites), y juego.hoja() los
+#   separa sola por los huecos transparentes que hay entre ellos. Con un PNG
+#   sería igual: juego.hoja("pajaro.png").
 importar "juego"
 importar "matematica"
 
@@ -91,28 +92,14 @@ fijo NUBE = juego.sprite([
     ".WWWWWWWWWW."
 ], {"W": [250, 250, 255]})
 
-# Un pájaro animado a la manera tradicional: tres fotogramas dibujados a mano
-fijo COLORES_PAJARO = {"N": [40, 40, 60], "A": [255, 190, 60]}
-fijo PAJARO = juego.juntar([
-    juego.sprite([
-        "N.....N",
-        ".N...N.",
-        "..NNNA.",
-        "...N..."
-    ], COLORES_PAJARO),
-    juego.sprite([
-        ".......",
-        ".......",
-        "NNNNNNA",
-        "...N..."
-    ], COLORES_PAJARO),
-    juego.sprite([
-        ".......",
-        "..NNNA.",
-        ".N...N.",
-        "N.....N"
-    ], COLORES_PAJARO)
-])
+# Un pájaro animado a la manera tradicional: una hoja con sus tres fotogramas
+# (alas arriba, en medio y abajo), separados por una columna vacía
+fijo PAJARO = juego.hoja(juego.sprite([
+    "N.....N.................",
+    ".N...N.............NNNA.",
+    "..NNNA...NNNNNNA..N...N.",
+    "...N........N....N.....N"
+], {"N": [40, 40, 60], "A": [255, 190, 60]}))
 
 # ── Estado ──────────────────────────────────────────────────────────
 sea x = 400                             # el centro del personaje

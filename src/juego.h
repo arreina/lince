@@ -1722,9 +1722,121 @@ static int jg_rejilla_de(Valor *v, JgRejilla *g) {
     return g->cw >= 1 && g->ch >= 1 && g->sep >= 0 && g->margen >= 0;
 }
 
-/* hoja(imagen o ruta, ancho[, alto][, {"separacion": n, "margen": n}]): la
-   imagen partida en cuadros iguales (sprites de una animación o tiles de un
-   mapa). Devuelve la imagen con "celda", "columnas" y "cuadros"; así
+static int jg_resto(int a, int m) { int r = a % m; return r < 0 ? r + m : r; }
+
+/* Dónde está un cuadro de una hoja de hoja() (o de animar() o juntar()).
+   'fila' >= 0 cuenta los cuadros dentro de esa fila (cada fila, una
+   animación); -1, todos seguidos. Un número fuera de rango da la vuelta.
+   Deja en 'src' el trozo de imagen, en 'cw'×'ch' la celda (lo que mide el
+   mayor cuadro) y en 'ox', 'oy' dónde va el trozo dentro de ella: los cuadros
+   de distinto tamaño (hojas divididas solas) van centrados y apoyados abajo.
+   Devuelve 1 si es una hoja, 0 si no, y -1 si la fila no existe (con 'msg'). */
+static int jg_hoja_cuadro(Valor *v, const JgImagen *img, int fila, int cuadro, JgRect *src,
+                          int *ox, int *oy, int *cw, int *ch, char *msg, size_t max) {
+    JgRejilla g;
+    if (!jg_rejilla_de(v, &g)) return 0;
+    *cw = g.cw; *ch = g.ch; *ox = *oy = 0;
+    int kr = valor_diccionario_buscar(v, "recortes"), kf = valor_diccionario_buscar(v, "por_fila");
+    Valor *recortes = kr >= 0 ? v->diccionario.valores[kr] : NULL, *por_fila = kf >= 0 ? v->diccionario.valores[kf] : NULL;
+    int filas, cols, total;
+    if (recortes && recortes->tipo == VAL_LISTA && recortes->lista.cantidad > 0) {
+        total = recortes->lista.cantidad;
+        filas = por_fila && por_fila->tipo == VAL_LISTA ? por_fila->lista.cantidad : 1;
+        cols = total;
+    } else {
+        recortes = NULL;
+        total = jg_rejilla_cuadros(img, &g, &cols);
+        filas = total / cols;
+    }
+    int i = jg_resto(cuadro, total);
+    if (fila >= 0) {
+        if (fila >= filas) {
+            snprintf(msg, max, "la hoja tiene %d fila%s (de 0 a %d); no hay fila %d", filas, filas == 1 ? "" : "s", filas - 1, fila);
+            return -1;
+        }
+        if (recortes) {
+            int base = 0, en_fila = total;
+            for (int f = 0; f <= fila && f < por_fila->lista.cantidad; f++) {
+                Valor *e = por_fila->lista.elementos[f];
+                en_fila = e->tipo == VAL_NUMERO && e->numero >= 1 ? (int)e->numero : 1;
+                if (f < fila) base += en_fila;
+            }
+            i = jg_resto(base + jg_resto(cuadro, en_fila), total);
+        } else i = fila * cols + jg_resto(cuadro, cols);
+    }
+    if (!recortes) { *src = jg_rejilla_rect(img, &g, i); return 1; }
+    Valor *r = recortes->lista.elementos[i];
+    int q[4] = {0, 0, 1, 1};
+    for (int j = 0; j < 4 && r->tipo == VAL_LISTA && j < r->lista.cantidad; j++)
+        if (r->lista.elementos[j]->tipo == VAL_NUMERO) q[j] = (int)r->lista.elementos[j]->numero;
+    JgRect s = {q[0], q[1], q[2], q[3]};
+    *src = s;
+    *ox = (g.cw - s.w) / 2;
+    *oy = g.ch - s.h;
+    return 1;
+}
+
+/* Divide sola una hoja: los cuadros son los trozos separados por filas y
+   columnas transparentes. Primero busca las bandas horizontales (filas de la
+   hoja) y en cada una los trozos; cada cuadro ocupa todo el alto de su banda,
+   así los pies de una misma fila siguen a la misma altura. Devuelve cuántos
+   cuadros hay (0 si la imagen no tiene huecos transparentes). */
+#define JG_MAX_RECORTES 1024
+static int jg_dividir_hoja(const unsigned char *px, int w, int h, JgRect *rec, int *por_fila, int *nfilas) {
+    int n = 0, nf = 0, y = 0;
+    char *col = malloc((size_t)w);
+    if (!col) return 0;
+    while (y < h && n < JG_MAX_RECORTES) {
+        int y0 = y, hay = 0;
+        for (; y0 < h && !hay; y0++)
+            for (int x = 0; x < w && !hay; x++) hay = px[((size_t)y0 * w + x) * 4 + 3] > 0;
+        if (!hay) break;
+        y0--;
+        int y1 = y0;
+        for (;;) {                                  /* la banda acaba en la primera fila vacía */
+            int lleno = 0;
+            if (y1 + 1 < h)
+                for (int x = 0; x < w && !lleno; x++) lleno = px[((size_t)(y1 + 1) * w + x) * 4 + 3] > 0;
+            if (!lleno) break;
+            y1++;
+        }
+        for (int x = 0; x < w; x++) {
+            col[x] = 0;
+            for (int yy = y0; yy <= y1 && !col[x]; yy++) col[x] = px[((size_t)yy * w + x) * 4 + 3] > 0;
+        }
+        int en_fila = 0;
+        for (int x = 0; x < w && n < JG_MAX_RECORTES;) {
+            if (!col[x]) { x++; continue; }
+            int x0 = x;
+            while (x < w && col[x]) x++;
+            JgRect r = {x0, y0, x - x0, y1 - y0 + 1};
+            rec[n++] = r;
+            en_fila++;
+        }
+        por_fila[nf++] = en_fila;
+        y = y1 + 1;
+    }
+    free(col);
+    *nfilas = nf;
+    return n;
+}
+
+static void jg_poner_filas(Valor *d, int filas, int por_fila_igual, const int *por_fila) {
+    valor_diccionario_agregar(d, "filas", valor_numero(filas));
+    Valor *l = valor_lista_crear();
+    for (int f = 0; f < filas; f++) lista_agregar(l, valor_numero(por_fila ? por_fila[f] : por_fila_igual));
+    valor_diccionario_agregar(d, "por_fila", l);
+}
+
+/* hoja(imagen o ruta[, cómo dividirla]): una imagen con varios cuadros (los
+   de una animación, o los tiles de un mapa) partida en esos cuadros:
+     hoja("andar.png")                               sola: los cuadros son los
+                                                     trozos separados por huecos
+                                                     transparentes
+     hoja("andar.png", {"columnas": 6[, "filas": 2]}) en cuadros iguales, por número
+     hoja("tiles.png", 16[, alto])                   en cuadros iguales, por tamaño
+   Las dos últimas admiten "separacion" y "margen". Devuelve la imagen con
+   "celda", "cuadros", "columnas", "filas" y "por_fila"; así
    dibujar(hoja, x, y, {"cuadro": 3}) y dibujar_mapa(mapa, {"#": [hoja, 3]})
    ya saben dónde está cada cuadro. */
 static Valor *fn_jg_hoja(Valor **a, int n) {
@@ -1732,38 +1844,95 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     Valor *img = NULL;
     if (n >= 1 && a[0]->tipo == VAL_TEXTO) { img = fn_jg_imagen(a, 1); if (hay_error) return img; }
     else if (n >= 1 && jg_id_de(a[0], "imagen") >= 0 && jg_id_de(a[0], "imagen") < _jgs.nimagenes) img = a[0];
-    if (!img || n < 2 || a[1]->tipo != VAL_NUMERO) {
+    if (!img || (n >= 2 && a[1]->tipo != VAL_NUMERO && a[1]->tipo != VAL_DICCIONARIO)) {
         if (img && img != a[0]) valor_destruir(img);
-        return jg_error("ErrorTipo", "hoja() espera (imagen o ruta, ancho de cada cuadro[, alto][, opciones])");
+        return jg_error("ErrorTipo", "hoja() espera (imagen o ruta), (imagen, {\"columnas\": n, \"filas\": n}) "
+                        "o (imagen, ancho de cada cuadro[, alto])");
     }
     int k = jg_id_de(img, "imagen");
     if (img != a[0]) valor_destruir(img);
-    JgRejilla g = {(int)a[1]->numero, (int)a[1]->numero, 0, 0};
-    int i = 2;
-    if (n > i && a[i]->tipo == VAL_NUMERO) g.ch = (int)a[i++]->numero;
+    JgImagen *im = &_jgs.imagenes[k];
+    char msg[300];
+    JgRejilla g = {0, 0, 0, 0};
+    int i = 1, por_tamano = 0;
+    if (n > 1 && a[1]->tipo == VAL_NUMERO) {
+        por_tamano = 1;
+        g.cw = g.ch = (int)a[1]->numero;
+        i = 2;
+        if (n > i && a[i]->tipo == VAL_NUMERO) g.ch = (int)a[i++]->numero;
+    }
+    Valor *op = NULL;
     if (n > i) {
         if (a[i]->tipo != VAL_DICCIONARIO)
-            return jg_error("ErrorTipo", "hoja(): las opciones van en un diccionario, por ejemplo {\"separacion\": 1}");
-        Valor *op = a[i];
+            return jg_error("ErrorTipo", "hoja(): las opciones van en un diccionario, por ejemplo {\"columnas\": 4}");
+        op = a[i];
         for (int j = 0; j < op->diccionario.cantidad; j++) {
-            const char *k = op->diccionario.claves[j];
-            if (strcmp(k, "separacion") != 0 && strcmp(k, "margen") != 0) {
-                char msg[160];
-                snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"separacion\" y \"margen\")", k);
+            const char *c = op->diccionario.claves[j];
+            int de_cuenta = !strcmp(c, "columnas") || !strcmp(c, "filas");
+            if (strcmp(c, "separacion") && strcmp(c, "margen") && !de_cuenta) {
+                snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"columnas\", \"filas\", "
+                         "\"separacion\" y \"margen\")", c);
                 return jg_error("Error", msg);
             }
-            if (op->diccionario.valores[j]->tipo != VAL_NUMERO)
-                return jg_error("ErrorTipo", "hoja(): \"separacion\" y \"margen\" son números de píxeles");
+            if (de_cuenta && por_tamano)
+                return jg_error("Error", "hoja(): di el tamaño de los cuadros o cuántos hay (\"columnas\", \"filas\"), no las dos cosas");
+            if (op->diccionario.valores[j]->tipo != VAL_NUMERO) {
+                snprintf(msg, sizeof msg, "hoja(): \"%s\" es un número", c);
+                return jg_error("ErrorTipo", msg);
+            }
         }
         double v;
         if (jg_opcion(op, "separacion", &v)) g.sep = (int)v;
         if (jg_opcion(op, "margen", &v)) g.margen = (int)v;
     }
-    JgImagen *im = &_jgs.imagenes[k];
+    double columnas = 0, filas = 0;
+    int por_cuenta = jg_opcion(op, "columnas", &columnas) | jg_opcion(op, "filas", &filas);
+
+    if (!por_tamano && !por_cuenta) {
+        /* sola: por los huecos transparentes */
+        unsigned char *px = jg_pixeles(k);
+        if (!px) return jg_error("ErrorJuego", "hoja(): no se pudieron leer los píxeles de la imagen");
+        static JgRect rec[JG_MAX_RECORTES];
+        static int por_fila[JG_MAX_RECORTES];
+        int nf = 0, total = jg_dividir_hoja(px, im->ancho, im->alto, rec, por_fila, &nf);
+        free(px);
+        if (total == 0) return jg_error("Error", "hoja(): la imagen es transparente del todo");
+        if (total == 1 && rec[0].w == im->ancho && rec[0].h == im->alto)
+            return jg_error("Error", "hoja(): no encuentro huecos transparentes entre los cuadros; di cuántos hay, "
+                            "por ejemplo hoja(imagen, {\"columnas\": 6}), o cuánto mide cada uno: hoja(imagen, 32)");
+        int mw = 0, mh = 0, mc = 0;
+        Valor *recortes = valor_lista_crear();
+        for (int j = 0; j < total; j++) {
+            if (rec[j].w > mw) mw = rec[j].w;
+            if (rec[j].h > mh) mh = rec[j].h;
+            Valor *r = valor_lista_crear();
+            lista_agregar(r, valor_numero(rec[j].x)); lista_agregar(r, valor_numero(rec[j].y));
+            lista_agregar(r, valor_numero(rec[j].w)); lista_agregar(r, valor_numero(rec[j].h));
+            lista_agregar(recortes, r);
+        }
+        for (int f = 0; f < nf; f++) if (por_fila[f] > mc) mc = por_fila[f];
+        Valor *d = jg_imagen_valor(k);
+        Valor *celda = valor_lista_crear();
+        lista_agregar(celda, valor_numero(mw));
+        lista_agregar(celda, valor_numero(mh));
+        valor_diccionario_agregar(d, "celda", celda);
+        valor_diccionario_agregar(d, "cuadros", valor_numero(total));
+        valor_diccionario_agregar(d, "columnas", valor_numero(mc));
+        jg_poner_filas(d, nf, 0, por_fila);
+        valor_diccionario_agregar(d, "recortes", recortes);
+        return d;
+    }
+    if (por_cuenta) {
+        if (columnas == 0) columnas = 1;
+        if (filas == 0) filas = 1;
+        if (columnas < 1 || filas < 1 || columnas > 4096 || filas > 4096)
+            return jg_error("Error", "hoja(): \"columnas\" y \"filas\" son al menos 1");
+        g.cw = (int)((im->ancho - 2 * g.margen - (columnas - 1) * g.sep) / columnas);
+        g.ch = (int)((im->alto - 2 * g.margen - (filas - 1) * g.sep) / filas);
+    }
     if (g.cw < 1 || g.ch < 1 || g.sep < 0 || g.margen < 0)
         return jg_error("Error", "hoja(): los cuadros miden al menos 1×1 y la separación y el margen no son negativos");
     if (g.cw + 2 * g.margen > im->ancho || g.ch + 2 * g.margen > im->alto) {
-        char msg[200];
         snprintf(msg, sizeof msg, "hoja(): la imagen mide %d×%d, no cabe ni un cuadro de %d×%d", im->ancho, im->alto, g.cw, g.ch);
         return jg_error("Error", msg);
     }
@@ -1777,6 +1946,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     valor_diccionario_agregar(d, "margen", valor_numero(g.margen));
     valor_diccionario_agregar(d, "columnas", valor_numero(cols));
     valor_diccionario_agregar(d, "cuadros", valor_numero(total));
+    jg_poner_filas(d, total / cols, cols, NULL);
     return d;
 }
 
@@ -1972,6 +2142,7 @@ static Valor *jg_animacion_valor(int k) {
     valor_diccionario_agregar(d, "margen", valor_numero(0));
     valor_diccionario_agregar(d, "columnas", valor_numero(n));
     valor_diccionario_agregar(d, "cuadros", valor_numero(n));
+    jg_poner_filas(d, 1, n, NULL);
     if (im->origen < 0) return d;
     JgImagen *o = &_jgs.imagenes[im->origen];
     Valor *rel = valor_lista_crear();
@@ -2198,7 +2369,10 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
 /* dibujar(imagen, x, y[, opciones]). Opciones (todas opcionales):
      escala, ancho, alto, angulo (grados), espejo, voltear, centrado, alfa (0-255),
      color ([r, g, b] para teñir), recorte ([x, y, ancho, alto]),
-     cuadro + celda (hoja de sprites: número de cuadro y [ancho, alto] de cada uno) */
+     cuadro (y fila) de una hoja de hoja(), animar() o juntar(); con una imagen
+     normal, cuadro + celda ([ancho, alto] de cada cuadro).
+   Con una hoja, x, y (y "centrado") se refieren a la celda entera, así los
+   cuadros de distinto tamaño quedan en su sitio. */
 static Valor *fn_jg_dibujar(Valor **a, int n) {
     JG_ABIERTA();
     int k = n > 0 ? jg_id_de(a[0], "imagen") : -1;
@@ -2212,8 +2386,12 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     JgRect src = {0, 0, img->ancho, img->alto};
     Valor *rec = jg_opcion_valor(op, "recorte");
     Valor *celda = jg_opcion_valor(op, "celda");
-    double cuadro;
-    JgRejilla rejilla;
+    double cuadro = 0, fv;
+    jg_opcion(op, "cuadro", &cuadro);
+    int fila = jg_opcion(op, "fila", &fv) ? (int)floor(fv) : -1;
+    int ox = 0, oy = 0, cw = 0, ch = 0, es_hoja = 0;
+    if (fila < -1 || (fila == -1 && jg_opcion(op, "fila", &fv)))
+        return jg_error("Error", "dibujar(): \"fila\" empieza en 0");
     if (rec) {
         if (rec->tipo != VAL_LISTA || rec->lista.cantidad != 4) return jg_error("ErrorTipo", "dibujar(): 'recorte' es [x, y, ancho, alto]");
         int *dst[4] = {&src.x, &src.y, &src.w, &src.h};
@@ -2227,20 +2405,33 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
             return jg_error("ErrorTipo", "dibujar(): 'celda' es [ancho, alto] de cada cuadro");
         JgRejilla g = {(int)celda->lista.elementos[0]->numero, (int)celda->lista.elementos[1]->numero, 0, 0};
         if (g.cw < 1 || g.ch < 1) return jg_error("Error", "dibujar(): la celda debe medir al menos 1×1");
-        src = jg_rejilla_rect(img, &g, jg_opcion(op, "cuadro", &cuadro) ? (int)floor(cuadro) : 0);
-    } else if (jg_rejilla_de(a[0], &rejilla)) {     /* una hoja de juego.hoja(): ya sabe sus cuadros */
-        src = jg_rejilla_rect(img, &rejilla, jg_opcion(op, "cuadro", &cuadro) ? (int)floor(cuadro) : 0);
+        src = jg_rejilla_rect(img, &g, (int)floor(cuadro));
+    } else {                                        /* una hoja: ya sabe dónde está cada cuadro */
+        char msg[200];
+        es_hoja = jg_hoja_cuadro(a[0], img, fila, (int)floor(cuadro), &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
+        if (es_hoja < 0) {
+            char m2[260];
+            snprintf(m2, sizeof m2, "dibujar(): %s", msg);
+            return jg_error("Error", m2);
+        }
     }
-    double escala = 1, w, h, angulo = 0, v;
+    if (fila >= 0 && es_hoja != 1)
+        return jg_error("Error", "dibujar(): \"fila\" es para hojas de juego.hoja() (cada fila, una animación)");
+    if (es_hoja != 1) { cw = src.w; ch = src.h; }
+    double escala = 1, fx, fy, angulo = 0, v;
     jg_opcion(op, "escala", &escala);
-    w = src.w * escala; h = src.h * escala;
-    if (jg_opcion(op, "ancho", &v)) w = v;
-    if (jg_opcion(op, "alto", &v)) h = v;
+    fx = fy = escala;
+    if (jg_opcion(op, "ancho", &v)) fx = v / cw;
+    if (jg_opcion(op, "alto", &v)) fy = v / ch;
+    double w = src.w * fx, h = src.h * fy;
     jg_opcion(op, "angulo", &angulo);
-    if (jg_opcion(op, "centrado", &v) && v) { x -= w / 2; y -= h / 2; }
+    if (jg_opcion(op, "centrado", &v) && v) { x -= cw * fx / 2; y -= ch * fy / 2; }
     int volteo = 0;
     if (jg_opcion(op, "espejo", &v) && v) volteo |= 1;
     if (jg_opcion(op, "voltear", &v) && v) volteo |= 2;
+    /* el cuadro dentro de su celda (de lado a lado si está en espejo) */
+    x += ((volteo & 1) ? cw - src.w - ox : ox) * fx;
+    y += ((volteo & 2) ? ch - src.h - oy : oy) * fy;
     double alfa = 255;
     jg_opcion(op, "alfa", &alfa);
     unsigned char tinte[4] = {255, 255, 255, 255};
@@ -3299,6 +3490,7 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
     char msg[300];
     int id = jg_id_de(v, "imagen");
     JgRejilla g;
+    int ox, oy, cw, ch;
     if (id >= 0 && id < _jgs.nimagenes) {
         if (jg_rejilla_de(v, &g)) {
             snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" es una hoja de tiles; di qué cuadro, por ejemplo [hoja, 3]", car);
@@ -3346,7 +3538,7 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
         jg_error("ErrorTipo", msg);
         return -1;
     }
-    *src = jg_rejilla_rect(&_jgs.imagenes[id], &g, cuadro);
+    jg_hoja_cuadro(hoja, &_jgs.imagenes[id], -1, cuadro, src, &ox, &oy, &cw, &ch, msg, sizeof msg);
     return id;
 }
 

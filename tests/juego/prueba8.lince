@@ -55,6 +55,34 @@ intentar {
 } capturar (error e) {
     escribir("error: " + e.mensaje)
 }
+# hoja que se divide sola: fila 0 con 3 cuadros (uno más bajo), fila 1 con 2
+fijo SOLA = juego.hoja(juego.sprite([
+    "RR....BB",
+    "RR.GG.BB",
+    "RR.GG.BB",
+    "........",
+    "YY.MM...",
+    "YY.MM..."
+], {"R": [255, 0, 0], "G": [0, 255, 0], "B": [0, 0, 255], "Y": [255, 255, 0], "M": [255, 0, 255]}))
+escribir("sola: " + a_texto(SOLA["cuadros"]) + " filas " + a_texto(SOLA["filas"]) + " " + a_texto(SOLA["por_fila"][0]) +
+         "+" + a_texto(SOLA["por_fila"][1]) + " celda " + a_texto(SOLA["celda"][0]) + "x" + a_texto(SOLA["celda"][1]))
+fijo CUENTA = juego.hoja(juego.sprite(["RRGGBB", "RRGGBB"], {"R": [255, 0, 0], "G": [0, 255, 0], "B": [0, 0, 255]}), {"columnas": 3})
+escribir("por cuenta: " + a_texto(CUENTA["cuadros"]) + " " + a_texto(CUENTA["celda"][0]) + "x" + a_texto(CUENTA["celda"][1]))
+juego.limpiar([0, 0, 0])
+juego.dibujar(SOLA, 0, 0, {"fila": 0, "cuadro": 1, "escala": 4})       # verde 2×2, abajo en una celda de 2×3
+juego.dibujar(SOLA, 20, 0, {"fila": 1, "cuadro": 3, "escala": 4})      # da la vuelta en la fila: magenta
+juego.dibujar(CUENTA, 40, 0, {"cuadro": 2, "escala": 4})               # azul
+juego.captura("hojas.bmp")
+intentar {
+    juego.dibujar(SOLA, 0, 0, {"fila": 5})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.hoja(juego.sprite(["XX"], {"X": [1, 1, 1]}))
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
 intentar {
     juego.guardar_imagen(PJ, "pj.bmp")
 } capturar (error e) {

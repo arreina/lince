@@ -26,7 +26,7 @@ Y se reparten como un único ejecutable:
 | `07_tres_en_raya.lince` | ratón | **recursión** (minimax): la máquina nunca pierde |
 | `08_plataformas.lince` | flechas / A-D y espacio, o **mando** | nivel escrito como texto, **sprites dibujados con texto** y animados (`juego.sprite`, hoja de sprites), gravedad y un **mapa de casillas** (`juego.mapa`, `juego.mover_en_mapa`), **cámara** con marcador fijo, **acciones** (cada control definido una vez para teclado y mando), **partículas**, **escenas** con fundido (portada y nivel) y animación con `juego.cuadro` |
 | `09_mazmorra.lince` | flechas o WASD, o **mando** | un juego de **vista cenital**: el mismo mapa de casillas sin gravedad, casillas que cambian (`juego.poner_casilla`) y **enemigos que te persiguen** esquivando las paredes (`juego.camino`) |
-| `10_paseo.lince` | flechas o A / D, Mayús corre, o **mando** | **animaciones generadas** a partir de un solo dibujo (`juego.animar`: andar, correr y respirar), la hoja generada en pantalla, **animación tradicional** fotograma a fotograma (`juego.juntar`, los pájaros), pasos con sonido y un paisaje que se repite con varias capas de profundidad |
+| `10_paseo.lince` | flechas o A / D, Mayús corre, o **mando** | **animaciones generadas** a partir de un solo dibujo (`juego.animar`: andar, correr y respirar), la hoja generada en pantalla, **animación tradicional** con una hoja de sprites que se divide sola (`juego.hoja`, los pájaros), pasos con sonido y un paisaje que se repite con varias capas de profundidad |
 
 Todos terminan con **Esc**.
 
