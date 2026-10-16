@@ -9,7 +9,8 @@
 # dibujados con texto y animados como hoja de sprites, gravedad y un mapa de
 # casillas (juego.mapa) que mueve al lince sin atravesar paredes, una cámara que sigue al jugador con un marcador fijo, acciones
 # (cada control se define una vez para teclado y mando a la vez), partículas
-# y escenas con fundido (la portada y el nivel).
+# escenas con fundido (la portada y el nivel) y efectos de sonido generados
+# (juego.efecto).
 importar "juego"
 importar "matematica"
 
@@ -117,7 +118,7 @@ funcion empezar(): nulo {
 funcion herido(): nulo {
     si invulnerable > 0 { devolver nulo }
     vidas = vidas - 1
-    juego.pitido(140, 300)
+    juego.efecto("perder", {"largo": 0.5})
     si vidas == 0 {
         estado = "perdido"
     } sino {
@@ -138,7 +139,7 @@ funcion mover_jugador(val numero dt): nulo {
     si yo["vx"] > 0 { mira_izquierda = falso }
     si yo["en_suelo"] y juego.accion_pulsada("saltar") {
         yo["vy"] = SALTO
-        juego.pitido(660, 50, 0.15)
+        juego.efecto("salto", {"volumen": 0.3})
         polvo()
     }
     yo["vy"] = matematica.minimo(yo["vy"] + GRAVEDAD * dt, 900)
@@ -151,7 +152,7 @@ funcion mover_jugador(val numero dt): nulo {
     si yo["y"] > FILAS * CASILLA { herido() }
     si juego.casilla(NIVEL, matematica.piso((yo["x"] + JW / 2) / CASILLA), matematica.piso((yo["y"] + JH / 2) / CASILLA)) == "M" {
         estado = "ganado"
-        juego.pitido(880, 400)
+        juego.efecto("subir")
         juego.particulas(yo["x"] + JW / 2, yo["y"], {"cantidad": 120, "color": [255, 220, 80], "color_final": [255, 80, 80, 0],
                                            "velocidad": [80, 320], "direccion": -90, "apertura": 120,
                                            "gravedad": 500, "vida": [0.8, 1.6], "tamaño": 5})
@@ -177,7 +178,7 @@ funcion mover_enemigos(val numero dt): nulo {
                 si yo["vy"] > 0 y yo["y"] + JH - bicho["y"] < 14 {
                     bicho["vivo"] = falso
                     yo["vy"] = SALTO * 0.6
-                    juego.pitido(300, 80)
+                    juego.efecto("golpe")
                     juego.particulas(bicho["x"] + 12, bicho["y"] + 6, {"cantidad": 25, "color": [120, 70, 160],
                                      "velocidad": [60, 200], "gravedad": 600, "vida": [0.4, 0.7], "tamaño": [3, 6]})
                 } sino {
@@ -190,7 +191,7 @@ funcion mover_enemigos(val numero dt): nulo {
         si m["viva"] y juego.colision(yo["x"], yo["y"], JW, JH, m["x"], m["y"], 12, 12) {
             m["viva"] = falso
             recogidas = recogidas + 1
-            juego.pitido(1320, 60, 0.15)
+            juego.efecto("moneda", {"volumen": 0.35})
             juego.particulas(m["x"] + 6, m["y"] + 6, {"cantidad": 16, "color": [250, 200, 50], "color_final": [255, 255, 255, 0],
                                                       "velocidad": [40, 140], "vida": [0.3, 0.6], "tamaño": [3, 5]})
         }

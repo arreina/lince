@@ -1,0 +1,32 @@
+# Prueba de los efectos de sonido generados
+importar "juego"
+importar "archivos"
+importar "matematica"
+juego.abrir("Efectos", 40, 40)
+sea a = juego.crear_efecto("moneda", {"semilla": 3})
+sea b = juego.crear_efecto("moneda", {"semilla": 3})
+escribir("mismo sonido: " + a_texto(a["sonido"] == b["sonido"]))
+sea c = juego.crear_efecto("moneda", {"semilla": 4})
+escribir("otra semilla: " + a_texto(a["sonido"] != c["sonido"]))
+sea largo = juego.crear_efecto("explosion", {"semilla": 1, "largo": 2})
+sea corto = juego.crear_efecto("explosion", {"semilla": 1})
+escribir("largo: " + a_texto(matematica.redondear(largo["duracion"] / corto["duracion"] * 10) / 10))
+juego.guardar_sonido(a, "a.wav")
+juego.guardar_sonido(b, "b.wav")
+escribir("wav: " + a_texto(archivos.existe("a.wav")))
+sea leido = juego.sonido("a.wav")
+escribir("se vuelve a cargar: " + a_texto(leido["duracion"] == a["duracion"]))
+para cada texto t en ["moneda", "salto", "disparo", "explosion", "golpe", "subir", "clic", "perder"] {
+    juego.efecto(t, {"volumen": 0.1})
+}
+escribir("voz: " + a_texto(juego.efecto("clic") > 0))
+intentar {
+    juego.efecto("trompeta")
+} capturar (error e) {
+    escribir("desconocido: " + e.mensaje)
+}
+intentar {
+    juego.efecto("salto", {"volumne": 1})
+} capturar (error e) {
+    escribir("opcion: " + e.mensaje)
+}

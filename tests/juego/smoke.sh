@@ -182,4 +182,17 @@ PY
 (cd mi_juego && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2400 LINCE_JUEGO_PULSAR=espacio,derecha,abajo \
     timeout 60 "$LINCE" mi_juego.lince >> ../salida9.txt 2>&1) && ok "el juego nuevo se juega entero (portada, partida y fin)" || mal "el juego nuevo falla"
 "$LINCE" nuevo mi_juego >> salida9.txt 2>&1 && mal "lince nuevo pisa una carpeta que existe" || ok "lince nuevo no pisa una carpeta que existe"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt; exit 1; }
+# ── Octava parte: efectos de sonido generados ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 30 "$LINCE" "$DIR/prueba6.lince" > salida10.txt 2>&1
+[ $? -eq 0 ] && ok "la octava prueba termina bien" || mal "la octava prueba falló"
+for l in "mismo sonido: verdadero" "otra semilla: verdadero" "largo: 2" "wav: verdadero" "se vuelve a cargar: verdadero" "voz: verdadero"; do
+    grep -qxF "$l" salida10.txt && ok "efecto: $l" || mal "falta la línea: $l"
+done
+grep -qF "no conozco el efecto 'trompeta'" salida10.txt && ok "efecto: tipo desconocido" || mal "falta el error de efecto desconocido"
+grep -qF "opción desconocida 'volumne'" salida10.txt && ok "efecto: opción mal escrita" || mal "falta el error de opción de efecto"
+cmp -s a.wav b.wav && ok "efecto: la misma semilla da el mismo .wav" || mal "la misma semilla da sonidos distintos"
+# Sin pantalla, un error con la ventana abierta termina en vez de esperar el arreglo
+printf 'importar "juego"\njuego.abrir("x", 10, 10)\nfalla()\n' > falla.lince
+SDL_VIDEODRIVER=dummy timeout 10 "$LINCE" falla.lince > /dev/null 2>&1
+[ $? -eq 1 ] && ok "sin pantalla, un error no se queda esperando" || mal "un error sin pantalla se queda esperando"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt; exit 1; }

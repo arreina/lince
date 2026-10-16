@@ -106,7 +106,7 @@ static const char PLANTILLA[] =
     "    pos_y = matematica.limitar(pos_y + juego.direccion(\"arriba\", \"abajo\") * VELOCIDAD * dt, 56, ALTO - 16)\n"
     "    si juego.colision_circulos(pos_x, pos_y, 16, estrella[0], estrella[1], 12) {\n"
     "        puntos = puntos + 1\n"
-    "        juego.pitido(880, 60, 0.2)\n"
+    "        juego.efecto(\"moneda\")              # sonido generado, sin archivos\n"
     "        juego.particulas(estrella[0], estrella[1], {\"cantidad\": 20, \"color\": [255, 215, 80], \"velocidad\": [60, 180]})\n"
     "        nueva_estrella()\n"
     "    }\n"

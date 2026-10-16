@@ -830,6 +830,9 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | `musica(sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para |
 | `volumen([v])` | volumen general de 0 a 1 |
 | `pitido(frecuencia, ms[, volumen])` | tono sencillo, sin archivos |
+| `efecto(tipo[, opciones])` | genera y hace sonar un efecto al estilo de los juegos de 8 bits, sin archivos: `"moneda"`, `"salto"`, `"disparo"`, `"explosion"`, `"golpe"`, `"subir"`, `"clic"` o `"perder"`. Cada vez suena un poco distinto. Opciones: `volumen` (0,5), `tono` y `largo` (multiplican la frecuencia y la duración: `{"tono": 1.5}` más agudo) y `semilla` (siempre el mismo sonido) |
+| `crear_efecto(tipo[, opciones])` | el efecto como sonido, para `reproducir()` o `guardar_sonido()`; sin `semilla` usa la 1 |
+| `guardar_sonido(sonido, ruta)` | guarda un sonido como `.wav` |
 
 **Colisiones y animación**
 

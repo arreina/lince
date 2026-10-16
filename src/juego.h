@@ -936,6 +936,10 @@ static Valor *fn_jg_recargado(Valor **a, int n) { (void)a; (void)n; return valor
    guarde un arreglo (devuelve 1) o se cierre la ventana (devuelve 0). */
 int juego_esperar_arreglo(const char *msg) {
     if (!_jgs.abierta) return 0;
+    /* Sin pantalla de verdad (pruebas automáticas) nadie va a arreglar nada:
+       se termina con el error, como siempre */
+    const char *driver = getenv("SDL_VIDEODRIVER");
+    if (driver && (strcmp(driver, "dummy") == 0 || strcmp(driver, "offscreen") == 0) && !_jgs.limite) return 0;
     if (_jgs.audio) _jg.PauseAudio(_jgs.audio, 1);
     int r = 0;
     while (!_jgs.cierre) {
@@ -2064,6 +2068,211 @@ static void jg_escenas(void) {
     _jg.FillRect(_jgs.render, &r);
 }
 
+/* ── Efectos de sonido generados ──
+   Un sintetizador pequeño al estilo de los juegos de 8 bits: una onda cuya
+   frecuencia se desliza, con envolvente, arpegio, vibrato y un filtro. Cada
+   tipo de efecto tiene sus parámetros y un poco de azar, así dos monedas no
+   suenan exactamente igual (salvo que se fije la semilla). */
+typedef struct {
+    int onda;                       /* 0 cuadrada, 1 sierra, 2 seno, 3 ruido, 4 triangular */
+    double f0, f1;                  /* frecuencia al empezar y al acabar (desliza) */
+    double ataque, sostener, caida; /* envolvente, en segundos */
+    double arpegio_t, arpegio;      /* a los arpegio_t s la frecuencia se multiplica por arpegio */
+    double vib_prof, vib_vel;       /* vibrato: profundidad (fracción) y velocidad (Hz) */
+    double ciclo;                   /* ciclo de la cuadrada (0,5 = cuadrada pura) */
+    double filtro;                  /* paso bajo: 1 sin filtro, menos es más apagado */
+} JgSintesis;
+
+static const char *const JG_EFECTOS[] = { "moneda", "salto", "disparo", "explosion", "golpe",
+                                          "subir", "clic", "perder", NULL };
+
+/* Azar propio del efecto (para que la semilla no toque matematica.aleatorio) */
+static unsigned long long _jg_azar_efecto;
+static double jg_azar_ef(void) {
+    _jg_azar_efecto = _jg_azar_efecto * 6364136223846793005ULL + 1442695040888963407ULL;
+    return (double)(_jg_azar_efecto >> 11) / 9007199254740992.0;
+}
+static double jg_entre(double a, double b) { return a + (b - a) * jg_azar_ef(); }
+
+static int jg_preparar_efecto(const char *tipo, JgSintesis *p) {
+    memset(p, 0, sizeof *p);
+    p->ciclo = 0.5; p->filtro = 1; p->ataque = 0.002;
+    if (strcmp(tipo, "moneda") == 0) {
+        p->onda = 0; p->f0 = p->f1 = jg_entre(900, 1500);
+        p->sostener = jg_entre(0.03, 0.07); p->caida = jg_entre(0.15, 0.3);
+        p->arpegio_t = jg_entre(0.04, 0.08); p->arpegio = jg_azar_ef() < 0.5 ? 1.5 : 1.335;
+    } else if (strcmp(tipo, "salto") == 0) {
+        p->onda = 0; p->ciclo = jg_entre(0.2, 0.45);
+        p->f0 = jg_entre(250, 450); p->f1 = p->f0 * jg_entre(1.8, 2.6);
+        p->sostener = jg_entre(0.05, 0.12); p->caida = jg_entre(0.1, 0.2);
+    } else if (strcmp(tipo, "disparo") == 0) {
+        p->onda = jg_azar_ef() < 0.5 ? 0 : 1; p->ciclo = jg_entre(0.2, 0.5);
+        p->f0 = jg_entre(800, 1400); p->f1 = jg_entre(120, 250);
+        p->sostener = jg_entre(0.02, 0.06); p->caida = jg_entre(0.12, 0.22);
+    } else if (strcmp(tipo, "explosion") == 0) {
+        p->onda = 3; p->f0 = jg_entre(2500, 4500); p->f1 = jg_entre(300, 700);
+        p->sostener = jg_entre(0.05, 0.15); p->caida = jg_entre(0.4, 0.8); p->filtro = jg_entre(0.25, 0.5);
+        p->vib_prof = jg_entre(0, 0.2); p->vib_vel = jg_entre(5, 15);
+    } else if (strcmp(tipo, "golpe") == 0) {
+        p->onda = jg_azar_ef() < 0.6 ? 3 : 0; p->f0 = jg_entre(1500, 3000); p->f1 = jg_entre(200, 500);
+        if (p->onda == 0) { p->f0 = jg_entre(250, 450); p->f1 = jg_entre(60, 120); }
+        p->sostener = jg_entre(0.01, 0.03); p->caida = jg_entre(0.08, 0.16); p->filtro = jg_entre(0.4, 0.8);
+    } else if (strcmp(tipo, "subir") == 0) {
+        p->onda = jg_azar_ef() < 0.5 ? 0 : 4; p->f0 = jg_entre(250, 400); p->f1 = p->f0 * jg_entre(2.5, 3.5);
+        p->sostener = jg_entre(0.25, 0.4); p->caida = jg_entre(0.15, 0.3);
+        p->vib_prof = jg_entre(0.03, 0.08); p->vib_vel = jg_entre(10, 18);
+    } else if (strcmp(tipo, "clic") == 0) {
+        p->onda = 0; p->f0 = p->f1 = jg_entre(1000, 1600); p->ciclo = jg_entre(0.3, 0.5);
+        p->sostener = jg_entre(0.01, 0.02); p->caida = jg_entre(0.02, 0.05);
+    } else if (strcmp(tipo, "perder") == 0) {
+        p->onda = 1; p->f0 = jg_entre(400, 550); p->f1 = jg_entre(60, 100);
+        p->sostener = jg_entre(0.5, 0.7); p->caida = jg_entre(0.2, 0.35);
+        p->vib_prof = jg_entre(0.04, 0.08); p->vib_vel = jg_entre(5, 8); p->filtro = 0.6;
+    } else return 0;
+    return 1;
+}
+
+/* Genera el efecto en estéreo de 16 bits a 44100 Hz; devuelve las muestras por canal */
+static short *jg_sintetizar(const JgSintesis *p, double tono, double largo, int *muestras) {
+    double dur = (p->ataque + p->sostener + p->caida) * largo;
+    int total = (int)(dur * JG_FRECUENCIA);
+    if (total < 2) total = 2;
+    short *buf = malloc((size_t)total * JG_CANALES * sizeof(short));
+    if (!buf) return NULL;
+    double fase = 0, ruido = 0, filtrada = 0, at = p->ataque * largo, so = p->sostener * largo;
+    for (int i = 0; i < total; i++) {
+        double t = (double)i / JG_FRECUENCIA, u = t / dur;
+        double f = p->f0 * pow(p->f1 / p->f0, u) * tono;               /* desliza de f0 a f1 */
+        if (p->arpegio > 0 && t >= p->arpegio_t * largo) f *= p->arpegio;
+        if (p->vib_prof > 0) f *= 1 + p->vib_prof * sin(2 * M_PI * p->vib_vel * t);
+        double antes = fase;
+        fase += f / JG_FRECUENCIA;
+        fase -= floor(fase);
+        double m;
+        switch (p->onda) {
+            case 0:  m = fase < p->ciclo ? 1 : -1; break;
+            case 1:  m = 2 * fase - 1; break;
+            case 2:  m = sin(2 * M_PI * fase); break;
+            case 3:  if (fase < antes) ruido = jg_azar_ef() * 2 - 1;      /* nuevo valor en cada ciclo */
+                     m = ruido; break;
+            default: m = fase < 0.5 ? 4 * fase - 1 : 3 - 4 * fase; break;
+        }
+        filtrada += (m - filtrada) * p->filtro;
+        double env = t < at ? t / at : t < at + so ? 1 : 1 - (t - at - so) / (dur - at - so);
+        if (env < 0) env = 0;
+        short v = (short)(filtrada * env * env * 14000);
+        buf[2 * i] = buf[2 * i + 1] = v;
+    }
+    *muestras = total;
+    return buf;
+}
+
+/* Lee tipo y opciones de efecto(tipo[, opciones]) / crear_efecto(...) y genera el sonido */
+static short *jg_efecto_args(Valor **a, int n, const char *fn, int *muestras, float *vol, char *clave, size_t max) {
+    char msg[300];
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) {
+        snprintf(msg, sizeof msg, "%s() espera el tipo de efecto: moneda, salto, disparo, explosion, golpe, subir, clic o perder", fn);
+        jg_error("ErrorTipo", msg);
+        return NULL;
+    }
+    Valor *op = n > 1 && a[1]->tipo == VAL_DICCIONARIO ? a[1] : NULL;
+    if (op)
+        for (int i = 0; i < op->diccionario.cantidad; i++) {
+            const char *k = op->diccionario.claves[i];
+            if (strcmp(k, "volumen") && strcmp(k, "semilla") && strcmp(k, "tono") && strcmp(k, "largo")) {
+                snprintf(msg, sizeof msg, "%s(): opción desconocida '%s'. Las opciones son: volumen, tono, largo y semilla", fn, k);
+                jg_error("Error", msg);
+                return NULL;
+            }
+        }
+    double semilla = -1, tono = 1, largo = 1, v = 0.5;
+    jg_opcion(op, "semilla", &semilla);
+    jg_opcion(op, "tono", &tono);
+    jg_opcion(op, "largo", &largo);
+    jg_opcion(op, "volumen", &v);
+    if (tono <= 0.05 || tono > 20 || largo <= 0.05 || largo > 10) {
+        snprintf(msg, sizeof msg, "%s(): 'tono' y 'largo' multiplican la frecuencia y la duración: usa valores como 0.5, 1 o 2", fn);
+        jg_error("Error", msg);
+        return NULL;
+    }
+    *vol = (float)(v < 0 ? 0 : v > 1 ? 1 : v);
+    if (semilla < 0 && clave) semilla = 1;                 /* crear_efecto: siempre el mismo sonido */
+    if (semilla >= 0) _jg_azar_efecto = (unsigned long long)(semilla * 7919) + 12345;
+    else _jg_azar_efecto += 0x9E3779B97F4A7C15ULL;            /* otro distinto cada vez, sin tocar matematica.aleatorio */
+    JgSintesis p;
+    if (!jg_preparar_efecto(a[0]->texto, &p)) {
+        snprintf(msg, sizeof msg, "%s(): no conozco el efecto '%s'. Hay: moneda, salto, disparo, explosion, golpe, subir, clic y perder", fn, a[0]->texto);
+        jg_error("Error", msg);
+        return NULL;
+    }
+    if (clave) snprintf(clave, max, "<efecto %s %g %g %g>", a[0]->texto, semilla, tono, largo);
+    return jg_sintetizar(&p, tono, largo, muestras);
+}
+
+/* efecto(tipo[, opciones]): genera el efecto y lo hace sonar; devuelve la voz */
+static Valor *fn_jg_efecto(Valor **a, int n) {
+    JG_ABIERTA();
+    int muestras;
+    float vol;
+    short *buf = jg_efecto_args(a, n, "efecto", &muestras, &vol, NULL, 0);
+    if (!buf) return valor_nulo();
+    return valor_numero(jg_sonar(buf, muestras, vol, 0, buf));
+}
+
+/* crear_efecto(tipo[, opciones]): el efecto como sonido, para reproducir() o guardar_sonido() */
+static Valor *fn_jg_crear_efecto(Valor **a, int n) {
+    JG_ABIERTA();
+    int muestras;
+    float vol;
+    char clave[200];
+    short *buf = jg_efecto_args(a, n, "crear_efecto", &muestras, &vol, clave, sizeof clave);
+    if (!buf) return valor_nulo();
+    int k = -1;
+    for (int i = 0; i < _jgs.nsonidos; i++) if (strcmp(_jgs.sonidos[i].ruta, clave) == 0) { k = i; break; }
+    if (k >= 0) free(buf);
+    else {
+        if (_jgs.nsonidos == JG_MAX_SONIDOS) { free(buf); return jg_error("ErrorJuego", "demasiados sonidos cargados"); }
+        k = _jgs.nsonidos++;
+        _jgs.sonidos[k].datos = buf;
+        _jgs.sonidos[k].muestras = muestras;
+        _jgs.sonidos[k].ruta = strdup(clave);
+        _jgs.sonidos[k].mtime = _jgs.sonidos[k].tam = -1;
+    }
+    Valor *d = valor_diccionario_crear();
+    valor_diccionario_agregar(d, "sonido", valor_numero(k));
+    valor_diccionario_agregar(d, "duracion", valor_numero((double)_jgs.sonidos[k].muestras / JG_FRECUENCIA));
+    valor_diccionario_agregar(d, "ruta", valor_texto(clave));
+    return d;
+}
+
+/* guardar_sonido(sonido, ruta): lo guarda como .wav (estéreo, 16 bits, 44100 Hz) */
+static Valor *fn_jg_guardar_sonido(Valor **a, int n) {
+    JG_ABIERTA();
+    JgSonido *so = jg_sonido_arg(a, n, "guardar_sonido");
+    if (!so) return valor_nulo();
+    if (n < 2 || a[1]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "guardar_sonido() espera (sonido, ruta del .wav)");
+    FILE *f = fopen(a[1]->texto, "wb");
+    if (!f) return jg_error("Error", "guardar_sonido(): no se pudo crear el archivo");
+    unsigned datos = (unsigned)so->muestras * JG_CANALES * 2;
+    unsigned char cab[44];
+    memcpy(cab, "RIFF", 4);
+    unsigned v[] = {36 + datos};
+    for (int i = 0; i < 4; i++) cab[4 + i] = (unsigned char)(v[0] >> (8 * i));
+    memcpy(cab + 8, "WAVEfmt ", 8);
+    const unsigned campos[] = {16, 1 | JG_CANALES << 16, JG_FRECUENCIA, JG_FRECUENCIA * JG_CANALES * 2, (JG_CANALES * 2) | 16 << 16};
+    for (int c = 0; c < 5; c++) for (int i = 0; i < 4; i++) cab[16 + 4 * c + i] = (unsigned char)(campos[c] >> (8 * i));
+    memcpy(cab + 36, "data", 4);
+    for (int i = 0; i < 4; i++) cab[40 + i] = (unsigned char)(datos >> (8 * i));
+    int ok = fwrite(cab, 1, 44, f) == 44;
+    for (int i = 0; ok && i < so->muestras * JG_CANALES; i++) {
+        unsigned char m[2] = {(unsigned char)(so->datos[i] & 0xFF), (unsigned char)((unsigned short)so->datos[i] >> 8)};
+        ok = fwrite(m, 1, 2, f) == 2;
+    }
+    ok = fclose(f) == 0 && ok;
+    if (!ok) return jg_error("Error", "guardar_sonido(): no se pudo escribir el archivo");
+    return valor_nulo();
+}
+
 /* ── Mapas de casillas ──
    Un nivel escrito con texto, un carácter por casilla, para cualquier juego 2D:
    plataformas, vista cenital (mazmorras, laberintos), puzles por casillas... */
@@ -2511,6 +2720,9 @@ static void cargar_juego(Entorno *entorno) {
         {"escena_nueva",    fn_jg_escena_nueva,     0},
         {"tiempo_escena",   fn_jg_tiempo_escena,    0},
         {"mapa",            fn_jg_mapa,            -1},
+        {"efecto",          fn_jg_efecto,          -1},
+        {"crear_efecto",    fn_jg_crear_efecto,    -1},
+        {"guardar_sonido",  fn_jg_guardar_sonido,   2},
         {"casilla",         fn_jg_casilla,          3},
         {"poner_casilla",   fn_jg_poner_casilla,    4},
         {"solido",          fn_jg_solido,           3},

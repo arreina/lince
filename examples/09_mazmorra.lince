@@ -7,7 +7,8 @@
 # Muestra: un juego de vista cenital con un mapa de casillas (juego.mapa),
 # movimiento sin atravesar paredes y sin gravedad (juego.mover_en_mapa),
 # casillas que cambian (juego.poner_casilla), y enemigos que te persiguen
-# esquivando las paredes (juego.camino).
+# esquivando las paredes (juego.camino). Los sonidos son efectos generados
+# (juego.efecto), sin archivos.
 importar "juego"
 importar "matematica"
 
@@ -108,13 +109,13 @@ funcion mover_jugador(val numero dt): nulo {
     si t == "*" {
         juego.poner_casilla(NIVEL, aqui[0], aqui[1], ".")      # la gema desaparece del mapa
         gemas = gemas + 1
-        juego.pitido(1100, 70, 0.2)
+        juego.efecto("moneda", {"tono": 1.3, "volumen": 0.35})
         juego.particulas(centro(aqui[0]), centro(aqui[1]), {"cantidad": 18, "color": [90, 220, 255],
                                                           "velocidad": [40, 160], "vida": [0.3, 0.6]})
     }
     si t == "S" y gemas == total_gemas {
         estado = "ganado"
-        juego.pitido(880, 400)
+        juego.efecto("subir")
     }
 }
 
@@ -146,7 +147,7 @@ funcion mover_fantasmas(val numero dt): nulo {
         }
         si pausa == 0 y juego.colision_circulo_rect(f["x"], f["y"], 12, yo["x"], yo["y"], yo["ancho"], yo["alto"]) {
             vidas = vidas - 1
-            juego.pitido(150, 350)
+            juego.efecto("perder", {"largo": 0.6})
             juego.particulas(yo["x"] + 10, yo["y"] + 10, {"cantidad": 40, "color": [255, 160, 60],
                                                            "velocidad": [60, 220], "vida": [0.4, 0.8]})
             atrapado = verdadero
