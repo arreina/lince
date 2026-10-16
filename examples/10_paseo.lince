@@ -3,12 +3,16 @@
 # Pasea por el campo: flechas o A / D (o el stick del mando) para andar, y
 # manteniendo Mayús (o el botón B) para correr. Esc sale.
 #
-# Muestra: animaciones generadas a partir de un solo dibujo. El personaje
-# está dibujado una vez, quieto y de perfil; juego.animar() saca de él los
-# cuadros de andar y de correr (encuentra las piernas y las mueve por turnos)
-# y los de estar quieto (respirar). Arriba se ve la hoja que ha generado, con
-# el cuadro que toca marcado. Con juego.guardar_imagen() se puede guardar esa
-# hoja como PNG para retocarla en un editor de dibujo.
+# Muestra las dos maneras de animar:
+# - generando los cuadros a partir de un solo dibujo: el personaje está
+#   dibujado una vez, quieto y de perfil, y juego.animar() saca de él los
+#   cuadros de andar y de correr (encuentra las piernas y las mueve por turnos)
+#   y los de estar quieto (respirar). Arriba se ve la hoja que ha generado, con
+#   el cuadro que toca marcado. juego.guardar_imagen() la guarda como PNG para
+#   retocarla en un editor de dibujo.
+# - la tradicional, un dibujo por fotograma: los pájaros tienen tres, hechos a
+#   mano, que juego.juntar() junta en una hoja. Con archivos sería igual:
+#   juego.juntar(["pajaro_1.png", "pajaro_2.png", "pajaro_3.png"]).
 importar "juego"
 importar "matematica"
 
@@ -87,6 +91,29 @@ fijo NUBE = juego.sprite([
     ".WWWWWWWWWW."
 ], {"W": [250, 250, 255]})
 
+# Un pájaro animado a la manera tradicional: tres fotogramas dibujados a mano
+fijo COLORES_PAJARO = {"N": [40, 40, 60], "A": [255, 190, 60]}
+fijo PAJARO = juego.juntar([
+    juego.sprite([
+        "N.....N",
+        ".N...N.",
+        "..NNNA.",
+        "...N..."
+    ], COLORES_PAJARO),
+    juego.sprite([
+        ".......",
+        ".......",
+        "NNNNNNA",
+        "...N..."
+    ], COLORES_PAJARO),
+    juego.sprite([
+        ".......",
+        "..NNNA.",
+        ".N...N.",
+        "N.....N"
+    ], COLORES_PAJARO)
+])
+
 # ── Estado ──────────────────────────────────────────────────────────
 sea x = 400                             # el centro del personaje
 sea mira_izquierda = falso
@@ -106,6 +133,12 @@ funcion dibujar_campo(val numero cam): nulo {
     }
     para cada numero i en rango(0, 12) {
         juego.circulo(cam + ciclo(i * 330 - cam * 0.5, 3960) - 200, SUELO + 40, 170, [120, 180, 110])
+    }
+    # pájaros: alas arriba, en medio, abajo, en medio... (los cuadros [0, 1, 2, 1])
+    para cada numero i en rango(0, 3) {
+        sea px = cam + ciclo(i * 360 + juego.tiempo() * (60 + i * 15) - cam * 0.6, 1200) - 100
+        sea py = 110 + i * 45 + matematica.seno(juego.tiempo() * 2 + i) * 10
+        juego.dibujar(PAJARO, px, py, {"cuadro": juego.cuadro([0, 1, 2, 1], 8 + i), "escala": 4})
     }
     # árboles
     para cada numero i en rango(0, 14) {

@@ -114,7 +114,8 @@ typedef struct { char tipo[16]; int cuadros, piernas, centro, frente; double int
    (sprites y animaciones generadas); las de archivo se vuelven a leer si hace
    falta. origen: la imagen de la que se generó la animación, o -1. */
 typedef struct { void *tex; int ancho, alto; char *ruta; long long mtime, tam;
-                 unsigned char *px; int origen; JgReceta receta; } JgImagen;
+                 unsigned char *px; int origen; JgReceta receta;
+                 int *partes, npartes; } JgImagen;     /* partes: los fotogramas de una hoja de juntar() */
 typedef struct { short *datos; int muestras; char *ruta; long long mtime, tam; } JgSonido;   /* muestras por canal */
 typedef struct {
     const short *datos; int muestras, pos, bucle, activa, id;
@@ -417,6 +418,7 @@ static void jg_cerrar_todo(void) {
         _jg.DestroyTexture(_jgs.imagenes[i].tex);
         free(_jgs.imagenes[i].ruta);
         free(_jgs.imagenes[i].px);
+        free(_jgs.imagenes[i].partes);
     }
     _jgs.nimagenes = 0;
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
@@ -1955,10 +1957,11 @@ static unsigned char *jg_generar_animacion(const unsigned char *px, int w, int h
     return hoja;
 }
 
-/* La hoja de una animación, como la devuelve hoja(), más "relleno": cuánto
-   más ancha y alta es cada celda que el dibujo, por cada lado */
+/* La hoja de una animación, como la devuelve hoja(); las generadas con
+   animar() llevan además "relleno": cuánto más ancha y alta es cada celda que
+   el dibujo, por cada lado */
 static Valor *jg_animacion_valor(int k) {
-    JgImagen *im = &_jgs.imagenes[k], *o = &_jgs.imagenes[im->origen];
+    JgImagen *im = &_jgs.imagenes[k];
     int n = im->receta.cuadros, cw = im->ancho / n;
     Valor *d = jg_imagen_valor(k);
     Valor *celda = valor_lista_crear();
@@ -1969,6 +1972,8 @@ static Valor *jg_animacion_valor(int k) {
     valor_diccionario_agregar(d, "margen", valor_numero(0));
     valor_diccionario_agregar(d, "columnas", valor_numero(n));
     valor_diccionario_agregar(d, "cuadros", valor_numero(n));
+    if (im->origen < 0) return d;
+    JgImagen *o = &_jgs.imagenes[im->origen];
     Valor *rel = valor_lista_crear();
     lista_agregar(rel, valor_numero((cw - o->ancho) / 2));
     lista_agregar(rel, valor_numero((im->alto - o->alto) / 2));
@@ -1976,11 +1981,49 @@ static Valor *jg_animacion_valor(int k) {
     return d;
 }
 
-/* Rehace las animaciones generadas a partir de la imagen 'origen' (que acaba
-   de cambiar en el disco), si siguen midiendo lo mismo */
+/* Junta los fotogramas 'partes' en una hoja de una fila. Cada celda mide lo
+   que el mayor; los menores van centrados y apoyados abajo (los pies en el
+   mismo sitio). Devuelve los píxeles RGBA (con malloc) o NULL. */
+static unsigned char *jg_componer(const int *partes, int n, int *cw, int *ch) {
+    *cw = 0; *ch = 0;
+    for (int i = 0; i < n; i++) {
+        if (_jgs.imagenes[partes[i]].ancho > *cw) *cw = _jgs.imagenes[partes[i]].ancho;
+        if (_jgs.imagenes[partes[i]].alto > *ch) *ch = _jgs.imagenes[partes[i]].alto;
+    }
+    if ((long)*cw * n > 16384 || *ch > 16384) return NULL;
+    int ancho = *cw * n;
+    unsigned char *hoja = calloc((size_t)ancho * *ch, 4);
+    if (!hoja) return NULL;
+    for (int i = 0; i < n; i++) {
+        JgImagen *im = &_jgs.imagenes[partes[i]];
+        unsigned char *px = jg_pixeles(partes[i]);
+        if (!px) { free(hoja); return NULL; }
+        int x0 = i * *cw + (*cw - im->ancho) / 2, y0 = *ch - im->alto;
+        for (int y = 0; y < im->alto; y++)
+            memcpy(hoja + ((size_t)(y0 + y) * ancho + x0) * 4, px + (size_t)y * im->ancho * 4, (size_t)im->ancho * 4);
+        free(px);
+    }
+    return hoja;
+}
+
+/* Rehace las hojas hechas con animar() o juntar() a partir de la imagen
+   'origen' (que acaba de cambiar en el disco), si siguen midiendo lo mismo */
 static void jg_rehacer_animaciones(int origen) {
     for (int j = 0; j < _jgs.nimagenes; j++) {
         JgImagen *im = &_jgs.imagenes[j];
+        int usa = 0;
+        for (int p = 0; p < im->npartes; p++) if (im->partes[p] == origen) usa = 1;
+        if (usa) {
+            int cw, ch;
+            unsigned char *hoja = jg_componer(im->partes, im->npartes, &cw, &ch);
+            void *tex = hoja && cw * im->npartes == im->ancho && ch == im->alto ? jg_textura_rgba(hoja, im->ancho, im->alto) : NULL;
+            if (!tex) { free(hoja); continue; }
+            _jg.DestroyTexture(im->tex);
+            free(im->px);
+            im->tex = tex;
+            im->px = hoja;
+            continue;
+        }
         if (im->origen != origen) continue;
         unsigned char *px = jg_pixeles(origen);
         if (!px) continue;
@@ -2084,6 +2127,53 @@ static Valor *fn_jg_animar(Valor **a, int n) {
     if (k < 0) return jg_error("ErrorJuego", "animar(): no se pudo crear la hoja (¿demasiadas imágenes?)");
     _jgs.imagenes[k].origen = src;
     _jgs.imagenes[k].receta = r;
+    return jg_animacion_valor(k);
+}
+
+/* juntar(fotogramas): la forma tradicional de animar, un dibujo por
+   fotograma. Junta las imágenes (rutas o imágenes cargadas) en una hoja, en
+   ese orden, para dibujarla con "cuadro" como cualquier otra.
+     fijo ANDAR = juego.juntar(["andar_1.png", "andar_2.png", "andar_3.png"]) */
+static Valor *fn_jg_juntar(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_LISTA || a[0]->lista.cantidad == 0)
+        return jg_error("ErrorTipo", "juntar() espera una lista de fotogramas: rutas de imágenes o imágenes cargadas");
+    int total = a[0]->lista.cantidad;
+    if (total > 256) return jg_error("Error", "juntar(): como mucho 256 fotogramas");
+    int partes[256];
+    char nombre[2200];
+    int largo = snprintf(nombre, sizeof nombre, "<juntar");
+    for (int i = 0; i < total; i++) {
+        Valor *e = a[0]->lista.elementos[i];
+        int k = -1;
+        if (e->tipo == VAL_TEXTO) {
+            Valor *arg[1] = {e};
+            Valor *img = fn_jg_imagen(arg, 1);
+            if (hay_error) return img;
+            k = jg_id_de(img, "imagen");
+            valor_destruir(img);
+        } else k = jg_id_de(e, "imagen");
+        if (k < 0 || k >= _jgs.nimagenes) {
+            char msg[160];
+            snprintf(msg, sizeof msg, "juntar(): el fotograma %d no es una imagen ni la ruta de una", i + 1);
+            return jg_error("ErrorTipo", msg);
+        }
+        partes[i] = k;
+        if (largo < (int)sizeof nombre - 8) largo += snprintf(nombre + largo, sizeof nombre - largo, " %d", k);
+    }
+    snprintf(nombre + largo, sizeof nombre - largo, ">");
+    for (int i = 0; i < _jgs.nimagenes; i++)          /* ya juntados (por ejemplo, al recargar en caliente) */
+        if (strcmp(_jgs.imagenes[i].ruta, nombre) == 0) return jg_animacion_valor(i);
+    int cw, ch;
+    unsigned char *hoja = jg_componer(partes, total, &cw, &ch);
+    if (!hoja) return jg_error("Error", "juntar(): la hoja saldría demasiado grande");
+    int k = jg_nueva_imagen(nombre, hoja, cw * total, ch);
+    if (k < 0) return jg_error("ErrorJuego", "juntar(): no se pudo crear la hoja (¿demasiadas imágenes?)");
+    JgImagen *im = &_jgs.imagenes[k];
+    im->partes = malloc(sizeof(int) * total);
+    if (im->partes) { memcpy(im->partes, partes, sizeof(int) * total); im->npartes = total; }
+    snprintf(im->receta.tipo, sizeof im->receta.tipo, "juntar");
+    im->receta.cuadros = total;
     return jg_animacion_valor(k);
 }
 
@@ -3431,6 +3521,7 @@ static void cargar_juego(Entorno *entorno) {
         {"sprite",          fn_jg_sprite,           2},
         {"hoja",            fn_jg_hoja,            -1},
         {"animar",          fn_jg_animar,          -1},
+        {"juntar",          fn_jg_juntar,           1},
         {"guardar_imagen",  fn_jg_guardar_imagen,   2},
         {"sonido",          fn_jg_sonido,           1},
         {"reproducir",      fn_jg_reproducir,      -1},

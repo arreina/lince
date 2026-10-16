@@ -243,11 +243,11 @@ PY
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
-for l in "andar: 8 8x6 relleno 2" "misma hoja: verdadero" "respirar: 4" "girar: 4" "frente: 0" "png: 64x6" "desde archivo: 2"; do
+for l in "andar: 8 8x6 relleno 2" "misma hoja: verdadero" "respirar: 4" "girar: 4" "frente: 0" "png: 64x6" "desde archivo: 2" "juntar: 3 64x6" "juntar otra vez: verdadero"; do
     grep -qxF "$l" salida12.txt && ok "animar: $l" || mal "falta la línea: $l"
 done
 for e in "no conozco la opción 'cuadro'" "no conozco la animación 'bailar'" '"vista" es "lado"' '"cuadros" va de 1 a 64' \
-         "transparente del todo" "debe acabar en .png"; do
+         "transparente del todo" "debe acabar en .png" "el fotograma 2 no es una imagen"; do
     grep -qF "$e" salida12.txt && ok "animar: error «$e»" || mal "falta el error: $e"
 done
 python3 - <<'PY' || fallos=$((fallos+1))
@@ -265,6 +265,14 @@ mal = 0
 for (x, y), esp, nombre in casos:
     if px(x, y) == esp: print("  ✅ andar:", nombre)
     else: print("  ❌ andar:", nombre, "→", px(x, y)); mal += 1
+d = open("juntar.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+# el fotograma 0 (2×2) va centrado (x 31-32) y abajo (y 4-5) en su celda de 64×6
+for (x, y), esp, nombre in [((31, 4), (0, 0, 255), "fotograma pequeño, centrado y abajo"), ((31, 1), (0, 0, 0), "encima, vacío"),
+                            ((2, 5), (0, 0, 0), "a un lado, vacío")]:
+    if px(x, y) == esp: print("  ✅ juntar:", nombre)
+    else: print("  ❌ juntar:", nombre, "→", px(x, y)); mal += 1
 d = open("andar.png", "rb").read(8)
 if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1

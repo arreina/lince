@@ -41,6 +41,20 @@ intentar {
 } capturar (error e) {
     escribir("error: " + e.mensaje)
 }
+# juntar: la forma tradicional, un dibujo por fotograma (tamaños distintos: centrados y abajo)
+fijo F1 = juego.sprite(["AA", "AA"], {"A": [0, 0, 255]})
+fijo F2 = juego.sprite(["BBBB", "BBBB", "BBBB"], {"B": [0, 255, 0]})
+sea juntas = juego.juntar([F1, F2, "andar.png"])
+escribir("juntar: " + a_texto(juntas["cuadros"]) + " " + a_texto(juntas["celda"][0]) + "x" + a_texto(juntas["celda"][1]))
+escribir("juntar otra vez: " + a_texto(juego.juntar([F1, F2, "andar.png"])["imagen"] == juntas["imagen"]))
+juego.limpiar([0, 0, 0])
+juego.dibujar(juntas, 0, 0, {"cuadro": 0})
+juego.captura("juntar.bmp")
+intentar {
+    juego.juntar([F1, 7])
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
 intentar {
     juego.guardar_imagen(PJ, "pj.bmp")
 } capturar (error e) {
