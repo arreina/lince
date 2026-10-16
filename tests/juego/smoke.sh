@@ -190,7 +190,7 @@ for l in "mismo sonido: verdadero" "otra semilla: verdadero" "largo: 2" "wav: ve
 done
 grep -qF "no conozco el efecto 'trompeta'" salida10.txt && ok "efecto: tipo desconocido" || mal "falta el error de efecto desconocido"
 grep -qF "opción desconocida 'volumne'" salida10.txt && ok "efecto: opción mal escrita" || mal "falta el error de opción de efecto"
-cmp -s a.wav b.wav && ok "efecto: la misma semilla da el mismo .wav" || mal "la misma semilla da sonidos distintos"
+python3 -c "import sys; sys.exit(open('a.wav','rb').read() != open('b.wav','rb').read())" && ok "efecto: la misma semilla da el mismo .wav" || mal "la misma semilla da sonidos distintos"
 # Sin pantalla, un error con la ventana abierta termina en vez de esperar el arreglo
 printf 'importar "juego"\njuego.abrir("x", 10, 10)\nfalla()\n' > falla.lince
 SDL_VIDEODRIVER=dummy timeout 10 "$LINCE" falla.lince > /dev/null 2>&1
