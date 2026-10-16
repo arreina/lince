@@ -798,6 +798,27 @@ mientras juego.abierto() {
 | `tecla(nombre)` · `tecla_pulsada(n)` · `tecla_soltada(n)` | mantenida / pulsada en este fotograma / soltada en este fotograma |
 | `raton()` · `boton_raton(n)` · `clic(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · giro de la rueda |
 | `mandos()` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4) · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
+| `cursor(visible)` · `capturar_raton(si)` · `movimiento_raton()` | muestra u oculta la flecha · encierra y oculta el ratón para apuntar (devuelve si se pudo) · `[dx, dy]` movido desde el fotograma anterior |
+| `editar(texto[, maximo])` · `texto_escrito()` | el texto con lo tecleado añadido y «borrar» aplicado (tildes y ñ incluidas) · lo tecleado en este fotograma |
+
+**Acciones.** Un nombre para varias teclas, botones y ejes, así el juego funciona igual con teclado, ratón y mando:
+
+```lince
+juego.definir_accion("saltar", ["espacio", "w", "mando:a", "raton:izquierdo"])
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+
+si juego.accion_pulsada("saltar") { vy = -500 }
+x = x + juego.direccion("izquierda", "derecha") * 200 * juego.dt()   # gradual con el stick
+```
+
+| Función | Qué hace |
+|---|---|
+| `definir_accion(nombre, entradas)` | crea o sustituye la acción. Entradas: una tecla (`"espacio"`), `"mando:a"` (botón de cualquier mando), `"mando2:a"` (del mando 2), `"mando:izq_x-"` / `"mando:izq_x+"` (eje hacia un lado), `"raton:izquierdo"` / `"raton:central"` / `"raton:derecho"` |
+| `accion(n)` · `accion_pulsada(n)` · `accion_soltada(n)` | mantenida / empieza en este fotograma / termina en este fotograma |
+| `direccion(negativa, positiva)` | de −1 a 1: entero con teclas, gradual con el stick |
+
+Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(nombre, 10)` en cada fotograma y `juego.tecla_pulsada("entrar")` para terminar.
 
 **Sonido**
 

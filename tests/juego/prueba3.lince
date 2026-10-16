@@ -1,0 +1,58 @@
+importar "juego"
+
+# Texto tecleado, puntero del ratón y acciones. Se ejecuta con
+# LINCE_JUEGO_ESCRIBIR="Peñaz<ón" (el '<' es «borrar») y LINCE_JUEGO_PULSAR=espacio
+
+juego.abrir("Prueba 3", 160, 120)
+
+juego.definir_accion("saltar", ["espacio", "w", "mando:a", "raton:izquierdo"])
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando2:derecha", "mando:izq_x+"])
+
+sea nombre = ""
+sea escrito = ""
+sea mantenida = 0
+sea pulsada = 0
+sea soltada = 0
+sea fotograma = 0
+mientras juego.abierto() {
+    nombre = juego.editar(nombre, 5)
+    escrito = escrito + juego.texto_escrito()
+    si juego.accion("saltar") { mantenida = mantenida + 1 }
+    si juego.accion_pulsada("saltar") { pulsada = pulsada + 1 }
+    si juego.accion_soltada("saltar") { soltada = soltada + 1 }
+    fotograma = fotograma + 1
+    juego.presentar()
+}
+escribir("nombre: " + nombre)
+escribir("escrito: " + escrito)
+escribir("mantenida: " + a_texto(mantenida))
+escribir("pulsada: " + a_texto(pulsada))
+escribir("soltada: " + a_texto(soltada))
+escribir("direccion: " + a_texto(juego.direccion("izquierda", "derecha")))
+escribir("movimiento: " + a_texto(juego.movimiento_raton()[0]))
+juego.cursor(falso)
+juego.cursor(verdadero)
+sea capturado = juego.capturar_raton(verdadero)
+juego.capturar_raton(falso)
+escribir("capturar: " + a_texto(capturado == verdadero o capturado == falso))
+
+# Redefinir sustituye; errores claros
+juego.definir_accion("saltar", ["x"])
+escribir("redefinida: " + a_texto(juego.accion("saltar")))
+intentar {
+    juego.definir_accion("mal", ["mando:z"])
+} capturar (error e) {
+    escribir("entrada mala: " + e.mensaje)
+}
+intentar {
+    juego.definir_accion("mal", ["teclaquenoexiste"])
+} capturar (error e) {
+    escribir("tecla mala: " + e.mensaje)
+}
+intentar {
+    juego.accion("volar")
+} capturar (error e) {
+    escribir("sin definir: " + e.mensaje)
+}
+juego.cerrar()

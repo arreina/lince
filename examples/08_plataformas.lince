@@ -7,7 +7,8 @@
 #
 # Muestra: un nivel escrito como texto (cada carácter es una casilla), sprites
 # dibujados con texto y animados como hoja de sprites, gravedad y colisiones
-# con el mapa, una cámara que sigue al jugador con un marcador fijo, y mando.
+# con el mapa, una cámara que sigue al jugador con un marcador fijo, y
+# acciones: cada control se define una vez para teclado y mando a la vez.
 importar "juego"
 importar "matematica"
 
@@ -156,27 +157,15 @@ funcion herido(): nulo {
     }
 }
 
-# ── Entrada: teclado o mando ─────────────────────────────────────────
-funcion direccion(): numero {
-    sea d = juego.eje("izq_x")
-    si juego.tecla("izquierda") o juego.tecla("a") o juego.boton("izquierda") { d = -1 }
-    si juego.tecla("derecha") o juego.tecla("d") o juego.boton("derecha") { d = 1 }
-    devolver d
-}
-
-funcion quiere_saltar(): logico {
-    devolver juego.tecla_pulsada("espacio") o juego.tecla_pulsada("arriba") o juego.tecla_pulsada("w") o juego.boton_pulsado("a")
-}
-
 # ── Física ───────────────────────────────────────────────────────────
 fijo JW = 22
 fijo JH = 26
 
 funcion mover_jugador(val numero dt): nulo {
-    vx = direccion() * VELOCIDAD
+    vx = juego.direccion("izquierda", "derecha") * VELOCIDAD
     si vx < 0 { mira_izquierda = verdadero }
     si vx > 0 { mira_izquierda = falso }
-    si en_suelo y quiere_saltar() {
+    si en_suelo y juego.accion_pulsada("saltar") {
         vy = SALTO
         juego.pitido(660, 50, 0.15)
     }
@@ -246,6 +235,12 @@ funcion mover_enemigos(val numero dt): nulo {
 }
 
 juego.abrir("Plataformas", ANCHO, ALTO)
+
+# ── Controles: cada acción con su teclado y su mando ─────────────────
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("saltar", ["espacio", "arriba", "w", "mando:a"])
+juego.definir_accion("empezar", ["espacio", "entrar", "mando:a", "mando:inicio"])
 sea lince = juego.sprite(hoja_del_lince(), COLORES_LINCE)
 sea escarabajo = juego.sprite([
     "...MMMMMM...",
@@ -275,7 +270,7 @@ mientras juego.abierto() {
         invulnerable = matematica.maximo(0, invulnerable - dt)
         mover_jugador(dt)
         mover_enemigos(dt)
-    } sino si juego.tecla_pulsada("espacio") o juego.boton_pulsado("a") o juego.tecla_pulsada("entrar") {
+    } sino si juego.accion_pulsada("empezar") {
         empezar()
     }
 

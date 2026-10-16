@@ -98,4 +98,16 @@ for (x, y), esp, nombre in casos:
     else: print("  ❌ píxel:", nombre, "→", px(x, y)); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt; exit 1; }
+# ── Tercera parte: texto tecleado, puntero del ratón y acciones ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 LINCE_JUEGO_PULSAR=espacio \
+    LINCE_JUEGO_ESCRIBIR='Peñaz<ón' timeout 20 "$LINCE" "$DIR/prueba3.lince" > salida3.txt 2>&1
+[ $? -eq 0 ] && ok "la tercera prueba termina bien" || mal "la tercera prueba falló"
+for l in "nombre: Peñaó" "escrito: Peñazón" "mantenida: 5" "pulsada: 5" "soltada: 4" "direccion: 0" \
+         "movimiento: 0" "capturar: verdadero" "redefinida: falso"; do
+    grep -qxF "$l" salida3.txt && ok "$l" || mal "falta la línea: $l"
+done
+for l in "entrada mala: definir_accion(\"mal\"): entrada de mando desconocida" "tecla mala: definir_accion(\"mal\"): tecla desconocida" \
+         "sin definir: accion(): la acción 'volar' no está definida"; do
+    grep -qF "$l" salida3.txt && ok "${l%%:*}" || mal "falta: $l"
+done
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt; exit 1; }

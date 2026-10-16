@@ -97,6 +97,9 @@ static struct {
     int  (*OutputSize)(void *, int *, int *);
     /* opcionales */
     void (*WindowToLogical)(void *, int, int, float *, float *);   /* SDL ≥ 2.0.18 */
+    int  (*ShowCursor)(int);
+    int  (*RelativeMouse)(int);
+    void (*StartTextInput)(void);
     void *(*IMG_Load_RW)(void *, int);                               /* SDL2_image */
 } _jg;
 
@@ -122,6 +125,15 @@ typedef struct {
 #define JG_VOCES        32
 #define JG_MANDOS       4
 #define JG_BOTONES      15
+#define JG_EJES         6
+#define JG_ESCRITO      512       /* texto tecleado en un fotograma ('\b' = borrar) */
+#define JG_ACCIONES     64
+#define JG_ENTRADAS     16
+
+/* Una entrada de una acción: tecla, botón del mando, botón del ratón o eje del mando
+   hacia un lado. mando = -1: cualquiera. */
+typedef struct { char tipo; int codigo, mando, signo; } JgEntrada;
+typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; int n; } JgAccion;
 
 static struct {
     int cargada, abierta, ancho, alto, cierre;
@@ -135,6 +147,8 @@ static struct {
     /* Modo de prueba (sin pantalla ni espera): LINCE_JUEGO_FOTOGRAMAS=N cierra tras N
        fotogramas con dt fijo; LINCE_JUEGO_PULSAR=a,espacio,... pulsa esas teclas en los
        fotogramas impares; LINCE_JUEGO_CLIC=x,y hace clic ahí en los fotogramas impares;
+       LINCE_JUEGO_ESCRIBIR=texto lo teclea (con '<' como «borrar») la primera vez que
+       el juego llama a editar() o texto_escrito();
        LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma. */
     long limite, total;
     int pulsar[16], npulsar, clic_x, clic_y, hay_clic;
@@ -149,7 +163,15 @@ static struct {
     float volumen;
     void *mandos[JG_MANDOS];
     unsigned char botones[JG_MANDOS][JG_BOTONES], botones_prev[JG_MANDOS][JG_BOTONES];
+    float ejes[JG_MANDOS][JG_EJES], ejes_prev[JG_MANDOS][JG_EJES];
     int njoy;
+    char escrito[JG_ESCRITO];            /* lo tecleado en el último fotograma */
+    int nescrito;
+    int mov_x, mov_y;                    /* cuánto se ha movido el ratón en el último fotograma */
+    char *escribir_prueba;               /* modo de prueba: LINCE_JUEGO_ESCRIBIR */
+    int pide_texto;                      /* el juego ha llamado a editar() o texto_escrito() */
+    JgAccion acciones[JG_ACCIONES];
+    int nacciones;
 } _jgs;
 
 static int jg_tecla_codigo(const char *nombre);
@@ -226,6 +248,9 @@ static int jg_cargar(void) {
     JG_FN(LogicalSize, "SDL_RenderSetLogicalSize")
     JG_FN(OutputSize, "SDL_GetRendererOutputSize")
     *(void **)(&_jg.WindowToLogical) = JG_SIMBOLO(h, "SDL_RenderWindowToLogical");
+    *(void **)(&_jg.ShowCursor) = JG_SIMBOLO(h, "SDL_ShowCursor");
+    *(void **)(&_jg.RelativeMouse) = JG_SIMBOLO(h, "SDL_SetRelativeMouseMode");
+    *(void **)(&_jg.StartTextInput) = JG_SIMBOLO(h, "SDL_StartTextInput");
     void *hi = JG_ABRIR_IMG();
     if (hi) *(void **)(&_jg.IMG_Load_RW) = JG_SIMBOLO(hi, "IMG_Load_RW");
     return 1;
@@ -314,6 +339,23 @@ static void jg_cerrar_todo(void) {
     _jgs.abierta = 0;
 }
 
+/* Variable de entorno en UTF-8 (en Windows getenv usa la página de códigos local) */
+static char *jg_entorno_utf8(const char *nombre) {
+#ifdef _WIN32
+    wchar_t wnombre[64];
+    if (!MultiByteToWideChar(CP_UTF8, 0, nombre, -1, wnombre, 64)) return NULL;
+    const wchar_t *w = _wgetenv(wnombre);
+    if (!w) return NULL;
+    int largo = WideCharToMultiByte(CP_UTF8, 0, w, -1, NULL, 0, NULL, NULL);
+    char *t = largo > 0 ? malloc((size_t)largo) : NULL;
+    if (t) WideCharToMultiByte(CP_UTF8, 0, w, -1, t, largo, NULL, NULL);
+    return t;
+#else
+    const char *e = getenv(nombre);
+    return e ? strdup(e) : NULL;
+#endif
+}
+
 /* abrir(titulo, ancho, alto) */
 static Valor *fn_jg_abrir(Valor **a, int n) {
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "abrir() espera (título, ancho, alto)");
@@ -347,6 +389,10 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     memset(_jgs.previas, 0, sizeof(_jgs.previas));
     memset(_jgs.botones, 0, sizeof(_jgs.botones));
     memset(_jgs.botones_prev, 0, sizeof(_jgs.botones_prev));
+    memset(_jgs.ejes, 0, sizeof(_jgs.ejes));
+    memset(_jgs.ejes_prev, 0, sizeof(_jgs.ejes_prev));
+    _jgs.nescrito = 0; _jgs.mov_x = _jgs.mov_y = 0;
+    if (_jg.StartTextInput) _jg.StartTextInput();          /* recibir texto tecleado (tildes, ñ…) */
     _jgs.cam_x = _jgs.cam_y = 0;
     _jgs.completa = 0;
     _jgs.njoy = -1;
@@ -366,6 +412,9 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
             if (c >= 0) _jgs.pulsar[_jgs.npulsar++] = c;
         }
     }
+    free(_jgs.escribir_prueba);
+    _jgs.escribir_prueba = jg_entorno_utf8("LINCE_JUEGO_ESCRIBIR");
+    _jgs.pide_texto = 0;
     e = getenv("LINCE_JUEGO_CLIC");
     if (e && sscanf(e, "%d,%d", &_jgs.clic_x, &_jgs.clic_y) == 2) _jgs.hay_clic = 1;
     _jgs.dt = 1.0 / 60; _jgs.t_ultimo = jg_ahora(); _jgs.t_fps = _jgs.t_ultimo; _jgs.cuadros = 0; _jgs.fps = 0;
@@ -646,13 +695,26 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     memcpy(_jgs.previas, _jgs.teclas, sizeof(_jgs.teclas));
     _jgs.raton_prev = _jgs.raton;
     _jgs.rueda = 0;
+    _jgs.nescrito = 0;
+    _jgs.mov_x = _jgs.mov_y = 0;
     unsigned long long ev_buf[16];                      /* SDL_Event (56 bytes), alineado */
     unsigned char *ev = (unsigned char *)ev_buf;
     while (_jg.PollEvent(ev)) {
         unsigned tipo = *(unsigned *)ev;
         if (tipo == 0x100) _jgs.cierre = 1;                         /* SDL_QUIT */
         else if (tipo == 0x403) _jgs.rueda += *(int *)(ev + 20);    /* rueda: y */
+        else if (tipo == 0x400) {                                   /* movimiento: xrel, yrel */
+            _jgs.mov_x += *(int *)(ev + 28);
+            _jgs.mov_y += *(int *)(ev + 32);
+        } else if (tipo == 0x303) {                                 /* texto tecleado (UTF-8) */
+            const char *t = (const char *)ev + 12;
+            size_t l = strnlen(t, 32);
+            if (_jgs.nescrito + (int)l < JG_ESCRITO) { memcpy(_jgs.escrito + _jgs.nescrito, t, l); _jgs.nescrito += (int)l; }
+        } else if (tipo == 0x300 && *(int *)(ev + 16) == 42) {      /* «borrar», también al repetir */
+            if (_jgs.nescrito + 1 < JG_ESCRITO) _jgs.escrito[_jgs.nescrito++] = '\b';
+        }
     }
+    _jgs.escrito[_jgs.nescrito] = '\0';
     int nt = 0;
     const unsigned char *k = _jg.KeyboardState(&nt);
     if (nt > 512) nt = 512;
@@ -665,6 +727,13 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     }
     jg_leer_mandos();
     jg_recoger_voces();
+    if (_jgs.pide_texto && _jgs.escribir_prueba) {     /* prueba: se teclea cuando el juego lo espera */
+        snprintf(_jgs.escrito, JG_ESCRITO, "%s", _jgs.escribir_prueba);
+        for (char *c = _jgs.escrito; *c; c++) if (*c == '<') *c = '\b';   /* '<' = borrar */
+        _jgs.nescrito = (int)strlen(_jgs.escrito);
+        free(_jgs.escribir_prueba);
+        _jgs.escribir_prueba = NULL;
+    }
     if (_jgs.total & 1) {
         for (int i = 0; i < _jgs.npulsar; i++) _jgs.teclas[_jgs.pulsar[i]] = 1;
         if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; _jgs.raton |= 1; }
@@ -1213,6 +1282,7 @@ static Valor *fn_jg_tiempo(Valor **a, int n) {
 static const char *const JG_NOMBRES_BOTON[JG_BOTONES] = {
     "a", "b", "x", "y", "atras", "guia", "inicio", "stick_izq", "stick_der",
     "lb", "rb", "arriba", "abajo", "izquierda", "derecha" };
+static const char *const JG_NOMBRES_EJE[JG_EJES] = {"izq_x", "izq_y", "der_x", "der_y", "lt", "rt"};
 
 static void jg_abrir_mandos(void) {
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
@@ -1225,12 +1295,24 @@ static void jg_abrir_mandos(void) {
     _jgs.njoy = total;
 }
 
+/* Valor de un eje de -1 a 1 (gatillos de 0 a 1), con zona muerta */
+static float jg_leer_eje(void *mando, int e) {
+    float v = _jg.ControllerAxis(mando, e) / 32767.0f;
+    if (v < -1) v = -1;
+    if (fabsf(v) < 0.15f) v = 0;
+    return v;
+}
+
 static void jg_leer_mandos(void) {
     memcpy(_jgs.botones_prev, _jgs.botones, sizeof _jgs.botones);
+    memcpy(_jgs.ejes_prev, _jgs.ejes, sizeof _jgs.ejes);
     if (_jg.NumJoysticks() != _jgs.njoy) jg_abrir_mandos();
-    for (int i = 0; i < JG_MANDOS; i++)
+    for (int i = 0; i < JG_MANDOS; i++) {
         for (int b = 0; b < JG_BOTONES; b++)
             _jgs.botones[i][b] = _jgs.mandos[i] ? _jg.ControllerButton(_jgs.mandos[i], b) : 0;
+        for (int e = 0; e < JG_EJES; e++)
+            _jgs.ejes[i][e] = _jgs.mandos[i] ? jg_leer_eje(_jgs.mandos[i], e) : 0;
+    }
 }
 
 static int jg_mando_arg(Valor **a, int n, int i) {
@@ -1274,17 +1356,232 @@ static Valor *fn_jg_boton_pulsado(Valor **a, int n) { return jg_boton_mando(a, n
 /* eje(nombre[, mando]): izq_x, izq_y, der_x, der_y (-1..1), lt, rt (0..1); zona muerta 0,15 */
 static Valor *fn_jg_eje(Valor **a, int n) {
     JG_ABIERTA();
-    static const char *const ejes[] = {"izq_x", "izq_y", "der_x", "der_y", "lt", "rt"};
     int e = -1;
     if (n > 0 && a[0]->tipo == VAL_TEXTO)
-        for (int i = 0; i < 6; i++) if (strcmp(a[0]->texto, ejes[i]) == 0) { e = i; break; }
+        for (int i = 0; i < JG_EJES; i++) if (strcmp(a[0]->texto, JG_NOMBRES_EJE[i]) == 0) { e = i; break; }
     if (e < 0) return jg_error("Error", "eje() espera \"izq_x\", \"izq_y\", \"der_x\", \"der_y\", \"lt\" o \"rt\"");
     int m = jg_mando_arg(a, n, 1);
-    if (m < 0 || !_jgs.mandos[m]) return valor_numero(0);
-    double v = _jg.ControllerAxis(_jgs.mandos[m], e) / 32767.0;
-    if (v < -1) v = -1;
-    if (fabs(v) < 0.15) v = 0;
-    return valor_numero(v);
+    if (m < 0) return valor_numero(0);
+    return valor_numero(_jgs.ejes[m][e]);
+}
+
+/* ── Texto tecleado ── */
+
+/* texto_escrito(): lo que se ha tecleado desde el fotograma anterior (con tildes y ñ) */
+static Valor *fn_jg_texto_escrito(Valor **a, int n) {
+    (void)a; (void)n;
+    JG_ABIERTA();
+    _jgs.pide_texto = 1;
+    char buf[JG_ESCRITO];
+    int k = 0;
+    for (int i = 0; i < _jgs.nescrito; i++) if (_jgs.escrito[i] != '\b') buf[k++] = _jgs.escrito[i];
+    buf[k] = '\0';
+    return valor_texto(buf);
+}
+
+static int jg_caracteres(const char *t) {
+    int c = 0;
+    for (; *t; t++) if (((unsigned char)*t & 0xC0) != 0x80) c++;
+    return c;
+}
+
+/* editar(texto[, maximo]): el texto con lo tecleado añadido y «borrar» aplicado.
+   Uso: nombre = juego.editar(nombre, 12) en cada fotograma. */
+static Valor *fn_jg_editar(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "editar() espera (texto[, máximo de caracteres])");
+    _jgs.pide_texto = 1;
+    double max = 0;
+    if (n > 1 && !jg_num(a, n, 1, &max, "editar")) return valor_nulo();
+    size_t largo = strlen(a[0]->texto);
+    char *t = malloc(largo + JG_ESCRITO + 1);
+    if (!t) return valor_nulo();
+    memcpy(t, a[0]->texto, largo + 1);
+    int cuenta = jg_caracteres(t);
+    for (int i = 0; i < _jgs.nescrito; ) {
+        unsigned char c = (unsigned char)_jgs.escrito[i];
+        if (c == '\b') {                                   /* quita el último carácter entero */
+            if (largo > 0) {
+                do largo--; while (largo > 0 && ((unsigned char)t[largo] & 0xC0) == 0x80);
+                t[largo] = '\0';
+                cuenta--;
+            }
+            i++;
+            continue;
+        }
+        int l = 1;                                         /* un carácter UTF-8 completo */
+        while (i + l < _jgs.nescrito && ((unsigned char)_jgs.escrito[i + l] & 0xC0) == 0x80) l++;
+        if (c >= 32 && (max <= 0 || cuenta < (int)max)) {
+            memcpy(t + largo, _jgs.escrito + i, (size_t)l);
+            largo += (size_t)l;
+            t[largo] = '\0';
+            cuenta++;
+        }
+        i += l;
+    }
+    Valor *v = valor_texto(t);
+    free(t);
+    return v;
+}
+
+/* ── Puntero del ratón ── */
+
+/* cursor(visible): muestra u oculta la flecha del ratón sobre la ventana */
+static Valor *fn_jg_cursor(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_BOOLEANO) return jg_error("ErrorTipo", "cursor() espera verdadero o falso");
+    if (_jg.ShowCursor) _jg.ShowCursor(a[0]->booleano ? 1 : 0);
+    return valor_nulo();
+}
+
+/* capturar_raton(si): encierra y oculta el ratón; solo cuenta movimiento_raton().
+   Devuelve si se pudo (algunos sistemas no lo permiten). */
+static Valor *fn_jg_capturar_raton(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_BOOLEANO) return jg_error("ErrorTipo", "capturar_raton() espera verdadero o falso");
+    int ok = _jg.RelativeMouse && _jg.RelativeMouse(a[0]->booleano ? 1 : 0) == 0;
+    return valor_booleano(ok);
+}
+
+/* movimiento_raton() -> [dx, dy]: cuánto se movió desde el fotograma anterior */
+static Valor *fn_jg_movimiento_raton(Valor **a, int n) {
+    (void)a; (void)n;
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(_jgs.mov_x));
+    lista_agregar(l, valor_numero(_jgs.mov_y));
+    return l;
+}
+
+/* ── Acciones: un nombre para varias teclas, botones y ejes ──
+   Entradas: "espacio" (tecla), "mando:a" (botón de cualquier mando), "mando2:a"
+   (del mando 2), "mando:izq_x-" / "mando:izq_x+" (eje hacia un lado), "raton:izquierdo". */
+
+static int jg_entrada(const char *t, JgEntrada *e, char *msg, size_t max) {
+    e->mando = -1; e->signo = 0;
+    if (strncmp(t, "raton:", 6) == 0) {
+        static const char *const B[] = {"izquierdo", "central", "derecho"};
+        for (int i = 0; i < 3; i++) if (strcmp(t + 6, B[i]) == 0) { e->tipo = 'r'; e->codigo = i + 1; return 1; }
+        snprintf(msg, max, "botón de ratón desconocido '%s' (raton:izquierdo, raton:central, raton:derecho)", t);
+        return 0;
+    }
+    if (strncmp(t, "mando", 5) == 0 && (t[5] == ':' || (t[5] >= '1' && t[5] <= '4' && t[6] == ':'))) {
+        if (t[5] != ':') e->mando = t[5] - '1';
+        const char *b = t + (t[5] == ':' ? 6 : 7);
+        for (int i = 0; i < JG_BOTONES; i++)
+            if (strcmp(b, JG_NOMBRES_BOTON[i]) == 0) { e->tipo = 'b'; e->codigo = i; return 1; }
+        size_t lb = strlen(b);
+        if (lb > 1 && (b[lb - 1] == '+' || b[lb - 1] == '-'))
+            for (int i = 0; i < JG_EJES; i++)
+                if (strlen(JG_NOMBRES_EJE[i]) == lb - 1 && strncmp(b, JG_NOMBRES_EJE[i], lb - 1) == 0) {
+                    e->tipo = 'e'; e->codigo = i; e->signo = b[lb - 1] == '+' ? 1 : -1;
+                    return 1;
+                }
+        snprintf(msg, max, "entrada de mando desconocida '%s' (por ejemplo mando:a, mando:izquierda o mando:izq_x-)", t);
+        return 0;
+    }
+    int c = jg_tecla_codigo(t);
+    if (c < 0) { snprintf(msg, max, "tecla desconocida '%s'", t); return 0; }
+    e->tipo = 't'; e->codigo = c;
+    return 1;
+}
+
+/* Fuerza de una entrada (0 a 1) ahora o en el fotograma anterior */
+static float jg_fuerza(const JgEntrada *e, int antes) {
+    switch (e->tipo) {
+        case 't': return (antes ? _jgs.previas : _jgs.teclas)[e->codigo] ? 1 : 0;
+        case 'r': return ((antes ? _jgs.raton_prev : _jgs.raton) & (1u << (e->codigo - 1))) ? 1 : 0;
+        case 'b': case 'e': {
+            float mejor = 0;
+            for (int m = 0; m < JG_MANDOS; m++) {
+                if (e->mando >= 0 && m != e->mando) continue;
+                float v = e->tipo == 'b' ? (antes ? _jgs.botones_prev : _jgs.botones)[m][e->codigo]
+                                         : (antes ? _jgs.ejes_prev : _jgs.ejes)[m][e->codigo] * e->signo;
+                if (v > mejor) mejor = v;
+            }
+            return mejor > 1 ? 1 : mejor;
+        }
+    }
+    return 0;
+}
+
+static JgAccion *jg_buscar_accion(const char *nombre) {
+    for (int i = 0; i < _jgs.nacciones; i++)
+        if (strcmp(_jgs.acciones[i].nombre, nombre) == 0) return &_jgs.acciones[i];
+    return NULL;
+}
+
+/* definir_accion(nombre, [entradas]): crea o sustituye la acción */
+static Valor *fn_jg_definir_accion(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_LISTA)
+        return jg_error("ErrorTipo", "definir_accion() espera (nombre, lista de entradas), por ejemplo (\"saltar\", [\"espacio\", \"mando:a\"])");
+    if (a[1]->lista.cantidad > JG_ENTRADAS) return jg_error("Error", "definir_accion(): como mucho 16 entradas por acción");
+    JgAccion nueva = {0};
+    for (int i = 0; i < a[1]->lista.cantidad; i++) {
+        Valor *v = a[1]->lista.elementos[i];
+        char msg[300];
+        if (v->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "definir_accion(): cada entrada es un texto, por ejemplo \"espacio\" o \"mando:a\"");
+        if (!jg_entrada(v->texto, &nueva.e[nueva.n], msg, sizeof msg)) {
+            char m2[400];
+            snprintf(m2, sizeof m2, "definir_accion(\"%s\"): %s", a[0]->texto, msg);
+            return jg_error("Error", m2);
+        }
+        nueva.n++;
+    }
+    JgAccion *acc = jg_buscar_accion(a[0]->texto);
+    if (!acc) {
+        if (_jgs.nacciones == JG_ACCIONES) return jg_error("Error", "definir_accion(): como mucho 64 acciones");
+        acc = &_jgs.acciones[_jgs.nacciones++];
+        acc->nombre = strdup(a[0]->texto);
+    }
+    nueva.nombre = acc->nombre;
+    *acc = nueva;
+    return valor_nulo();
+}
+
+static JgAccion *jg_accion_arg(Valor **a, int n, int i, const char *fn) {
+    char msg[200];
+    if (i >= n || a[i]->tipo != VAL_TEXTO) {
+        snprintf(msg, sizeof msg, "%s() espera el nombre de una acción", fn);
+        jg_error("ErrorTipo", msg);
+        return NULL;
+    }
+    JgAccion *acc = jg_buscar_accion(a[i]->texto);
+    if (!acc) {
+        snprintf(msg, sizeof msg, "%s(): la acción '%s' no está definida (usa juego.definir_accion)", fn, a[i]->texto);
+        jg_error("Error", msg);
+    }
+    return acc;
+}
+
+/* La fuerza de una acción es la mayor de sus entradas; activa a partir de 0,5 */
+static float jg_accion_fuerza(const JgAccion *acc, int antes) {
+    float f = 0;
+    for (int i = 0; i < acc->n; i++) { float v = jg_fuerza(&acc->e[i], antes); if (v > f) f = v; }
+    return f;
+}
+
+/* modo 0: mantenida; 1: empieza en este fotograma; 2: termina en este fotograma */
+static Valor *jg_accion(Valor **a, int n, int modo, const char *fn) {
+    JG_ABIERTA();
+    JgAccion *acc = jg_accion_arg(a, n, 0, fn);
+    if (!acc) return valor_nulo();
+    int ahora = jg_accion_fuerza(acc, 0) >= 0.5f, antes = jg_accion_fuerza(acc, 1) >= 0.5f;
+    return valor_booleano(modo == 0 ? ahora : modo == 1 ? (ahora && !antes) : (!ahora && antes));
+}
+static Valor *fn_jg_accion(Valor **a, int n)          { return jg_accion(a, n, 0, "accion"); }
+static Valor *fn_jg_accion_pulsada(Valor **a, int n)  { return jg_accion(a, n, 1, "accion_pulsada"); }
+static Valor *fn_jg_accion_soltada(Valor **a, int n)  { return jg_accion(a, n, 2, "accion_soltada"); }
+
+/* direccion(negativa, positiva): de -1 a 1, gradual con el stick y entera con teclas.
+   Ejemplo: x = x + juego.direccion("izquierda", "derecha") * velocidad * juego.dt() */
+static Valor *fn_jg_direccion(Valor **a, int n) {
+    JG_ABIERTA();
+    JgAccion *neg = jg_accion_arg(a, n, 0, "direccion");
+    if (!neg) return valor_nulo();
+    JgAccion *pos = jg_accion_arg(a, n, 1, "direccion");
+    if (!pos) return valor_nulo();
+    return valor_numero(jg_accion_fuerza(pos, 0) - jg_accion_fuerza(neg, 0));
 }
 
 /* colision(x1, y1, w1, h1, x2, y2, w2, h2): ¿se solapan los dos rectángulos? */
@@ -1339,6 +1636,16 @@ static void cargar_juego(Entorno *entorno) {
         {"boton",           fn_jg_boton,           -1},
         {"boton_pulsado",   fn_jg_boton_pulsado,   -1},
         {"eje",             fn_jg_eje,             -1},
+        {"texto_escrito",   fn_jg_texto_escrito,    0},
+        {"editar",          fn_jg_editar,          -1},
+        {"cursor",          fn_jg_cursor,           1},
+        {"capturar_raton",  fn_jg_capturar_raton,   1},
+        {"movimiento_raton", fn_jg_movimiento_raton, 0},
+        {"definir_accion",  fn_jg_definir_accion,   2},
+        {"accion",          fn_jg_accion,           1},
+        {"accion_pulsada",  fn_jg_accion_pulsada,   1},
+        {"accion_soltada",  fn_jg_accion_soltada,   1},
+        {"direccion",       fn_jg_direccion,        2},
     };
     registrar_modulo_diccionario(entorno, "juego",
         fns, (int)(sizeof(fns) / sizeof(fns[0])), NULL, NULL, 0);
