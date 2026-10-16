@@ -161,6 +161,9 @@ for l in "tamaño: 8x8 128" "casilla: #.=[]" "solido: verdadero falso verdadero 
     grep -qxF "$l" salida8.txt && ok "mapa: $l" || mal "falta la línea: $l"
 done
 grep -qF "no es ASCII" salida8.txt && ok "mapa: carácter no ASCII" || mal "falta el error de carácter no ASCII"
+grep -qxF "hoja: 2 4" salida8.txt && ok "hoja: 2 columnas, 4 cuadros" || mal "falta la línea: hoja: 2 4"
+grep -qF "di qué cuadro" salida8.txt && ok "tiles: hoja sin cuadro" || mal "falta el error de hoja sin cuadro"
+grep -qF "no conozco la opción 'separasion'" salida8.txt && ok "hoja: opción mal escrita" || mal "falta el error de opción de hoja"
 python3 - <<'PY' || fallos=$((fallos+1))
 import struct, sys
 d = open("mapa.bmp", "rb").read()
@@ -175,6 +178,15 @@ mal = 0
 for (x, y), esp, nombre in casos:
     if px(x, y) == esp: print("  ✅ dibujar_mapa:", nombre)
     else: print("  ❌ dibujar_mapa:", nombre, "→", px(x, y)); mal += 1
+d = open("tiles.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+casos = [((8, 8), (255, 0, 0), "tile 0"), ((24, 8), (0, 255, 0), "tile 1"), ((40, 8), (0, 0, 255), "tile 2"),
+         ((56, 8), (255, 255, 0), "tile -1 (el último)"), ((72, 8), (0, 255, 0), "tile animado"),
+         ((4, 24), (0, 0, 255), "dibujar con cuadro")]
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ tiles:", nombre)
+    else: print("  ❌ tiles:", nombre, "→", px(x, y)); mal += 1
 sys.exit(1 if mal else 0)
 PY
 # ── Séptima parte: lince nuevo crea un juego que se puede jugar ──

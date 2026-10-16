@@ -1625,6 +1625,103 @@ static Valor *jg_opcion_valor(Valor *op, const char *clave) {
     return k < 0 ? NULL : op->diccionario.valores[k];
 }
 
+/* Rejilla de una hoja de sprites o de tiles: cuadros de cw×ch separados por
+   'sep' píxeles, con 'margen' alrededor. Cuenta de izquierda a derecha y de
+   arriba abajo desde 0; un número fuera de rango da la vuelta. */
+typedef struct { int cw, ch, sep, margen; } JgRejilla;
+
+static int jg_rejilla_cuadros(const JgImagen *img, const JgRejilla *g, int *columnas) {
+    int cols = (img->ancho - 2 * g->margen + g->sep) / (g->cw + g->sep);
+    int filas = (img->alto - 2 * g->margen + g->sep) / (g->ch + g->sep);
+    if (cols < 1) cols = 1;
+    if (filas < 1) filas = 1;
+    if (columnas) *columnas = cols;
+    return cols * filas;
+}
+
+static JgRect jg_rejilla_rect(const JgImagen *img, const JgRejilla *g, int cuadro) {
+    int cols, total = jg_rejilla_cuadros(img, g, &cols);
+    cuadro %= total;
+    if (cuadro < 0) cuadro += total;
+    JgRect r = {g->margen + (cuadro % cols) * (g->cw + g->sep), g->margen + (cuadro / cols) * (g->ch + g->sep), g->cw, g->ch};
+    return r;
+}
+
+/* La rejilla que lleva una imagen hecha con juego.hoja(); 0 si no la lleva */
+static int jg_rejilla_de(Valor *v, JgRejilla *g) {
+    if (v->tipo != VAL_DICCIONARIO) return 0;
+    int k = valor_diccionario_buscar(v, "celda");
+    if (k < 0) return 0;
+    Valor *c = v->diccionario.valores[k];
+    if (c->tipo != VAL_LISTA || c->lista.cantidad != 2 || c->lista.elementos[0]->tipo != VAL_NUMERO ||
+        c->lista.elementos[1]->tipo != VAL_NUMERO) return 0;
+    g->cw = (int)c->lista.elementos[0]->numero;
+    g->ch = (int)c->lista.elementos[1]->numero;
+    double s = 0, m = 0;
+    jg_opcion(v, "separacion", &s);
+    jg_opcion(v, "margen", &m);
+    g->sep = (int)s; g->margen = (int)m;
+    return g->cw >= 1 && g->ch >= 1 && g->sep >= 0 && g->margen >= 0;
+}
+
+/* hoja(imagen o ruta, ancho[, alto][, {"separacion": n, "margen": n}]): la
+   imagen partida en cuadros iguales (sprites de una animación o tiles de un
+   mapa). Devuelve la imagen con "celda", "columnas" y "cuadros"; así
+   dibujar(hoja, x, y, {"cuadro": 3}) y dibujar_mapa(mapa, {"#": [hoja, 3]})
+   ya saben dónde está cada cuadro. */
+static Valor *fn_jg_hoja(Valor **a, int n) {
+    JG_ABIERTA();
+    Valor *img = NULL;
+    if (n >= 1 && a[0]->tipo == VAL_TEXTO) { img = fn_jg_imagen(a, 1); if (hay_error) return img; }
+    else if (n >= 1 && jg_id_de(a[0], "imagen") >= 0 && jg_id_de(a[0], "imagen") < _jgs.nimagenes) img = a[0];
+    if (!img || n < 2 || a[1]->tipo != VAL_NUMERO) {
+        if (img && img != a[0]) valor_destruir(img);
+        return jg_error("ErrorTipo", "hoja() espera (imagen o ruta, ancho de cada cuadro[, alto][, opciones])");
+    }
+    int k = jg_id_de(img, "imagen");
+    if (img != a[0]) valor_destruir(img);
+    JgRejilla g = {(int)a[1]->numero, (int)a[1]->numero, 0, 0};
+    int i = 2;
+    if (n > i && a[i]->tipo == VAL_NUMERO) g.ch = (int)a[i++]->numero;
+    if (n > i) {
+        if (a[i]->tipo != VAL_DICCIONARIO)
+            return jg_error("ErrorTipo", "hoja(): las opciones van en un diccionario, por ejemplo {\"separacion\": 1}");
+        Valor *op = a[i];
+        for (int j = 0; j < op->diccionario.cantidad; j++) {
+            const char *k = op->diccionario.claves[j];
+            if (strcmp(k, "separacion") != 0 && strcmp(k, "margen") != 0) {
+                char msg[160];
+                snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"separacion\" y \"margen\")", k);
+                return jg_error("Error", msg);
+            }
+            if (op->diccionario.valores[j]->tipo != VAL_NUMERO)
+                return jg_error("ErrorTipo", "hoja(): \"separacion\" y \"margen\" son números de píxeles");
+        }
+        double v;
+        if (jg_opcion(op, "separacion", &v)) g.sep = (int)v;
+        if (jg_opcion(op, "margen", &v)) g.margen = (int)v;
+    }
+    JgImagen *im = &_jgs.imagenes[k];
+    if (g.cw < 1 || g.ch < 1 || g.sep < 0 || g.margen < 0)
+        return jg_error("Error", "hoja(): los cuadros miden al menos 1×1 y la separación y el margen no son negativos");
+    if (g.cw + 2 * g.margen > im->ancho || g.ch + 2 * g.margen > im->alto) {
+        char msg[200];
+        snprintf(msg, sizeof msg, "hoja(): la imagen mide %d×%d, no cabe ni un cuadro de %d×%d", im->ancho, im->alto, g.cw, g.ch);
+        return jg_error("Error", msg);
+    }
+    int cols, total = jg_rejilla_cuadros(im, &g, &cols);
+    Valor *d = jg_imagen_valor(k);
+    Valor *celda = valor_lista_crear();
+    lista_agregar(celda, valor_numero(g.cw));
+    lista_agregar(celda, valor_numero(g.ch));
+    valor_diccionario_agregar(d, "celda", celda);
+    valor_diccionario_agregar(d, "separacion", valor_numero(g.sep));
+    valor_diccionario_agregar(d, "margen", valor_numero(g.margen));
+    valor_diccionario_agregar(d, "columnas", valor_numero(cols));
+    valor_diccionario_agregar(d, "cuadros", valor_numero(total));
+    return d;
+}
+
 /* dibujar(imagen, x, y[, opciones]). Opciones (todas opcionales):
      escala, ancho, alto, angulo (grados), espejo, voltear, centrado, alfa (0-255),
      color ([r, g, b] para teñir), recorte ([x, y, ancho, alto]),
@@ -1643,6 +1740,7 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     Valor *rec = jg_opcion_valor(op, "recorte");
     Valor *celda = jg_opcion_valor(op, "celda");
     double cuadro;
+    JgRejilla rejilla;
     if (rec) {
         if (rec->tipo != VAL_LISTA || rec->lista.cantidad != 4) return jg_error("ErrorTipo", "dibujar(): 'recorte' es [x, y, ancho, alto]");
         int *dst[4] = {&src.x, &src.y, &src.w, &src.h};
@@ -1654,16 +1752,11 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
         if (celda->tipo != VAL_LISTA || celda->lista.cantidad != 2 ||
             celda->lista.elementos[0]->tipo != VAL_NUMERO || celda->lista.elementos[1]->tipo != VAL_NUMERO)
             return jg_error("ErrorTipo", "dibujar(): 'celda' es [ancho, alto] de cada cuadro");
-        int cw = (int)celda->lista.elementos[0]->numero, ch = (int)celda->lista.elementos[1]->numero;
-        if (cw < 1 || ch < 1) return jg_error("Error", "dibujar(): la celda debe medir al menos 1×1");
-        int columnas = img->ancho / cw;
-        if (columnas < 1) columnas = 1;
-        int filas = img->alto / ch;
-        if (filas < 1) filas = 1;
-        int c = jg_opcion(op, "cuadro", &cuadro) ? (int)cuadro : 0;
-        if (c < 0) c = 0;
-        c %= columnas * filas;
-        src.x = (c % columnas) * cw; src.y = (c / columnas) * ch; src.w = cw; src.h = ch;
+        JgRejilla g = {(int)celda->lista.elementos[0]->numero, (int)celda->lista.elementos[1]->numero, 0, 0};
+        if (g.cw < 1 || g.ch < 1) return jg_error("Error", "dibujar(): la celda debe medir al menos 1×1");
+        src = jg_rejilla_rect(img, &g, jg_opcion(op, "cuadro", &cuadro) ? (int)floor(cuadro) : 0);
+    } else if (jg_rejilla_de(a[0], &rejilla)) {     /* una hoja de juego.hoja(): ya sabe sus cuadros */
+        src = jg_rejilla_rect(img, &rejilla, jg_opcion(op, "cuadro", &cuadro) ? (int)floor(cuadro) : 0);
     }
     double escala = 1, w, h, angulo = 0, v;
     jg_opcion(op, "escala", &escala);
@@ -2723,29 +2816,99 @@ static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
     return valor_booleano(pared || techo || (suelo && dy > 0));
 }
 
+/* El trozo de imagen con que se pinta un carácter en dibujar_mapa():
+     imagen               la imagen entera
+     [hoja, 5]            el cuadro 5 de una hoja de juego.hoja()
+     [hoja, [5, 6, 7]]    animado: va pasando por esos cuadros (0.25 s cada uno)
+     [hoja, [5, 6], 0.1]  animado, con los segundos que dura cada cuadro
+   Devuelve el número de imagen, o -1 (con el error puesto). */
+static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
+    char msg[300];
+    int id = jg_id_de(v, "imagen");
+    JgRejilla g;
+    if (id >= 0 && id < _jgs.nimagenes) {
+        if (jg_rejilla_de(v, &g)) {
+            snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" es una hoja de tiles; di qué cuadro, por ejemplo [hoja, 3]", car);
+            jg_error("ErrorTipo", msg);
+            return -1;
+        }
+        JgRect r = {0, 0, _jgs.imagenes[id].ancho, _jgs.imagenes[id].alto};
+        *src = r;
+        return id;
+    }
+    int nl = v->tipo == VAL_LISTA ? v->lista.cantidad : 0;
+    Valor *hoja = nl >= 2 ? v->lista.elementos[0] : NULL;
+    id = hoja ? jg_id_de(hoja, "imagen") : -1;
+    if (id < 0 || id >= _jgs.nimagenes || !jg_rejilla_de(hoja, &g)) {
+        snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" debe ser un color, una imagen o [hoja, cuadro] "
+                 "(la hoja se hace con juego.hoja(\"tiles.png\", 16))", car);
+        jg_error("ErrorTipo", msg);
+        return -1;
+    }
+    Valor *c = v->lista.elementos[1];
+    int cuadro = 0;
+    if (c->tipo == VAL_NUMERO && nl == 2) {
+        cuadro = (int)floor(c->numero);
+    } else if (c->tipo == VAL_LISTA && c->lista.cantidad > 0 && nl <= 3) {
+        double paso = 0.25;
+        if (nl == 3) {
+            if (v->lista.elementos[2]->tipo != VAL_NUMERO || v->lista.elementos[2]->numero <= 0) {
+                snprintf(msg, sizeof msg, "dibujar_mapa(): en \"%s\", lo tercero son los segundos de cada cuadro (más de 0)", car);
+                jg_error("ErrorTipo", msg);
+                return -1;
+            }
+            paso = v->lista.elementos[2]->numero;
+        }
+        long i = (long)floor(jg_reloj() / paso) % c->lista.cantidad;
+        Valor *e = c->lista.elementos[i];
+        for (int j = 0; j < c->lista.cantidad; j++)
+            if (c->lista.elementos[j]->tipo != VAL_NUMERO) {
+                snprintf(msg, sizeof msg, "dibujar_mapa(): en \"%s\", los cuadros de la animación son números", car);
+                jg_error("ErrorTipo", msg);
+                return -1;
+            }
+        cuadro = (int)floor(e->numero);
+    } else {
+        snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" es [hoja, cuadro] o [hoja, [cuadros], segundos]", car);
+        jg_error("ErrorTipo", msg);
+        return -1;
+    }
+    *src = jg_rejilla_rect(&_jgs.imagenes[id], &g, cuadro);
+    return id;
+}
+
 /* dibujar_mapa(mapa, aspecto): dibuja las casillas que se ven. 'aspecto' dice
-   cómo se pinta cada carácter: un color o una imagen (que se ajusta a la
-   casilla). Los caracteres que no aparecen no se dibujan. */
+   cómo se pinta cada carácter: un color, una imagen (que se ajusta a la
+   casilla) o un cuadro de una hoja de tiles, que puede estar animado (ver
+   jg_aspecto_imagen). Los caracteres que no aparecen no se dibujan. */
 static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
     JG_ABIERTA();
     JgMapa *m = jg_mapa_arg(a, n, "dibujar_mapa");
     if (!m) return valor_nulo();
     if (n < 2 || a[1]->tipo != VAL_DICCIONARIO)
-        return jg_error("ErrorTipo", "dibujar_mapa() espera (mapa, {carácter: color o imagen})");
-    /* aspecto de cada carácter: color (tipo 1) o textura (tipo 2) */
+        return jg_error("ErrorTipo", "dibujar_mapa() espera (mapa, {carácter: color, imagen o [hoja, cuadro]})");
+    /* aspecto de cada carácter: color (tipo 1) o trozo de una textura (tipo 2) */
     unsigned char tipo[128] = {0}, color[128][4];
     void *tex[128] = {0};
+    JgRect src[128];
     Valor *d = a[1];
     for (int i = 0; i < d->diccionario.cantidad; i++) {
         const char *k = d->diccionario.claves[i];
         if (!k[0] || k[1] || (unsigned char)k[0] >= 128)
             return jg_error("ErrorTipo", "dibujar_mapa(): cada clave es un solo carácter, por ejemplo \"#\"");
         Valor *v = d->diccionario.valores[i];
-        int id = jg_id_de(v, "imagen");
-        if (id >= 0 && id < _jgs.nimagenes) { tipo[(int)k[0]] = 2; tex[(int)k[0]] = _jgs.imagenes[id].tex; continue; }
+        int ch = (unsigned char)k[0];
+        if (v->tipo == VAL_DICCIONARIO || (v->tipo == VAL_LISTA && v->lista.cantidad > 0 &&
+                                           v->lista.elementos[0]->tipo == VAL_DICCIONARIO)) {
+            int id = jg_aspecto_imagen(v, k, &src[ch]);
+            if (id < 0) return valor_nulo();
+            tipo[ch] = 2;
+            tex[ch] = _jgs.imagenes[id].tex;
+            continue;
+        }
         Valor *arg[1] = {v};
-        if (!jg_color(arg, 1, 0, color[(int)k[0]])) return valor_nulo();
-        tipo[(int)k[0]] = 1;
+        if (!jg_color(arg, 1, 0, color[ch])) return valor_nulo();
+        tipo[ch] = 1;
     }
     int c0 = (int)floor(_jgs.cam_x / m->tam), f0 = (int)floor(_jgs.cam_y / m->tam);
     int c1 = (int)floor((_jgs.cam_x + _jgs.ancho) / m->tam), f1 = (int)floor((_jgs.cam_y + _jgs.alto) / m->tam);
@@ -2764,7 +2927,7 @@ static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
             else {
                 _jg.TextureAlpha(tex[ch], 255);
                 _jg.TextureColor(tex[ch], 255, 255, 255);
-                _jg.RenderCopyEx(_jgs.render, tex[ch], NULL, &r, 0, NULL, 0);
+                _jg.RenderCopyEx(_jgs.render, tex[ch], &src[ch], &r, 0, NULL, 0);
             }
         }
     return valor_nulo();
@@ -2883,6 +3046,7 @@ static void cargar_juego(Entorno *entorno) {
         {"imagen",          fn_jg_imagen,           1},
         {"dibujar",         fn_jg_dibujar,         -1},
         {"sprite",          fn_jg_sprite,           2},
+        {"hoja",            fn_jg_hoja,            -1},
         {"sonido",          fn_jg_sonido,           1},
         {"reproducir",      fn_jg_reproducir,      -1},
         {"detener",         fn_jg_detener,         -1},

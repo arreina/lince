@@ -58,3 +58,28 @@ intentar {
 } capturar (error e) {
     escribir("no ascii: " + e.mensaje)
 }
+
+# tiles: una hoja de 2×2 con separación de 1 píxel (hecha con sprite, sin archivos)
+fijo HOJA = juego.hoja(juego.sprite([
+    "RR.GG",
+    "RR.GG",
+    ".....",
+    "BB.YY",
+    "BB.YY"
+], {"R": [255, 0, 0], "G": [0, 255, 0], "B": [0, 0, 255], "Y": [255, 255, 0]}), 2, {"separacion": 1})
+escribir("hoja: " + a_texto(HOJA["columnas"]) + " " + a_texto(HOJA["cuadros"]))
+sea t = juego.mapa(["ABCDE"], 16)
+juego.limpiar([0, 0, 0])
+juego.dibujar_mapa(t, {"A": [HOJA, 0], "B": [HOJA, 1], "C": [HOJA, 2], "D": [HOJA, -1], "E": [HOJA, [1, 2], 0.5]})
+juego.dibujar(HOJA, 0, 20, {"cuadro": 2, "escala": 4})
+juego.captura("tiles.bmp")
+intentar {
+    juego.dibujar_mapa(t, {"A": HOJA})
+} capturar (error e) {
+    escribir("hoja sin cuadro: " + e.mensaje)
+}
+intentar {
+    juego.hoja(HOJA, 2, {"separasion": 1})
+} capturar (error e) {
+    escribir("opcion: " + e.mensaje)
+}

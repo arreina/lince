@@ -4,7 +4,8 @@
 # fantasmas. Flechas o WASD (o el stick del mando) para moverte en las
 # cuatro direcciones. Esc sale.
 #
-# Muestra: un juego de vista cenital con un mapa de casillas (juego.mapa),
+# Muestra: un juego de vista cenital con un mapa de casillas (juego.mapa)
+# dibujado con tiles de una hoja (juego.hoja), algunos animados,
 # movimiento sin atravesar paredes y sin gravedad (juego.mover_en_mapa),
 # casillas que cambian (juego.poner_casilla), y enemigos que te persiguen
 # esquivando las paredes (juego.camino). Los sonidos son efectos generados
@@ -47,6 +48,23 @@ juego.definir_accion("empezar", ["espacio", "entrar", "mando:a"])
 # El plano como mapa de casillas: '#' es muro (por defecto) y fuera del mapa también
 fijo NIVEL = juego.mapa(PLANO, CASILLA, {"bordes": "todos"})
 fijo GEMAS = juego.buscar_en_mapa(NIVEL, "*")        # dónde están al empezar
+
+# Los tiles del mapa: una hoja de cuadros de 8×8 (aquí dibujada con texto; podría
+# ser un PNG hecho con cualquier editor: juego.hoja("tiles.png", 16)).
+#    0 muro     1 suelo    2 puerta   3 y 4: la salida abierta (animada)
+fijo TILES = juego.hoja(juego.sprite([
+    "hhhmhhhhffffffffmmmmmmmmfffffffffggggggf",
+    "MMMmMMMMffffffdfmwwwwwwmffggggffgGGGGGGg",
+    "MMMmMMMMffffffffmwkwwkwmfgGGGGgfgGWWWWGg",
+    "mmmmmmmmfdffffffmwkwwkwmfgGWWGgfgGWWWWGg",
+    "hhhhhhmhffffffffmwwwwwwmfgGWWGgfgGWWWWGg",
+    "MMMMMMmMfffffdffmwkwwkwmfgGGGGgfgGWWWWGg",
+    "MMMMMMmMffffffffmwkwwkwmffggggffgGGGGGGg",
+    "mmmmmmmmffdfffffmwwwwwwmfffffffffggggggf"
+], {"M": [82, 72, 108], "h": [112, 100, 142], "m": [48, 42, 64],
+    "f": [36, 32, 46], "d": [50, 46, 62],
+    "w": [120, 80, 50], "k": [80, 52, 34],
+    "g": [70, 170, 100], "G": [140, 240, 170], "W": [230, 255, 235]}), 8)
 
 fijo FANTASMA = juego.sprite([
     "...WWWW...",
@@ -161,12 +179,11 @@ funcion mover_fantasmas(val numero dt): nulo {
 
 funcion dibujar(): nulo {
     juego.limpiar([28, 24, 34])
-    juego.dibujar_mapa(NIVEL, {"#": [70, 62, 90], "S": [60, 140, 80]})
-    si gemas == total_gemas {          # la salida se abre: brilla
-        para cada lista s en juego.buscar_en_mapa(NIVEL, "S") {
-            juego.circulo(centro(s[0]), centro(s[1]), 8 + matematica.seno(juego.tiempo() * 6) * 3, [180, 255, 190])
-        }
-    }
+    sea salida = [TILES, 2]                              # cerrada: una puerta
+    si gemas == total_gemas { salida = [TILES, [3, 4], 0.3] }   # abierta: brilla (dos cuadros)
+    sea suelo = [TILES, 1]
+    juego.dibujar_mapa(NIVEL, {"#": [TILES, 0], "S": salida,
+                               ".": suelo, "*": suelo, "P": suelo, "F": suelo})
     para cada lista g en juego.buscar_en_mapa(NIVEL, "*") {
         juego.dibujar(GEMA, centro(g[0]), centro(g[1]) + matematica.seno(juego.tiempo() * 4 + g[0]) * 2,
                       {"escala": 3, "centrado": verdadero})

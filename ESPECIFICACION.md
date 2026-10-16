@@ -790,7 +790,8 @@ mientras juego.abierto() {
 |---|---|
 | `imagen(ruta)` | carga un PNG, JPG, BMP, GIF o TGA; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo |
 | `sprite(filas, colores)` | crea una imagen a partir de texto, un carácter por píxel: `juego.sprite([".X.", "XXX"], {"X": [255, 0, 0]})`; los caracteres sin color son transparentes |
-| `dibujar(imagen, x, y[, opciones])` | dibuja la imagen; `opciones` es un diccionario con cualquiera de: `escala`, `ancho`, `alto`, `angulo` (grados), `espejo`, `voltear`, `centrado` (x, y es el centro), `alfa` (0–255), `color` (tinte), `recorte` (`[x, y, ancho, alto]`), y para hojas de sprites `celda` (`[ancho, alto]` de cada cuadro) con `cuadro` (número de cuadro) |
+| `hoja(imagen o ruta, ancho[, alto][, opciones])` | una imagen partida en cuadros iguales: los de una animación o los tiles de un mapa. Se cuentan de izquierda a derecha y de arriba abajo desde 0 (un número fuera de rango da la vuelta: −1 es el último). Opciones: `separacion` (píxeles entre cuadros) y `margen` (alrededor), como en muchas hojas descargadas. Devuelve la imagen con `"celda"`, `"columnas"` y `"cuadros"`. También vale una imagen hecha con `sprite()` |
+| `dibujar(imagen, x, y[, opciones])` | dibuja la imagen; `opciones` es un diccionario con cualquiera de: `escala`, `ancho`, `alto`, `angulo` (grados), `espejo`, `voltear`, `centrado` (x, y es el centro), `alfa` (0–255), `color` (tinte), `recorte` (`[x, y, ancho, alto]`) y `cuadro` (el número de cuadro de una hoja; con una imagen normal, indica también `celda`: `[ancho, alto]` de cada cuadro) |
 
 **Entrada**
 
@@ -845,7 +846,8 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
 
 ```lince
-juego.dibujar(hoja, x, y, {"celda": [16, 16], "cuadro": juego.cuadro(4, 8)})   # 4 cuadros, 8 por segundo
+fijo HEROE = juego.hoja("heroe.png", 16)                            # cuadros de 16×16
+juego.dibujar(HEROE, x, y, {"cuadro": juego.cuadro(4, 8)})          # 4 cuadros, 8 por segundo
 ```
 
 **Mapas de casillas.** Un nivel escrito con texto, un carácter por casilla, para cualquier juego 2D:
@@ -874,9 +876,25 @@ juego.dibujar_mapa(NIVEL, {"#": [80, 70, 100]})
 | `solido(mapa, c, f)` · `casilla_en(mapa, x, y)` | ¿es pared? · `[columna, fila]` de un punto en píxeles |
 | `buscar_en_mapa(mapa, caracteres)` | lista de `[columna, fila]` con esos caracteres: dónde empieza el jugador, dónde están las monedas o los enemigos |
 | `camino(mapa, [c1, f1], [c2, f2][, diagonales])` | el camino más corto sin atravesar paredes, como lista de `[columna, fila]` sin la de salida (`[]` si no hay). Para enemigos que persiguen |
-| `dibujar_mapa(mapa, aspecto)` | dibuja las casillas que se ven (respeta la cámara); `aspecto` da a cada carácter un color o una imagen |
+| `dibujar_mapa(mapa, aspecto)` | dibuja las casillas que se ven (respeta la cámara); `aspecto` da a cada carácter un color, una imagen o un tile de una hoja (ver abajo). Los caracteres que no aparecen no se dibujan |
 
-Ejemplos: `08_plataformas` (con gravedad y plataformas) y `09_mazmorra` (vista cenital, con
+**Tiles.** Lo normal es dibujar los niveles con una hoja de tiles (un PNG con todos los tiles en
+rejilla, hecho con cualquier editor o descargado) y decir qué tile toca a cada carácter:
+
+```lince
+fijo TILES = juego.hoja("tiles.png", 16)            # tiles de 16×16 (se ajustan al tamaño de la casilla)
+juego.dibujar_mapa(NIVEL, {
+    "#": [TILES, 0],                               # el tile 0
+    ".": [TILES, 5],
+    "~": [TILES, [8, 9, 10, 9]],                   # animado: agua (0,25 s cada cuadro)
+    "S": [TILES, [12, 13], 0.1]                    # animado, 0,1 s cada cuadro
+})
+```
+
+El aspecto de un carácter se puede cambiar en cualquier momento (una puerta que se abre, un
+interruptor): es un diccionario normal. `09_mazmorra` hace su hoja con `sprite()`, sin archivos.
+
+Ejemplos: `08_plataformas` (con gravedad y plataformas) y `09_mazmorra` (vista cenital con tiles,
 fantasmas que te persiguen).
 
 **Partículas.** Chispas, polvo, explosiones: `particulas(x, y[, opciones])` lanza un puñado y
