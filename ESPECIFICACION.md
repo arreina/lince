@@ -827,7 +827,7 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | `sonido(ruta)` | carga un `.wav` o un `.ogg` (Ogg Vorbis, mucho más pequeño: mejor para la música); devuelve `{"sonido", "duracion", "ruta"}` |
 | `reproducir(sonido[, volumen[, bucle]])` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz |
 | `detener([voz])` | para esa voz o, sin argumento, todo |
-| `musica(sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para |
+| `musica(ruta o sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para. Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
 | `volumen([v])` | volumen general de 0 a 1 |
 | `pitido(frecuencia, ms[, volumen])` | tono sencillo, sin archivos |
 | `efecto(tipo[, opciones])` | genera y hace sonar un efecto al estilo de los juegos de 8 bits, sin archivos: `"moneda"`, `"salto"`, `"disparo"`, `"explosion"`, `"golpe"`, `"subir"`, `"clic"` o `"perder"`. Cada vez suena un poco distinto. Opciones: `volumen` (0,5), `tono` y `largo` (multiplican la frecuencia y la duración: `{"tono": 1.5}` más agudo) y `semilla` (siempre el mismo sonido) |

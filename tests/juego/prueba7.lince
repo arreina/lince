@@ -1,0 +1,17 @@
+# Prueba de la música en streaming: suena 1,5 s y se repite sin cortes
+importar "juego"
+juego.abrir("Música", 40, 40)
+juego.musica("tono.ogg", 1)
+intentar {
+    juego.musica("no_existe.ogg")
+} capturar (error e) {
+    escribir("sin archivo: " + e.mensaje)
+}
+juego.musica("tono.ogg", 1)
+mientras juego.abierto() {
+    juego.musica("tono.ogg", 1)          # la misma: no vuelve a empezar
+    si juego.tiempo() > 1.5 { juego.salir() }
+    juego.presentar()
+}
+juego.musica(nulo)
+escribir("fin")

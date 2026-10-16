@@ -31,3 +31,33 @@ short *ogg_decodificar(const unsigned char *bytes, size_t largo,
     *muestras = n;
     return salida;
 }
+
+struct OggFlujo { stb_vorbis *v; int canales; };
+
+OggFlujo *ogg_abrir(const unsigned char *bytes, size_t largo, int *canales, int *frecuencia) {
+    if (largo < 4 || largo > INT_MAX || memcmp(bytes, "OggS", 4) != 0) return NULL;
+    int err = 0;
+    stb_vorbis *v = stb_vorbis_open_memory(bytes, (int)largo, &err, NULL);
+    if (!v) return NULL;
+    stb_vorbis_info info = stb_vorbis_get_info(v);
+    if (info.channels < 1 || info.sample_rate <= 0) { stb_vorbis_close(v); return NULL; }
+    OggFlujo *f = malloc(sizeof *f);
+    if (!f) { stb_vorbis_close(v); return NULL; }
+    f->v = v;
+    f->canales = info.channels;
+    *canales = info.channels;
+    *frecuencia = (int)info.sample_rate;
+    return f;
+}
+
+int ogg_leer(OggFlujo *f, short *destino, int max) {
+    return stb_vorbis_get_samples_short_interleaved(f->v, f->canales, destino, max * f->canales);
+}
+
+void ogg_rebobinar(OggFlujo *f) { stb_vorbis_seek_start(f->v); }
+
+void ogg_cerrar(OggFlujo *f) {
+    if (!f) return;
+    stb_vorbis_close(f->v);
+    free(f);
+}

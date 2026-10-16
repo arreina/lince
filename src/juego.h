@@ -193,6 +193,18 @@ static struct {
     int npart;
     JgMapa mapas[JG_MAPAS];
     int nmapas;
+    /* música en streaming: el OGG se decodifica poco a poco en un anillo que
+       el mezclador va vaciando (juego.musica("tema.ogg")) */
+    struct {
+        char *bytes, *ruta;
+        size_t largo;
+        OggFlujo *ogg;
+        void *conv;                      /* SDL_AudioStream: a estéreo y 44100 Hz */
+        short *anillo;
+        int cap, lee, escribe, lleno;    /* en muestras (L y R cuentan por separado) */
+        int activa, canales;
+        float vol;
+    } flujo;
     /* escenas: la actual, la que viene (se cambia en presentar()) y el fundido */
     char escena[64], siguiente[64];
     int hay_siguiente, escena_nueva, fase;   /* fase 1: oscurece; 2: aclara */
@@ -204,6 +216,9 @@ static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
 static void jg_leer_mandos(void);
 static void jg_recoger_voces(void);
+static void jg_parar_flujo(void);
+static void jg_alimentar_flujo(void);
+static Valor *fn_jg_sonido(Valor **a, int n);
 static int jg_escribir(const char *t, int x, int y, int e, int ancho);
 static void jg_glifo(int ch, int px, int py, int e, int ac);
 static int jg_vigilar(void);
@@ -357,6 +372,7 @@ static void jg_pintar(const unsigned char c[4]) {
 }
 
 static void jg_cerrar_todo(void) {
+    jg_parar_flujo();
     if (_jgs.audio) { _jg.CloseAudio(_jgs.audio); _jgs.audio = 0; }
     for (int i = 0; i < JG_VOCES; i++) free(_jgs.voces[i].propio);
     memset(_jgs.voces, 0, sizeof _jgs.voces);
@@ -821,6 +837,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     }
     jg_leer_mandos();
     jg_recoger_voces();
+    jg_alimentar_flujo();
     if (_jgs.pide_texto && _jgs.escribir_prueba) {     /* prueba: se teclea cuando el juego lo espera */
         snprintf(_jgs.escrito, JG_ESCRITO, "%s", _jgs.escribir_prueba);
         for (char *c = _jgs.escrito; *c; c++) if (*c == '<') *c = '\b';   /* '<' = borrar */
@@ -1010,6 +1027,11 @@ static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
             }
             acc += (int)(voz->datos[voz->pos++] * voz->vol);
         }
+        if (_jgs.flujo.activa && _jgs.flujo.lleno > 0) {           /* música en streaming */
+            acc += (int)(_jgs.flujo.anillo[_jgs.flujo.lee] * _jgs.flujo.vol);
+            _jgs.flujo.lee = (_jgs.flujo.lee + 1) % _jgs.flujo.cap;
+            _jgs.flujo.lleno--;
+        }
         acc = (int)(acc * _jgs.volumen);
         salida[i] = (short)(acc > 32767 ? 32767 : acc < -32768 ? -32768 : acc);
     }
@@ -1072,6 +1094,89 @@ static void jg_parar_voz(int id) {
     for (int v = 0; v < JG_VOCES; v++)
         if (_jgs.voces[v].id == id) _jgs.voces[v].activa = 0;
     _jg.UnlockAudio(_jgs.audio);
+}
+
+/* ── Música en streaming ── */
+static void jg_parar_flujo(void) {
+    if (_jgs.audio) _jg.LockAudio(_jgs.audio);
+    _jgs.flujo.activa = 0;
+    if (_jgs.audio) _jg.UnlockAudio(_jgs.audio);
+    ogg_cerrar(_jgs.flujo.ogg);
+    if (_jgs.flujo.conv) _jg.FreeStream(_jgs.flujo.conv);
+    free(_jgs.flujo.bytes); free(_jgs.flujo.anillo); free(_jgs.flujo.ruta);
+    memset(&_jgs.flujo, 0, sizeof _jgs.flujo);
+}
+
+/* Decodifica lo que falte para tener el anillo lleno (unos 2 segundos por
+   delante). Se llama en cada presentar(): un fotograma que tarde más que eso
+   dejaría un hueco de silencio, nada peor. */
+static void jg_alimentar_flujo(void) {
+    if (!_jgs.flujo.activa) return;
+    short ent[4096 * 2], sal[8192 * 2];
+    int vueltas = 0;
+    for (;;) {
+        int libre = _jgs.flujo.cap - _jgs.flujo.lleno;        /* lo lee el hilo de audio: solo crece */
+        if (libre < (int)(sizeof sal / sizeof sal[0])) break;
+        int disp = _jg.StreamAvailable(_jgs.flujo.conv);
+        if (disp <= 0) {
+            int n = ogg_leer(_jgs.flujo.ogg, ent, 4096 / _jgs.flujo.canales);
+            if (n <= 0) {                                       /* al acabar, vuelve a empezar */
+                if (++vueltas > 2) break;                       /* archivo sin sonido: no insistir */
+                ogg_rebobinar(_jgs.flujo.ogg);
+                continue;
+            }
+            _jg.StreamPut(_jgs.flujo.conv, ent, n * (int)sizeof(short) * _jgs.flujo.canales);
+            continue;
+        }
+        int pedir = disp < (int)sizeof sal ? disp : (int)sizeof sal;
+        pedir -= pedir % 4;
+        int r = _jg.StreamGet(_jgs.flujo.conv, sal, pedir);
+        if (r <= 0) break;
+        int muestras = r / (int)sizeof(short);
+        _jg.LockAudio(_jgs.audio);
+        for (int i = 0; i < muestras; i++) {
+            _jgs.flujo.anillo[_jgs.flujo.escribe] = sal[i];
+            _jgs.flujo.escribe = (_jgs.flujo.escribe + 1) % _jgs.flujo.cap;
+        }
+        _jgs.flujo.lleno += muestras;
+        _jg.UnlockAudio(_jgs.audio);
+    }
+}
+
+/* Empieza la música en streaming desde 'ruta' (un .ogg); 0 con el motivo en msg */
+static int jg_empezar_flujo(const char *ruta, float vol, char *msg, size_t max) {
+    if (_jgs.flujo.activa && strcmp(_jgs.flujo.ruta, ruta) == 0) {    /* ya suena: solo el volumen */
+        _jgs.flujo.vol = vol;
+        return 1;
+    }
+    jg_parar_flujo();
+    if (!jg_audio()) return 1;                                  /* sin audio: se juega en silencio */
+    size_t largo = 0;
+    char *bytes = interprete_leer_bytes(ruta, &largo);
+    if (!bytes) { snprintf(msg, max, "no se encuentra la música '%s'", ruta); return 0; }
+    int canales = 0, freq = 0;
+    OggFlujo *ogg = ogg_abrir((const unsigned char *)bytes, largo, &canales, &freq);
+    if (!ogg) { free(bytes); snprintf(msg, max, "'%s' no es un OGG Vorbis válido", ruta); return 0; }
+    void *conv = _jg.NewAudioStream(JG_S16, (unsigned char)canales, freq, JG_S16, JG_CANALES, JG_FRECUENCIA);
+    int cap = JG_FRECUENCIA * JG_CANALES * 2;                   /* 2 segundos */
+    short *anillo = malloc((size_t)cap * sizeof(short));
+    if (!conv || !anillo) {
+        ogg_cerrar(ogg); free(bytes); free(anillo);
+        if (conv) _jg.FreeStream(conv);
+        snprintf(msg, max, "no se pudo preparar la música '%s'", ruta);
+        return 0;
+    }
+    _jgs.flujo.bytes = bytes; _jgs.flujo.largo = largo; _jgs.flujo.ogg = ogg; _jgs.flujo.conv = conv;
+    _jgs.flujo.canales = canales;
+    _jgs.flujo.anillo = anillo; _jgs.flujo.cap = cap;
+    _jgs.flujo.lee = _jgs.flujo.escribe = _jgs.flujo.lleno = 0;
+    _jgs.flujo.ruta = strdup(ruta);
+    _jgs.flujo.vol = vol;
+    _jg.LockAudio(_jgs.audio);
+    _jgs.flujo.activa = 1;
+    _jg.UnlockAudio(_jgs.audio);
+    jg_alimentar_flujo();
+    return 1;
 }
 
 static float jg_volumen_arg(Valor **a, int n, int i, float defecto) {
@@ -1260,19 +1365,58 @@ static Valor *fn_jg_detener(Valor **a, int n) {
         for (int v = 0; v < JG_VOCES; v++) _jgs.voces[v].activa = 0;
         _jg.UnlockAudio(_jgs.audio);
     }
+    jg_parar_flujo();
     _jgs.voz_musica = 0;
     return valor_nulo();
 }
 
-/* musica(sonido[, volumen]): suena en bucle y sustituye a la anterior; musica(nulo) la para */
+/* ¿Sigue sonando la voz con ese id y esos datos? */
+static int jg_voz_suena(int id, const short *datos) {
+    if (!_jgs.audio || id <= 0) return 0;
+    for (int v = 0; v < JG_VOCES; v++)
+        if (_jgs.voces[v].id == id) return _jgs.voces[v].activa && _jgs.voces[v].datos == datos;
+    return 0;
+}
+
+/* musica(ruta o sonido[, volumen]): suena en bucle y sustituye a la anterior;
+   musica(nulo) la para. Con la ruta de un .ogg se lee poco a poco (streaming):
+   una canción larga no ocupa decenas de MB. Si ya está sonando la misma, solo
+   cambia el volumen (así no vuelve a empezar al recargar en caliente). */
 static Valor *fn_jg_musica(Valor **a, int n) {
     JG_ABIERTA();
-    jg_parar_voz(_jgs.voz_musica);
-    _jgs.voz_musica = 0;
-    if (n < 1 || a[0]->tipo == VAL_NULO) return valor_nulo();
+    float vol = jg_volumen_arg(a, n, 1, 0.6f);
+    if (n >= 1 && a[0]->tipo == VAL_TEXTO) {
+        size_t l = strlen(a[0]->texto);
+        int es_ogg = l > 4 && (strcmp(a[0]->texto + l - 4, ".ogg") == 0 || strcmp(a[0]->texto + l - 4, ".OGG") == 0);
+        if (es_ogg) {
+            jg_parar_voz(_jgs.voz_musica);
+            _jgs.voz_musica = 0;
+            char msg[600];
+            if (!jg_empezar_flujo(a[0]->texto, vol, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
+            return valor_nulo();
+        }
+        /* un .wav: se carga entero, como juego.sonido() */
+        Valor *s = fn_jg_sonido(a, 1);
+        if (hay_error) return s;
+        Valor *args[2] = {s, n > 1 ? a[1] : NULL};
+        Valor *r = fn_jg_musica(args, n > 1 ? 2 : 1);
+        valor_destruir(s);
+        return r;
+    }
+    jg_parar_flujo();
+    if (n < 1 || a[0]->tipo == VAL_NULO) {
+        jg_parar_voz(_jgs.voz_musica);
+        _jgs.voz_musica = 0;
+        return valor_nulo();
+    }
     JgSonido *s = jg_sonido_arg(a, n, "musica");
     if (!s) return valor_nulo();
-    _jgs.voz_musica = jg_sonar(s->datos, s->muestras, jg_volumen_arg(a, n, 1, 0.6f), 1, NULL);
+    if (jg_voz_suena(_jgs.voz_musica, s->datos)) {               /* la misma: solo el volumen */
+        for (int v = 0; v < JG_VOCES; v++) if (_jgs.voces[v].id == _jgs.voz_musica) _jgs.voces[v].vol = vol;
+        return valor_nulo();
+    }
+    jg_parar_voz(_jgs.voz_musica);
+    _jgs.voz_musica = jg_sonar(s->datos, s->muestras, vol, 1, NULL);
     return valor_nulo();
 }
 

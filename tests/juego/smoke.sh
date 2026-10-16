@@ -195,4 +195,28 @@ cmp -s a.wav b.wav && ok "efecto: la misma semilla da el mismo .wav" || mal "la 
 printf 'importar "juego"\njuego.abrir("x", 10, 10)\nfalla()\n' > falla.lince
 SDL_VIDEODRIVER=dummy timeout 10 "$LINCE" falla.lince > /dev/null 2>&1
 [ $? -eq 1 ] && ok "sin pantalla, un error no se queda esperando" || mal "un error sin pantalla se queda esperando"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt; exit 1; }
+# ── Novena parte: música en streaming, escuchada con el controlador «disk» de SDL ──
+rm -f sdlaudio.raw
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=disk SDL_DISKAUDIOFILE="$PWD/sdlaudio.raw" timeout 30 "$LINCE" "$DIR/prueba7.lince" > salida11.txt 2>/dev/null
+[ $? -eq 0 ] && grep -qx "fin" salida11.txt && ok "la novena prueba termina bien" || mal "la novena prueba falló"
+grep -qF "no se encuentra la música 'no_existe.ogg'" salida11.txt && ok "música: archivo que no existe" || mal "falta el error de música inexistente"
+if [ -f sdlaudio.raw ]; then
+    python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+d = open("sdlaudio.raw", "rb").read()
+izq = struct.unpack("<%dh" % (len(d) // 2), d[:len(d) // 2 * 2])[0::2]
+sonando = [i for i, x in enumerate(izq) if abs(x) > 50]
+if len(izq) < 44100 or not sonando:
+    print("  ❌ música: no suena"); sys.exit(1)
+racha = peor = 0
+for x in izq[sonando[0]:sonando[-1]]:
+    racha = racha + 1 if abs(x) <= 50 else 0
+    peor = max(peor, racha)
+dura = (sonando[-1] - sonando[0]) / 44100
+if dura > 1.2 and peor < 441: print("  ✅ música: suena %.1f s seguidos, repitiéndose sin cortes" % dura)
+else: print("  ❌ música: %.2f s, hueco de %d muestras" % (dura, peor)); sys.exit(1)
+PY
+else
+    echo "  ⏭  música: este SDL no tiene el controlador «disk»"
+fi
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt; exit 1; }
