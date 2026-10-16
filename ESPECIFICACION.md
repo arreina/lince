@@ -945,7 +945,8 @@ Para pruebas automáticas (sin pantalla, con `SDL_VIDEODRIVER=dummy`): `LINCE_JU
 cierra el juego tras N fotogramas de 1/60 s; `LINCE_JUEGO_PULSAR=espacio,derecha` y
 `LINCE_JUEGO_CLIC=x,y` pulsan en los fotogramas impares; `LINCE_JUEGO_ESCRIBIR=texto` teclea
 (`<` borra); `LINCE_JUEGO_CAPTURA=ruta.bmp` guarda el último fotograma y
-`LINCE_JUEGO_FOTOS=carpeta` todos (para hacer un vídeo).
+`LINCE_JUEGO_FOTOS=carpeta` todos; `LINCE_JUEGO_AUDIO=ruta.wav` guarda el sonido sincronizado con
+esos fotogramas (para hacer un vídeo con sonido) y `LINCE_JUEGO_SEMILLA=n` hace las partidas repetibles.
 
 ### `bytes`
 

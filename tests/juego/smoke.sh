@@ -219,4 +219,13 @@ PY
 else
     echo "  ⏭  música: este SDL no tiene el controlador «disk»"
 fi
+# Grabar el sonido a la par que los fotogramas: 90 fotogramas son 1,5 s de .wav
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=90 LINCE_JUEGO_AUDIO=grabado.wav timeout 30 "$LINCE" "$DIR/prueba7.lince" > /dev/null 2>&1
+python3 - <<'PY' && ok "el sonido se graba sincronizado con los fotogramas" || mal "el sonido grabado no cuadra"
+import wave, struct
+w = wave.open("grabado.wav")
+d = w.readframes(w.getnframes())
+assert w.getnframes() == 90 * 735, w.getnframes()
+assert max(abs(x) for x in struct.unpack("<%dh" % (len(d) // 2), d)) > 1000
+PY
 [ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt; exit 1; }

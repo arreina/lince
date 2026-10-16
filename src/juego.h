@@ -164,7 +164,9 @@ static struct {
        el juego llama a editar() o texto_escrito();
        LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma, y
        LINCE_JUEGO_FOTOS=carpeta todos (00000.bmp, 00001.bmp...);
-       LINCE_JUEGO_SEMILLA=n fija la semilla de matematica.aleatorio(). */
+       LINCE_JUEGO_SEMILLA=n fija la semilla de matematica.aleatorio() y
+       LINCE_JUEGO_AUDIO=ruta.wav guarda el sonido (1/60 s por fotograma, a la par
+       que LINCE_JUEGO_FOTOS: sirve para hacer un vídeo con sonido). */
     long limite, total;
     int pulsar[16], npulsar, clic_x, clic_y, hay_clic;
     double cam_x, cam_y, t_inicio;
@@ -189,6 +191,8 @@ static struct {
     int nacciones;
     int reabrir;                         /* recarga en caliente: abrir() reutiliza la ventana */
     int recargado;                       /* el programa se recargó conservando sus variables */
+    FILE *audio_prueba;                  /* LINCE_JUEGO_AUDIO: el sonido de cada fotograma, a un .wav */
+    long audio_bytes;
     JgParticula part[JG_PARTICULAS];
     int npart;
     JgMapa mapas[JG_MAPAS];
@@ -217,6 +221,8 @@ static int jg_guardar_bmp(const char *ruta);
 static void jg_leer_mandos(void);
 static void jg_recoger_voces(void);
 static void jg_parar_flujo(void);
+static int jg_audio(void);
+static void jg_mezclar(void *datos, unsigned char *flujo, int largo);
 static void jg_alimentar_flujo(void);
 static Valor *fn_jg_sonido(Valor **a, int n);
 static int jg_escribir(const char *t, int x, int y, int e, int ancho);
@@ -371,7 +377,27 @@ static void jg_pintar(const unsigned char c[4]) {
     _jg.SetDrawColor(_jgs.render, c[0], c[1], c[2], c[3]);
 }
 
+/* Cierra el .wav de LINCE_JUEGO_AUDIO poniendo los tamaños en la cabecera */
+static void jg_cerrar_audio_prueba(void) {
+    FILE *f = _jgs.audio_prueba;
+    if (!f) return;
+    unsigned datos = (unsigned)_jgs.audio_bytes;
+    unsigned char cab[44];
+    memcpy(cab, "RIFF", 4);
+    for (int i = 0; i < 4; i++) cab[4 + i] = (unsigned char)((36 + datos) >> (8 * i));
+    memcpy(cab + 8, "WAVEfmt ", 8);
+    const unsigned campos[] = {16, 1 | JG_CANALES << 16, JG_FRECUENCIA, JG_FRECUENCIA * JG_CANALES * 2, (JG_CANALES * 2) | 16 << 16};
+    for (int c = 0; c < 5; c++) for (int i = 0; i < 4; i++) cab[16 + 4 * c + i] = (unsigned char)(campos[c] >> (8 * i));
+    memcpy(cab + 36, "data", 4);
+    for (int i = 0; i < 4; i++) cab[40 + i] = (unsigned char)(datos >> (8 * i));
+    fseek(f, 0, SEEK_SET);
+    fwrite(cab, 1, 44, f);
+    fclose(f);
+    _jgs.audio_prueba = NULL;
+}
+
 static void jg_cerrar_todo(void) {
+    jg_cerrar_audio_prueba();
     jg_parar_flujo();
     if (_jgs.audio) { _jg.CloseAudio(_jgs.audio); _jgs.audio = 0; }
     for (int i = 0; i < JG_VOCES; i++) free(_jgs.voces[i].propio);
@@ -487,6 +513,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         valor_destruir(s);
     }
     _jgs.dt = 1.0 / 60; _jgs.t_ultimo = jg_ahora(); _jgs.t_fps = _jgs.t_ultimo; _jgs.cuadros = 0; _jgs.fps = 0;
+    if (_jgs.limite && getenv("LINCE_JUEGO_AUDIO")) jg_audio();     /* el sonido empieza con el fotograma 0 */
     return valor_nulo();
 }
 
@@ -838,6 +865,18 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     jg_leer_mandos();
     jg_recoger_voces();
     jg_alimentar_flujo();
+    if (_jgs.audio_prueba) {                         /* prueba: el sonido de este fotograma */
+        short bloque[JG_FRECUENCIA / 60 * JG_CANALES];
+        _jg.LockAudio(_jgs.audio);
+        jg_mezclar(NULL, (unsigned char *)bloque, (int)sizeof bloque);
+        _jg.UnlockAudio(_jgs.audio);
+        for (size_t i = 0; i < sizeof bloque / sizeof bloque[0]; i++) {
+            unsigned char m[2] = {(unsigned char)(bloque[i] & 0xFF), (unsigned char)((unsigned short)bloque[i] >> 8)};
+            fwrite(m, 1, 2, _jgs.audio_prueba);
+        }
+        _jgs.audio_bytes += (long)sizeof bloque;
+        jg_alimentar_flujo();
+    }
     if (_jgs.pide_texto && _jgs.escribir_prueba) {     /* prueba: se teclea cuando el juego lo espera */
         snprintf(_jgs.escrito, JG_ESCRITO, "%s", _jgs.escribir_prueba);
         for (char *c = _jgs.escrito; *c; c++) if (*c == '<') *c = '\b';   /* '<' = borrar */
@@ -1037,6 +1076,8 @@ static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
     }
 }
 
+static void jg_cerrar_audio_prueba(void);
+
 /* Abre el dispositivo la primera vez; 0 si no hay audio (se juega en silencio) */
 static int jg_audio(void) {
     if (_jgs.audio) return 1;
@@ -1046,6 +1087,19 @@ static int jg_audio(void) {
     want.callback = jg_mezclar;
     _jgs.audio = _jg.OpenAudio(NULL, 0, &want, &have, 0);      /* sin cambios permitidos: SDL convierte */
     if (!_jgs.audio) return 0;
+    const char *ruta = getenv("LINCE_JUEGO_AUDIO");
+    if (_jgs.limite && ruta && !_jgs.audio_prueba) {
+        /* prueba: el dispositivo no suena; presentar() mezcla 1/60 s por fotograma
+           y lo guarda, sincronizado con LINCE_JUEGO_FOTOS */
+        _jgs.audio_prueba = fopen(ruta, "wb");
+        if (_jgs.audio_prueba) {
+            unsigned char cab[44] = {0};
+            fwrite(cab, 1, 44, _jgs.audio_prueba);
+            atexit(jg_cerrar_audio_prueba);          /* el programa puede acabar sin juego.cerrar() */
+        }
+        _jgs.audio_bytes = 0;
+        return 1;
+    }
     _jg.PauseAudio(_jgs.audio, 0);
     return 1;
 }
