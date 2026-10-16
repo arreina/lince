@@ -791,7 +791,6 @@ mientras juego.abierto() {
 | `imagen(ruta)` | carga un PNG, JPG, BMP, GIF o TGA; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo |
 | `sprite(filas, colores)` | crea una imagen a partir de texto, un carácter por píxel: `juego.sprite([".X.", "XXX"], {"X": [255, 0, 0]})`; los caracteres sin color son transparentes |
 | `hoja(imagen o ruta[, cómo dividirla])` | una imagen con varios cuadros (los fotogramas de una animación, los tiles de un mapa) partida en esos cuadros; ver **Hojas de sprites** más abajo. También vale una imagen hecha con `sprite()` |
-| `juntar(fotogramas)` | junta los fotogramas de una animación (rutas de imágenes o imágenes ya cargadas, un dibujo por fotograma) en una hoja, en ese orden. Si no miden lo mismo, cada uno va centrado y apoyado abajo |
 | `animar(imagen o ruta, tipo[, opciones])` | genera una animación a partir de un solo dibujo y la devuelve como hoja (ver abajo) |
 | `guardar_imagen(imagen, ruta)` | guarda una imagen (un sprite, una hoja generada...) como `.png`, por ejemplo para retocarla en un editor |
 | `dibujar(imagen, x, y[, opciones])` | dibuja la imagen; `opciones` es un diccionario con cualquiera de: `escala`, `ancho`, `alto`, `angulo` (grados), `espejo`, `voltear`, `centrado` (x, y es el centro), `alfa` (0–255), `color` (tinte), `recorte` (`[x, y, ancho, alto]`), `cuadro` (el número de cuadro de una hoja; con una imagen normal, indica también `celda`: `[ancho, alto]` de cada cuadro) y `fila` (en una hoja con una animación por fila, cuenta `cuadro` dentro de esa fila) |
@@ -878,11 +877,9 @@ si saltando { fila = 1 }
 juego.dibujar(PJ, x, y, {"fila": fila, "cuadro": juego.cuadro(PJ["por_fila"][fila], 10)})
 ```
 
-Hay otras dos maneras de tener una animación, y las tres dan una hoja que se dibuja igual: un
-archivo por fotograma, `juntar(["andar_1.png", "andar_2.png", ...])`, o generarla a partir de un
-solo dibujo con `animar()` (abajo). Así se puede empezar con una generada y cambiarla después por
-la dibujada a mano sin tocar el resto del juego. Si cambia en el disco una imagen con el juego en
-marcha, las hojas hechas con ella con `juntar` o `animar` se rehacen solas.
+La otra manera de tener una animación es generarla a partir de un solo dibujo con `animar()`
+(abajo), que también da una hoja y se dibuja igual. Así se puede empezar con una generada y
+cambiarla después por la dibujada a mano sin tocar el resto del juego.
 
 **Animaciones generadas.** Con un solo dibujo del personaje (quieto y, para andar, de perfil
 mirando a la derecha), `animar()` hace los cuadros de una animación:
@@ -909,7 +906,8 @@ normal; 2, el doble de movimiento), `vista` (`"lado"` o `"frente"`), y si no aci
 Funciona mejor con pixel art pequeño (de 16 a 48 píxeles de alto) y con las piernas separadas
 por al menos un píxel transparente. Cada cuadro es algo mayor que el dibujo (lo que asoma al
 moverse; la hoja dice cuánto en `"relleno"`, `[x, y]` por cada lado) y el dibujo queda en el centro,
-así que con `"centrado"` se dibuja en el mismo sitio que el original. Ejemplo: `10_paseo`, que usa
+así que con `"centrado"` se dibuja en el mismo sitio que el original. Si la imagen cambia en el
+disco con el juego en marcha, sus animaciones se rehacen solas. Ejemplo: `10_paseo`, que usa
 las dos maneras (el personaje, generado; los pájaros, con una hoja dibujada a mano que se divide sola).
 
 **Mapas de casillas.** Un nivel escrito con texto, un carácter por casilla, para cualquier juego 2D:
