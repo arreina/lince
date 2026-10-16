@@ -244,6 +244,7 @@ static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
 static int jg_opcion(Valor *op, const char *clave, double *out);
 static Valor *jg_opcion_valor(Valor *op, const char *clave);
+static void jg_dic_poner(Valor *d, const char *clave, Valor *v);
 
 static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
@@ -2119,6 +2120,160 @@ static void jg_poner_filas(Valor *d, int filas, int por_fila_igual, const int *p
     valor_diccionario_agregar(d, "por_fila", l);
 }
 
+/* Quita de la hoja 'd' los cuadros de la lista 'quitar' (números de cuadro,
+   contando desde 0 como siempre): los demás se vuelven a numerar seguidos y
+   las filas que se quedan sin cuadros desaparecen. La hoja pasa a llevar la
+   lista de "recortes" de los cuadros que quedan. */
+static Valor *jg_hoja_quitar(Valor *d, Valor *quitar) {
+    if (!quitar) return d;
+    JgImagen *img = &_jgs.imagenes[jg_id_de(d, "imagen")];
+    Valor *pf = d->diccionario.valores[valor_diccionario_buscar(d, "por_fila")];
+    int total = (int)d->diccionario.valores[valor_diccionario_buscar(d, "cuadros")]->numero;
+    char *fuera = calloc((size_t)total, 1);
+    int *por_fila = malloc(sizeof(int) * (pf->lista.cantidad + 1));
+    char msg[200];
+    if (!fuera || !por_fila) { free(fuera); free(por_fila); valor_destruir(d); return jg_error("Error", "sin memoria"); }
+    for (int i = 0; i < quitar->lista.cantidad; i++) {
+        Valor *e = quitar->lista.elementos[i];
+        if (e->tipo != VAL_NUMERO || e->numero != floor(e->numero) || e->numero < 0 || e->numero >= total) {
+            snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número de 0 a %d", total - 1);
+            free(fuera); free(por_fila); valor_destruir(d);
+            return jg_error("Error", msg);
+        }
+        fuera[(int)e->numero] = 1;
+    }
+    Valor *recortes = valor_lista_crear();
+    int quedan = 0, nf = 0, cols = 0, global = 0;
+    for (int f = 0; f < pf->lista.cantidad; f++) {
+        int en_fila = (int)pf->lista.elementos[f]->numero, cuenta = 0;
+        for (int e = 0; e < en_fila; e++, global++) {
+            if (fuera[global]) continue;
+            JgRect src;
+            int ox, oy, cw, ch;
+            jg_hoja_cuadro(d, img, f, e, &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
+            Valor *r = valor_lista_crear();
+            lista_agregar(r, valor_numero(src.x)); lista_agregar(r, valor_numero(src.y));
+            lista_agregar(r, valor_numero(src.w)); lista_agregar(r, valor_numero(src.h));
+            lista_agregar(recortes, r);
+            cuenta++;
+        }
+        if (cuenta) { por_fila[nf++] = cuenta; if (cuenta > cols) cols = cuenta; quedan += cuenta; }
+    }
+    free(fuera);
+    if (quedan == 0) {
+        free(por_fila); valor_destruir(recortes); valor_destruir(d);
+        return jg_error("Error", "hoja(): con \"quitar\" no queda ningún cuadro");
+    }
+    Valor *l = valor_lista_crear();
+    for (int f = 0; f < nf; f++) lista_agregar(l, valor_numero(por_fila[f]));
+    free(por_fila);
+    jg_dic_poner(d, "recortes", recortes);
+    jg_dic_poner(d, "cuadros", valor_numero(quedan));
+    jg_dic_poner(d, "columnas", valor_numero(cols));
+    jg_dic_poner(d, "filas", valor_numero(nf));
+    jg_dic_poner(d, "por_fila", l);
+    return d;
+}
+
+/* pisadas(hoja[, fila]): los cuadros en que un pie toca el suelo, para que
+   suenen los pasos a su tiempo. En cada cuadro mira qué hay pegado al suelo
+   (las filas de abajo de la celda) y lo compara con el cuadro anterior (el
+   del final cuenta como anterior del primero, porque las animaciones de andar
+   dan la vuelta). Supone que el personaje mira a la derecha. Con 'fila', los
+   números son dentro de esa fila. */
+#define JG_MAX_APOYOS 16
+static Valor *fn_jg_pisadas(Valor **a, int n) {
+    JG_ABIERTA();
+    JgRejilla g;
+    int k = n > 0 ? jg_id_de(a[0], "imagen") : -1;
+    if (k < 0 || k >= _jgs.nimagenes || !jg_rejilla_de(a[0], &g))
+        return jg_error("ErrorTipo", "pisadas() espera una hoja de juego.hoja() (y, si quieres, una fila)");
+    int fila = -1;
+    char msg[200];
+    if (n > 1) {
+        if (a[1]->tipo != VAL_NUMERO || a[1]->numero < 0) return jg_error("ErrorTipo", "pisadas(): la fila es un número desde 0");
+        fila = (int)a[1]->numero;
+    }
+    JgImagen *img = &_jgs.imagenes[k];
+    int cuantos = (int)a[0]->diccionario.valores[valor_diccionario_buscar(a[0], "cuadros")]->numero;
+    if (fila >= 0) {
+        int kp = valor_diccionario_buscar(a[0], "por_fila");
+        Valor *pf = kp >= 0 ? a[0]->diccionario.valores[kp] : NULL;
+        if (!pf || pf->tipo != VAL_LISTA || fila >= pf->lista.cantidad) {
+            snprintf(msg, sizeof msg, "pisadas(): la hoja no tiene fila %d", fila);
+            return jg_error("Error", msg);
+        }
+        cuantos = (int)pf->lista.elementos[fila]->numero;
+    }
+    unsigned char *px = jg_pixeles(k);
+    if (!px) return jg_error("ErrorJuego", "pisadas(): no se pudieron leer los píxeles de la hoja");
+    /* lo más bajo de cada cuadro, en coordenadas de la celda; el suelo es lo más bajo de todos */
+    int *abajo = malloc(sizeof(int) * cuantos), (*apoyo)[JG_MAX_APOYOS][2] = malloc(sizeof *apoyo * cuantos);
+    int *napoyos = calloc((size_t)cuantos, sizeof(int));
+    if (!abajo || !apoyo || !napoyos) { free(px); free(abajo); free(apoyo); free(napoyos); return jg_error("Error", "sin memoria"); }
+    int suelo = -1, cw = 1, ch = 1;
+    for (int i = 0; i < cuantos; i++) {
+        JgRect src;
+        int ox, oy;
+        jg_hoja_cuadro(a[0], img, fila, i, &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
+        abajo[i] = -1;
+        for (int y = src.y; y < src.y + src.h; y++)
+            for (int x = src.x; x < src.x + src.w; x++)
+                if (x >= 0 && y >= 0 && x < img->ancho && y < img->alto && px[((size_t)y * img->ancho + x) * 4 + 3] > 64)
+                    if (oy + y - src.y > abajo[i]) abajo[i] = oy + y - src.y;
+        if (abajo[i] > suelo) suelo = abajo[i];
+    }
+    int margen = (int)floor(ch * 0.04);              /* los pies no siempre llegan justo al mismo suelo */
+    int junta = (int)fmax(1, round(cw * 0.025));     /* huecos más pequeños no separan dos apoyos */
+    for (int i = 0; i < cuantos; i++) {
+        JgRect src;
+        int ox, oy;
+        jg_hoja_cuadro(a[0], img, fila, i, &src, &ox, &oy, &cw, &ch, msg, sizeof msg);
+        int desde = -1, hueco = 0;
+        for (int x = 0; x <= src.w; x++) {                  /* columnas con algo pegado al suelo */
+            int toca = 0;
+            for (int y = suelo - margen; y <= suelo && x < src.w && !toca; y++) {
+                int sy = src.y + y - oy, sx = src.x + x;
+                if (sy >= src.y && sy < src.y + src.h && sx < img->ancho && sy < img->alto)
+                    toca = px[((size_t)sy * img->ancho + sx) * 4 + 3] > 64;
+            }
+            if (toca) { if (desde < 0) desde = x; hueco = 0; continue; }
+            if (desde >= 0 && (++hueco > junta || x == src.w) && napoyos[i] < JG_MAX_APOYOS) {
+                apoyo[i][napoyos[i]][0] = ox + desde;
+                apoyo[i][napoyos[i]][1] = ox + x - hueco;
+                napoyos[i]++;
+                desde = -1;
+            }
+        }
+    }
+    free(px);
+    /* hay pisada si ahora hay más apoyos que antes (un pie aterriza: tras ir por el aire, o
+       al lado del otro) o si el apoyo de delante salta hacia delante (andando con los dos
+       pies casi siempre en el suelo, el que avanzaba aterriza por delante del otro) */
+    char *pisa = calloc((size_t)cuantos, 1);
+    int salto = (int)fmax(2, round(cw * 0.06));
+    for (int i = 0; i < cuantos && cuantos > 1; i++) {
+        int p = (i + cuantos - 1) % cuantos, nuevo = 0, delante_i = -1, delante_p = -1;
+        for (int s = 0; s < napoyos[i]; s++) if (apoyo[i][s][1] > delante_i) delante_i = apoyo[i][s][1];
+        for (int s = 0; s < napoyos[p]; s++) if (apoyo[p][s][1] > delante_p) delante_p = apoyo[p][s][1];
+        nuevo = napoyos[i] > napoyos[p];
+        pisa[i] = nuevo || (delante_p >= 0 && delante_i - delante_p > salto);
+    }
+    /* una pisada puede tardar dos cuadros en asentarse (la punta y luego el pie): cuenta una */
+    Valor *l = valor_lista_crear();
+    int primera = -1, ultima = -1000;
+    for (int i = 0; i < cuantos; i++) {
+        if (!pisa[i] || i - ultima < 2) continue;
+        if (primera >= 0 && i + cuantos - primera < 2) continue;      /* pegada a la primera, dando la vuelta */
+        if (primera < 0) primera = i;
+        ultima = i;
+        lista_agregar(l, valor_numero(i));
+    }
+    free(pisa);
+    free(abajo); free(apoyo); free(napoyos);
+    return l;
+}
+
 /* hoja(imagen o ruta[, cómo dividirla]): una imagen con varios cuadros (los
    de una animación, o los tiles de un mapa) partida en esos cuadros:
      hoja("andar.png")                               sola: busca las figuras
@@ -2143,8 +2298,23 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     }
     int k = jg_id_de(img, "imagen");
     if (img != a[0]) valor_destruir(img);
-    char msg[300];
     JgRejilla g = {0, 0, 0, 0};
+    /* hoja(otra_hoja, {"quitar": [...]}): no se vuelve a dividir, solo se quitan cuadros */
+    if (img == a[0] && jg_rejilla_de(a[0], &g) && n == 2 && a[1]->tipo == VAL_DICCIONARIO &&
+        a[1]->diccionario.cantidad == 1 && valor_diccionario_buscar(a[1], "quitar") >= 0) {
+        Valor *q = jg_opcion_valor(a[1], "quitar");
+        if (q->tipo != VAL_LISTA)
+            return jg_error("ErrorTipo", "hoja(): \"quitar\" es la lista de los cuadros que no se usan, por ejemplo [0, 1, 2]");
+        Valor *d = valor_diccionario_crear();
+        for (int j = 0; j < a[0]->diccionario.cantidad; j++) {
+            Valor *v = a[0]->diccionario.valores[j];
+            v->refs++;
+            valor_diccionario_agregar(d, a[0]->diccionario.claves[j], v);
+        }
+        return jg_hoja_quitar(d, q);
+    }
+    memset(&g, 0, sizeof g);
+    char msg[300];
     int i = 1, por_tamano = 0;
     if (n > 1 && a[1]->tipo == VAL_NUMERO) {
         por_tamano = 1;
@@ -2161,9 +2331,14 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
             const char *c = op->diccionario.claves[j];
             int de_cuenta = !strcmp(c, "columnas") || !strcmp(c, "filas");
             if (!strcmp(c, "fondo") || !strcmp(c, "escala")) continue;      /* se leen abajo */
+            if (!strcmp(c, "quitar")) {
+                if (op->diccionario.valores[j]->tipo != VAL_LISTA)
+                    return jg_error("ErrorTipo", "hoja(): \"quitar\" es la lista de los cuadros que no se usan, por ejemplo [0, 1, 2]");
+                continue;
+            }
             if (strcmp(c, "separacion") && strcmp(c, "margen") && !de_cuenta) {
                 snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"columnas\", \"filas\", "
-                         "\"separacion\", \"margen\", \"fondo\" y \"escala\")", c);
+                         "\"separacion\", \"margen\", \"quitar\", \"fondo\" y \"escala\")", c);
                 return jg_error("Error", msg);
             }
             if (de_cuenta && por_tamano)
@@ -2241,7 +2416,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
         valor_diccionario_agregar(d, "columnas", valor_numero(cols));
         jg_poner_filas(d, nf, 0, hi->partes);
         valor_diccionario_agregar(d, "recortes", recortes);
-        return d;
+        return jg_hoja_quitar(d, jg_opcion_valor(op, "quitar"));
     }
     if (por_cuenta) {
         if (columnas == 0) columnas = 1;
@@ -2268,7 +2443,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     valor_diccionario_agregar(d, "columnas", valor_numero(cols));
     valor_diccionario_agregar(d, "cuadros", valor_numero(total));
     jg_poner_filas(d, total / cols, cols, NULL);
-    return d;
+    return jg_hoja_quitar(d, jg_opcion_valor(op, "quitar"));
 }
 
 /* ── Animaciones generadas ──
@@ -3948,6 +4123,7 @@ static void cargar_juego(Entorno *entorno) {
         {"dibujar",         fn_jg_dibujar,         -1},
         {"sprite",          fn_jg_sprite,           2},
         {"hoja",            fn_jg_hoja,            -1},
+        {"pisadas",         fn_jg_pisadas,         -1},
         {"animar",          fn_jg_animar,          -1},
         {"guardar_imagen",  fn_jg_guardar_imagen,   2},
         {"sonido",          fn_jg_sonido,           1},

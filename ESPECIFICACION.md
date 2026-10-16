@@ -871,6 +871,14 @@ queda. Un número de cuadro fuera de rango
 da la vuelta (−1 es el último). La hoja devuelta lleva `"cuadros"`, `"celda"` (`[ancho, alto]` de
 cada cuadro), `"columnas"`, `"filas"` y `"por_fila"` (cuántos cuadros hay en cada fila).
 
+Para no usar algunos cuadros (uno repetido, o unos del principio en que el personaje está
+girándose), `quitar`: los que quedan se vuelven a numerar seguidos desde 0, así el resto del juego
+no tiene que saber nada. También vale con una hoja ya hecha: `hoja(OTRA, {"quitar": [5]})`.
+
+```lince
+fijo CORRE = juego.hoja("corre.png", {"quitar": [0, 1, 2]})
+```
+
 Si cada fila es una animación, `fila` elige cuál y `cuadro` cuenta dentro de ella (y da la
 vuelta al llegar al final de la fila):
 
@@ -879,6 +887,19 @@ fijo PJ = juego.hoja("personaje.png")                   # fila 0: andar, fila 1:
 sea fila = 0
 si saltando { fila = 1 }
 juego.dibujar(PJ, x, y, {"fila": fila, "cuadro": juego.cuadro(PJ["por_fila"][fila], 10)})
+```
+
+**Pisadas.** Para que los pasos suenen justo cuando el pie toca el suelo, `pisadas(hoja[, fila])`
+mira los cuadros y devuelve en cuáles hay una pisada: cuando aterriza un pie (tras ir por el aire,
+o al lado del otro) o cuando el pie de delante aparece más adelante que en el cuadro anterior
+(andando, con los dos pies casi siempre en el suelo). Supone que el personaje mira a la derecha y
+que la animación da la vuelta (el último cuadro va antes del primero). Los sonidos los pones tú:
+
+```lince
+fijo PASOS = juego.pisadas(CORRE)                     # por ejemplo [1, 7, 13, 19, 26, 31]
+fijo PASO = juego.sonido("paso.wav")
+# en cada fotograma, cuando cambia el cuadro:
+si cuadro != anterior y PASOS.contiene(cuadro) { juego.reproducir(PASO) }
 ```
 
 La otra manera de tener una animación es generarla a partir de un solo dibujo con `animar()`

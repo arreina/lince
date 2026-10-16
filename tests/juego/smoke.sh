@@ -243,11 +243,11 @@ PY
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
-for l in "andar: 8 8x6 relleno 2" "misma hoja: verdadero" "respirar: 4" "girar: 4" "frente: 0" "png: 64x6" "desde archivo: 2" "sola: 5 filas 2 3+2 celda 2x3" "por cuenta: 3 2x2" "con fondo: 2 filas 1 celda 4x6" "reducida: 7"; do
+for l in "andar: 8 8x6 relleno 2" "misma hoja: verdadero" "respirar: 4" "girar: 4" "frente: 0" "png: 64x6" "desde archivo: 2" "sola: 5 filas 2 3+2 celda 2x3" "por cuenta: 3 2x2" "con fondo: 2 filas 1 celda 4x6" "reducida: 7" "pisadas: 1 3 de 2" "quitar: 3 pisadas 2 de 1"; do
     grep -qxF "$l" salida12.txt && ok "animar: $l" || mal "falta la línea: $l"
 done
 for e in "no conozco la opción 'cuadro'" "no conozco la animación 'bailar'" '"vista" es "lado"' '"cuadros" va de 1 a 64' \
-         "transparente del todo" "debe acabar en .png" "no hay fila 5" "no encuentro huecos transparentes" '"fondo" es "auto"' '"escala" reduce la imagen'; do
+         "transparente del todo" "debe acabar en .png" "no hay fila 5" "no encuentro huecos transparentes" '"fondo" es "auto"' '"escala" reduce la imagen' "cada cuadro es un número de 0 a 3" "pisadas() espera una hoja"; do
     grep -qF "$e" salida12.txt && ok "animar: error «$e»" || mal "falta el error: $e"
 done
 python3 - <<'PY' || fallos=$((fallos+1))

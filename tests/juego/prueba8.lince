@@ -100,6 +100,33 @@ intentar {
 } capturar (error e) {
     escribir("error: " + e.mensaje)
 }
+# pisadas: 4 cuadros mirando a la derecha. 0: en el aire; 1: aterriza el pie de
+# delante; 2: ese pie retrocede (está apoyado); 3: aterriza también el de atrás
+fijo CORRE = juego.hoja(juego.sprite([
+    "XXXXXX.XXXXXX.XXXXXX.XXXXXX",
+    "X....X.X....X.X....X.X....X",
+    "X....X.X....X.X....X.X....X",
+    "............X.....X..X...X."
+], {"X": [200, 100, 50]}))
+escribir("pisadas: " + a_texto(juego.pisadas(CORRE)[0]) + " " + a_texto(juego.pisadas(CORRE)[1]) + " de " + a_texto(juego.pisadas(CORRE).longitud()))
+fijo SIN_AIRE = juego.hoja(juego.sprite([
+    "XXXXXX.XXXXXX.XXXXXX.XXXXXX",
+    "X....X.X....X.X....X.X....X",
+    "X....X.X....X.X....X.X....X",
+    "............X.....X..X...X."
+], {"X": [200, 100, 50]}), {"quitar": [0]})
+# sin el cuadro en el aire, el aterrizaje no se distingue (antes estaba el de los dos pies): queda el 2
+escribir("quitar: " + a_texto(SIN_AIRE["cuadros"]) + " pisadas " + a_texto(juego.pisadas(SIN_AIRE)[0]) + " de " + a_texto(juego.pisadas(SIN_AIRE).longitud()))
+intentar {
+    juego.hoja(CORRE, {"quitar": [9]})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.pisadas(PJ)
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
 intentar {
     juego.guardar_imagen(PJ, "pj.bmp")
 } capturar (error e) {
