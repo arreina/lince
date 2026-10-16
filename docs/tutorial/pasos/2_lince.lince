@@ -1,0 +1,39 @@
+# @titulo: El lince
+# @texto: Ahora el protagonista. `juego.sprite` convierte un dibujo hecho con letras en una imagen: cada letra es un píxel del color que le des, y el punto es transparente. `juego.dibujar` lo pinta cuatro veces más grande.
+# @texto: Para moverlo, si la flecha está pulsada se suma o se resta a `x`. Se multiplica por `juego.dt()`, los segundos que ha durado el último fotograma, para que vaya a 320 píxeles por segundo en cualquier ordenador, sea rápido o lento. `matematica.limitar` impide que se salga por los lados.
+# @texto: **Prueba la recarga en caliente:** deja el juego abierto, cambia `VELOCIDAD` o un color del sprite y guarda. El juego se actualiza al momento sin cerrarse. Por eso lo que quieras retocar va en un `fijo`: las constantes se toman del código nuevo, mientras que las variables `sea`, como `x`, conservan su valor.
+# @fotogramas: 40
+# @teclas: derecha
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 640
+fijo ALTO = 480
+fijo VELOCIDAD = 320               # píxeles por segundo
+
+juego.abrir("Lluvia de estrellas", ANCHO, ALTO)
+
+fijo LINCE = juego.sprite([
+    "K..........K",
+    "O..........O",
+    "OO........OO",
+    "OOOOOOOOOOOO",
+    "OOKOOOOOOKOO",
+    "OOOOOOOOOOOO",
+    "OWWWWKKWWWWO",
+    "OWWWWWWWWWWO",
+    ".OWWWWWWWWO.",
+    "..OOOOOOOO.."
+], {"O": [235, 150, 60], "K": [40, 30, 30], "W": [250, 240, 225]})
+
+sea x = ANCHO / 2
+
+mientras juego.abierto() {
+    si juego.tecla("izquierda") { x = x - VELOCIDAD * juego.dt() }
+    si juego.tecla("derecha") { x = x + VELOCIDAD * juego.dt() }
+    x = matematica.limitar(x, 24, ANCHO - 24)
+
+    juego.limpiar([20, 24, 48])
+    juego.dibujar(LINCE, x, ALTO - 40, {"escala": 4, "centrado": verdadero})
+    juego.presentar()
+}

@@ -1,0 +1,80 @@
+# @titulo: ¡Atrápalas!
+# @texto: `juego.colision` dice si dos rectángulos se solapan. El primero es el del lince: su `x` es el centro, así que el rectángulo empieza 24 píxeles a la izquierda. El segundo es el de la estrella.
+# @texto: Una estrella cogida no se borra en ese momento: se marca con `"cogida"` y el `filtrar` de después la quita. Borrar elementos de una lista mientras se recorre da problemas en casi todos los lenguajes.
+# @texto: Para que se note: `juego.pitido` hace un sonido sin necesitar archivos, y `juego.particulas` lanza unas chispas que se mueven y dibujan solas al llamar a `juego.dibujar_particulas()`. El marcador es `juego.texto`, y `a_texto` convierte el número en texto.
+# @fotogramas: 448
+# @semilla: 2
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 640
+fijo ALTO = 480
+fijo VELOCIDAD = 320               # píxeles por segundo
+
+juego.abrir("Lluvia de estrellas", ANCHO, ALTO)
+
+fijo LINCE = juego.sprite([
+    "K..........K",
+    "O..........O",
+    "OO........OO",
+    "OOOOOOOOOOOO",
+    "OOKOOOOOOKOO",
+    "OOOOOOOOOOOO",
+    "OWWWWKKWWWWO",
+    "OWWWWWWWWWWO",
+    ".OWWWWWWWWO.",
+    "..OOOOOOOO.."
+], {"O": [235, 150, 60], "K": [40, 30, 30], "W": [250, 240, 225]})
+
+fijo ESTRELLA = juego.sprite([
+    "...Y...",
+    "..YYY..",
+    "YYYYYYY",
+    ".YYYYY.",
+    "..YYY..",
+    ".YY.YY.",
+    "YY...YY"
+], {"Y": [255, 215, 80]})
+
+sea x = ANCHO / 2
+sea estrellas = []                 # cada una es un diccionario: {"x", "y", "vel"}
+sea espera = 0                     # segundos que faltan para la siguiente
+sea puntos = 0
+
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    si juego.tecla("izquierda") { x = x - VELOCIDAD * dt }
+    si juego.tecla("derecha") { x = x + VELOCIDAD * dt }
+    x = matematica.limitar(x, 24, ANCHO - 24)
+
+    # una estrella nueva cada 0,6 segundos, en un sitio al azar
+    espera = espera - dt
+    si espera <= 0 {
+        estrellas.agregar({"x": matematica.aleatorio(20, ANCHO - 20), "y": -20,
+                           "vel": matematica.aleatorio(120, 220), "cogida": falso})
+        espera = 0.6
+    }
+    # caen; si tocan al lince, punto, pitido y chispas
+    para cada diccionario e en estrellas {
+        e["y"] = e["y"] + e["vel"] * dt
+        si juego.colision(x - 24, ALTO - 60, 48, 40, e["x"] - 10, e["y"] - 10, 20, 20) {
+            e["cogida"] = verdadero
+            puntos = puntos + 1
+            juego.pitido(880, 60, 0.2)
+            juego.particulas(e["x"], e["y"], {"cantidad": 20, "color": [255, 215, 80],
+                                              "velocidad": [60, 200], "vida": [0.3, 0.6]})
+        }
+    }
+    estrellas = filtrar(estrellas, funcion(val diccionario e): logico {
+        devolver no e["cogida"] y e["y"] < ALTO + 20
+    })
+
+    juego.limpiar([20, 24, 48])
+    para cada diccionario e en estrellas {
+        juego.dibujar(ESTRELLA, e["x"], e["y"], {"escala": 3, "centrado": verdadero})
+    }
+    juego.dibujar(LINCE, x, ALTO - 40, {"escala": 4, "centrado": verdadero})
+    juego.dibujar_particulas()
+    juego.texto("PUNTOS " + a_texto(puntos), 16, 16, 3, [255, 255, 255])
+    juego.presentar()
+}

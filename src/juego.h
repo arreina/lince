@@ -153,7 +153,8 @@ static struct {
        LINCE_JUEGO_ESCRIBIR=texto lo teclea (con '<' como «borrar») la primera vez que
        el juego llama a editar() o texto_escrito();
        LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma, y
-       LINCE_JUEGO_FOTOS=carpeta todos (00000.bmp, 00001.bmp...). */
+       LINCE_JUEGO_FOTOS=carpeta todos (00000.bmp, 00001.bmp...);
+       LINCE_JUEGO_SEMILLA=n fija la semilla de matematica.aleatorio(). */
     long limite, total;
     int pulsar[16], npulsar, clic_x, clic_y, hay_clic;
     double cam_x, cam_y, t_inicio;
@@ -449,6 +450,12 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     _jgs.pide_texto = 0;
     e = getenv("LINCE_JUEGO_CLIC");
     if (e && sscanf(e, "%d,%d", &_jgs.clic_x, &_jgs.clic_y) == 2) _jgs.hay_clic = 1;
+    e = getenv("LINCE_JUEGO_SEMILLA");
+    if (e && *e) {                                   /* prueba: partidas repetibles */
+        Valor *s = valor_numero(atof(e));
+        valor_destruir(fn_mat_semilla(&s, 1));
+        valor_destruir(s);
+    }
     _jgs.dt = 1.0 / 60; _jgs.t_ultimo = jg_ahora(); _jgs.t_fps = _jgs.t_ultimo; _jgs.cuadros = 0; _jgs.fps = 0;
     return valor_nulo();
 }

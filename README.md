@@ -13,7 +13,7 @@
 [![Tests](https://img.shields.io/badge/tests-31%2F31-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows-6A2D72.svg)]()
 
-[🌐 lince-lang.github.io](https://arreina.github.io/lince)
+[🌐 Web](https://arreina.github.io/lince) · [🎮 Tu primer juego](https://arreina.github.io/lince/tutorial.html) · [📖 Manual](https://arreina.github.io/lince/manual.html)
 
 </div>
 

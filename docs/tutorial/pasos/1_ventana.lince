@@ -1,0 +1,14 @@
+# @titulo: Una ventana
+# @texto: Todo juego empieza igual: se abre una ventana y se entra en el **bucle del juego**, un `mientras` que se repite unas 60 veces por segundo hasta que se cierra la ventana.
+# @texto: En cada vuelta se borra la pantalla con `juego.limpiar`, se dibuja lo que toque y `juego.presentar()` lo enseña. Además espera lo justo para ir a 60 fotogramas por segundo y lee el teclado y el ratón.
+# @texto: Guárdalo como `estrellas.lince` y ejecútalo con `lince estrellas.lince`. Los colores son listas `[rojo, verde, azul]` de 0 a 255.
+# @fotogramas: 2
+importar "juego"
+
+juego.abrir("Lluvia de estrellas", 640, 480)
+
+mientras juego.abierto() {
+    juego.limpiar([20, 24, 48])
+    juego.texto("HOLA", 272, 220, 4, [255, 220, 120])
+    juego.presentar()
+}
