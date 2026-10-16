@@ -67,7 +67,7 @@
     },
     "numeros": {
       "name": "constant.numeric.lince",
-      "match": "\\b([0-9]+\\.?[0-9]*)\\b"
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|[0-9]+\\.?[0-9]*)\\b"
     },
     "palabras_clave_control": {
       "name": "keyword.control.lince",
@@ -91,7 +91,7 @@
     },
     "palabras_clave_modulos": {
       "name": "support.class.module.lince",
-      "match": "\\b(matematica|texto|archivos|tiempo|sistema|json|pruebas|juego)(?=\\.)"
+      "match": "\\b(matematica|texto|archivos|tiempo|sistema|json|pruebas|juego|bytes|bits)(?=\\.)"
     },
     "literales": {
       "patterns": [

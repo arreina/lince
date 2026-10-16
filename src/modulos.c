@@ -1687,6 +1687,234 @@ static void cargar_json(Entorno *entorno) {
         fns, 2, NULL, NULL, 0);
 }
 
+/* ─────────────────────────────────────────
+   MÓDULO: bytes
+   Datos binarios: leer y escribir archivos byte a byte (formatos de imagen,
+   niveles comprimidos, partidas guardadas...). Un valor bytes se usa como una
+   lista de números de 0 a 255: b[i], b.longitud(), para cada...
+───────────────────────────────────────── */
+static Valor *bytes_error(const char *tipo, const char *msg) {
+    hay_error = 1;
+    valor_error = valor_error_nuevo(tipo, msg, 0);
+    return valor_nulo();
+}
+
+/* crear(n[, valor]): n bytes, todos a 'valor' (0 por defecto) */
+static Valor *fn_bytes_crear(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_NUMERO || a[0]->numero < 0 || a[0]->numero > 1e9)
+        return bytes_error("ErrorTipo", "crear() espera cuántos bytes (y, si quieres, su valor)");
+    int v = 0;
+    if (n > 1) {
+        if (a[1]->tipo != VAL_NUMERO || a[1]->numero < 0 || a[1]->numero > 255)
+            return bytes_error("ErrorTipo", "crear(): el valor es un número de 0 a 255");
+        v = (int)a[1]->numero;
+    }
+    Valor *b = valor_bytes_crear((int)a[0]->numero);
+    if (v) memset(b->bytes.datos, v, (size_t)b->bytes.cantidad);
+    return b;
+}
+
+/* desde_lista([72, 111, 108, 97]) */
+static Valor *fn_bytes_desde_lista(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_LISTA) return bytes_error("ErrorTipo", "desde_lista() espera una lista de números de 0 a 255");
+    Valor *b = valor_bytes_crear(a[0]->lista.cantidad);
+    for (int i = 0; i < a[0]->lista.cantidad; i++) {
+        Valor *e = a[0]->lista.elementos[i];
+        if (e->tipo != VAL_NUMERO || e->numero < 0 || e->numero > 255 || e->numero != floor(e->numero)) {
+            valor_destruir(b);
+            char msg[120];
+            snprintf(msg, sizeof msg, "desde_lista(): el elemento %d no es un número entero de 0 a 255", i);
+            return bytes_error("ErrorTipo", msg);
+        }
+        b->bytes.datos[i] = (unsigned char)e->numero;
+    }
+    return b;
+}
+
+/* desde_texto("hola"): los bytes del texto en UTF-8 */
+static Valor *fn_bytes_desde_texto(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return bytes_error("ErrorTipo", "desde_texto() espera un texto");
+    size_t l = strlen(a[0]->texto);
+    Valor *b = valor_bytes_crear((int)l);
+    memcpy(b->bytes.datos, a[0]->texto, l);
+    return b;
+}
+
+/* leer(ruta): el archivo entero (también desde un ejecutable de lince compilar) */
+static Valor *fn_bytes_leer(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return bytes_error("ErrorTipo", "leer() espera la ruta de un archivo");
+    size_t largo = 0;
+    char *c = interprete_leer_bytes(a[0]->texto, &largo);
+    if (!c) {
+        char msg[600];
+        snprintf(msg, sizeof msg, "no se pudo leer '%s'", a[0]->texto);
+        return bytes_error("Error", msg);
+    }
+    if (largo > 0x7fffffff) { free(c); return bytes_error("Error", "leer(): el archivo es demasiado grande"); }
+    Valor *b = valor_bytes_crear((int)largo);
+    memcpy(b->bytes.datos, c, largo);
+    free(c);
+    return b;
+}
+
+/* guardar(ruta, bytes) */
+static Valor *fn_bytes_guardar(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_BYTES)
+        return bytes_error("ErrorTipo", "guardar() espera (ruta, bytes)");
+    FILE *f = fopen(a[0]->texto, "wb");
+    if (!f) {
+        char msg[600];
+        snprintf(msg, sizeof msg, "no se pudo crear '%s'", a[0]->texto);
+        return bytes_error("Error", msg);
+    }
+    int ok = fwrite(a[1]->bytes.datos, 1, (size_t)a[1]->bytes.cantidad, f) == (size_t)a[1]->bytes.cantidad;
+    ok = fclose(f) == 0 && ok;
+    if (!ok) return bytes_error("Error", "guardar(): no se pudo escribir el archivo");
+    return valor_nulo();
+}
+
+/* unir([b1, b2, ...]): unos bytes detrás de otros */
+static Valor *fn_bytes_unir(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_LISTA) return bytes_error("ErrorTipo", "unir() espera una lista de bytes");
+    long total = 0;
+    for (int i = 0; i < a[0]->lista.cantidad; i++) {
+        if (a[0]->lista.elementos[i]->tipo != VAL_BYTES) return bytes_error("ErrorTipo", "unir(): cada elemento de la lista son bytes");
+        total += a[0]->lista.elementos[i]->bytes.cantidad;
+    }
+    if (total > 0x7fffffff) return bytes_error("Error", "unir(): demasiado grande");
+    Valor *b = valor_bytes_crear((int)total);
+    long p = 0;
+    for (int i = 0; i < a[0]->lista.cantidad; i++) {
+        Valor *e = a[0]->lista.elementos[i];
+        memcpy(b->bytes.datos + p, e->bytes.datos, (size_t)e->bytes.cantidad);
+        p += e->bytes.cantidad;
+    }
+    return b;
+}
+
+static void cargar_bytes(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"crear",       fn_bytes_crear,       -1},
+        {"desde_lista", fn_bytes_desde_lista,  1},
+        {"desde_texto", fn_bytes_desde_texto,  1},
+        {"leer",        fn_bytes_leer,         1},
+        {"guardar",     fn_bytes_guardar,      2},
+        {"unir",        fn_bytes_unir,         1},
+    };
+    registrar_modulo_diccionario(entorno, "bytes", fns, (int)(sizeof fns / sizeof fns[0]), NULL, NULL, 0);
+}
+
+/* ─────────────────────────────────────────
+   MÓDULO: bits
+   Operaciones bit a bit sobre enteros de 32 bits sin signo (de 0 a
+   4294967295). Los negativos se toman en complemento a dos.
+───────────────────────────────────────── */
+static int bits_num(Valor **a, int n, int i, uint32_t *out, const char *fn) {
+    if (i >= n || a[i]->tipo != VAL_NUMERO || a[i]->numero != floor(a[i]->numero) ||
+        a[i]->numero < -2147483648.0 || a[i]->numero > 4294967295.0) {
+        char msg[160];
+        snprintf(msg, sizeof msg, "%s(): el argumento %d tiene que ser un número entero de 32 bits", fn, i + 1);
+        bytes_error("ErrorTipo", msg);
+        return 0;
+    }
+    *out = (uint32_t)(int64_t)a[i]->numero;
+    return 1;
+}
+
+#define BITS_DOS(nombre, expr) \
+    static Valor *fn_bits_##nombre(Valor **a, int n) { \
+        uint32_t x, y; \
+        if (!bits_num(a, n, 0, &x, #nombre) || !bits_num(a, n, 1, &y, #nombre)) return valor_nulo(); \
+        return valor_numero((double)(uint32_t)(expr)); }
+BITS_DOS(ambos, x & y)            /* AND: 1 donde los dos tienen 1 */
+BITS_DOS(alguno, x | y)           /* OR: 1 donde alguno tiene 1 */
+BITS_DOS(solo_uno, x ^ y)         /* XOR: 1 donde solo uno tiene 1 */
+BITS_DOS(izquierda, y >= 32 ? 0 : x << y)
+BITS_DOS(derecha, y >= 32 ? 0 : x >> y)
+#undef BITS_DOS
+
+static Valor *fn_bits_invertir(Valor **a, int n) {
+    uint32_t x;
+    if (!bits_num(a, n, 0, &x, "invertir")) return valor_nulo();
+    return valor_numero((double)(uint32_t)~x);
+}
+
+/* leer(numero, posicion): el bit en esa posición (0 = el de menos valor) */
+static Valor *fn_bits_leer(Valor **a, int n) {
+    uint32_t x, p;
+    if (!bits_num(a, n, 0, &x, "leer") || !bits_num(a, n, 1, &p, "leer")) return valor_nulo();
+    return valor_numero(p < 32 ? (x >> p) & 1 : 0);
+}
+
+/* poner(numero, posicion, 0 o 1): el número con ese bit cambiado */
+static Valor *fn_bits_poner(Valor **a, int n) {
+    uint32_t x, p, v;
+    if (!bits_num(a, n, 0, &x, "poner") || !bits_num(a, n, 1, &p, "poner") || !bits_num(a, n, 2, &v, "poner")) return valor_nulo();
+    if (p >= 32) return bytes_error("ErrorRango", "poner(): la posición va de 0 a 31");
+    return valor_numero((double)(v ? x | (1u << p) : x & ~(1u << p)));
+}
+
+static Valor *fn_bits_contar(Valor **a, int n) {
+    uint32_t x;
+    if (!bits_num(a, n, 0, &x, "contar")) return valor_nulo();
+    int c = 0;
+    for (; x; x &= x - 1) c++;
+    return valor_numero(c);
+}
+
+/* hex(n[, cifras]) y binario(n[, cifras]): como texto, con ceros delante hasta 'cifras' */
+static Valor *bits_en_base(Valor **a, int n, int base, const char *fn) {
+    uint32_t x;
+    if (!bits_num(a, n, 0, &x, fn)) return valor_nulo();
+    int cifras = n > 1 && a[1]->tipo == VAL_NUMERO ? (int)a[1]->numero : 1;
+    if (cifras < 1) cifras = 1;
+    if (cifras > 32) cifras = 32;
+    char buf[40];
+    int i = 39;
+    buf[i] = '\0';
+    do { buf[--i] = "0123456789abcdef"[x % (uint32_t)base]; x /= (uint32_t)base; } while (x && i > 0);
+    while (39 - i < cifras) buf[--i] = '0';
+    return valor_texto(buf + i);
+}
+static Valor *fn_bits_hex(Valor **a, int n)     { return bits_en_base(a, n, 16, "hex"); }
+static Valor *fn_bits_binario(Valor **a, int n) { return bits_en_base(a, n, 2, "binario"); }
+
+/* de_hex("ff") y de_binario("1010"): el número */
+static Valor *bits_de_base(Valor **a, int n, int base, const char *fn) {
+    char msg[160];
+    snprintf(msg, sizeof msg, "%s() espera un texto con cifras %s", fn, base == 16 ? "hexadecimales (0-9, a-f)" : "binarias (0 y 1)");
+    if (n < 1 || a[0]->tipo != VAL_TEXTO || !a[0]->texto[0]) return bytes_error("ErrorTipo", msg);
+    double v = 0;
+    for (const char *c = a[0]->texto; *c; c++) {
+        int d = isdigit((unsigned char)*c) ? *c - '0' : (*c | 32) >= 'a' && (*c | 32) <= 'f' ? (*c | 32) - 'a' + 10 : 99;
+        if (d >= base) return bytes_error("ErrorTipo", msg);
+        v = v * base + d;
+    }
+    if (v > 4294967295.0) return bytes_error("ErrorRango", "el número no cabe en 32 bits");
+    return valor_numero(v);
+}
+static Valor *fn_bits_de_hex(Valor **a, int n)     { return bits_de_base(a, n, 16, "de_hex"); }
+static Valor *fn_bits_de_binario(Valor **a, int n) { return bits_de_base(a, n, 2, "de_binario"); }
+
+static void cargar_bits(Entorno *entorno) {
+    FuncionNativa fns[] = {
+        {"ambos",      fn_bits_ambos,      2},
+        {"alguno",     fn_bits_alguno,     2},
+        {"solo_uno",   fn_bits_solo_uno,   2},
+        {"invertir",   fn_bits_invertir,   1},
+        {"izquierda",  fn_bits_izquierda,  2},
+        {"derecha",    fn_bits_derecha,    2},
+        {"leer",       fn_bits_leer,       2},
+        {"poner",      fn_bits_poner,      3},
+        {"contar",     fn_bits_contar,     1},
+        {"hex",        fn_bits_hex,       -1},
+        {"binario",    fn_bits_binario,   -1},
+        {"de_hex",     fn_bits_de_hex,     1},
+        {"de_binario", fn_bits_de_binario, 1},
+    };
+    registrar_modulo_diccionario(entorno, "bits", fns, (int)(sizeof fns / sizeof fns[0]), NULL, NULL, 0);
+}
+
 /* Única lista de módulos estándar: cargador y nombre van juntos. */
 static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_ESTANDAR[] = {
     {"matematica", cargar_matematica},
@@ -1697,6 +1925,8 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"json", cargar_json},
     {"pruebas", cargar_pruebas},
     {"juego", cargar_juego},
+    {"bytes", cargar_bytes},
+    {"bits", cargar_bits},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -1722,7 +1952,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: matematica, texto, archivos, tiempo, sistema, json, pruebas, juego",
+        "El módulo '%s' no existe. Módulos disponibles: juego, matematica, texto, archivos, tiempo, sistema, json, pruebas, bytes y bits",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }

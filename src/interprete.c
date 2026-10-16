@@ -297,6 +297,7 @@ static void valor_liberar(Valor *v) {
         free(v->funcion->nombre);
         free(v->funcion);
     }
+    if (v->tipo == VAL_BYTES) free(v->bytes.datos);
     if (v->tipo == VAL_GENERADOR) {
         for (int i = 0; i < v->generador.cantidad; i++)
             valor_liberar(v->generador.elementos[i]);
@@ -312,6 +313,16 @@ static void valor_liberar(Valor *v) {
 
 /* Alias para claridad — función real para que sea linkeable */
 void valor_destruir(Valor *v) { valor_liberar(v); }
+
+Valor *valor_bytes_crear(int n) {
+    Valor *v = valor_alloc();
+    v->tipo = VAL_BYTES;
+    v->refs = 1; v->es_modulo = 0;
+    v->bytes.capacidad = n > 16 ? n : 16;
+    v->bytes.datos = calloc((size_t)v->bytes.capacidad, 1);
+    v->bytes.cantidad = n;
+    return v;
+}
 
 Valor *valor_lista_crear(void) {
     Valor *v = valor_alloc();
@@ -545,6 +556,7 @@ static Valor *valor_copiar(Valor *v) {
         case VAL_DICCIONARIO:
         case VAL_CLASE:
         case VAL_OBJETO:
+        case VAL_BYTES:
             return valor_retener(v);
         default:              return valor_nulo();
     }
@@ -614,6 +626,17 @@ static char *valor_a_texto(Valor *v) {
             }
             strncat(tmp, "]", sizeof(tmp) - strlen(tmp) - 1);
             return strdup(tmp);
+        }
+        case VAL_BYTES: {          /* bytes[48 6f 6c 61], en hexadecimal */
+            int n = v->bytes.cantidad, muestra = n > 64 ? 64 : n;
+            char *t = malloc((size_t)muestra * 3 + 64);
+            strcpy(t, "bytes[");
+            size_t p = strlen(t);
+            for (int i = 0; i < muestra; i++)
+                p += (size_t)sprintf(t + p, i ? " %02x" : "%02x", v->bytes.datos[i]);
+            if (n > muestra) p += (size_t)sprintf(t + p, " … %d en total", n);
+            strcpy(t + p, "]");
+            return t;
         }
         case VAL_DICCIONARIO: {
             char tmp[4096] = "{";
@@ -963,6 +986,7 @@ static Valor *exec_es(Nodo *n, Entorno *e) {
     else if (strcmp(nm, "texto") == 0)       r = v->tipo == VAL_TEXTO;
     else if (strcmp(nm, "logico") == 0)      r = v->tipo == VAL_BOOLEANO;
     else if (strcmp(nm, "lista") == 0)       r = v->tipo == VAL_LISTA;
+    else if (strcmp(nm, "bytes") == 0)       r = v->tipo == VAL_BYTES;
     else if (strcmp(nm, "diccionario") == 0) r = v->tipo == VAL_DICCIONARIO && !v->es_modulo;
     else if (strcmp(nm, "nulo") == 0)        r = v->tipo == VAL_NULO;
     else if (strcmp(nm, "funcion") == 0)     r = v->tipo == VAL_FUNCION;
@@ -1167,6 +1191,14 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
         else if (strcmp(op, "!=") == 0) resultado = valor_booleano(cmp != 0);
     }
 
+    /* Bytes: iguales si tienen el mismo contenido */
+    if (!resultado && izq->tipo == VAL_BYTES && der->tipo == VAL_BYTES &&
+        (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0)) {
+        int ig = izq->bytes.cantidad == der->bytes.cantidad &&
+                 memcmp(izq->bytes.datos, der->bytes.datos, (size_t)izq->bytes.cantidad) == 0;
+        resultado = valor_booleano(op[0] == '=' ? ig : !ig);
+    }
+
     /* Comparaciones entre lógicos. Sin esto caerían en el caso general
        de más abajo, que sólo sabe comparar nulos, y 'verdadero ==
        verdadero' daba falso. */
@@ -1234,14 +1266,14 @@ static void validar_tipo(Valor *v, TipoDato tipo, const char *contexto,
         };
         const char *recibido[] = {
             "numero", "texto", "logico", "nulo", "funcion",
-            "lista", "diccionario", "clase", "objeto", "error"
+            "lista", "diccionario", "clase", "objeto", "error", "generador", "bytes"
         };
         char msg[256];
         snprintf(msg, sizeof(msg),
             "Error de tipo en %s '%s': se esperaba '%s' pero se recibió '%s'.",
             contexto, nombre,
             tipo < 8 ? esperado[tipo] : "?",
-            v->tipo < 10 ? recibido[v->tipo] : "?");
+            v->tipo <= VAL_BYTES ? recibido[v->tipo] : "?");
         valor_error = valor_error_nuevo("ErrorTipo", msg, linea);
         hay_error = 1;
     }
@@ -1864,6 +1896,20 @@ static Valor *exec_para(Nodo *n, Entorno *e) {
 static Valor *exec_para_cada(Nodo *n, Entorno *e) {
     Valor *col = ejecutar(n->para_cada.coleccion, e);
 
+    /* ── Bytes: cada uno es un número de 0 a 255 ── */
+    if (col->tipo == VAL_BYTES) {
+        for (int i = 0; i < col->bytes.cantidad && !hay_retorno && !hay_error; i++) {
+            Valor *elem = valor_numero(col->bytes.datos[i]);
+            validar_tipo(elem, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
+            Entorno *iter = entorno_crear(e);
+            entorno_definir_i(iter, NI(n, n->para_cada.variable), elem, 0);
+            valor_destruir(ejecutar(n->para_cada.cuerpo, iter));
+            entorno_destruir(iter);
+        }
+        valor_destruir(col);
+        return valor_nulo();
+    }
+
     /* ── Lista o Generador ── */
     if (col->tipo == VAL_LISTA || col->tipo == VAL_GENERADOR) {
         int cant = (col->tipo == VAL_LISTA)
@@ -2092,9 +2138,28 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
     return retorno;
 }
 
+/* Posición i (negativa: desde el final) dentro de unos bytes, o -1 si se sale */
+static int pos_bytes(Valor *b, Valor *idx) {
+    if (idx->tipo != VAL_NUMERO) return -1;
+    int i = (int)idx->numero;
+    if (i < 0) i += b->bytes.cantidad;
+    return i >= 0 && i < b->bytes.cantidad ? i : -1;
+}
+
 static Valor *exec_indice(Nodo *n, Entorno *e) {
     Valor *obj = ejecutar(n->acceso_indice.objeto, e);
     Valor *idx = ejecutar(n->acceso_indice.indice, e);
+
+    if (obj->tipo == VAL_BYTES) {
+        int i = pos_bytes(obj, idx), cant = obj->bytes.cantidad;
+        double pedido = idx->tipo == VAL_NUMERO ? idx->numero : 0;
+        Valor *r = i >= 0 ? valor_numero(obj->bytes.datos[i]) : NULL;
+        int no_numero = idx->tipo != VAL_NUMERO;
+        valor_destruir(obj); valor_destruir(idx);
+        if (r) return r;
+        if (no_numero) return error_rt("ErrorTipo", n->linea, "El índice de unos bytes debe ser un número.");
+        return error_rt("ErrorRango", n->linea, "Índice %.0f fuera de rango. Hay %d bytes.", pedido, cant);
+    }
 
     if (obj->tipo == VAL_LISTA) {
         if (idx->tipo != VAL_NUMERO) {
@@ -2188,6 +2253,17 @@ static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
     Valor *idx = ejecutar(n->asignacion_indice.indice, e);
     Valor *val = ejecutar(n->asignacion_indice.valor,  e);
 
+    if (obj->tipo == VAL_BYTES) {
+        int i = pos_bytes(obj, idx), cant = obj->bytes.cantidad;
+        double pedido = idx->tipo == VAL_NUMERO ? idx->numero : 0;
+        int bien = val->tipo == VAL_NUMERO && val->numero >= 0 && val->numero <= 255 && val->numero == floor(val->numero);
+        if (i >= 0 && bien) obj->bytes.datos[i] = (unsigned char)val->numero;
+        valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+        if (i < 0) return error_rt("ErrorRango", n->linea, "Índice %.0f fuera de rango. Hay %d bytes.", pedido, cant);
+        if (!bien) return error_rt("ErrorTipo", n->linea, "Un byte es un número entero de 0 a 255.");
+        return valor_nulo();
+    }
+
     if (obj->tipo == VAL_LISTA) {
         int i = (int)idx->numero;
         if (i < 0) i = obj->lista.cantidad + i;
@@ -2237,6 +2313,100 @@ static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
     valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
     return error_rt("ErrorTipo", n->linea,
         "Solo puedes asignar por índice en listas o diccionarios.");
+}
+
+/* ── Métodos de BYTES ──
+   leer_u8/i8/u16/i16/u32/i32(pos[, grande]) y escribir_...(pos, valor[, grande]):
+   enteros sin signo (u) o con signo (i) de 1, 2 o 4 bytes. Por defecto el byte
+   menos significativo va primero (como en WAV, BMP o los PC); con 'grande' =
+   verdadero, el más significativo (como en PNG o en la red). */
+static Valor *metodo_bytes(Valor *obj, const char *met, Nodo *n, Entorno *e) {
+    int nargs = n->metodo.num_argumentos;
+    Valor *a[4] = {NULL, NULL, NULL, NULL};
+    for (int j = 0; j < nargs && j < 4; j++) {
+        a[j] = ejecutar(n->metodo.argumentos[j], e);
+        if (hay_error) { for (int k = 0; k <= j; k++) valor_destruir(a[k]); valor_destruir(obj); return valor_nulo(); }
+    }
+    Valor *r = NULL;
+    int cant = obj->bytes.cantidad;
+    unsigned char *d = obj->bytes.datos;
+    #define NUM(j) (j < nargs && a[j] && a[j]->tipo == VAL_NUMERO)
+    if (strcmp(met, "longitud") == 0) r = valor_numero(cant);
+    else if (strcmp(met, "agregar") == 0) {
+        if (!NUM(0) || a[0]->numero < 0 || a[0]->numero > 255 || a[0]->numero != floor(a[0]->numero))
+            r = error_rt("ErrorTipo", n->linea, "agregar(): un byte es un número entero de 0 a 255.");
+        else {
+            if (obj->bytes.cantidad == obj->bytes.capacidad) {
+                obj->bytes.capacidad *= 2;
+                obj->bytes.datos = realloc(obj->bytes.datos, (size_t)obj->bytes.capacidad);
+            }
+            obj->bytes.datos[obj->bytes.cantidad++] = (unsigned char)a[0]->numero;
+            r = valor_nulo();
+        }
+    } else if (strcmp(met, "parte") == 0) {
+        int desde = NUM(0) ? (int)a[0]->numero : 0, hasta = NUM(1) ? (int)a[1]->numero : cant;
+        if (desde < 0) desde += cant;
+        if (hasta < 0) hasta += cant;
+        if (desde < 0) desde = 0;
+        if (hasta > cant) hasta = cant;
+        if (hasta < desde) hasta = desde;
+        r = valor_bytes_crear(hasta - desde);
+        memcpy(r->bytes.datos, d + desde, (size_t)(hasta - desde));
+    } else if (strcmp(met, "a_lista") == 0) {
+        r = valor_lista_crear();
+        for (int i = 0; i < cant; i++) lista_agregar(r, valor_numero(d[i]));
+    } else if (strcmp(met, "a_texto") == 0) {
+        char *t = malloc((size_t)cant + 1);
+        memcpy(t, d, (size_t)cant);
+        t[cant] = '\0';
+        r = valor_texto_propio(t);
+    } else if (strncmp(met, "leer_", 5) == 0 || strncmp(met, "escribir_", 9) == 0) {
+        int escribir = met[0] == 'e';
+        const char *tipo = met + (escribir ? 9 : 5);
+        int con_signo = tipo[0] == 'i', tam = 0;
+        if (strcmp(tipo + 1, "8") == 0) tam = 1;
+        else if (strcmp(tipo + 1, "16") == 0) tam = 2;
+        else if (strcmp(tipo + 1, "32") == 0) tam = 4;
+        if (!tam || (tipo[0] != 'u' && tipo[0] != 'i')) goto desconocido;
+        int ig = escribir ? 2 : 1;                        /* posición del argumento 'grande' */
+        int grande = ig < nargs && a[ig] && a[ig]->tipo == VAL_BOOLEANO && a[ig]->booleano;
+        if (!NUM(0) || (escribir && !NUM(1))) {
+            r = error_rt("ErrorTipo", n->linea, escribir ? "%s() espera (posición, valor[, grande])"
+                                                         : "%s() espera (posición[, grande])", met);
+        } else {
+            int pos = (int)a[0]->numero;
+            if (pos < 0 || pos + tam > cant)
+                r = error_rt("ErrorRango", n->linea, "%s(): la posición %d se sale (hay %d bytes).", met, pos, cant);
+            else if (escribir) {
+                double v = a[1]->numero;
+                double min = con_signo ? -ldexp(1, tam * 8 - 1) : 0, max = con_signo ? ldexp(1, tam * 8 - 1) - 1 : ldexp(1, tam * 8) - 1;
+                if (v != floor(v) || v < min || v > max)
+                    r = error_rt("ErrorRango", n->linea, "%s(): %.0f no cabe en %d byte(s)%s.", met, v, tam, con_signo ? " con signo" : "");
+                else {
+                    unsigned long long u = (unsigned long long)(long long)v;
+                    for (int k = 0; k < tam; k++)
+                        d[pos + (grande ? tam - 1 - k : k)] = (unsigned char)(u >> (8 * k));
+                    r = valor_nulo();
+                }
+            } else {
+                unsigned long long u = 0;
+                for (int k = 0; k < tam; k++)
+                    u |= (unsigned long long)d[pos + (grande ? tam - 1 - k : k)] << (8 * k);
+                double v = (double)u;
+                if (con_signo && (u >> (tam * 8 - 1)) & 1) v -= ldexp(1, tam * 8);
+                r = valor_numero(v);
+            }
+        }
+    } else {
+desconocido:
+        r = error_rt("Error", n->linea,
+            "Los bytes no tienen el método '%s'. Tienen: longitud, agregar, parte, a_lista, a_texto, "
+            "leer_u8, leer_i8, leer_u16, leer_i16, leer_u32, leer_i32 y los escribir_ correspondientes.", met);
+    }
+    #undef NUM
+    for (int j = 0; j < 4; j++) valor_destruir(a[j]);
+    valor_destruir(obj);
+    return r;
 }
 
 static Valor *exec_metodo(Nodo *n, Entorno *e) {
@@ -2389,6 +2559,8 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         profundidad--;
         return retorno;
     }
+
+    if (obj->tipo == VAL_BYTES) return metodo_bytes(obj, met, n, e);
 
     /* ── Métodos de LISTA ── */
     if (obj->tipo == VAL_LISTA) {

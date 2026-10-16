@@ -53,13 +53,14 @@ Lince es un lenguaje de programación **para videojuegos, en español**, impleme
 
 | Tipo | Keyword | Ejemplo |
 |------|---------|---------|
-| Número | `numero` | `3`, `3.14` |
+| Número | `numero` | `3`, `3.14`, `0xff` (hexadecimal), `0b1010` (binario; admite `_`: `0b1111_0000`) |
 | Texto | `texto` | `"hola"` |
 | Lógico | `logico` | `verdadero`, `falso` |
 | Lista | `lista` | `[1, 2, 3]` |
 | Diccionario | `diccionario` | `{"clave": valor}` |
 | Función | `funcion` | lambdas, funciones como args |
 | Sin valor | `nulo` | `nulo` |
+| Bytes | — | `bytes.leer("nivel.bin")` (módulo `bytes`) |
 
 ---
 
@@ -945,6 +946,54 @@ cierra el juego tras N fotogramas de 1/60 s; `LINCE_JUEGO_PULSAR=espacio,derecha
 `LINCE_JUEGO_CLIC=x,y` pulsan en los fotogramas impares; `LINCE_JUEGO_ESCRIBIR=texto` teclea
 (`<` borra); `LINCE_JUEGO_CAPTURA=ruta.bmp` guarda el último fotograma y
 `LINCE_JUEGO_FOTOS=carpeta` todos (para hacer un vídeo).
+
+### `bytes`
+
+Datos binarios: leer y escribir archivos byte a byte (formatos de imagen, niveles
+guardados en binario, partidas...). Unos bytes se usan como una lista de números de 0 a
+255: `b[i]`, `b[i] = 0xff`, `b.longitud()`, `para cada numero x en b`, `==` compara el
+contenido y `x es bytes` dice si lo son. `escribir(b)` los muestra en hexadecimal.
+
+```lince
+importar "bytes"
+sea b = bytes.leer("imagen.bmp")
+si b.parte(0, 2).a_texto() == "BM" {
+    escribir("ancho: " + b.leer_u32(18) + ", alto: " + b.leer_u32(22))
+}
+```
+
+| Función o método | Qué hace |
+|---|---|
+| `bytes.crear(n[, valor])` · `bytes.desde_lista([1, 2])` · `bytes.desde_texto(t)` | bytes nuevos (a 0 o a `valor`) · desde una lista · los de un texto en UTF-8 |
+| `bytes.leer(ruta)` · `bytes.guardar(ruta, b)` | el archivo entero (también desde dentro de un ejecutable de `lince compilar`) · escribe el archivo |
+| `bytes.unir([b1, b2, ...])` | unos detrás de otros |
+| `b.agregar(n)` · `b.parte(desde[, hasta])` · `b.a_lista()` · `b.a_texto()` | añade uno al final · copia de un trozo (los negativos cuentan desde el final) · lista de números · texto (UTF-8) |
+| `b.leer_u8(pos)` · `leer_i8` · `leer_u16` · `leer_i16` · `leer_u32` · `leer_i32` | entero sin signo (`u`) o con signo (`i`) de 1, 2 o 4 bytes en esa posición. Por defecto el byte de menos valor va primero (como en WAV y BMP); con un último argumento `verdadero`, el de más valor (como en PNG): `b.leer_u32(16, verdadero)` |
+| `b.escribir_u8(pos, valor)` · ... · `b.escribir_i32(pos, valor[, verdadero])` | lo mismo para escribir; da error si el valor no cabe |
+
+### `bits`
+
+Operaciones bit a bit sobre enteros de 32 bits (de 0 a 4294967295; los negativos se
+toman en complemento a dos). Los operadores de otros lenguajes (`&`, `|`, `^`, `<<`...)
+aquí son funciones con nombre:
+
+| Función | Qué hace | Equivale a |
+|---|---|---|
+| `ambos(a, b)` · `alguno(a, b)` · `solo_uno(a, b)` | 1 donde los dos tienen 1 · donde alguno · donde solo uno | AND `&` · OR `\|` · XOR `^` |
+| `invertir(a)` | cambia todos los bits | NOT `~` |
+| `izquierda(a, n)` · `derecha(a, n)` | desplaza `n` bits | `<<` · `>>` |
+| `leer(a, pos)` · `poner(a, pos, 0 o 1)` | un bit (0 es el de menos valor) · el número con ese bit cambiado | |
+| `contar(a)` | cuántos bits valen 1 | |
+| `hex(a[, cifras])` · `binario(a[, cifras])` | como texto: `bits.hex(255)` → `"ff"`, `bits.binario(5, 8)` → `"00000101"` | |
+| `de_hex(t)` · `de_binario(t)` | del texto al número | |
+
+```lince
+importar "bits"
+fijo SALTA = 0b0001
+fijo DISPARA = 0b0010
+sea estado = bits.alguno(SALTA, DISPARA)          # 0b0011
+si bits.ambos(estado, DISPARA) != 0 { escribir("dispara") }
+```
 
 ### `pruebas`
 

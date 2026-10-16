@@ -177,6 +177,8 @@
     "json",
     "pruebas",
     "juego",
+    "bytes",
+    "bits",
     "Error",
     "ErrorAcceso",
     "ErrorArgumento",

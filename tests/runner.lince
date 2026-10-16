@@ -116,6 +116,7 @@ sea lista tests = [
     "test_casos_limite",
     "test_generadores",
     "test_matematica",
+    "test_bytes",
     "test_archivos",
     "test_importar",
     "test_redefinicion",

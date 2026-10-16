@@ -1,0 +1,23 @@
+281
+bytes[48 6f 6c 61]
+4 72 97
+hola
+hola!
+bytes[78 56 34 12 02 01 fe 00]
+12345678 513 -2 254
+6
+verdadero
+ol a!
+7
+verdadero
+verdadero
+8 14 6
+4294967295 16 1
+1 8 8
+00000101 ff 255 5
+240
+Un byte es un número entero de 0 a 255.
+Índice 99 fuera de rango. Hay 5 bytes.
+leer_u32(): la posición 6 se sale (hay 8 bytes).
+escribir_u8(): 256 no cabe en 1 byte(s).
+Los bytes no tienen el método 'volar'. Tienen: longitud, agregar, parte, a_lista, a_texto, leer_u8, leer_i8, leer_u16, leer_i16, leer_u32, leer_i32 y los escribir_ correspondientes.

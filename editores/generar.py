@@ -100,7 +100,7 @@ def gramatica():
                 "name": "string.quoted.double.lince", "begin": "\"", "end": "\"",
                 "patterns": [{"name": "constant.character.escape.lince",
                               "match": "\\\\(n|t|\"|\\\\)"}]},
-            "numeros": {"name": "constant.numeric.lince", "match": "\\b([0-9]+\\.?[0-9]*)\\b"},
+            "numeros": {"name": "constant.numeric.lince", "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|[0-9]+\\.?[0-9]*)\\b"},
             "palabras_clave_control": {
                 "name": "keyword.control.lince",
                 "match": "\\b(" + alt(CONTROL + EXTRA_CONTROL) + ")\\b"},

@@ -1,0 +1,38 @@
+# TEST: bytes, bits y números en hexadecimal y binario
+importar "bytes"
+importar "bits"
+escribir(0xFF + 0b1010 + 0x10)
+sea b = bytes.desde_texto("Hola")
+escribir(b)
+escribir(b.longitud() + " " + b[0] + " " + b[-1])
+b[0] = 0x68
+escribir(b.a_texto())
+b.agregar(33)
+escribir(b.a_texto())
+sea c = bytes.crear(8)
+c.escribir_u32(0, 0x12345678)
+c.escribir_u16(4, 513, verdadero)
+c.escribir_i8(6, -2)
+escribir(c)
+escribir(bits.hex(c.leer_u32(0)) + " " + c.leer_u16(4, verdadero) + " " + c.leer_i8(6) + " " + c.leer_u8(6))
+sea suma = 0
+para cada numero x en bytes.desde_lista([1, 2, 3]) { suma = suma + x }
+escribir(suma)
+escribir(bytes.desde_lista([1, 2]) == bytes.desde_lista([1, 2]))
+escribir(b.parte(1, 3).a_texto() + " " + b.parte(-2).a_texto())
+escribir(bytes.unir([b, c.parte(0, 2)]).longitud())
+escribir(b es bytes)
+bytes.guardar("lince_test_bytes.bin", c)
+escribir(bytes.leer("lince_test_bytes.bin") == c)
+escribir(bits.ambos(0b1100, 0b1010) + " " + bits.alguno(0b1100, 0b1010) + " " + bits.solo_uno(0b1100, 0b1010))
+escribir(bits.invertir(0) + " " + bits.izquierda(1, 4) + " " + bits.derecha(0x80, 7))
+escribir(bits.leer(5, 2) + " " + bits.poner(0, 3, 1) + " " + bits.contar(0xFF))
+escribir(bits.binario(5, 8) + " " + bits.hex(255) + " " + bits.de_hex("FF") + " " + bits.de_binario("101"))
+escribir(0b1111_0000)
+intentar { b[0] = 300 } capturar (error e) { escribir(e.mensaje) }
+intentar { escribir(b[99]) } capturar (error e) { escribir(e.mensaje) }
+intentar { c.leer_u32(6) } capturar (error e) { escribir(e.mensaje) }
+intentar { c.escribir_u8(0, 256) } capturar (error e) { escribir(e.mensaje) }
+intentar { b.volar() } capturar (error e) { escribir(e.mensaje) }
+importar "archivos"
+archivos.eliminar("lince_test_bytes.bin")

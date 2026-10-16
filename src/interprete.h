@@ -22,6 +22,7 @@ typedef enum {
     VAL_OBJETO,
     VAL_ERROR,
     VAL_GENERADOR,
+    VAL_BYTES,      /* datos binarios: cada elemento es un número de 0 a 255 */
 } TipoValor;
 
 typedef struct Valor Valor;
@@ -123,6 +124,12 @@ struct Valor {
         ClaseLince  *clase;
         ObjetoLince *objeto;
         ErrorLince  *error;
+        /* VAL_BYTES */
+        struct {
+            unsigned char *datos;
+            int            cantidad;
+            int            capacidad;
+        } bytes;
         /* VAL_GENERADOR — lista de valores producidos */
         struct {
             struct Valor **elementos;
@@ -160,6 +167,8 @@ Valor *valor_texto(const char *s);
 Valor *valor_booleano(int b);
 Valor *valor_nulo(void);
 Valor *valor_lista_crear(void);
+/* Bytes con 'n' ceros (los datos se pueden rellenar después) */
+Valor *valor_bytes_crear(int n);
 /* ── UTF-8 ──
    El texto se guarda en UTF-8 y estas ayudas permiten trabajar con
    caracteres en vez de bytes: "niño" mide 4, no 5. */

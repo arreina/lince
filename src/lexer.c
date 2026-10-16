@@ -252,6 +252,26 @@ static void saltar_espacios_y_comentarios(Lexer *l) {
 
 static void leer_numero(Lexer *l, int linea) {
     int inicio = l->pos;
+    /* 0xff (hexadecimal) y 0b1010 (binario): el token lleva ya el valor en decimal */
+    char base_c = l->pos + 1 < l->longitud ? (char)(l->codigo[l->pos + 1] | 32) : 0;
+    if (actual(l) == '0' && (base_c == 'x' || base_c == 'b') && l->pos + 2 < l->longitud &&
+        isxdigit((unsigned char)l->codigo[l->pos + 2]) &&
+        (base_c == 'x' || l->codigo[l->pos + 2] == '0' || l->codigo[l->pos + 2] == '1')) {
+        int base = base_c == 'x' ? 16 : 2;
+        avanzar(l); avanzar(l);
+        double v = 0;
+        while (l->pos < l->longitud) {
+            int c = (unsigned char)actual(l), d = isdigit(c) ? c - '0' : isxdigit(c) ? (c | 32) - 'a' + 10 : 99;
+            if (c == '_') { avanzar(l); continue; }          /* 0b1111_0000: separador opcional */
+            if (d >= base) break;
+            v = v * base + d;
+            avanzar(l);
+        }
+        char buf[64];
+        snprintf(buf, sizeof buf, "%.0f", v);
+        agregar_token(l, TOK_NUMERO, buf, linea);
+        return;
+    }
     while (l->pos < l->longitud && isdigit(actual(l)))
         avanzar(l);
     if (actual(l) == '.' && isdigit(siguiente(l))) {
