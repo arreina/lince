@@ -81,7 +81,7 @@ juego.abrir("Esquiva", ANCHO, ALTO)
 para cada numero i en rango(0, 60) {
     fondo.agregar([matematica.aleatorio(0, ANCHO), matematica.aleatorio(0, ALTO), matematica.aleatorio(1, 3)])
 }
-reiniciar()
+si no juego.recargado() { reiniciar() }      # al recargar en caliente sigue la partida
 
 mientras juego.abierto() {
     sea dt = juego.dt()

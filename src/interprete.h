@@ -202,6 +202,18 @@ typedef struct {
 Interprete *interprete_crear(void);
 void        interprete_destruir(Interprete *interp);
 void        interprete_ejecutar(Interprete *interp, Nodo *programa);
+/* Como interprete_ejecutar, pero sin terminar el proceso: 0 si acaba bien,
+   1 si hubo un error (ya escrito en stderr y copiado en 'mensaje'), 2 si se
+   cortó para recargar el programa (error de tipo ERROR_RECARGA). */
+int         interprete_ejecutar_recargable(Interprete *interp, Nodo *programa,
+                                           char *mensaje, size_t max);
+/* Recarga en caliente: mientras corre 'nuevo', sus 'sea' del nivel superior
+   toman el valor que tenían en el global 'anterior' (NULL lo desactiva). */
+void        interprete_conservar(Entorno *anterior, Interprete *nuevo);
+/* Olvida qué archivos se importaron, para que el programa recargado los
+   vuelva a importar. */
+void        interprete_olvidar_importados(void);
+#define ERROR_RECARGA "RecargaLince"
 void        interprete_set_args(int argc, char *argv[]);
 Valor      *ejecutar_nodo(Nodo *n, Entorno *e);
 char       *valor_a_texto_repl(Valor *v);

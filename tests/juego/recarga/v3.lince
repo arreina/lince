@@ -1,0 +1,7 @@
+# Versión 3: arregla el fallo y termina
+importar "juego"
+fijo VERSION = 3
+sea cuenta = 0
+juego.abrir("Recarga 3", 160, 90)
+escribir("v3 tras el error: " + a_texto(cuenta > 5) + " " + a_texto(juego.ancho()))
+juego.salir()

@@ -24,9 +24,16 @@ Y se reparten como un único ejecutable:
 | `05_esquiva.lince` | flechas o A / D | **clases, herencia y polimorfismo** (`Objeto` → `Meteorito` y `Estrella`), `es` |
 | `06_memoria.lince` | ratón | el ratón, una máquina de estados y temporizadores sin bloquear el bucle |
 | `07_tres_en_raya.lince` | ratón | **recursión** (minimax): la máquina nunca pierde |
-| `08_plataformas.lince` | flechas / A-D y espacio, o **mando** | nivel escrito como texto, **sprites dibujados con texto** y animados (`juego.sprite`, hoja de sprites), gravedad y colisiones con el mapa, **cámara** con marcador fijo, **acciones** (cada control definido una vez para teclado y mando) |
+| `08_plataformas.lince` | flechas / A-D y espacio, o **mando** | nivel escrito como texto, **sprites dibujados con texto** y animados (`juego.sprite`, hoja de sprites), gravedad y colisiones con el mapa, **cámara** con marcador fijo, **acciones** (cada control definido una vez para teclado y mando), **partículas**, **escenas** con fundido (portada y nivel) y animación con `juego.cuadro` |
 
 Todos terminan con **Esc**.
+
+## Prueba la recarga en caliente
+
+Abre `08_plataformas.lince` con `./lince examples/08_plataformas.lince`, avanza un
+poco y, sin cerrarlo, cambia en el editor `fijo GRAVEDAD = 1500` por `700`, o el color
+de las monedas, y guarda: el juego se actualiza al momento y el lince sigue donde
+estaba. **F5** empieza desde cero. Si guardas algo con un error, sale en la ventana.
 
 ## Probarlos sin pantalla
 

@@ -46,4 +46,9 @@ void modulo_registrar(Entorno *entorno, const char *nombre,
 typedef int (*ModuloExterno)(const char *nombre, Entorno *entorno);
 void modulo_fijar_externo(ModuloExterno fn);
 
+/* ── Recarga en caliente (módulo juego) ── */
+int  juego_ventana_abierta(void);
+void juego_preparar_recarga(int conserva);
+int  juego_esperar_arreglo(const char *mensaje);
+
 #endif /* LINCE_MODULOS_H */

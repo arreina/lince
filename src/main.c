@@ -14,6 +14,8 @@
 #include "empaquetado.h"
 #include "depurador.h"
 #include "lsp.h"
+#include "modulos.h"
+#include "recarga.h"
 
 static char *leer_archivo(const char *ruta) {
     FILE *f = fopen(ruta, "r");
@@ -78,6 +80,53 @@ static int ejecutar_empaquetado(int argc, char *argv[]) {
     parser_destruir(parser);
     lexer_destruir(lexer);
     return 0;
+}
+
+/* Ejecuta un programa .lince con recarga en caliente: si es un juego y se
+   guarda un cambio mientras corre, juego.presentar() lo corta y aquí se
+   vuelve a lanzar el código nuevo con la misma ventana, conservando las
+   variables 'sea' del nivel superior (o desde cero, con F5). Si el programa
+   se para por un error con la ventana abierta, el error se muestra en ella
+   hasta que se guarde un arreglo. Sin ventana, todo es como siempre. */
+static int ejecutar_recargable(const char *archivo) {
+    recarga_iniciar(archivo);
+    Interprete *anterior = NULL;
+    for (;;) {
+        /* El AST no se libera: las funciones conservadas de una versión
+           anterior lo siguen usando. */
+        char       *codigo   = leer_archivo(archivo);
+        Lexer      *lexer    = lexer_crear(codigo);
+        int         cantidad = 0;
+        Token      *tokens   = lexer_tokenizar(lexer, &cantidad);
+        Parser     *parser   = parser_crear(tokens, cantidad);
+        Nodo       *programa = parser_parsear(parser);
+        Interprete *interp   = interprete_crear();
+
+        /* Para resolver los 'importar "./x"' junto a este fichero */
+        interprete_fijar_archivo(archivo);
+        interprete_conservar(anterior ? anterior->global : NULL, interp);
+        char mensaje[700] = "";
+        int r = interprete_ejecutar_recargable(interp, programa, mensaje, sizeof mensaje);
+        interprete_conservar(NULL, NULL);
+        if (r == 1) {
+            /* Error: con la ventana abierta se espera a que se arregle */
+            if (!juego_ventana_abierta() || !juego_esperar_arreglo(mensaje)) exit(1);
+            r = 2;
+        }
+        if (r == 0) {
+            interprete_destruir(interp);
+            if (anterior) interprete_destruir(anterior);
+            return 0;
+        }
+        /* Recargar: el que acaba de correr pasa a ser «el anterior» */
+        if (anterior) interprete_destruir(anterior);
+        anterior = interp;
+        if (recarga_completa()) { interprete_destruir(anterior); anterior = NULL; }
+        interprete_olvidar_importados();
+        juego_preparar_recarga(anterior != NULL);
+        printf("🔄 Recargado %s%s\n", archivo, anterior ? "" : " (desde cero)");
+        fflush(stdout);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -213,28 +262,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    char       *codigo   = leer_archivo(archivo);
-    Lexer      *lexer    = lexer_crear(codigo);
-    int         cantidad = 0;
-    Token      *tokens   = lexer_tokenizar(lexer, &cantidad);
-    Parser     *parser   = parser_crear(tokens, cantidad);
-    Nodo       *programa = parser_parsear(parser);
-    Interprete *interp   = interprete_crear();
-
-    /* Para resolver los 'importar "./x"' junto a este fichero */
-    interprete_fijar_archivo(archivo);
-
     /* Argumentos del programa (los que van después del archivo) */
     interprete_set_args(argc - 2, argv + 2);
-
-    interprete_ejecutar(interp, programa);
-
-    interprete_destruir(interp);
-    nodo_destruir(programa);
-    parser_destruir(parser);
-    lexer_destruir(lexer);
-    free(codigo);
-    return 0;
+    return ejecutar_recargable(archivo);
 }
 
 

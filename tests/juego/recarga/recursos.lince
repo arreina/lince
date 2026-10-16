@@ -1,0 +1,24 @@
+# Recarga de lo importado y de las imágenes cambiadas mientras corre
+importar "juego"
+importar "archivos"
+importar "sistema"
+importar "./util"
+sea n = 0
+juego.abrir("Recarga de recursos", 60, 40)
+sea img = juego.imagen("img.bmp")
+escribir("util: " + a_texto(valor()) + ", imagen: " + a_texto(img["ancho"]))
+mientras juego.abierto() {
+    n = n + 1
+    si n == 2 {
+        sea orden = "cp a20.bmp img.bmp"
+        si sistema.plataforma() == "windows" { orden = "copy /y a20.bmp img.bmp > nul" }
+        sistema.ejecutar(orden)
+    }
+    si n == 6 {
+        sea otra = juego.imagen("img.bmp")
+        escribir("imagen cambiada: " + a_texto(otra["ancho"]))
+        archivos.escribir("util.lince", archivos.leer("util2.lince"))
+    }
+    si n == 30 { juego.salir() }
+    juego.presentar()
+}

@@ -7,8 +7,9 @@
 #
 # Muestra: un nivel escrito como texto (cada carácter es una casilla), sprites
 # dibujados con texto y animados como hoja de sprites, gravedad y colisiones
-# con el mapa, una cámara que sigue al jugador con un marcador fijo, y
-# acciones: cada control se define una vez para teclado y mando a la vez.
+# con el mapa, una cámara que sigue al jugador con un marcador fijo, acciones
+# (cada control se define una vez para teclado y mando a la vez), partículas
+# y escenas con fundido (la portada y el nivel).
 importar "juego"
 importar "matematica"
 
@@ -168,6 +169,7 @@ funcion mover_jugador(val numero dt): nulo {
     si en_suelo y juego.accion_pulsada("saltar") {
         vy = SALTO
         juego.pitido(660, 50, 0.15)
+        polvo()
     }
     vy = matematica.minimo(vy + GRAVEDAD * dt, 900)
 
@@ -181,11 +183,13 @@ funcion mover_jugador(val numero dt): nulo {
 
     # vertical: al caer sobre algo se queda en el suelo
     sea ny = py + vy * dt
+    sea estaba_en_suelo = en_suelo
     en_suelo = falso
     si choca(px, ny, JW, JH) {
         si vy > 0 {
             ny = matematica.piso((ny + JH) / CASILLA) * CASILLA - JH
             en_suelo = verdadero
+            si no estaba_en_suelo y vy > 400 { polvo() }      # aterriza de una buena caída
         } sino {
             ny = (matematica.piso(ny / CASILLA) + 1) * CASILLA
         }
@@ -196,6 +200,9 @@ funcion mover_jugador(val numero dt): nulo {
     si casilla(matematica.piso((px + JW / 2) / CASILLA), matematica.piso((py + JH / 2) / CASILLA)) == "M" {
         estado = "ganado"
         juego.pitido(880, 400)
+        juego.particulas(px + JW / 2, py, {"cantidad": 120, "color": [255, 220, 80], "color_final": [255, 80, 80, 0],
+                                           "velocidad": [80, 320], "direccion": -90, "apertura": 120,
+                                           "gravedad": 500, "vida": [0.8, 1.6], "tamaño": 5})
     }
 }
 
@@ -219,6 +226,8 @@ funcion mover_enemigos(val numero dt): nulo {
                     bicho["vivo"] = falso
                     vy = SALTO * 0.6
                     juego.pitido(300, 80)
+                    juego.particulas(bicho["x"] + 12, bicho["y"] + 6, {"cantidad": 25, "color": [120, 70, 160],
+                                     "velocidad": [60, 200], "gravedad": 600, "vida": [0.4, 0.7], "tamaño": [3, 6]})
                 } sino {
                     herido()
                 }
@@ -230,41 +239,40 @@ funcion mover_enemigos(val numero dt): nulo {
             m["viva"] = falso
             recogidas = recogidas + 1
             juego.pitido(1320, 60, 0.15)
+            juego.particulas(m["x"] + 6, m["y"] + 6, {"cantidad": 16, "color": [250, 200, 50], "color_final": [255, 255, 255, 0],
+                                                      "velocidad": [40, 140], "vida": [0.3, 0.6], "tamaño": [3, 5]})
         }
     }
 }
 
-juego.abrir("Plataformas", ANCHO, ALTO)
+# Polvo bajo los pies al saltar o al caer
+funcion polvo(): nulo {
+    juego.particulas(px + JW / 2, py + JH, {"cantidad": 10, "color": [235, 225, 200, 200], "velocidad": [20, 70],
+                                             "direccion": -90, "apertura": 160, "vida": [0.2, 0.4],
+                                             "tamaño": 5, "tamaño_final": 1})
+}
 
-# ── Controles: cada acción con su teclado y su mando ─────────────────
-juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
-juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
-juego.definir_accion("saltar", ["espacio", "arriba", "w", "mando:a"])
-juego.definir_accion("empezar", ["espacio", "entrar", "mando:a", "mando:inicio"])
-sea lince = juego.sprite(hoja_del_lince(), COLORES_LINCE)
-sea escarabajo = juego.sprite([
-    "...MMMMMM...",
-    "..MMMMMMMM..",
-    ".MMWKMMWKMM.",
-    ".MMMMMMMMMM.",
-    "MMMMMMMMMMMM",
-    ".K.K....K.K."
-], {"M": [120, 70, 160], "W": [255, 255, 255], "K": [30, 20, 40]})
-sea moneda = juego.sprite([
-    "..YY..",
-    ".YYYY.",
-    "YYWYYY",
-    "YYWYYY",
-    ".YYYY.",
-    "..YY.."
-], {"Y": [250, 200, 50], "W": [255, 250, 220]})
-empezar()
+# ── Portada ──────────────────────────────────────────────────────────
+funcion portada(): nulo {
+    juego.limpiar([120, 190, 235])
+    juego.rectangulo(0, ALTO - 96, ANCHO, 96, [150, 95, 55])
+    juego.rectangulo(0, ALTO - 96, ANCHO, 12, [90, 180, 70])
+    sea t = "EL LINCE SALTARIN"
+    juego.texto(t, (ANCHO - juego.ancho_texto(t, 5)) / 2, 120, 5, [255, 255, 255])
+    # el lince corre en el sitio: cuadros 1 y 2 de la hoja, 10 por segundo
+    juego.dibujar(LINCE, ANCHO / 2 - 36, ALTO - 96 - 78, {"celda": [12, 13], "cuadro": 1 + juego.cuadro(2, 10), "escala": 6})
+    si juego.cuadro(2, 2) == 0 {
+        sea p = "PULSA ESPACIO PARA EMPEZAR"
+        juego.texto(p, (ANCHO - juego.ancho_texto(p, 2)) / 2, 220, 2, [255, 240, 200])
+    }
+    si juego.accion_pulsada("empezar") {
+        empezar()
+        juego.cambiar_escena("nivel", 0.6)
+    }
+}
 
-mientras juego.abierto() {
-    sea dt = juego.dt()
-    si juego.tecla_pulsada("escape") { juego.salir() }
-    si juego.tecla_pulsada("f11") { juego.pantalla_completa() }
-
+# ── Un fotograma del nivel ────────────────────────────────────────────
+funcion nivel(val numero dt): nulo {
     si estado == "jugando" {
         reloj = reloj + dt
         invulnerable = matematica.maximo(0, invulnerable - dt)
@@ -298,25 +306,27 @@ mientras juego.abierto() {
     }
     para cada diccionario m en monedas {
         si m["viva"] {
-            juego.dibujar(moneda, m["x"], m["y"] + matematica.seno(juego.tiempo() * 5 + m["x"]) * 3, {"escala": 2})
+            juego.dibujar(MONEDA, m["x"], m["y"] + matematica.seno(juego.tiempo() * 5 + m["x"]) * 3, {"escala": 2})
         }
     }
     para cada diccionario bicho en enemigos {
-        si bicho["vivo"] { juego.dibujar(escarabajo, bicho["x"], bicho["y"], {"escala": 2, "espejo": bicho["dir"] > 0}) }
+        si bicho["vivo"] { juego.dibujar(ESCARABAJO, bicho["x"], bicho["y"], {"escala": 2, "espejo": bicho["dir"] > 0}) }
     }
     sea cuadro = 0
     si no en_suelo {
         cuadro = 1
     } sino si vx != 0 {
-        cuadro = 1 + matematica.piso(juego.tiempo() * 10) % 2
+        cuadro = 1 + juego.cuadro(2, 10)
     }
     si invulnerable == 0 o matematica.piso(invulnerable * 12) % 2 == 0 {
-        juego.dibujar(lince, px - 1, py, {"celda": [12, 13], "cuadro": cuadro, "escala": 2, "espejo": mira_izquierda})
+        juego.dibujar(LINCE, px - 1, py, {"celda": [12, 13], "cuadro": cuadro, "escala": 2, "espejo": mira_izquierda})
     }
+
+    juego.dibujar_particulas()
 
     # ── marcador, fijo en pantalla ──
     juego.camara()
-    juego.dibujar(moneda, 12, 12, {"escala": 2})
+    juego.dibujar(MONEDA, 12, 12, {"escala": 2})
     juego.texto("x " + a_texto(recogidas), 32, 14, 2, [255, 255, 255])
     juego.texto("VIDAS " + a_texto(vidas), 120, 14, 2, [255, 255, 255])
     sea t = "TIEMPO " + a_texto(matematica.piso(reloj))
@@ -329,5 +339,40 @@ mientras juego.abierto() {
         sea r = a_texto(recogidas) + " MONEDAS EN " + a_texto(matematica.piso(reloj)) + " S - ESPACIO PARA REPETIR"
         juego.texto(r, (ANCHO - juego.ancho_texto(r, 2)) / 2, 250, 2, [255, 255, 255])
     }
+}
+
+juego.abrir("Plataformas", ANCHO, ALTO)
+
+# ── Controles: cada acción con su teclado y su mando ─────────────────
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("saltar", ["espacio", "arriba", "w", "mando:a"])
+juego.definir_accion("empezar", ["espacio", "entrar", "mando:a", "mando:inicio"])
+fijo LINCE = juego.sprite(hoja_del_lince(), COLORES_LINCE)
+fijo ESCARABAJO = juego.sprite([
+    "...MMMMMM...",
+    "..MMMMMMMM..",
+    ".MMWKMMWKMM.",
+    ".MMMMMMMMMM.",
+    "MMMMMMMMMMMM",
+    ".K.K....K.K."
+], {"M": [120, 70, 160], "W": [255, 255, 255], "K": [30, 20, 40]})
+fijo MONEDA = juego.sprite([
+    "..YY..",
+    ".YYYY.",
+    "YYWYYY",
+    "YYWYYY",
+    ".YYYY.",
+    "..YY.."
+], {"Y": [250, 200, 50], "W": [255, 250, 220]})
+si no juego.recargado() {                   # al recargar en caliente sigue la partida
+    empezar()
+    juego.cambiar_escena("portada")
+}
+
+mientras juego.abierto() {
+    si juego.tecla_pulsada("escape") { juego.salir() }
+    si juego.tecla_pulsada("f11") { juego.pantalla_completa() }
+    si juego.escena() == "portada" { portada() } sino { nivel(juego.dt()) }
     juego.presentar()
 }

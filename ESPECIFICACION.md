@@ -831,9 +831,71 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | `volumen([v])` | volumen general de 0 a 1 |
 | `pitido(frecuencia, ms[, volumen])` | tono sencillo, sin archivos |
 
-**Utilidades:** `colision(x1, y1, w1, h1, x2, y2, w2, h2)` dice si se solapan dos rectángulos. En
-`matematica` hay además `distancia`, `angulo`, `interpolar`, `limitar`, `signo`, `radianes`,
-`grados` y `semilla` (misma semilla, misma secuencia de `aleatorio`: partidas repetibles).
+**Colisiones y animación**
+
+| Función | Qué hace |
+|---|---|
+| `colision(x1, y1, w1, h1, x2, y2, w2, h2)` | ¿se solapan dos rectángulos? |
+| `colision_circulos(x1, y1, r1, x2, y2, r2)` · `colision_circulo_rect(cx, cy, r, x, y, w, h)` | ¿se tocan dos círculos? · ¿toca el círculo al rectángulo? |
+| `dentro(px, py, x, y, w, h)` | ¿está el punto dentro del rectángulo? (botones, clics) |
+| `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
+
+```lince
+juego.dibujar(hoja, x, y, {"celda": [16, 16], "cuadro": juego.cuadro(4, 8)})   # 4 cuadros, 8 por segundo
+```
+
+**Partículas.** Chispas, polvo, explosiones: `particulas(x, y[, opciones])` lanza un puñado y
+`dibujar_particulas()` las mueve y las dibuja (llámala en cada fotograma, después de lo que deban
+tapar; respeta la cámara y devuelve cuántas quedan). `borrar_particulas()` las quita todas.
+
+```lince
+juego.particulas(x, y, {"cantidad": 30, "color": [255, 200, 50], "velocidad": [50, 200], "gravedad": 400})
+```
+
+Opciones (todas opcionales; las que admiten `[mínimo, máximo]` toman un valor al azar en ese
+rango para cada partícula): `cantidad` (20), `color` (blanco), `color_final` (el mismo
+transparente: se desvanecen), `velocidad` en píxeles por segundo (`[60, 180]`), `direccion` en
+grados (0 = derecha, −90 = arriba) y `apertura` (360: en todas direcciones), `vida` en segundos
+(`[0.4, 0.8]`), `tamaño` (4) y `tamaño_final`, y `gravedad` (0). Una opción mal escrita da error.
+
+**Escenas.** Un nombre para cada parte del juego (portada, partida, fin...):
+
+```lince
+juego.cambiar_escena("portada")
+mientras juego.abierto() {
+    si juego.escena() == "portada" { portada() } sino { partida() }
+    juego.presentar()
+}
+# dentro de portada(): si juego.tecla_pulsada("espacio") { juego.cambiar_escena("partida", 0.6) }
+```
+
+| Función | Qué hace |
+|---|---|
+| `cambiar_escena(nombre[, fundido])` | cambia de escena en el siguiente `presentar()` (así un fotograma no mezcla dos escenas; la primera empieza en el acto). Con `fundido` en segundos, la pantalla se oscurece, cambia y se aclara |
+| `escena()` · `escena_nueva()` · `tiempo_escena()` | la escena actual · verdadero en su primer fotograma (para prepararla) · segundos desde que empezó |
+
+En `matematica` hay además `distancia`, `angulo`, `interpolar`, `limitar`, `signo`, `radianes`,
+`grados`, `semilla` (misma semilla, misma secuencia de `aleatorio`: partidas repetibles) y, para
+vectores (listas `[x, y]`), `longitud(x, y)`, `normalizar(x, y)`, `vector(angulo, largo)` (el
+contrario de `angulo`), `rotar(x, y, grados)` y `acercar(actual, objetivo, paso)` (avanza sin
+pasarse: frenar, perseguir, cámaras suaves).
+
+**Recarga en caliente.** Con `lince juego.lince` el juego se vigila mientras corre: al guardar el
+programa (o un archivo que importa) se vuelve a ejecutar con el código nuevo **sin cerrar la
+ventana**, y las imágenes y sonidos cargados que cambien se recargan solos.
+
+- Las variables `sea` del nivel superior **conservan su valor** (el jugador sigue donde estaba);
+  las constantes `fijo`, las funciones y las clases salen del código nuevo, y los objetos
+  conservados pasan a usar la clase nueva. Para que un cambio de valor se note al guardar
+  (gravedad, colores, un sprite), decláralo con `fijo`.
+- `juego.recargado()` es verdadero cuando el programa se ha recargado así; sirve para no
+  reiniciar la partida: `si no juego.recargado() { empezar() }`.
+- **F5** lo vuelve a empezar desde cero, sin conservar nada.
+- Si lo guardado tiene un error de sintaxis, el juego sigue con el código anterior y el error
+  sale abajo, en la ventana. Si el programa se para por un error, el error ocupa la ventana
+  hasta que se guarde el arreglo.
+
+Los ejecutables de `lince compilar` no se recargan.
 
 Las imágenes y los sonidos se leen también desde dentro de un ejecutable de `lince compilar`
 si se incluyeron con `--incluir`.
@@ -843,6 +905,12 @@ se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`,
 `"derecha"`, `"espacio"`, `"entrar"`, `"escape"`, `"borrar"`, `"tab"`, `"mayus"`, `"ctrl"`,
 `"alt"`, `"f1"`–`"f12"` (y los nombres de SDL). Los fallos son de tipo `ErrorJuego`
 (sin SDL2, sin pantalla) o `Error`. Ejemplos completos: los ocho minijuegos de `examples/`.
+
+Para pruebas automáticas (sin pantalla, con `SDL_VIDEODRIVER=dummy`): `LINCE_JUEGO_FOTOGRAMAS=N`
+cierra el juego tras N fotogramas de 1/60 s; `LINCE_JUEGO_PULSAR=espacio,derecha` y
+`LINCE_JUEGO_CLIC=x,y` pulsan en los fotogramas impares; `LINCE_JUEGO_ESCRIBIR=texto` teclea
+(`<` borra); `LINCE_JUEGO_CAPTURA=ruta.bmp` guarda el último fotograma y
+`LINCE_JUEGO_FOTOS=carpeta` todos (para hacer un vídeo).
 
 ### `pruebas`
 

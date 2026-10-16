@@ -1,0 +1,9 @@
+# F5 vuelve a empezar desde cero, sin conservar las variables
+importar "juego"
+sea veces = 0
+juego.abrir("F5", 40, 40)
+escribir("recargado: " + a_texto(juego.recargado()) + ", veces: " + a_texto(veces))
+mientras juego.abierto() {
+    veces = veces + 1
+    juego.presentar()
+}

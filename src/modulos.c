@@ -202,6 +202,49 @@ static Valor *fn_mat_grados(Valor **a, int n) {
     if (!mat_nums(a, n, 1, v, "grados")) return valor_nulo();
     return valor_numero(v[0] * 180.0 / M_PI);
 }
+/* ── Vectores: un vector es una lista [x, y] ── */
+static Valor *mat_par(double x, double y) {
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(x));
+    lista_agregar(l, valor_numero(y));
+    return l;
+}
+/* longitud(x, y): largo del vector */
+static Valor *fn_mat_longitud(Valor **a, int n) {
+    double v[2];
+    if (!mat_nums(a, n, 2, v, "longitud")) return valor_nulo();
+    return valor_numero(hypot(v[0], v[1]));
+}
+/* normalizar(x, y): el mismo vector con largo 1 ([0, 0] si es nulo) */
+static Valor *fn_mat_normalizar(Valor **a, int n) {
+    double v[2];
+    if (!mat_nums(a, n, 2, v, "normalizar")) return valor_nulo();
+    double l = hypot(v[0], v[1]);
+    return l > 0 ? mat_par(v[0] / l, v[1] / l) : mat_par(0, 0);
+}
+/* vector(angulo, largo): [x, y] que apunta hacia ese ángulo (grados, como angulo()) */
+static Valor *fn_mat_vector(Valor **a, int n) {
+    double v[2];
+    if (!mat_nums(a, n, 2, v, "vector")) return valor_nulo();
+    double r = v[0] * M_PI / 180.0;
+    return mat_par(cos(r) * v[1], sin(r) * v[1]);
+}
+/* rotar(x, y, grados): gira el vector (positivo = como las agujas del reloj en pantalla) */
+static Valor *fn_mat_rotar(Valor **a, int n) {
+    double v[3];
+    if (!mat_nums(a, n, 3, v, "rotar")) return valor_nulo();
+    double r = v[2] * M_PI / 180.0, c = cos(r), s = sin(r);
+    return mat_par(v[0] * c - v[1] * s, v[0] * s + v[1] * c);
+}
+/* acercar(actual, objetivo, paso): avanza hacia el objetivo sin pasarse */
+static Valor *fn_mat_acercar(Valor **a, int n) {
+    double v[3];
+    if (!mat_nums(a, n, 3, v, "acercar")) return valor_nulo();
+    double paso = fabs(v[2]);
+    if (fabs(v[1] - v[0]) <= paso) return valor_numero(v[1]);
+    return valor_numero(v[0] + (v[1] > v[0] ? paso : -paso));
+}
+
 static Valor *fn_mat_signo(Valor **a, int n) {
     double v[1];
     if (!mat_nums(a, n, 1, v, "signo")) return valor_nulo();
@@ -1511,6 +1554,7 @@ static void cargar_pruebas(Entorno *entorno) {
 #include <dlfcn.h>
 #endif
 #include "ogg.h"
+#include "recarga.h"
 #include "juego.h"
 
 static void cargar_matematica(Entorno *entorno) {
@@ -1542,6 +1586,11 @@ static void cargar_matematica(Entorno *entorno) {
         {"radianes",       fn_mat_radianes,      1},
         {"grados",         fn_mat_grados,        1},
         {"signo",          fn_mat_signo,         1},
+        {"longitud",       fn_mat_longitud,      2},
+        {"normalizar",     fn_mat_normalizar,    2},
+        {"vector",         fn_mat_vector,        2},
+        {"rotar",          fn_mat_rotar,         3},
+        {"acercar",        fn_mat_acercar,       3},
     };
     const char *cnames[] = {"PI", "E", "TAU"};
     double      cvals[]  = {M_PI, M_E, M_PI * 2};

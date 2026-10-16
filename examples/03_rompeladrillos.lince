@@ -60,7 +60,7 @@ funcion limitar(val numero v, val numero minimo, val numero maximo): numero {
 }
 
 juego.abrir("Rompeladrillos", ANCHO, ALTO)
-nueva_partida()
+si no juego.recargado() { nueva_partida() }      # al recargar en caliente sigue la partida
 
 mientras juego.abierto() {
     sea dt = juego.dt()

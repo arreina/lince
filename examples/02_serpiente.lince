@@ -77,7 +77,7 @@ funcion avanzar(): nulo {
 }
 
 juego.abrir("Serpiente", COLUMNAS * CELDA, FILAS * CELDA + MARGEN)
-reiniciar()
+si no juego.recargado() { reiniciar() }      # al recargar en caliente sigue la partida
 
 mientras juego.abierto() {
     si juego.tecla_pulsada("escape") { juego.salir() }

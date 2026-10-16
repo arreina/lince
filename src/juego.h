@@ -100,6 +100,7 @@ static struct {
     int  (*ShowCursor)(int);
     int  (*RelativeMouse)(int);
     void (*StartTextInput)(void);
+    void (*SetWindowSize)(void *, int, int);
     void *(*IMG_Load_RW)(void *, int);                               /* SDL2_image */
 } _jg;
 
@@ -112,8 +113,9 @@ typedef struct { int freq; unsigned short formato; unsigned char canales, silenc
                  unsigned short muestras, pad; unsigned tam; void (*callback)(void *, unsigned char *, int);
                  void *datos; } JgAudioSpec;
 
-typedef struct { void *tex; int ancho, alto; char *ruta; } JgImagen;
-typedef struct { short *datos; int muestras; char *ruta; } JgSonido;   /* muestras por canal */
+/* mtime/tam: huella del archivo al cargarlo, para recargarlo si cambia */
+typedef struct { void *tex; int ancho, alto; char *ruta; long long mtime, tam; } JgImagen;
+typedef struct { short *datos; int muestras; char *ruta; long long mtime, tam; } JgSonido;   /* muestras por canal */
 typedef struct {
     const short *datos; int muestras, pos, bucle, activa, id;
     float vol;
@@ -129,11 +131,18 @@ typedef struct {
 #define JG_ESCRITO      512       /* texto tecleado en un fotograma ('\b' = borrar) */
 #define JG_ACCIONES     64
 #define JG_ENTRADAS     16
+#define JG_PARTICULAS   8192
 
 /* Una entrada de una acción: tecla, botón del mando, botón del ratón o eje del mando
    hacia un lado. mando = -1: cualquiera. */
 typedef struct { char tipo; int codigo, mando, signo; } JgEntrada;
 typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; int n; } JgAccion;
+
+/* Partícula: se mueve, cae, cambia de tamaño y de color, y se apaga al acabar su vida */
+typedef struct {
+    float x, y, vx, vy, grav, vida, total, tam, tam_fin;
+    unsigned char c[4], c_fin[4];
+} JgParticula;
 
 static struct {
     int cargada, abierta, ancho, alto, cierre;
@@ -149,7 +158,8 @@ static struct {
        fotogramas impares; LINCE_JUEGO_CLIC=x,y hace clic ahí en los fotogramas impares;
        LINCE_JUEGO_ESCRIBIR=texto lo teclea (con '<' como «borrar») la primera vez que
        el juego llama a editar() o texto_escrito();
-       LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma. */
+       LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma, y
+       LINCE_JUEGO_FOTOS=carpeta todos (00000.bmp, 00001.bmp...). */
     long limite, total;
     int pulsar[16], npulsar, clic_x, clic_y, hay_clic;
     double cam_x, cam_y, t_inicio;
@@ -172,12 +182,29 @@ static struct {
     int pide_texto;                      /* el juego ha llamado a editar() o texto_escrito() */
     JgAccion acciones[JG_ACCIONES];
     int nacciones;
+    int reabrir;                         /* recarga en caliente: abrir() reutiliza la ventana */
+    int recargado;                       /* el programa se recargó conservando sus variables */
+    JgParticula part[JG_PARTICULAS];
+    int npart;
+    /* escenas: la actual, la que viene (se cambia en presentar()) y el fundido */
+    char escena[64], siguiente[64];
+    int hay_siguiente, escena_nueva, fase;   /* fase 1: oscurece; 2: aclara */
+    double t_escena, t_fundido, fundido;
+    double t_vigilar;                    /* última comprobación de archivos cambiados */
 } _jgs;
 
 static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
 static void jg_leer_mandos(void);
 static void jg_recoger_voces(void);
+static int jg_escribir(const char *t, int x, int y, int e, int ancho);
+static void jg_glifo(int ch, int px, int py, int e, int ac);
+static int jg_vigilar(void);
+static double jg_reloj(void);
+static void jg_escenas(void);
+static void jg_aviso_error(const char *msg, int pantalla);
+static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
+static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 
 static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
@@ -251,6 +278,7 @@ static int jg_cargar(void) {
     *(void **)(&_jg.ShowCursor) = JG_SIMBOLO(h, "SDL_ShowCursor");
     *(void **)(&_jg.RelativeMouse) = JG_SIMBOLO(h, "SDL_SetRelativeMouseMode");
     *(void **)(&_jg.StartTextInput) = JG_SIMBOLO(h, "SDL_StartTextInput");
+    *(void **)(&_jg.SetWindowSize) = JG_SIMBOLO(h, "SDL_SetWindowSize");
     void *hi = JG_ABRIR_IMG();
     if (hi) *(void **)(&_jg.IMG_Load_RW) = JG_SIMBOLO(hi, "IMG_Load_RW");
     return 1;
@@ -363,6 +391,18 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     if (n > 1 && !jg_num(a, n, 1, &w, "abrir")) return valor_nulo();
     if (n > 2 && !jg_num(a, n, 2, &h, "abrir")) return valor_nulo();
     if (w < 1 || h < 1 || w > 16384 || h > 16384) return jg_error("Error", "abrir(): tamaño de ventana no válido");
+    if (_jgs.abierta && _jgs.reabrir) {          /* programa recargado: la ventana sigue */
+        _jgs.reabrir = 0;
+        _jg.SetTitle(_jgs.ventana, a[0]->texto);
+        if ((int)w != _jgs.ancho || (int)h != _jgs.alto) {
+            if (_jg.SetWindowSize && !_jgs.completa) _jg.SetWindowSize(_jgs.ventana, (int)w, (int)h);
+            _jg.LogicalSize(_jgs.render, (int)w, (int)h);
+            _jgs.ancho = (int)w; _jgs.alto = (int)h;
+        }
+        _jgs.cam_x = _jgs.cam_y = 0;
+        _jgs.cierre = 0;
+        return valor_nulo();
+    }
     if (_jgs.abierta) return jg_error("Error", "la ventana ya está abierta");
     if (!jg_cargar())
         return jg_error("ErrorJuego", "no se encuentra SDL2: instálala (por ejemplo 'sudo apt install libsdl2-2.0-0')");
@@ -572,30 +612,63 @@ static Valor *fn_jg_texto(Valor **a, int n) {
     if (!jg_color(a, n, 4, c)) return valor_nulo();
     int e = esc < 1 ? 1 : esc > 64 ? 64 : (int)esc;
     jg_pintar(c);
-    x -= _jgs.cam_x;
-    y -= _jgs.cam_y;
-    int px = (int)x, py = (int)y, ac;
-    const unsigned char *p = (const unsigned char *)a[0]->texto;
+    jg_escribir(a[0]->texto, (int)(x - _jgs.cam_x), (int)(y - _jgs.cam_y), e, -1);
+    return valor_nulo();
+}
+
+/* Dibuja 't' con la fuente de Lince en (x, y) a escala e, en el color actual.
+   Con 'ancho' > 0 parte las líneas (por los espacios) para no pasar de ese
+   ancho. Devuelve la altura ocupada. */
+static int jg_escribir(const char *t, int x, int y, int e, int ancho) {
+    int px = x, py = y, ac;
+    int caben = ancho > 0 ? ancho / (6 * e) : 0;
+    const unsigned char *p = (const unsigned char *)t;
     while (*p) {
-        int ch = jg_siguiente(&p, &ac);
-        if (ch >= 'a' && ch <= 'z') ch -= 32;
-        if (ch == '\n') { px = (int)x; py += 9 * e; continue; }
-        if (ch < 32 || ch > 95) ch = '?';
-        const unsigned char *g = JG_FUENTE[ch - 32];
-        for (int col = 0; col < 5; col++) {
-            int fila = 0;
-            while (fila < 7) {
-                if (!(g[col] >> fila & 1)) { fila++; continue; }
-                int ini = fila;
-                while (fila < 7 && (g[col] >> fila & 1)) fila++;
-                JgRect r = {px + col * e, py + ini * e, e, (fila - ini) * e};
-                _jg.FillRect(_jgs.render, &r);
+        if (caben && px == x) {             /* principio de línea: ¿cabe la palabra? */
+            const unsigned char *q = p, *corte = NULL;
+            int nc = 0;
+            while (*q && *q != '\n' && nc < caben) {
+                if (*q == ' ') corte = q;
+                q += utf8_tam((const char *)q);
+                nc++;
+            }
+            if (*q && *q != '\n' && nc == caben) {
+                const unsigned char *fin = corte && corte > p ? corte : q;
+                while (p < fin) {
+                    int ch = jg_siguiente(&p, &ac);
+                    jg_glifo(ch, px, py, e, ac);
+                    px += 6 * e;
+                }
+                if (*p == ' ') p++;
+                px = x; py += 9 * e;
+                continue;
             }
         }
-        if (ac) { JgRect r = {px + 2 * e, py - 2 * e, 2 * e, e}; _jg.FillRect(_jgs.render, &r); }
+        int ch = jg_siguiente(&p, &ac);
+        if (ch == '\n') { px = x; py += 9 * e; continue; }
+        jg_glifo(ch, px, py, e, ac);
         px += 6 * e;
     }
-    return valor_nulo();
+    return py - y + 9 * e;
+}
+
+static void jg_glifo(int ch, int px, int py, int e, int ac) {
+    if (ch >= 'a' && ch <= 'z') ch -= 32;
+    if (ch == '{') ch = '(';                  /* la fuente no tiene llaves */
+    if (ch == '}') ch = ')';
+    if (ch < 32 || ch > 95) ch = '?';
+    const unsigned char *g = JG_FUENTE[ch - 32];
+    for (int col = 0; col < 5; col++) {
+        int fila = 0;
+        while (fila < 7) {
+            if (!(g[col] >> fila & 1)) { fila++; continue; }
+            int ini = fila;
+            while (fila < 7 && (g[col] >> fila & 1)) fila++;
+            JgRect r = {px + col * e, py + ini * e, e, (fila - ini) * e};
+            _jg.FillRect(_jgs.render, &r);
+        }
+    }
+    if (ac) { JgRect r = {px + 2 * e, py - 2 * e, 2 * e, e}; _jg.FillRect(_jgs.render, &r); }
 }
 
 /* ancho_texto(contenido[, escala]): para centrar o alinear */
@@ -677,8 +750,16 @@ static Valor *fn_jg_rueda(Valor **a, int n) { (void)a; (void)n; return valor_num
 static Valor *fn_jg_presentar(Valor **a, int n) {
     (void)a; (void)n;
     JG_ABIERTA();
+    int recargar = recarga_activa() && jg_vigilar();
+    jg_escenas();
+    if (recarga_error()) jg_aviso_error(recarga_error(), 0);
     if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))
         jg_guardar_bmp(getenv("LINCE_JUEGO_CAPTURA"));      /* prueba: guarda el último fotograma */
+    if (_jgs.limite && getenv("LINCE_JUEGO_FOTOS")) {          /* prueba: todos, para hacer un vídeo */
+        char ruta[600];
+        snprintf(ruta, sizeof ruta, "%s/%05ld.bmp", getenv("LINCE_JUEGO_FOTOS"), _jgs.total);
+        jg_guardar_bmp(ruta);
+    }
     _jg.RenderPresent(_jgs.render);
     double t = jg_ahora();
     double espera = 1.0 / 60 - (t - _jgs.t_ultimo);
@@ -738,7 +819,132 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         for (int i = 0; i < _jgs.npulsar; i++) _jgs.teclas[_jgs.pulsar[i]] = 1;
         if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; _jgs.raton |= 1; }
     } else if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; }
+    /* Código nuevo listo: se corta el programa que corre y main lo relanza */
+    if (recargar) return jg_error(ERROR_RECARGA, "recarga en caliente");
     return valor_nulo();
+}
+
+/* ── Recarga en caliente ──
+   Con el juego en marcha, cada cuarto de segundo (cada fotograma en el modo
+   de prueba) se mira si han cambiado el programa, lo que importa, o las
+   imágenes y sonidos cargados. Las imágenes y sonidos se cambian en el
+   momento; el código, si su sintaxis es correcta, hace que presentar()
+   corte el programa para que main lo vuelva a lanzar. F5 lo relanza desde
+   cero, sin conservar las variables. */
+static void jg_recargar_recursos(void) {
+    long long m, t;
+    for (int i = 0; i < _jgs.nimagenes; i++) {
+        JgImagen *im = &_jgs.imagenes[i];
+        recarga_huella(im->ruta, &m, &t);
+        if (m < 0 || (m == im->mtime && t == im->tam)) continue;
+        char msg[600];
+        void *tex;
+        if (!jg_leer_textura(im->ruta, &tex, msg, sizeof msg)) continue;   /* a medio guardar: luego */
+        _jg.DestroyTexture(im->tex);
+        im->tex = tex;
+        _jg.QueryTexture(tex, NULL, NULL, &im->ancho, &im->alto);
+        im->mtime = m; im->tam = t;
+    }
+    for (int i = 0; i < _jgs.nsonidos; i++) {
+        JgSonido *so = &_jgs.sonidos[i];
+        recarga_huella(so->ruta, &m, &t);
+        if (m < 0 || (m == so->mtime && t == so->tam)) continue;
+        char msg[600];
+        short *datos;
+        int muestras;
+        if (!jg_cargar_wav(so->ruta, &datos, &muestras, msg, sizeof msg)) continue;
+        if (_jgs.audio) _jg.LockAudio(_jgs.audio);
+        for (int v = 0; v < JG_VOCES; v++) {           /* lo que suena sigue con el sonido nuevo */
+            JgVoz *vz = &_jgs.voces[v];
+            if (vz->datos != so->datos) continue;
+            vz->datos = datos;
+            vz->muestras = muestras;
+            if (vz->pos >= muestras) vz->pos = 0;
+        }
+        short *viejo = so->datos;
+        so->datos = datos;
+        so->muestras = muestras;
+        if (_jgs.audio) _jg.UnlockAudio(_jgs.audio);
+        free(viejo);
+        so->mtime = m; so->tam = t;
+    }
+}
+
+static int jg_vigilar(void) {
+    int f5 = _jgs.teclas[62] && !_jgs.previas[62];
+    double t = jg_ahora();
+    if (!f5 && !_jgs.limite && t - _jgs.t_vigilar < 0.25) return 0;
+    _jgs.t_vigilar = t;
+    jg_recargar_recursos();
+    int r = recarga_comprobar(f5);
+    recarga_pedir_completa(r && f5);
+    return r;
+}
+
+/* Muestra un error en la ventana: abajo, sobre el juego, o (pantalla = 1)
+   ocupándola entera */
+static void jg_aviso_error(const char *msg, int pantalla) {
+    int w = _jgs.ancho, e = w >= 480 ? 2 : 1, margen = 6 * e;
+    char texto[800];
+    snprintf(texto, sizeof texto, "%s", msg);
+    /* altura que ocupa el texto: se dibuja una vez fuera de la ventana para medirlo */
+    _jg.SetDrawColor(_jgs.render, 0, 0, 0, 0);
+    int alto = jg_escribir(texto, -100000, -100000, e, w - 2 * margen);
+    int y0 = pantalla ? 0 : _jgs.alto - alto - 2 * margen - 9 * e;
+    unsigned char fondo[4] = {90, 20, 25, pantalla ? 255 : 235};
+    jg_pintar(fondo);
+    JgRect r = {0, y0, w, _jgs.alto - y0};
+    _jg.FillRect(_jgs.render, &r);
+    unsigned char amarillo[4] = {255, 210, 90, 255}, blanco[4] = {255, 255, 255, 255}, gris[4] = {230, 170, 170, 255};
+    jg_pintar(amarillo);
+    jg_escribir(pantalla ? "ERROR: EL JUEGO SE HA PARADO" : "ERROR: SIGUE EL CÓDIGO ANTERIOR", margen, y0 + margen, e, 0);
+    jg_pintar(blanco);
+    int y = y0 + margen + 9 * e + (pantalla ? 6 * e : 0);
+    y += jg_escribir(texto, margen, y, e, w - 2 * margen);
+    if (pantalla) {
+        jg_pintar(gris);
+        jg_escribir("Corrígelo y guarda: el juego se recarga solo. F5 lo empieza de cero.",
+                    margen, y + 6 * e, e, w - 2 * margen);
+    }
+}
+
+/* ¿Hay una ventana abierta? (main decide así si un error se muestra en ella) */
+int juego_ventana_abierta(void) { return _jgs.abierta && !_jgs.cierre; }
+
+/* Antes de relanzar el programa recargado: su abrir() reutilizará la ventana */
+void juego_preparar_recarga(int conserva) { _jgs.reabrir = _jgs.abierta; _jgs.recargado = conserva; }
+
+/* recargado(): verdadero si el programa se ha recargado en caliente y conserva
+   sus variables. Sirve para no reiniciar la partida al guardar:
+       si no juego.recargado() { empezar() } */
+static Valor *fn_jg_recargado(Valor **a, int n) { (void)a; (void)n; return valor_booleano(_jgs.recargado); }
+
+/* El programa se paró por un error: lo muestra en la ventana hasta que se
+   guarde un arreglo (devuelve 1) o se cierre la ventana (devuelve 0). */
+int juego_esperar_arreglo(const char *msg) {
+    if (!_jgs.abierta) return 0;
+    if (_jgs.audio) _jg.PauseAudio(_jgs.audio, 1);
+    int r = 0;
+    while (!_jgs.cierre) {
+        _jg.SetDrawColor(_jgs.render, 0, 0, 0, 255);
+        _jg.RenderClear(_jgs.render);
+        jg_aviso_error(recarga_error() ? recarga_error() : msg, 1);
+        if (_jgs.limite && getenv("LINCE_JUEGO_CAPTURA")) jg_guardar_bmp(getenv("LINCE_JUEGO_CAPTURA"));
+        _jg.RenderPresent(_jgs.render);
+        memcpy(_jgs.previas, _jgs.teclas, sizeof(_jgs.teclas));
+        unsigned long long ev_buf[16];
+        unsigned char *ev = (unsigned char *)ev_buf;
+        while (_jg.PollEvent(ev)) if (*(unsigned *)ev == 0x100) _jgs.cierre = 1;
+        int nt = 0;
+        const unsigned char *k = _jg.KeyboardState(&nt);
+        memcpy(_jgs.teclas, k, (size_t)(nt > 512 ? 512 : nt));
+        if (_jgs.teclas[41]) _jgs.cierre = 1;                      /* Esc */
+        if (jg_vigilar()) { r = 1; break; }
+        if (_jgs.limite) { if (++_jgs.total >= _jgs.limite) _jgs.cierre = 1; }
+        else _jg.Delay(30);
+    }
+    if (_jgs.audio) _jg.PauseAudio(_jgs.audio, 0);
+    return r;
 }
 
 /* Guarda la imagen actual de la ventana como BMP; 1 si va bien */
@@ -999,6 +1205,7 @@ static Valor *fn_jg_sonido(Valor **a, int n) {
         _jgs.sonidos[k].datos = datos;
         _jgs.sonidos[k].muestras = muestras;
         _jgs.sonidos[k].ruta = strdup(a[0]->texto);
+        recarga_huella(a[0]->texto, &_jgs.sonidos[k].mtime, &_jgs.sonidos[k].tam);
     }
     Valor *d = valor_diccionario_crear();
     valor_diccionario_agregar(d, "sonido", valor_numero(k));
@@ -1072,19 +1279,13 @@ static Valor *jg_imagen_valor(int k) {
     return d;
 }
 
-/* imagen(ruta): PNG/JPG (con SDL2_image) o BMP; devuelve {"imagen", "ancho", "alto"} */
-static Valor *fn_jg_imagen(Valor **a, int n) {
-    JG_ABIERTA();
-    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "imagen() espera la ruta de una imagen");
-    for (int i = 0; i < _jgs.nimagenes; i++)
-        if (strcmp(_jgs.imagenes[i].ruta, a[0]->texto) == 0) return jg_imagen_valor(i);
-    if (_jgs.nimagenes == JG_MAX_IMAGENES) return jg_error("ErrorJuego", "demasiadas imágenes cargadas");
+/* Lee la imagen 'ruta' como textura; 1 si va bien, 0 con el motivo en msg */
+static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) {
     size_t largo = 0;
-    char *bytes = interprete_leer_bytes(a[0]->texto, &largo);
-    char msg[600];
+    char *bytes = interprete_leer_bytes(ruta, &largo);
     if (!bytes) {
-        snprintf(msg, sizeof msg, "no se encuentra la imagen '%s'", a[0]->texto);
-        return jg_error("ErrorJuego", msg);
+        snprintf(msg, max, "no se encuentra la imagen '%s'", ruta);
+        return 0;
     }
     int es_bmp = largo > 2 && bytes[0] == 'B' && bytes[1] == 'M';
     void *sup = NULL;
@@ -1093,22 +1294,36 @@ static Valor *fn_jg_imagen(Valor **a, int n) {
     free(bytes);
     if (!sup) {
         if (!es_bmp && !_jg.IMG_Load_RW)
-            snprintf(msg, sizeof msg, "para cargar '%s' hace falta SDL2_image (por ejemplo 'sudo apt install libsdl2-image-2.0-0'); sin ella solo se leen .bmp", a[0]->texto);
+            snprintf(msg, max, "para cargar '%s' hace falta SDL2_image (por ejemplo 'sudo apt install libsdl2-image-2.0-0'); sin ella solo se leen .bmp", ruta);
         else
-            snprintf(msg, sizeof msg, "no se pudo leer la imagen '%s': %s", a[0]->texto, _jg.GetError());
-        return jg_error("ErrorJuego", msg);
+            snprintf(msg, max, "no se pudo leer la imagen '%s': %s", ruta, _jg.GetError());
+        return 0;
     }
-    void *tex = _jg.TextureFromSurface(_jgs.render, sup);
+    *tex = _jg.TextureFromSurface(_jgs.render, sup);
     _jg.FreeSurface(sup);
-    if (!tex) {
-        snprintf(msg, sizeof msg, "no se pudo preparar la imagen '%s': %s", a[0]->texto, _jg.GetError());
-        return jg_error("ErrorJuego", msg);
+    if (!*tex) {
+        snprintf(msg, max, "no se pudo preparar la imagen '%s': %s", ruta, _jg.GetError());
+        return 0;
     }
+    _jg.TextureBlend(*tex, 1);
+    return 1;
+}
+
+/* imagen(ruta): PNG/JPG (con SDL2_image) o BMP; devuelve {"imagen", "ancho", "alto"} */
+static Valor *fn_jg_imagen(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "imagen() espera la ruta de una imagen");
+    for (int i = 0; i < _jgs.nimagenes; i++)
+        if (strcmp(_jgs.imagenes[i].ruta, a[0]->texto) == 0) return jg_imagen_valor(i);
+    if (_jgs.nimagenes == JG_MAX_IMAGENES) return jg_error("ErrorJuego", "demasiadas imágenes cargadas");
+    char msg[600];
+    void *tex;
+    if (!jg_leer_textura(a[0]->texto, &tex, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
     int k = _jgs.nimagenes++;
     _jgs.imagenes[k].tex = tex;
     _jgs.imagenes[k].ruta = strdup(a[0]->texto);
+    recarga_huella(a[0]->texto, &_jgs.imagenes[k].mtime, &_jgs.imagenes[k].tam);
     _jg.QueryTexture(tex, NULL, NULL, &_jgs.imagenes[k].ancho, &_jgs.imagenes[k].alto);
-    _jg.TextureBlend(tex, 1);
     return jg_imagen_valor(k);
 }
 
@@ -1139,6 +1354,19 @@ static Valor *fn_jg_sprite(Valor **a, int n) {
         Valor *arg[1] = {d->diccionario.valores[i]};
         if (!jg_color(arg, 1, 0, pal[(unsigned char)k[0]])) return valor_nulo();
     }
+    /* El mismo dibujo con los mismos colores es la misma imagen: así el programa
+       recargado en caliente no crea texturas nuevas en cada recarga. */
+    unsigned long long huella = 1469598103934665603ULL;
+    for (int y = 0; y < alto; y++) {
+        for (const unsigned char *t = (const unsigned char *)a[0]->lista.elementos[y]->texto; *t; t++)
+            huella = (huella ^ *t) * 1099511628211ULL;
+        huella = (huella ^ '\n') * 1099511628211ULL;
+    }
+    for (int i = 0; i < 128 * 4; i++) huella = (huella ^ ((unsigned char *)pal)[i]) * 1099511628211ULL;
+    char nombre[48];
+    snprintf(nombre, sizeof nombre, "<sprite %016llx>", huella);
+    for (int i = 0; i < _jgs.nimagenes; i++)
+        if (strcmp(_jgs.imagenes[i].ruta, nombre) == 0) return jg_imagen_valor(i);
     unsigned *px = calloc((size_t)ancho * alto, 4);
     if (!px) return jg_error("Error", "sin memoria");
     for (int y = 0; y < alto; y++) {
@@ -1155,8 +1383,6 @@ static Valor *fn_jg_sprite(Valor **a, int n) {
     free(px);
     if (!tex) return jg_error("ErrorJuego", "no se pudo crear el sprite");
     int k = _jgs.nimagenes++;
-    char nombre[32];
-    snprintf(nombre, sizeof nombre, "<sprite %d>", k);
     _jgs.imagenes[k].tex = tex;
     _jgs.imagenes[k].ruta = strdup(nombre);
     _jgs.imagenes[k].ancho = ancho;
@@ -1271,11 +1497,16 @@ static Valor *fn_jg_pantalla_completa(Valor **a, int n) {
 }
 
 /* tiempo(): segundos desde que se abrió la ventana (para animaciones) */
+/* Segundos desde que se abrió la ventana (en el modo de prueba, fotogramas / 60) */
+static double jg_reloj(void) {
+    if (!_jgs.abierta) return 0;
+    if (_jgs.limite) return _jgs.total / 60.0;
+    return jg_ahora() - _jgs.t_inicio;
+}
+
 static Valor *fn_jg_tiempo(Valor **a, int n) {
     (void)a; (void)n;
-    if (!_jgs.abierta) return valor_numero(0);
-    if (_jgs.limite) return valor_numero(_jgs.total / 60.0);      /* modo de prueba: tiempo fijo */
-    return valor_numero(jg_ahora() - _jgs.t_inicio);
+    return valor_numero(jg_reloj());
 }
 
 /* ── Mandos ── */
@@ -1592,6 +1823,231 @@ static Valor *fn_jg_colision(Valor **a, int n) {
                           v[1] < v[5] + v[7] && v[1] + v[3] > v[5]);
 }
 
+/* ── Colisiones ── */
+
+/* colision_circulos(x1, y1, r1, x2, y2, r2): ¿se tocan los dos círculos? */
+static Valor *fn_jg_colision_circulos(Valor **a, int n) {
+    double v[6];
+    for (int i = 0; i < 6; i++) if (!jg_num(a, n, i, &v[i], "colision_circulos")) return valor_nulo();
+    double dx = v[3] - v[0], dy = v[4] - v[1], r = v[2] + v[5];
+    return valor_booleano(dx * dx + dy * dy < r * r);
+}
+
+/* colision_circulo_rect(cx, cy, radio, x, y, ancho, alto): ¿toca el círculo al rectángulo? */
+static Valor *fn_jg_colision_circulo_rect(Valor **a, int n) {
+    double v[7];
+    for (int i = 0; i < 7; i++) if (!jg_num(a, n, i, &v[i], "colision_circulo_rect")) return valor_nulo();
+    double px = v[0] < v[3] ? v[3] : v[0] > v[3] + v[5] ? v[3] + v[5] : v[0];   /* punto del rectángulo más cercano */
+    double py = v[1] < v[4] ? v[4] : v[1] > v[4] + v[6] ? v[4] + v[6] : v[1];
+    double dx = v[0] - px, dy = v[1] - py;
+    return valor_booleano(dx * dx + dy * dy < v[2] * v[2]);
+}
+
+/* dentro(px, py, x, y, ancho, alto): ¿está el punto dentro del rectángulo? (botones, clics) */
+static Valor *fn_jg_dentro(Valor **a, int n) {
+    double v[6];
+    for (int i = 0; i < 6; i++) if (!jg_num(a, n, i, &v[i], "dentro")) return valor_nulo();
+    return valor_booleano(v[0] >= v[2] && v[0] < v[2] + v[4] && v[1] >= v[3] && v[1] < v[3] + v[5]);
+}
+
+/* ── Animación ──
+   cuadro(cuadros, por_segundo[, desde[, repetir]]): el cuadro que toca ahora.
+   'cuadros' es cuántos hay (devuelve de 0 a cuadros - 1) o una lista de
+   cuadros ([0, 1, 2, 1]: devuelve el elemento que toca). 'desde' es el
+   juego.tiempo() en que empezó la animación (0 por defecto); con repetir =
+   falso se queda en el último cuadro (una explosión, por ejemplo). */
+static Valor *fn_jg_cuadro(Valor **a, int n) {
+    if (n < 2 || (a[0]->tipo != VAL_NUMERO && a[0]->tipo != VAL_LISTA))
+        return jg_error("ErrorTipo", "cuadro() espera (número de cuadros o lista de cuadros, cuadros por segundo[, desde[, repetir]])");
+    double fps, desde = 0;
+    if (!jg_num(a, n, 1, &fps, "cuadro")) return valor_nulo();
+    if (n > 2 && !jg_num(a, n, 2, &desde, "cuadro")) return valor_nulo();
+    int repetir = !(n > 3 && a[3]->tipo == VAL_BOOLEANO && !a[3]->booleano);
+    int total = a[0]->tipo == VAL_LISTA ? a[0]->lista.cantidad : (int)a[0]->numero;
+    if (total < 1) return jg_error("Error", "cuadro(): hace falta al menos un cuadro");
+    double t = jg_reloj() - desde;
+    long k = t > 0 ? (long)floor(t * fps + 1e-9) : 0;
+    if (repetir) k %= total;
+    else if (k >= total) k = total - 1;
+    if (a[0]->tipo == VAL_LISTA) { Valor *e = a[0]->lista.elementos[k]; e->refs++; return e; }
+    return valor_numero((double)k);
+}
+
+/* ── Partículas ──
+   particulas(x, y[, opciones]) lanza un puñado desde (x, y); dibujar_particulas()
+   las mueve y las dibuja (llámala cada fotograma, donde quieras que salgan). */
+static const char *const JG_OPC_PART[] = {
+    "cantidad", "color", "color_final", "velocidad", "direccion", "apertura", "vida",
+    "tamaño", "tamano", "tamaño_final", "tamano_final", "gravedad", NULL };
+
+/* Número u [mínimo, máximo] (al azar entre los dos) */
+static int jg_rango(Valor *op, const char *clave, double *min, double *max) {
+    Valor *v = jg_opcion_valor(op, clave);
+    if (!v) return 1;
+    if (v->tipo == VAL_NUMERO) { *min = *max = v->numero; return 1; }
+    if (v->tipo == VAL_LISTA && v->lista.cantidad == 2 && v->lista.elementos[0]->tipo == VAL_NUMERO &&
+        v->lista.elementos[1]->tipo == VAL_NUMERO) {
+        *min = v->lista.elementos[0]->numero; *max = v->lista.elementos[1]->numero;
+        return 1;
+    }
+    char msg[160];
+    snprintf(msg, sizeof msg, "particulas(): '%s' es un número o [mínimo, máximo]", clave);
+    jg_error("ErrorTipo", msg);
+    return 0;
+}
+
+static double jg_azar_entre(double a, double b) { return a + (b - a) * mat_azar(); }
+
+static Valor *fn_jg_particulas(Valor **a, int n) {
+    JG_ABIERTA();
+    double x, y;
+    if (!jg_num(a, n, 0, &x, "particulas") || !jg_num(a, n, 1, &y, "particulas")) return valor_nulo();
+    Valor *op = n > 2 ? a[2] : NULL;
+    if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
+        return jg_error("ErrorTipo", "particulas() espera (x, y[, opciones]); las opciones van en un diccionario");
+    if (op && op->tipo == VAL_DICCIONARIO) {
+        for (int i = 0; i < op->diccionario.cantidad; i++) {
+            const char *k = op->diccionario.claves[i];
+            int bien = 0;
+            for (int j = 0; JG_OPC_PART[j]; j++) if (strcmp(k, JG_OPC_PART[j]) == 0) bien = 1;
+            if (!bien) {
+                char msg[400];
+                snprintf(msg, sizeof msg, "particulas(): opción desconocida '%s'. Las opciones son: cantidad, color, "
+                         "color_final, velocidad, direccion, apertura, vida, tamaño, tamaño_final y gravedad", k);
+                return jg_error("Error", msg);
+            }
+        }
+    }
+    double cantidad = 20, v0 = 60, v1 = 180, dir = 0, apertura = 360, vida0 = 0.4, vida1 = 0.8;
+    double tam0 = 4, tam1 = 4, grav0 = 0, grav1 = 0;
+    jg_opcion(op, "cantidad", &cantidad);
+    jg_opcion(op, "direccion", &dir);
+    jg_opcion(op, "apertura", &apertura);
+    if (!jg_rango(op, "velocidad", &v0, &v1) || !jg_rango(op, "vida", &vida0, &vida1) ||
+        !jg_rango(op, "tamano", &tam0, &tam1) || !jg_rango(op, "tamaño", &tam0, &tam1) ||
+        !jg_rango(op, "gravedad", &grav0, &grav1)) return valor_nulo();
+    double fin0 = -1, fin1 = -1;
+    if (!jg_rango(op, "tamano_final", &fin0, &fin1) || !jg_rango(op, "tamaño_final", &fin0, &fin1)) return valor_nulo();
+    unsigned char c[4], c_fin[4];
+    Valor *vc = jg_opcion_valor(op, "color"), *vf = jg_opcion_valor(op, "color_final");
+    Valor *arg[1];
+    arg[0] = vc;
+    if (!jg_color(arg, vc ? 1 : 0, 0, c)) return valor_nulo();
+    memcpy(c_fin, c, 4);
+    c_fin[3] = 0;                                           /* por defecto se desvanece */
+    if (vf) { arg[0] = vf; if (!jg_color(arg, 1, 0, c_fin)) return valor_nulo(); }
+    int cuantas = cantidad < 0 ? 0 : cantidad > JG_PARTICULAS ? JG_PARTICULAS : (int)cantidad;
+    for (int i = 0; i < cuantas; i++) {
+        JgParticula *p;
+        if (_jgs.npart < JG_PARTICULAS) p = &_jgs.part[_jgs.npart++];
+        else p = &_jgs.part[(int)(mat_azar() * JG_PARTICULAS)];   /* llenas: sustituye una cualquiera */
+        double ang = (dir + (mat_azar() - 0.5) * apertura) * M_PI / 180.0;
+        double vel = jg_azar_entre(v0, v1);
+        p->x = (float)x; p->y = (float)y;
+        p->vx = (float)(cos(ang) * vel); p->vy = (float)(sin(ang) * vel);
+        p->grav = (float)jg_azar_entre(grav0, grav1);
+        p->total = p->vida = (float)jg_azar_entre(vida0, vida1);
+        p->tam = (float)jg_azar_entre(tam0, tam1);
+        p->tam_fin = fin0 < 0 ? p->tam : (float)jg_azar_entre(fin0, fin1);
+        memcpy(p->c, c, 4);
+        memcpy(p->c_fin, c_fin, 4);
+    }
+    return valor_nulo();
+}
+
+/* dibujar_particulas(): mueve y dibuja las partículas vivas; devuelve cuántas quedan */
+static Valor *fn_jg_dibujar_particulas(Valor **a, int n) {
+    (void)a; (void)n;
+    JG_ABIERTA();
+    float dt = (float)_jgs.dt;
+    int vivas = 0;
+    _jg.SetBlend(_jgs.render, 1);
+    for (int i = 0; i < _jgs.npart; i++) {
+        JgParticula p = _jgs.part[i];
+        p.vida -= dt;
+        if (p.vida <= 0 || p.total <= 0) continue;
+        p.vy += p.grav * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        _jgs.part[vivas++] = p;
+        float t = 1 - p.vida / p.total;                     /* 0 al nacer, 1 al morir */
+        unsigned char c[4];
+        for (int k = 0; k < 4; k++) c[k] = (unsigned char)(p.c[k] + (p.c_fin[k] - p.c[k]) * t);
+        float tam = p.tam + (p.tam_fin - p.tam) * t;
+        if (tam < 0.5f || c[3] == 0) continue;
+        _jg.SetDrawColor(_jgs.render, c[0], c[1], c[2], c[3]);
+        JgRect r = {(int)floorf(p.x - tam / 2 - (float)_jgs.cam_x), (int)floorf(p.y - tam / 2 - (float)_jgs.cam_y),
+                    (int)ceilf(tam), (int)ceilf(tam)};
+        _jg.FillRect(_jgs.render, &r);
+    }
+    _jgs.npart = vivas;
+    return valor_numero(vivas);
+}
+
+/* borrar_particulas(): quita todas (al cambiar de nivel, por ejemplo) */
+static Valor *fn_jg_borrar_particulas(Valor **a, int n) {
+    (void)a; (void)n;
+    _jgs.npart = 0;
+    return valor_nulo();
+}
+
+/* ── Escenas ──
+   Un nombre para cada parte del juego ("menu", "partida", "fin"...). El cambio
+   se hace en el siguiente presentar(), así un fotograma no mezcla dos escenas;
+   con fundido, la pantalla se oscurece, cambia y se aclara. */
+static void jg_poner_escena(const char *nombre) {
+    snprintf(_jgs.escena, sizeof _jgs.escena, "%s", nombre);
+    _jgs.escena_nueva = 1;
+    _jgs.t_escena = jg_reloj();
+}
+
+/* cambiar_escena(nombre[, fundido]): fundido en segundos (0 = de golpe) */
+static Valor *fn_jg_cambiar_escena(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "cambiar_escena() espera (nombre[, segundos de fundido])");
+    double f = 0;
+    if (n > 1 && !jg_num(a, n, 1, &f, "cambiar_escena")) return valor_nulo();
+    if (!_jgs.escena[0] && f <= 0) {                       /* la primera escena empieza ya */
+        jg_poner_escena(a[0]->texto);
+        return valor_nulo();
+    }
+    snprintf(_jgs.siguiente, sizeof _jgs.siguiente, "%s", a[0]->texto);
+    _jgs.hay_siguiente = 1;
+    _jgs.fundido = f > 0 ? f : 0;
+    if (f > 0 && _jgs.fase != 1) { _jgs.fase = 1; _jgs.t_fundido = jg_reloj(); }
+    return valor_nulo();
+}
+
+static Valor *fn_jg_escena(Valor **a, int n)        { (void)a; (void)n; return valor_texto(_jgs.escena); }
+static Valor *fn_jg_escena_nueva(Valor **a, int n)  { (void)a; (void)n; return valor_booleano(_jgs.escena_nueva); }
+static Valor *fn_jg_tiempo_escena(Valor **a, int n) { (void)a; (void)n; return valor_numero(jg_reloj() - _jgs.t_escena); }
+
+/* En presentar(): hace el cambio pendiente y dibuja el fundido */
+static void jg_escenas(void) {
+    _jgs.escena_nueva = 0;
+    double ahora = jg_reloj();
+    if (_jgs.hay_siguiente && _jgs.fase != 1) {
+        _jgs.hay_siguiente = 0;
+        jg_poner_escena(_jgs.siguiente);
+    }
+    if (!_jgs.fase) return;
+    double mitad = _jgs.fundido / 2, p = mitad > 0 ? (ahora - _jgs.t_fundido) / mitad : 1;
+    if (_jgs.fase == 1 && p >= 1) {                        /* a oscuras: cambia y empieza a aclarar */
+        if (_jgs.hay_siguiente) { _jgs.hay_siguiente = 0; jg_poner_escena(_jgs.siguiente); }
+        _jgs.fase = 2;
+        _jgs.t_fundido = ahora;
+        p = 0;
+    } else if (_jgs.fase == 2 && p >= 1) {
+        _jgs.fase = 0;
+        return;
+    }
+    double alfa = _jgs.fase == 1 ? p : 1 - p;
+    unsigned char negro[4] = {0, 0, 0, (unsigned char)(alfa < 0 ? 0 : alfa > 1 ? 255 : alfa * 255)};
+    jg_pintar(negro);
+    JgRect r = {0, 0, _jgs.ancho, _jgs.alto};
+    _jg.FillRect(_jgs.render, &r);
+}
+
 static void cargar_juego(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"abrir",           fn_jg_abrir,           -1},
@@ -1646,6 +2102,18 @@ static void cargar_juego(Entorno *entorno) {
         {"accion_pulsada",  fn_jg_accion_pulsada,   1},
         {"accion_soltada",  fn_jg_accion_soltada,   1},
         {"direccion",       fn_jg_direccion,        2},
+        {"recargado",       fn_jg_recargado,        0},
+        {"colision_circulos", fn_jg_colision_circulos, 6},
+        {"colision_circulo_rect", fn_jg_colision_circulo_rect, 7},
+        {"dentro",          fn_jg_dentro,           6},
+        {"cuadro",          fn_jg_cuadro,          -1},
+        {"particulas",      fn_jg_particulas,      -1},
+        {"dibujar_particulas", fn_jg_dibujar_particulas, 0},
+        {"borrar_particulas", fn_jg_borrar_particulas, 0},
+        {"cambiar_escena",  fn_jg_cambiar_escena,  -1},
+        {"escena",          fn_jg_escena,           0},
+        {"escena_nueva",    fn_jg_escena_nueva,     0},
+        {"tiempo_escena",   fn_jg_tiempo_escena,    0},
     };
     registrar_modulo_diccionario(entorno, "juego",
         fns, (int)(sizeof(fns) / sizeof(fns[0])), NULL, NULL, 0);

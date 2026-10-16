@@ -110,4 +110,46 @@ for l in "entrada mala: definir_accion(\"mal\"): entrada de mando desconocida" "
          "sin definir: accion(): la acción 'volar' no está definida"; do
     grep -qF "$l" salida3.txt && ok "${l%%:*}" || mal "falta: $l"
 done
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt; exit 1; }
+# ── Cuarta parte: recarga en caliente ──
+# El juego se reescribe a sí mismo: primero con un error de sintaxis (sigue
+# el código anterior), luego con una versión nueva (conserva las variables y
+# los objetos pasan a la clase nueva) que falla en ejecución; mientras espera
+# el arreglo, esta prueba guarda la versión 3.
+mkdir rec && cp "$DIR"/recarga/*.lince rec/ && cp rec/v1.lince rec/juego.lince
+(cd rec && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100000 timeout 60 "$LINCE" juego.lince > ../salida4.txt 2> ../errores4.txt; echo "código $?" >> ../salida4.txt) &
+for i in $(seq 1 300); do grep -q funcion_que_no_existe errores4.txt 2>/dev/null && break; sleep 0.1; done
+sleep 0.5
+cp rec/v3.lince rec/juego.lince
+wait
+for l in "v2 conserva: verdadero hola v2" "v3 tras el error: verdadero 160" "código 0"; do
+    grep -qxF "$l" salida4.txt && ok "recarga: $l" || mal "falta la línea: $l"
+done
+grep -q "capturado" salida4.txt && mal "intentar capturó la recarga" || ok "recarga: intentar no la captura"
+grep -qF "Error de sintaxis en juego.lince, línea 5" errores4.txt && ok "recarga: error de sintaxis avisado" || mal "falta el aviso del error de sintaxis"
+python3 - <<'PY'
+import struct
+for n in (10, 20):
+    fila = bytes((0, 0, 255)) * n + b"\x00" * ((4 - n * 3 % 4) % 4)
+    datos = fila * n
+    cab = b"BM" + struct.pack("<IHHI", 54 + len(datos), 0, 0, 54) + struct.pack("<IiiHHIIiiII", 40, n, n, 1, 24, 0, len(datos), 2835, 2835, 0, 0)
+    open("rec/a%d.bmp" % n, "wb").write(cab + datos)
+PY
+cp rec/a10.bmp rec/img.bmp
+(cd rec && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=200 timeout 30 "$LINCE" recursos.lince > ../salida5.txt 2>&1)
+[ $? -eq 0 ] && ok "recarga de recursos: termina bien" || mal "la recarga de recursos falló"
+for l in "util: 1, imagen: 10" "imagen cambiada: 20" "util: 2, imagen: 10"; do
+    grep -qxF "$l" salida5.txt && ok "recarga: $l" || mal "falta la línea: $l"
+done
+(cd rec && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=6 LINCE_JUEGO_PULSAR=f5 timeout 30 "$LINCE" f5.lince > ../salida6.txt 2>&1)
+[ "$(grep -cxF "recargado: falso, veces: 0" salida6.txt)" -ge 2 ] && grep -qF "(desde cero)" salida6.txt \
+    && ok "F5 empieza desde cero" || mal "F5 no empieza desde cero"
+# ── Quinta parte: colisiones, animación, partículas y escenas ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=60 timeout 20 "$LINCE" "$DIR/prueba4.lince" > salida7.txt 2>&1
+[ $? -eq 0 ] && ok "la quinta prueba termina bien" || mal "la quinta prueba falló"
+for l in "circulos: verdadero falso" "circulo_rect: verdadero falso" "dentro: verdadero falso" "escena: menu verdadero" \
+         "cuadro: 0 5 1" "escena nueva tras presentar: falso" "cambio diferido: menu" "fin en el fotograma 20" "vivas: 30, al final: 0"; do
+    grep -qxF "$l" salida7.txt && ok "$l" || mal "falta la línea: $l"
+done
+grep -qF "opción desconocida 'cantida'" salida7.txt && ok "opción de partículas mal escrita" || mal "falta el error de opción desconocida"
+grep -q "^escena: partida verdadero" salida7.txt && ok "escena: partida verdadero" || mal "falta la línea: escena: partida"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt; exit 1; }

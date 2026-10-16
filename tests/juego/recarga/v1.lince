@@ -1,0 +1,25 @@
+# Recarga en caliente, versión 1: se reescribe a sí misma mientras corre
+importar "juego"
+importar "archivos"
+fijo VERSION = 1
+sea cuenta = 0
+clase Bicho {
+    funcion saludo(): texto { devolver "hola v1" }
+}
+sea bicho = Bicho()
+juego.abrir("Recarga 1", 120, 80)
+mientras juego.abierto() {
+    cuenta = cuenta + 1
+    si cuenta == 3 { archivos.escribir("juego.lince", archivos.leer("v_rota.lince")) }
+    si cuenta == 6 { archivos.escribir("juego.lince", archivos.leer("v2.lince")) }
+    si cuenta == 50 {
+        escribir("v1 no se recargó")
+        juego.salir()
+    }
+    juego.limpiar([0, 0, 0])
+    intentar {
+        juego.presentar()                    # aquí salta la recarga, que no se captura
+    } capturar (error e) {
+        escribir("capturado: " + e.mensaje)
+    }
+}

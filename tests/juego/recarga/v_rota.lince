@@ -1,0 +1,5 @@
+# Versión con un error de sintaxis: el juego sigue con la anterior
+importar "juego"
+mientras juego.abierto() {
+    juego.presentar(
+}

@@ -1,0 +1,37 @@
+# Prueba de utilidades: colisiones, animación, partículas y escenas
+importar "juego"
+importar "matematica"
+juego.abrir("Utilidades", 100, 80)
+escribir("circulos: " + a_texto(juego.colision_circulos(0, 0, 5, 8, 0, 4)) + " " + a_texto(juego.colision_circulos(0, 0, 5, 10, 0, 4)))
+escribir("circulo_rect: " + a_texto(juego.colision_circulo_rect(5, 5, 3, 7, 0, 10, 10)) + " " + a_texto(juego.colision_circulo_rect(0, 0, 3, 5, 5, 10, 10)))
+escribir("dentro: " + a_texto(juego.dentro(10, 10, 10, 10, 5, 5)) + " " + a_texto(juego.dentro(15, 10, 10, 10, 5, 5)))
+intentar {
+    juego.particulas(0, 0, {"cantida": 3})
+} capturar (error e) {
+    escribir("opcion mala: " + e.mensaje)
+}
+matematica.semilla(7)
+juego.cambiar_escena("menu")
+escribir("escena: " + juego.escena() + " " + a_texto(juego.escena_nueva()))
+sea fotograma = 0
+sea vivas = 0
+mientras juego.abierto() {
+    fotograma = fotograma + 1
+    juego.limpiar([0, 0, 0])
+    si fotograma == 2 {
+        escribir("cuadro: " + a_texto(juego.cuadro(4, 30)) + " " + a_texto(juego.cuadro([5, 6, 7], 30)) + " " + a_texto(juego.cuadro(3, 60, 0, falso)))
+        escribir("escena nueva tras presentar: " + a_texto(juego.escena_nueva()))
+        juego.particulas(50, 40, {"cantidad": 30, "color": [255, 0, 0], "vida": 0.5, "velocidad": 0, "tamaño": 10})
+        juego.cambiar_escena("partida")
+        escribir("cambio diferido: " + juego.escena())
+    }
+    si fotograma == 3 {
+        escribir("escena: " + juego.escena() + " " + a_texto(juego.escena_nueva()) + " " + a_texto(juego.tiempo_escena()))
+    }
+    si fotograma == 4 { juego.cambiar_escena("fin", 0.5) }
+    si juego.escena_nueva() y juego.escena() == "fin" { escribir("fin en el fotograma " + a_texto(fotograma)) }
+    sea n = juego.dibujar_particulas()
+    si fotograma == 3 { vivas = n }
+    juego.presentar()
+}
+escribir("vivas: " + a_texto(vivas) + ", al final: " + a_texto(juego.dibujar_particulas()))

@@ -13,6 +13,7 @@
 #include "interprete.h"
 #include "modulos.h"
 #include "paquetes.h"
+#include "recarga.h"
 
 /* ─────────────────────────────────────────
    SEÑAL DE RETORNO
@@ -1487,6 +1488,7 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
                redefinición de más abajo. */
             if (!alias && importado_ya(ruta)) return valor_nulo();
             char *codigo = interprete_leer_fuente(ruta);
+            recarga_vigilar(ruta);
 
             Lexer  *lx  = lexer_crear(codigo);
             int     cnt = 0;
@@ -1698,8 +1700,69 @@ static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, 
     return vobj;
 }
 
+/* ── Recarga en caliente ──
+   Mientras corre el código recién recargado, un 'sea' del nivel superior cuyo
+   nombre ya existía en el programa anterior se queda con el valor que tenía en
+   vez de evaluar su expresión. Las funciones, clases y módulos sí salen del
+   código nuevo, y los objetos conservados pasan a usar la clase nueva. */
+static Entorno *_conservar_de = NULL;     /* global del programa anterior */
+static Entorno *_conservar_en = NULL;     /* global del programa nuevo */
+
+void interprete_conservar(Entorno *anterior, Interprete *nuevo) {
+    _conservar_de = anterior;
+    _conservar_en = anterior && nuevo ? nuevo->global : NULL;
+}
+
+/* Objetos ya visitados al cambiarles la clase (puede haber ciclos) */
+static Valor **_vistos = NULL;
+static int     _nvistos = 0, _cap_vistos = 0;
+
+static void reclasificar(Valor *v, Entorno *e) {
+    if (!v || (v->tipo != VAL_LISTA && v->tipo != VAL_DICCIONARIO && v->tipo != VAL_OBJETO)) return;
+    for (int i = 0; i < _nvistos; i++) if (_vistos[i] == v) return;
+    if (_nvistos == _cap_vistos) {
+        _cap_vistos = _cap_vistos ? _cap_vistos * 2 : 64;
+        _vistos = realloc(_vistos, sizeof(Valor *) * _cap_vistos);
+    }
+    _vistos[_nvistos++] = v;
+    if (v->tipo == VAL_LISTA)
+        for (int i = 0; i < v->lista.cantidad; i++) reclasificar(v->lista.elementos[i], e);
+    else if (v->tipo == VAL_DICCIONARIO)
+        for (int i = 0; i < v->diccionario.cantidad; i++) reclasificar(v->diccionario.valores[i], e);
+    else {
+        ObjetoLince *o = v->objeto;
+        if (o->clase) {
+            const char *id = intern(o->clase->nombre);
+            for (int i = 0; i < e->cantidad; i++)
+                if (e->vars[i].nombre == id && e->vars[i].valor->tipo == VAL_CLASE) {
+                    o->clase = e->vars[i].valor->clase;
+                    break;
+                }
+        }
+        for (int i = 0; i < o->num_campos; i++) reclasificar(o->campos_valores[i], e);
+    }
+}
+
+/* El valor que el 'sea' de nombre 'id' tenía antes de recargar, o NULL */
+static Valor *conservado(Nodo *n, const char *id, Entorno *e) {
+    if (!_conservar_de || e != _conservar_en || n->declaracion.constante) return NULL;
+    for (int i = 0; i < _conservar_de->cantidad; i++) {
+        if (_conservar_de->vars[i].nombre != id) continue;
+        Valor *v = _conservar_de->vars[i].valor;
+        if (_conservar_de->vars[i].constante || v->es_modulo ||
+            v->tipo == VAL_FUNCION || v->tipo == VAL_CLASE || v->tipo == VAL_ERROR) return NULL;
+        if (n->declaracion.es_lista && v->tipo != VAL_LISTA) return NULL;
+        if (n->declaracion.es_diccionario && v->tipo != VAL_DICCIONARIO) return NULL;
+        _nvistos = 0;
+        reclasificar(v, e);
+        return valor_retener(v);
+    }
+    return NULL;
+}
+
 static Valor *exec_declaracion(Nodo *n, Entorno *e) {
-    Valor *v = ejecutar(n->declaracion.valor, e);
+    Valor *v = _conservar_de ? conservado(n, NI(n, n->declaracion.nombre), e) : NULL;
+    if (!v) v = ejecutar(n->declaracion.valor, e);
     /* Comprobar el tipo anunciado en 'sea lista x' / 'sea
        diccionario x'. Se hace aquí y no en el parser porque sólo
        en ejecución se conoce el tipo de verdad: antes se exigía
@@ -2680,7 +2743,10 @@ static Valor *exec_intentar(Nodo *n, Entorno *e) {
     valor_destruir(ejecutar(n->intentar.cuerpo, e_try));   /* ver la nota de NODO_LLAMADA */
     entorno_destruir(e_try);
 
-    if (hay_error) {
+    /* La recarga en caliente usa un error para deshacer el programa que corre:
+       ese no lo captura nadie. */
+    if (hay_error && !(valor_error && valor_error->tipo == VAL_ERROR &&
+                       strcmp(valor_error->error->tipo, ERROR_RECARGA) == 0)) {
         Valor *err = valor_error;
         hay_error   = 0;
         valor_error = NULL;
@@ -3809,20 +3875,38 @@ void interprete_destruir(Interprete *interp) {
 }
 
 void interprete_ejecutar(Interprete *interp, Nodo *programa) {
+    if (interprete_ejecutar_recargable(interp, programa, NULL, 0) != 0) exit(1);
+}
+
+int interprete_ejecutar_recargable(Interprete *interp, Nodo *programa, char *mensaje, size_t max) {
     valor_destruir(ejecutar(programa, interp->global));   /* ver la nota de NODO_LLAMADA */
-    if (hay_error && valor_error) {
+    if (!hay_error || !valor_error) { hay_error = 0; return 0; }
+    ErrorLince *err = valor_error->error;
+    int r = 1;
+    if (strcmp(err->tipo, ERROR_RECARGA) == 0) r = 2;
+    else {
         /* Con el número de línea cuando se conoce: el pilar del lenguaje es
            "errores literales", y los fallos que antes morían con su propio
            fprintf ya lo decían; no puede perderse al pasar a ser capturables. */
-        if (valor_error->error->linea > 0)
-            fprintf(stderr, "\n❌ %s en línea %d: %s\n\n",
-                valor_error->error->tipo, valor_error->error->linea,
-                valor_error->error->mensaje);
+        if (err->linea > 0)
+            fprintf(stderr, "\n❌ %s en línea %d: %s\n\n", err->tipo, err->linea, err->mensaje);
         else
-            fprintf(stderr, "\n❌ %s: %s\n\n",
-                valor_error->error->tipo, valor_error->error->mensaje);
-        exit(1);
+            fprintf(stderr, "\n❌ %s: %s\n\n", err->tipo, err->mensaje);
+        if (mensaje && max) {
+            if (err->linea > 0) snprintf(mensaje, max, "%s en línea %d: %s", err->tipo, err->linea, err->mensaje);
+            else snprintf(mensaje, max, "%s: %s", err->tipo, err->mensaje);
+        }
     }
+    valor_destruir(valor_error);
+    valor_error = NULL;
+    hay_error = 0;
+    hay_retorno = 0;
+    return r;
+}
+
+void interprete_olvidar_importados(void) {
+    for (int i = 0; i < _num_importados; i++) free(_importados[i]);
+    _num_importados = 0;
 }
 
 /* Expuesta para el REPL */

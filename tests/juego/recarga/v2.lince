@@ -1,0 +1,18 @@
+# Versión 2: conserva 'cuenta' y 'bicho' (con la clase nueva); luego falla
+importar "juego"
+importar "archivos"
+fijo VERSION = 2
+sea cuenta = 0
+clase Bicho {
+    funcion saludo(): texto { devolver "hola v2" }
+}
+sea bicho = Bicho()
+sea inicio = cuenta
+juego.abrir("Recarga 2", 120, 80)
+escribir("v2 conserva: " + a_texto(cuenta > 5) + " " + bicho.saludo())
+mientras juego.abierto() {
+    cuenta = cuenta + 1
+    si cuenta == inicio + 3 { funcion_que_no_existe() }
+    juego.limpiar([0, 0, 0])
+    juego.presentar()
+}
