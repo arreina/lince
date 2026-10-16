@@ -1,0 +1,209 @@
+# 🐆 Lince — Mazmorra
+#
+# Recoge todas las gemas y sal por la puerta sin que te atrapen los
+# fantasmas. Flechas o WASD (o el stick del mando) para moverte en las
+# cuatro direcciones. Esc sale.
+#
+# Muestra: un juego de vista cenital con un mapa de casillas (juego.mapa),
+# movimiento sin atravesar paredes y sin gravedad (juego.mover_en_mapa),
+# casillas que cambian (juego.poner_casilla), y enemigos que te persiguen
+# esquivando las paredes (juego.camino).
+importar "juego"
+importar "matematica"
+
+fijo CASILLA = 32
+fijo ANCHO = 640
+fijo ALTO = 480
+fijo VELOCIDAD = 170
+fijo VELOCIDAD_FANTASMA = 95
+
+#   #  muro      *  gema      S  salida      P  tú      F  fantasma
+fijo PLANO = [
+    "####################",
+    "#P.....#.....*.....#",
+    "#.####.#.#####.###.#",
+    "#.#*...#.....#...#.#",
+    "#.#.######.#.###.#.#",
+    "#...#....#.#...#...#",
+    "###.#.##.#.###.#.###",
+    "#*..#.#F...#.F.#..*#",
+    "#.###.#.####.###.#.#",
+    "#.....#....*.....#.#",
+    "#.#####.######.###.#",
+    "#...*.#......#.....#",
+    "#.###.#.####.#.###.#",
+    "#.....#..*.....#..S#",
+    "####################"
+]
+
+juego.abrir("Mazmorra", ANCHO, ALTO)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("arriba", ["arriba", "w", "mando:arriba", "mando:izq_y-"])
+juego.definir_accion("abajo", ["abajo", "s", "mando:abajo", "mando:izq_y+"])
+juego.definir_accion("empezar", ["espacio", "entrar", "mando:a"])
+
+# El plano como mapa de casillas: '#' es muro (por defecto) y fuera del mapa también
+fijo NIVEL = juego.mapa(PLANO, CASILLA, {"bordes": "todos"})
+fijo GEMAS = juego.buscar_en_mapa(NIVEL, "*")        # dónde están al empezar
+
+fijo FANTASMA = juego.sprite([
+    "...WWWW...",
+    ".WWWWWWWW.",
+    "WWKKWWKKWW",
+    "WWKBWWKBWW",
+    "WWWWWWWWWW",
+    "WWWWWWWWWW",
+    "WW.WW.WW.W"
+], {"W": [235, 235, 255], "K": [255, 255, 255], "B": [40, 40, 120]})
+fijo GEMA = juego.sprite([
+    ".CCC.",
+    "CWCCC",
+    "CCCCC",
+    ".CCC.",
+    "..C.."
+], {"C": [90, 220, 255], "W": [230, 255, 255]})
+
+# ── Estado ──────────────────────────────────────────────────────────
+sea yo = {"x": 0, "y": 0, "ancho": 20, "alto": 20, "vx": 0, "vy": 0}
+sea fantasmas = []
+sea gemas = 0
+sea total_gemas = 0
+sea vidas = 3
+sea estado = "jugando"              # "jugando", "ganado" o "perdido"
+sea pausa = 0                       # tras perder una vida, un respiro
+
+# Centro de una casilla, en píxeles
+funcion centro(val numero c): numero { devolver c * CASILLA + CASILLA / 2 }
+
+funcion colocar(): nulo {
+    sea p = juego.buscar_en_mapa(NIVEL, "P")[0]
+    yo["x"] = centro(p[0]) - yo["ancho"] / 2
+    yo["y"] = centro(p[1]) - yo["alto"] / 2
+    fantasmas = []
+    para cada lista f en juego.buscar_en_mapa(NIVEL, "F") {
+        fantasmas.agregar({"x": centro(f[0]), "y": centro(f[1]), "camino": [], "recalcular": 0})
+    }
+}
+
+funcion empezar(): nulo {
+    para cada lista g en GEMAS { juego.poner_casilla(NIVEL, g[0], g[1], "*") }   # vuelven las gemas
+    gemas = 0
+    total_gemas = GEMAS.longitud()
+    vidas = 3
+    estado = "jugando"
+    pausa = 0
+    colocar()
+}
+
+# ── Un paso de la partida ────────────────────────────────────────────
+funcion mover_jugador(val numero dt): nulo {
+    yo["vx"] = juego.direccion("izquierda", "derecha") * VELOCIDAD
+    yo["vy"] = juego.direccion("arriba", "abajo") * VELOCIDAD
+    juego.mover_en_mapa(NIVEL, yo, dt)          # sin gravedad: choca en las cuatro direcciones
+
+    # ¿qué hay bajo sus pies?
+    sea aqui = juego.casilla_en(NIVEL, yo["x"] + yo["ancho"] / 2, yo["y"] + yo["alto"] / 2)
+    sea t = juego.casilla(NIVEL, aqui[0], aqui[1])
+    si t == "*" {
+        juego.poner_casilla(NIVEL, aqui[0], aqui[1], ".")      # la gema desaparece del mapa
+        gemas = gemas + 1
+        juego.pitido(1100, 70, 0.2)
+        juego.particulas(centro(aqui[0]), centro(aqui[1]), {"cantidad": 18, "color": [90, 220, 255],
+                                                          "velocidad": [40, 160], "vida": [0.3, 0.6]})
+    }
+    si t == "S" y gemas == total_gemas {
+        estado = "ganado"
+        juego.pitido(880, 400)
+    }
+}
+
+funcion mover_fantasmas(val numero dt): nulo {
+    sea objetivo = juego.casilla_en(NIVEL, yo["x"] + yo["ancho"] / 2, yo["y"] + yo["alto"] / 2)
+    sea atrapado = falso
+    para cada diccionario f en fantasmas {
+        # cada medio segundo busca de nuevo el camino hasta ti
+        f["recalcular"] = f["recalcular"] - dt
+        si f["recalcular"] <= 0 {
+            f["camino"] = juego.camino(NIVEL, juego.casilla_en(NIVEL, f["x"], f["y"]), objetivo)
+            f["recalcular"] = 0.5
+        }
+        # va hacia el centro de la siguiente casilla del camino
+        si f["camino"].longitud() > 0 {
+            sea paso = f["camino"][0]
+            sea dx = centro(paso[0]) - f["x"]
+            sea dy = centro(paso[1]) - f["y"]
+            sea d = matematica.longitud(dx, dy)
+            sea avance = VELOCIDAD_FANTASMA * dt
+            si d <= avance {
+                f["x"] = centro(paso[0])
+                f["y"] = centro(paso[1])
+                f["camino"].eliminar(0)
+            } sino {
+                f["x"] = f["x"] + dx / d * avance
+                f["y"] = f["y"] + dy / d * avance
+            }
+        }
+        si pausa == 0 y juego.colision_circulo_rect(f["x"], f["y"], 12, yo["x"], yo["y"], yo["ancho"], yo["alto"]) {
+            vidas = vidas - 1
+            juego.pitido(150, 350)
+            juego.particulas(yo["x"] + 10, yo["y"] + 10, {"cantidad": 40, "color": [255, 160, 60],
+                                                           "velocidad": [60, 220], "vida": [0.4, 0.8]})
+            atrapado = verdadero
+        }
+    }
+    si atrapado {                  # como en los juegos de laberinto: todos vuelven a su sitio
+        si vidas == 0 { estado = "perdido" } sino { pausa = 1.2 }
+        colocar()
+    }
+}
+
+funcion dibujar(): nulo {
+    juego.limpiar([28, 24, 34])
+    juego.dibujar_mapa(NIVEL, {"#": [70, 62, 90], "S": [60, 140, 80]})
+    si gemas == total_gemas {          # la salida se abre: brilla
+        para cada lista s en juego.buscar_en_mapa(NIVEL, "S") {
+            juego.circulo(centro(s[0]), centro(s[1]), 8 + matematica.seno(juego.tiempo() * 6) * 3, [180, 255, 190])
+        }
+    }
+    para cada lista g en juego.buscar_en_mapa(NIVEL, "*") {
+        juego.dibujar(GEMA, centro(g[0]), centro(g[1]) + matematica.seno(juego.tiempo() * 4 + g[0]) * 2,
+                      {"escala": 3, "centrado": verdadero})
+    }
+    si pausa == 0 o juego.cuadro(2, 12) == 0 {
+        juego.circulo(yo["x"] + 10, yo["y"] + 10, 10, [255, 170, 60])
+        juego.circulo(yo["x"] + 6, yo["y"] + 7, 2, [30, 20, 20])
+        juego.circulo(yo["x"] + 14, yo["y"] + 7, 2, [30, 20, 20])
+    }
+    para cada diccionario f en fantasmas {
+        juego.dibujar(FANTASMA, f["x"], f["y"] + matematica.seno(juego.tiempo() * 5) * 2,
+                      {"escala": 3, "centrado": verdadero, "alfa": 220})
+    }
+    juego.dibujar_particulas()
+    juego.texto("GEMAS " + a_texto(gemas) + "/" + a_texto(total_gemas), 8, 8, 2, [140, 230, 255])
+    juego.texto("VIDAS " + a_texto(vidas), ANCHO - 110, 8, 2, [255, 170, 60])
+    si estado != "jugando" {
+        juego.rectangulo(0, 190, ANCHO, 100, [0, 0, 0, 180])
+        sea m = "HAS ESCAPADO!"
+        si estado == "perdido" { m = "TE HAN ATRAPADO" }
+        juego.texto(m, (ANCHO - juego.ancho_texto(m, 4)) / 2, 205, 4, [255, 220, 120])
+        sea r = "ESPACIO PARA REPETIR"
+        juego.texto(r, (ANCHO - juego.ancho_texto(r, 2)) / 2, 255, 2, [255, 255, 255])
+    }
+}
+
+si no juego.recargado() { empezar() }    # al recargar en caliente sigue la partida
+
+mientras juego.abierto() {
+    si juego.tecla_pulsada("escape") { juego.salir() }
+    sea dt = juego.dt()
+    si estado == "jugando" {
+        pausa = matematica.maximo(0, pausa - dt)
+        mover_jugador(dt)
+        mover_fantasmas(dt)
+    } sino si juego.accion_pulsada("empezar") {
+        empezar()
+    }
+    dibujar()
+    juego.presentar()
+}

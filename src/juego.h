@@ -126,11 +126,21 @@ typedef struct {
 #define JG_ACCIONES     64
 #define JG_ENTRADAS     16
 #define JG_PARTICULAS   8192
+#define JG_MAPAS        256
 
 /* Una entrada de una acción: tecla, botón del mando, botón del ratón o eje del mando
    hacia un lado. mando = -1: cualquiera. */
 typedef struct { char tipo; int codigo, mando, signo; } JgEntrada;
 typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; int n; } JgAccion;
+
+/* Mapa de casillas: un carácter ASCII por casilla, fila a fila */
+typedef struct {
+    char *celdas;
+    int cols, filas;
+    double tam;
+    unsigned char solido[128], plataforma[128];
+    int bordes;                 /* 0 ninguno, 1 los lados (por defecto), 2 todos */
+} JgMapa;
 
 /* Partícula: se mueve, cae, cambia de tamaño y de color, y se apaga al acabar su vida */
 typedef struct {
@@ -181,6 +191,8 @@ static struct {
     int recargado;                       /* el programa se recargó conservando sus variables */
     JgParticula part[JG_PARTICULAS];
     int npart;
+    JgMapa mapas[JG_MAPAS];
+    int nmapas;
     /* escenas: la actual, la que viene (se cambia en presentar()) y el fundido */
     char escena[64], siguiente[64];
     int hay_siguiente, escena_nueva, fase;   /* fase 1: oscurece; 2: aclara */
@@ -350,6 +362,8 @@ static void jg_cerrar_todo(void) {
     memset(_jgs.voces, 0, sizeof _jgs.voces);
     for (int i = 0; i < _jgs.nsonidos; i++) { free(_jgs.sonidos[i].datos); free(_jgs.sonidos[i].ruta); }
     _jgs.nsonidos = 0;
+    for (int i = 0; i < _jgs.nmapas; i++) { free(_jgs.mapas[i].celdas); _jgs.mapas[i].celdas = NULL; }
+    _jgs.nmapas = 0;
     for (int i = 0; i < _jgs.nimagenes; i++) { _jg.DestroyTexture(_jgs.imagenes[i].tex); free(_jgs.imagenes[i].ruta); }
     _jgs.nimagenes = 0;
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
@@ -2050,6 +2064,386 @@ static void jg_escenas(void) {
     _jg.FillRect(_jgs.render, &r);
 }
 
+/* ── Mapas de casillas ──
+   Un nivel escrito con texto, un carácter por casilla, para cualquier juego 2D:
+   plataformas, vista cenital (mazmorras, laberintos), puzles por casillas... */
+
+/* Pone (o sustituye) d[clave] = v, quedándose con v */
+static void jg_dic_poner(Valor *d, const char *clave, Valor *v) {
+    int k = valor_diccionario_buscar(d, clave);
+    if (k >= 0) { valor_destruir(d->diccionario.valores[k]); d->diccionario.valores[k] = v; }
+    else valor_diccionario_agregar(d, clave, v);
+}
+
+static JgMapa *jg_mapa_arg(Valor **a, int n, const char *fn) {
+    int k = n > 0 ? jg_id_de(a[0], "mapa") : -1;
+    if (k < 0 || k >= _jgs.nmapas || !_jgs.mapas[k].celdas) {
+        char msg[120];
+        snprintf(msg, sizeof msg, "%s() espera un mapa creado con juego.mapa()", fn);
+        jg_error("ErrorTipo", msg);
+        return NULL;
+    }
+    return &_jgs.mapas[k];
+}
+
+/* Carácter de la casilla (c, f); fuera del mapa, 0 */
+static int jg_celda(const JgMapa *m, int c, int f) {
+    if (c < 0 || f < 0 || c >= m->cols || f >= m->filas) return 0;
+    return (unsigned char)m->celdas[f * m->cols + c];
+}
+
+static int jg_es_solida(const JgMapa *m, int c, int f) {
+    if (c < 0 || c >= m->cols) return m->bordes >= 1;
+    if (f < 0 || f >= m->filas) return m->bordes >= 2;
+    return m->solido[jg_celda(m, c, f) & 127];
+}
+
+/* mapa(filas, tamaño[, opciones]): opciones "solidos" (texto con los caracteres
+   que son pared; "#" por defecto), "plataformas" (se atraviesan desde abajo y
+   se pisan desde arriba) y "bordes" ("lados", "todos" o "ninguno") */
+static Valor *fn_jg_mapa(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_LISTA || a[0]->lista.cantidad == 0)
+        return jg_error("ErrorTipo", "mapa() espera (lista de filas de texto, tamaño de casilla[, opciones])");
+    double tam;
+    if (!jg_num(a, n, 1, &tam, "mapa")) return valor_nulo();
+    if (tam <= 0) return jg_error("Error", "mapa(): el tamaño de casilla tiene que ser mayor que 0");
+    Valor *op = n > 2 && a[2]->tipo == VAL_DICCIONARIO ? a[2] : NULL;
+    int filas = a[0]->lista.cantidad, cols = 0;
+    for (int f = 0; f < filas; f++) {
+        Valor *v = a[0]->lista.elementos[f];
+        if (v->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa(): cada fila es un texto");
+        for (const unsigned char *t = (const unsigned char *)v->texto; *t; t++)
+            if (*t >= 128) {
+                char msg[160];
+                snprintf(msg, sizeof msg, "mapa(): la fila %d tiene un carácter que no es ASCII; usa letras sin tilde, cifras o signos", f + 1);
+                return jg_error("Error", msg);
+            }
+        int l = (int)strlen(v->texto);
+        if (l > cols) cols = l;
+    }
+    if (cols == 0 || (long)cols * filas > 16 * 1024 * 1024) return jg_error("Error", "mapa(): tamaño no válido");
+    int k = -1;
+    for (int i = 0; i < _jgs.nmapas; i++) if (!_jgs.mapas[i].celdas) { k = i; break; }
+    if (k < 0) {
+        if (_jgs.nmapas == JG_MAPAS) return jg_error("ErrorJuego", "demasiados mapas");
+        k = _jgs.nmapas++;
+    }
+    JgMapa *m = &_jgs.mapas[k];
+    memset(m, 0, sizeof *m);
+    m->cols = cols; m->filas = filas; m->tam = tam; m->bordes = 1;
+    m->celdas = malloc((size_t)cols * filas);
+    memset(m->celdas, '.', (size_t)cols * filas);
+    for (int f = 0; f < filas; f++) {
+        const char *t = a[0]->lista.elementos[f]->texto;
+        memcpy(m->celdas + (size_t)f * cols, t, strlen(t));
+    }
+    Valor *v = jg_opcion_valor(op, "solidos");
+    const char *sol = v && v->tipo == VAL_TEXTO ? v->texto : "#";
+    for (const unsigned char *t = (const unsigned char *)sol; *t; t++) m->solido[*t & 127] = 1;
+    v = jg_opcion_valor(op, "plataformas");
+    if (v && v->tipo == VAL_TEXTO)
+        for (const unsigned char *t = (const unsigned char *)v->texto; *t; t++) m->plataforma[*t & 127] = 1;
+    v = jg_opcion_valor(op, "bordes");
+    if (v && v->tipo == VAL_TEXTO) {
+        if (strcmp(v->texto, "todos") == 0) m->bordes = 2;
+        else if (strcmp(v->texto, "ninguno") == 0) m->bordes = 0;
+        else if (strcmp(v->texto, "lados") != 0) { free(m->celdas); m->celdas = NULL;
+            return jg_error("Error", "mapa(): \"bordes\" es \"lados\", \"todos\" o \"ninguno\""); }
+    }
+    Valor *d = valor_diccionario_crear();
+    valor_diccionario_agregar(d, "mapa", valor_numero(k));
+    valor_diccionario_agregar(d, "columnas", valor_numero(cols));
+    valor_diccionario_agregar(d, "filas", valor_numero(filas));
+    valor_diccionario_agregar(d, "tamaño", valor_numero(tam));
+    valor_diccionario_agregar(d, "ancho", valor_numero(cols * tam));
+    valor_diccionario_agregar(d, "alto", valor_numero(filas * tam));
+    return d;
+}
+
+static int jg_celda_args(Valor **a, int n, int i, int *c, int *f, const char *fn) {
+    double dc, df;
+    if (!jg_num(a, n, i, &dc, fn) || !jg_num(a, n, i + 1, &df, fn)) return 0;
+    *c = (int)floor(dc); *f = (int)floor(df);
+    return 1;
+}
+
+/* casilla(mapa, columna, fila): el carácter que hay ahí ("" fuera del mapa) */
+static Valor *fn_jg_casilla(Valor **a, int n) {
+    JgMapa *m = jg_mapa_arg(a, n, "casilla");
+    int c, f;
+    if (!m || !jg_celda_args(a, n, 1, &c, &f, "casilla")) return valor_nulo();
+    char t[2] = {(char)jg_celda(m, c, f), 0};
+    return valor_texto(t);
+}
+
+/* poner_casilla(mapa, columna, fila, carácter) */
+static Valor *fn_jg_poner_casilla(Valor **a, int n) {
+    JgMapa *m = jg_mapa_arg(a, n, "poner_casilla");
+    int c, f;
+    if (!m || !jg_celda_args(a, n, 1, &c, &f, "poner_casilla")) return valor_nulo();
+    if (n < 4 || a[3]->tipo != VAL_TEXTO || strlen(a[3]->texto) != 1 || (unsigned char)a[3]->texto[0] >= 128)
+        return jg_error("ErrorTipo", "poner_casilla() espera (mapa, columna, fila, un carácter ASCII)");
+    if (c >= 0 && f >= 0 && c < m->cols && f < m->filas) m->celdas[f * m->cols + c] = a[3]->texto[0];
+    return valor_nulo();
+}
+
+/* solido(mapa, columna, fila): ¿es pared? (fuera del mapa, según los bordes) */
+static Valor *fn_jg_solido(Valor **a, int n) {
+    JgMapa *m = jg_mapa_arg(a, n, "solido");
+    int c, f;
+    if (!m || !jg_celda_args(a, n, 1, &c, &f, "solido")) return valor_nulo();
+    return valor_booleano(jg_es_solida(m, c, f));
+}
+
+static Valor *jg_par(double x, double y) {
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(x));
+    lista_agregar(l, valor_numero(y));
+    return l;
+}
+
+/* casilla_en(mapa, x, y): [columna, fila] de la casilla que hay en ese punto */
+static Valor *fn_jg_casilla_en(Valor **a, int n) {
+    JgMapa *m = jg_mapa_arg(a, n, "casilla_en");
+    double x, y;
+    if (!m || !jg_num(a, n, 1, &x, "casilla_en") || !jg_num(a, n, 2, &y, "casilla_en")) return valor_nulo();
+    return jg_par(floor(x / m->tam), floor(y / m->tam));
+}
+
+/* buscar_en_mapa(mapa, caracteres): lista de [columna, fila] de las casillas
+   que tienen alguno de esos caracteres, fila a fila */
+static Valor *fn_jg_buscar_en_mapa(Valor **a, int n) {
+    JgMapa *m = jg_mapa_arg(a, n, "buscar_en_mapa");
+    if (!m) return valor_nulo();
+    if (n < 2 || a[1]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "buscar_en_mapa() espera (mapa, caracteres)");
+    Valor *l = valor_lista_crear();
+    for (int f = 0; f < m->filas; f++)
+        for (int c = 0; c < m->cols; c++)
+            if (m->celdas[f * m->cols + c] && strchr(a[1]->texto, m->celdas[f * m->cols + c]))
+                lista_agregar(l, jg_par(c, f));
+    return l;
+}
+
+/* ¿Toca algo sólido el rectángulo [x, x+w) × [y, y+h)? */
+static int jg_choca_rect(const JgMapa *m, double x, double y, double w, double h) {
+    int c0 = (int)floor(x / m->tam), c1 = (int)floor((x + w - 1e-6) / m->tam);
+    int f0 = (int)floor(y / m->tam), f1 = (int)floor((y + h - 1e-6) / m->tam);
+    for (int f = f0; f <= f1; f++)
+        for (int c = c0; c <= c1; c++)
+            if (jg_es_solida(m, c, f)) return 1;
+    return 0;
+}
+
+/* ¿Hay una plataforma bajo los pies, en la fila donde acaba el rectángulo
+   después de bajar, que estaba por debajo de los pies antes de bajar? */
+static int jg_pisa_plataforma(const JgMapa *m, double x, double w, double pies_antes, double pies, double *tope) {
+    int c0 = (int)floor(x / m->tam), c1 = (int)floor((x + w - 1e-6) / m->tam);
+    int f = (int)floor((pies - 1e-6) / m->tam);
+    double arriba = f * m->tam;
+    if (pies_antes > arriba + 1e-6) return 0;
+    for (int c = c0; c <= c1; c++)
+        if (m->plataforma[jg_celda(m, c, f) & 127]) { *tope = arriba; return 1; }
+    return 0;
+}
+
+static double jg_num_dic(Valor *d, const char *clave, double defecto, int *falta) {
+    int k = valor_diccionario_buscar(d, clave);
+    if (k < 0 || d->diccionario.valores[k]->tipo != VAL_NUMERO) { if (falta) *falta = 1; return defecto; }
+    return d->diccionario.valores[k]->numero;
+}
+
+/* mover_en_mapa(mapa, cosa[, dt]): mueve 'cosa' (un diccionario con x, y, ancho,
+   alto, vx, vy) según su velocidad sin atravesar paredes. Al chocar se arrima y
+   pone a 0 esa velocidad. Deja en la cosa "en_suelo", "techo" (lógicos) y
+   "pared" (-1 a la izquierda, 1 a la derecha, 0 ninguna). Devuelve si chocó. */
+static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
+    JgMapa *m = jg_mapa_arg(a, n, "mover_en_mapa");
+    if (!m) return valor_nulo();
+    if (n < 2 || a[1]->tipo != VAL_DICCIONARIO)
+        return jg_error("ErrorTipo", "mover_en_mapa() espera (mapa, diccionario con x, y, ancho, alto, vx, vy[, dt])");
+    Valor *d = a[1];
+    int falta = 0;
+    double x = jg_num_dic(d, "x", 0, &falta), y = jg_num_dic(d, "y", 0, &falta);
+    double w = jg_num_dic(d, "ancho", 0, &falta), h = jg_num_dic(d, "alto", 0, &falta);
+    if (falta || w <= 0 || h <= 0)
+        return jg_error("Error", "mover_en_mapa(): la cosa necesita números en \"x\", \"y\", \"ancho\" y \"alto\"");
+    double vx = jg_num_dic(d, "vx", 0, NULL), vy = jg_num_dic(d, "vy", 0, NULL);
+    double dt = _jgs.dt;
+    if (n > 2 && !jg_num(a, n, 2, &dt, "mover_en_mapa")) return valor_nulo();
+    double dx = vx * dt, dy = vy * dt;
+    /* en pasos de media casilla como mucho, para no atravesar paredes finas */
+    int pasos = (int)ceil(fmax(fabs(dx), fabs(dy)) / (m->tam / 2));
+    if (pasos < 1) pasos = 1;
+    if (pasos > 1000) pasos = 1000;
+    double px = dx / pasos, py = dy / pasos;
+    int pared = 0, techo = 0, suelo = 0;
+    for (int i = 0; i < pasos; i++) {
+        if (px != 0) {
+            double nx = x + px;
+            if (jg_choca_rect(m, nx, y, w, h)) {
+                if (px > 0) { nx = floor((nx + w) / m->tam) * m->tam - w; pared = 1; }
+                else        { nx = (floor(nx / m->tam) + 1) * m->tam; pared = -1; }
+                if ((px > 0 && nx < x) || (px < 0 && nx > x)) nx = x;   /* ya estaba metido: no lo empuja */
+                px = 0; vx = 0;
+            }
+            x = nx;
+        }
+        if (py != 0) {
+            double ny = y + py, tope;
+            if (jg_choca_rect(m, x, ny, w, h)) {
+                if (py > 0) { ny = floor((ny + h) / m->tam) * m->tam - h; suelo = 1; }
+                else        { ny = (floor(ny / m->tam) + 1) * m->tam; techo = 1; }
+                if ((py > 0 && ny < y) || (py < 0 && ny > y)) ny = y;
+                py = 0; vy = 0;
+            } else if (py > 0 && jg_pisa_plataforma(m, x, w, y + h, ny + h, &tope)) {
+                ny = tope - h; suelo = 1; py = 0; vy = 0;
+            }
+            y = ny;
+        }
+    }
+    /* ¿Está apoyado aunque no se haya movido hacia abajo? */
+    if (!suelo && vy >= 0) {
+        double tope;
+        suelo = jg_choca_rect(m, x, y + 0.5, w, h) || jg_pisa_plataforma(m, x, w, y + h, y + h + 0.5, &tope);
+    }
+    jg_dic_poner(d, "x", valor_numero(x));
+    jg_dic_poner(d, "y", valor_numero(y));
+    jg_dic_poner(d, "vx", valor_numero(vx));
+    jg_dic_poner(d, "vy", valor_numero(vy));
+    jg_dic_poner(d, "en_suelo", valor_booleano(suelo));
+    jg_dic_poner(d, "techo", valor_booleano(techo));
+    jg_dic_poner(d, "pared", valor_numero(pared));
+    return valor_booleano(pared || techo || (suelo && dy > 0));
+}
+
+/* dibujar_mapa(mapa, aspecto): dibuja las casillas que se ven. 'aspecto' dice
+   cómo se pinta cada carácter: un color o una imagen (que se ajusta a la
+   casilla). Los caracteres que no aparecen no se dibujan. */
+static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
+    JG_ABIERTA();
+    JgMapa *m = jg_mapa_arg(a, n, "dibujar_mapa");
+    if (!m) return valor_nulo();
+    if (n < 2 || a[1]->tipo != VAL_DICCIONARIO)
+        return jg_error("ErrorTipo", "dibujar_mapa() espera (mapa, {carácter: color o imagen})");
+    /* aspecto de cada carácter: color (tipo 1) o textura (tipo 2) */
+    unsigned char tipo[128] = {0}, color[128][4];
+    void *tex[128] = {0};
+    Valor *d = a[1];
+    for (int i = 0; i < d->diccionario.cantidad; i++) {
+        const char *k = d->diccionario.claves[i];
+        if (!k[0] || k[1] || (unsigned char)k[0] >= 128)
+            return jg_error("ErrorTipo", "dibujar_mapa(): cada clave es un solo carácter, por ejemplo \"#\"");
+        Valor *v = d->diccionario.valores[i];
+        int id = jg_id_de(v, "imagen");
+        if (id >= 0 && id < _jgs.nimagenes) { tipo[(int)k[0]] = 2; tex[(int)k[0]] = _jgs.imagenes[id].tex; continue; }
+        Valor *arg[1] = {v};
+        if (!jg_color(arg, 1, 0, color[(int)k[0]])) return valor_nulo();
+        tipo[(int)k[0]] = 1;
+    }
+    int c0 = (int)floor(_jgs.cam_x / m->tam), f0 = (int)floor(_jgs.cam_y / m->tam);
+    int c1 = (int)floor((_jgs.cam_x + _jgs.ancho) / m->tam), f1 = (int)floor((_jgs.cam_y + _jgs.alto) / m->tam);
+    if (c0 < 0) c0 = 0;
+    if (f0 < 0) f0 = 0;
+    if (c1 >= m->cols) c1 = m->cols - 1;
+    if (f1 >= m->filas) f1 = m->filas - 1;
+    for (int f = f0; f <= f1; f++)
+        for (int c = c0; c <= c1; c++) {
+            int ch = (unsigned char)m->celdas[f * m->cols + c] & 127;
+            if (!tipo[ch]) continue;
+            int x0 = (int)floor(c * m->tam - _jgs.cam_x), y0 = (int)floor(f * m->tam - _jgs.cam_y);
+            int x1 = (int)floor((c + 1) * m->tam - _jgs.cam_x), y1 = (int)floor((f + 1) * m->tam - _jgs.cam_y);
+            JgRect r = {x0, y0, x1 - x0, y1 - y0};
+            if (tipo[ch] == 1) { jg_pintar(color[ch]); _jg.FillRect(_jgs.render, &r); }
+            else {
+                _jg.TextureAlpha(tex[ch], 255);
+                _jg.TextureColor(tex[ch], 255, 255, 255);
+                _jg.RenderCopyEx(_jgs.render, tex[ch], NULL, &r, 0, NULL, 0);
+            }
+        }
+    return valor_nulo();
+}
+
+/* camino(mapa, [c1, f1], [c2, f2][, diagonales]): el camino más corto entre dos
+   casillas sin pasar por paredes (A*), como lista de [columna, fila] sin la de
+   salida; [] si no hay camino. Para que un enemigo persiga al jugador. */
+static int jg_casilla_lista(Valor *v, int *c, int *f) {
+    if (v->tipo != VAL_LISTA || v->lista.cantidad != 2 || v->lista.elementos[0]->tipo != VAL_NUMERO ||
+        v->lista.elementos[1]->tipo != VAL_NUMERO) return 0;
+    *c = (int)floor(v->lista.elementos[0]->numero); *f = (int)floor(v->lista.elementos[1]->numero);
+    return 1;
+}
+
+static Valor *fn_jg_camino(Valor **a, int n) {
+    JgMapa *m = jg_mapa_arg(a, n, "camino");
+    if (!m) return valor_nulo();
+    int c1, f1, c2, f2;
+    if (n < 3 || !jg_casilla_lista(a[1], &c1, &f1) || !jg_casilla_lista(a[2], &c2, &f2))
+        return jg_error("ErrorTipo", "camino() espera (mapa, [columna, fila] de salida, [columna, fila] de llegada[, diagonales])");
+    int diag = n > 3 && a[3]->tipo == VAL_BOOLEANO && a[3]->booleano;
+    Valor *res = valor_lista_crear();
+    int W = m->cols, H = m->filas;
+    if (c1 < 0 || f1 < 0 || c1 >= W || f1 >= H || c2 < 0 || f2 < 0 || c2 >= W || f2 >= H) return res;
+    if (jg_es_solida(m, c2, f2)) return res;
+    if (c1 == c2 && f1 == f2) return res;
+    size_t N = (size_t)W * H;
+    int *g = malloc(N * sizeof(int)), *de = malloc(N * sizeof(int));
+    unsigned char *cerrado = calloc(N, 1);
+    int *monton = malloc((N * 8 + 16) * 2 * sizeof(int)), nm = 0;   /* montículo de pares (prioridad, casilla) */
+    if (!g || !de || !cerrado || !monton) { free(g); free(de); free(cerrado); free(monton); return res; }
+    for (size_t i = 0; i < N; i++) { g[i] = INT_MAX; de[i] = -1; }
+    #define JG_H(c, f) (diag ? (abs((c) - c2) > abs((f) - f2) ? abs((c) - c2) : abs((f) - f2)) * 10 \
+                             : (abs((c) - c2) + abs((f) - f2)) * 10)
+    #define JG_EMPUJAR(pr, id) do { int i_ = nm++; monton[2*i_] = (pr); monton[2*i_+1] = (id); \
+        while (i_ > 0) { int p_ = (i_ - 1) / 2; if (monton[2*p_] <= monton[2*i_]) break; \
+            int t0 = monton[2*p_], t1 = monton[2*p_+1]; monton[2*p_] = monton[2*i_]; monton[2*p_+1] = monton[2*i_+1]; \
+            monton[2*i_] = t0; monton[2*i_+1] = t1; i_ = p_; } } while (0)
+    int inicio = f1 * W + c1, fin = f2 * W + c2;
+    g[inicio] = 0;
+    JG_EMPUJAR(JG_H(c1, f1), inicio);
+    int hallado = 0;
+    while (nm > 0 && nm < (int)(N * 8)) {
+        int actual = monton[1];
+        nm--;
+        monton[0] = monton[2 * nm]; monton[1] = monton[2 * nm + 1];
+        for (int i = 0;;) {                                    /* hundir */
+            int l = 2 * i + 1, r = l + 1, menor = i;
+            if (l < nm && monton[2*l] < monton[2*menor]) menor = l;
+            if (r < nm && monton[2*r] < monton[2*menor]) menor = r;
+            if (menor == i) break;
+            int t0 = monton[2*i], t1 = monton[2*i+1];
+            monton[2*i] = monton[2*menor]; monton[2*i+1] = monton[2*menor+1];
+            monton[2*menor] = t0; monton[2*menor+1] = t1;
+            i = menor;
+        }
+        if (cerrado[actual]) continue;
+        cerrado[actual] = 1;
+        if (actual == fin) { hallado = 1; break; }
+        int c = actual % W, f = actual / W;
+        static const int DC[8] = {1, -1, 0, 0, 1, 1, -1, -1}, DF[8] = {0, 0, 1, -1, 1, -1, 1, -1};
+        for (int k = 0; k < (diag ? 8 : 4); k++) {
+            int nc = c + DC[k], nf = f + DF[k];
+            if (nc < 0 || nf < 0 || nc >= W || nf >= H || jg_es_solida(m, nc, nf)) continue;
+            if (k >= 4 && (jg_es_solida(m, c + DC[k], f) || jg_es_solida(m, c, f + DF[k]))) continue;  /* sin cortar esquinas */
+            int id = nf * W + nc, coste = g[actual] + (k >= 4 ? 14 : 10);
+            if (cerrado[id] || coste >= g[id]) continue;
+            g[id] = coste; de[id] = actual;
+            JG_EMPUJAR(coste + JG_H(nc, nf), id);
+        }
+    }
+    #undef JG_H
+    #undef JG_EMPUJAR
+    if (hallado) {
+        int largo = 0;
+        for (int i = fin; i != inicio; i = de[i]) largo++;
+        int *orden = malloc(sizeof(int) * (size_t)largo), k = largo;
+        for (int i = fin; i != inicio; i = de[i]) orden[--k] = i;
+        for (int i = 0; i < largo; i++) lista_agregar(res, jg_par(orden[i] % W, orden[i] / W));
+        free(orden);
+    }
+    free(g); free(de); free(cerrado); free(monton);
+    return res;
+}
+
 static void cargar_juego(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"abrir",           fn_jg_abrir,           -1},
@@ -2116,6 +2510,15 @@ static void cargar_juego(Entorno *entorno) {
         {"escena",          fn_jg_escena,           0},
         {"escena_nueva",    fn_jg_escena_nueva,     0},
         {"tiempo_escena",   fn_jg_tiempo_escena,    0},
+        {"mapa",            fn_jg_mapa,            -1},
+        {"casilla",         fn_jg_casilla,          3},
+        {"poner_casilla",   fn_jg_poner_casilla,    4},
+        {"solido",          fn_jg_solido,           3},
+        {"casilla_en",      fn_jg_casilla_en,       3},
+        {"buscar_en_mapa",  fn_jg_buscar_en_mapa,   2},
+        {"mover_en_mapa",   fn_jg_mover_en_mapa,   -1},
+        {"dibujar_mapa",    fn_jg_dibujar_mapa,     2},
+        {"camino",          fn_jg_camino,          -1},
     };
     registrar_modulo_diccionario(entorno, "juego",
         fns, (int)(sizeof(fns) / sizeof(fns[0])), NULL, NULL, 0);

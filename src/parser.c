@@ -1315,53 +1315,35 @@ static Nodo *sentencia_interna(Parser *p) {
             strncpy(n->incremento.operador, op->valor, 3);
             return n;
         }
-        /* lista[i] = valor */
-        if (sig == TOK_CORCHETE_IZQ) {
+        /* Cadenas que empiezan por una variable: lista[i] = v, a[i][j] = v,
+           obj.campo = v, obj.a.b = v, f["camino"].eliminar(0)... Se lee la
+           cadena entera y, si sigue un '=', su último eslabón es lo que se
+           asigna; si no, es una expresión usada como sentencia. */
+        if (sig == TOK_CORCHETE_IZQ || sig == TOK_PUNTO) {
             Token *var = consumir_cualquiera(p);
-            consumir(p, TOK_CORCHETE_IZQ, "'['");
-            Nodo *indice = expresion(p);
-            consumir(p, TOK_CORCHETE_DER, "']'");
+            Nodo *base = nodo_nuevo(NODO_IDENTIFICADOR, p);
+            base->identificador = strdup(var->valor);
+            base = postfijo(p, base);
+            if (!coincide(p, TOK_IGUAL)) return base;
             consumir(p, TOK_IGUAL, "'='");
             Nodo *valor = expresion(p);
-            Nodo *obj = nodo_nuevo(NODO_IDENTIFICADOR, p);
-            obj->identificador = strdup(var->valor);
-            Nodo *n = nodo_nuevo(NODO_ASIGNACION_INDICE, p);
-            n->asignacion_indice.objeto = obj;
-            n->asignacion_indice.indice = indice;
-            n->asignacion_indice.valor  = valor;
-            return n;
-        }
-        /* obj.campo = valor  o  obj.metodo() como sentencia */
-        if (sig == TOK_PUNTO) {
-            Token *var = consumir_cualquiera(p); /* obj */
-            consumir(p, TOK_PUNTO, "'.'");
-            /* Aceptar keyword como nombre de campo */
-            Token *campo;
-            if (coincide(p, TOK_IDENTIFICADOR) || coincide(p, TOK_ESCRIBIR) ||
-                coincide(p, TOK_TIPO_TEXTO) || coincide(p, TOK_TIPO_NUMERO) ||
-                coincide(p, TOK_LISTA) || coincide(p, TOK_DICCIONARIO)) {
-                campo = consumir_cualquiera(p);
-            } else {
-                campo = consumir(p, TOK_IDENTIFICADOR, "nombre de campo o método");
-            }
-            if (coincide(p, TOK_IGUAL)) {
-                consumir(p, TOK_IGUAL, "'='");
-                Nodo *valor = expresion(p);
-                Nodo *obj = nodo_nuevo(NODO_IDENTIFICADOR, p);
-                obj->identificador = strdup(var->valor);
-                Nodo *n = nodo_nuevo(NODO_ASIGNACION_CAMPO, p);
-                n->asignacion_campo.objeto = obj;
-                n->asignacion_campo.campo  = strdup(campo->valor);
-                n->asignacion_campo.valor  = valor;
+            if (base->tipo == NODO_INDICE) {
+                Nodo *n = nodo_nuevo(NODO_ASIGNACION_INDICE, p);
+                n->asignacion_indice.objeto = base->acceso_indice.objeto;
+                n->asignacion_indice.indice = base->acceso_indice.indice;
+                n->asignacion_indice.valor  = valor;
+                free(base);
                 return n;
             }
-            /* Es llamada a método u otro postfijo */
-            Nodo *obj = nodo_nuevo(NODO_IDENTIFICADOR, p);
-            obj->identificador = strdup(var->valor);
-            Nodo *acc = nodo_nuevo(NODO_ACCESO, p);
-            acc->acceso.objeto = obj;
-            acc->acceso.campo  = strdup(campo->valor);
-            return postfijo(p, acc);
+            if (base->tipo == NODO_ACCESO) {
+                Nodo *n = nodo_nuevo(NODO_ASIGNACION_CAMPO, p);
+                n->asignacion_campo.objeto = base->acceso.objeto;
+                n->asignacion_campo.campo  = base->acceso.campo;
+                n->asignacion_campo.valor  = valor;
+                free(base);
+                return n;
+            }
+            error_sintaxis(p, "A esto no se le puede asignar un valor: solo a una variable, a un elemento (lista[i]) o a un campo (objeto.campo).");
         }
     }
 

@@ -844,6 +844,37 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 juego.dibujar(hoja, x, y, {"celda": [16, 16], "cuadro": juego.cuadro(4, 8)})   # 4 cuadros, 8 por segundo
 ```
 
+**Mapas de casillas.** Un nivel escrito con texto, un carácter por casilla, para cualquier juego 2D:
+plataformas, vista cenital (mazmorras, laberintos, RPG), puzles por casillas...
+
+```lince
+fijo NIVEL = juego.mapa([
+    "##########",
+    "#P...*...#",
+    "#..####..#",
+    "##########"
+], 32)
+sea yo = {"x": 40, "y": 40, "ancho": 20, "alto": 20, "vx": 0, "vy": 0}
+# en cada fotograma:
+yo["vx"] = juego.direccion("izquierda", "derecha") * 150
+yo["vy"] = juego.direccion("arriba", "abajo") * 150      # o, en un juego de plataformas, gravedad
+juego.mover_en_mapa(NIVEL, yo)                            # se mueve sin atravesar las paredes
+juego.dibujar_mapa(NIVEL, {"#": [80, 70, 100]})
+```
+
+| Función | Qué hace |
+|---|---|
+| `mapa(filas, tamaño[, opciones])` | crea el mapa (un carácter ASCII por casilla; `tamaño` en píxeles). Opciones: `"solidos"` (los caracteres que son pared; `"#"` por defecto), `"plataformas"` (se atraviesan desde abajo y se pisan desde arriba, como en los juegos de plataformas) y `"bordes"`: fuera del mapa es pared por los `"lados"` (por defecto: se puede caer por un hoyo), por `"todos"` o por `"ninguno"`. Devuelve `{"mapa", "columnas", "filas", "tamaño", "ancho", "alto"}` |
+| `mover_en_mapa(mapa, cosa[, dt])` | mueve `cosa` (un diccionario con `x`, `y`, `ancho`, `alto`, `vx`, `vy`) según su velocidad sin atravesar paredes: al chocar se arrima y esa velocidad pasa a 0. Deja en `cosa` `"en_suelo"` y `"techo"` (lógicos) y `"pared"` (−1 izquierda, 1 derecha, 0). La gravedad, si la hay, la sumas tú a `vy` |
+| `casilla(mapa, c, f)` · `poner_casilla(mapa, c, f, carácter)` | lee o cambia una casilla (coger una gema, abrir una puerta, romper un bloque); fuera del mapa `casilla` da `""` |
+| `solido(mapa, c, f)` · `casilla_en(mapa, x, y)` | ¿es pared? · `[columna, fila]` de un punto en píxeles |
+| `buscar_en_mapa(mapa, caracteres)` | lista de `[columna, fila]` con esos caracteres: dónde empieza el jugador, dónde están las monedas o los enemigos |
+| `camino(mapa, [c1, f1], [c2, f2][, diagonales])` | el camino más corto sin atravesar paredes, como lista de `[columna, fila]` sin la de salida (`[]` si no hay). Para enemigos que persiguen |
+| `dibujar_mapa(mapa, aspecto)` | dibuja las casillas que se ven (respeta la cámara); `aspecto` da a cada carácter un color o una imagen |
+
+Ejemplos: `08_plataformas` (con gravedad y plataformas) y `09_mazmorra` (vista cenital, con
+fantasmas que te persiguen).
+
 **Partículas.** Chispas, polvo, explosiones: `particulas(x, y[, opciones])` lanza un puñado y
 `dibujar_particulas()` las mueve y las dibuja (llámala en cada fotograma, después de lo que deban
 tapar; respeta la cámara y devuelve cuántas quedan). `borrar_particulas()` las quita todas.
@@ -904,7 +935,7 @@ Los colores son `[r, g, b]`, `[r, g, b, a]` (0–255) o texto `"#rrggbb"` / `"#r
 se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`, `"izquierda"`,
 `"derecha"`, `"espacio"`, `"entrar"`, `"escape"`, `"borrar"`, `"tab"`, `"mayus"`, `"ctrl"`,
 `"alt"`, `"f1"`–`"f12"` (y los nombres de SDL). Los fallos son de tipo `ErrorJuego`
-(sin SDL2, sin pantalla) o `Error`. Ejemplos completos: los ocho minijuegos de `examples/`.
+(sin SDL2, sin pantalla) o `Error`. Ejemplos completos: los nueve minijuegos de `examples/`.
 
 Para pruebas automáticas (sin pantalla, con `SDL_VIDEODRIVER=dummy`): `LINCE_JUEGO_FOTOGRAMAS=N`
 cierra el juego tras N fotogramas de 1/60 s; `LINCE_JUEGO_PULSAR=espacio,derecha` y

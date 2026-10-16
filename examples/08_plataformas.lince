@@ -6,8 +6,8 @@
 # F11 pantalla completa. Esc sale.
 #
 # Muestra: un nivel escrito como texto (cada carácter es una casilla), sprites
-# dibujados con texto y animados como hoja de sprites, gravedad y colisiones
-# con el mapa, una cámara que sigue al jugador con un marcador fijo, acciones
+# dibujados con texto y animados como hoja de sprites, gravedad y un mapa de
+# casillas (juego.mapa) que mueve al lince sin atravesar paredes, una cámara que sigue al jugador con un marcador fijo, acciones
 # (cada control se define una vez para teclado y mando a la vez), partículas
 # y escenas con fundido (la portada y el nivel).
 importar "juego"
@@ -76,11 +76,10 @@ funcion hoja_del_lince(): lista {
 }
 
 # ── Estado ──────────────────────────────────────────────────────────
-sea px = 0
-sea py = 0
-sea vx = 0
-sea vy = 0
-sea en_suelo = falso
+fijo JW = 22                         # tamaño del lince para chocar
+fijo JH = 26
+# El lince: lo que juego.mover_en_mapa necesita (posición, tamaño y velocidad)
+sea yo = {"x": 0, "y": 0, "ancho": JW, "alto": JH, "vx": 0, "vy": 0, "en_suelo": falso}
 sea mira_izquierda = falso
 sea monedas = []
 sea enemigos = []
@@ -90,53 +89,22 @@ sea estado = "jugando"              # "jugando", "ganado" o "perdido"
 sea reloj = 0
 sea invulnerable = 0
 
-funcion casilla(val numero c, val numero f): texto {
-    si c < 0 o c >= COLUMNAS o f < 0 o f >= FILAS { devolver "." }
-    devolver MAPA[f][c]
-}
-
-funcion solido(val numero c, val numero f): logico {
-    si c < 0 o c >= COLUMNAS { devolver verdadero }         # bordes del nivel
-    sea t = casilla(c, f)
-    devolver t == "#" o t == "="
-}
-
-# ¿Toca algo sólido un rectángulo del mundo?
-funcion choca(val numero x, val numero arriba, val numero w, val numero h): logico {
-    sea c0 = matematica.piso(x / CASILLA)
-    sea c1 = matematica.piso((x + w - 1) / CASILLA)
-    sea f0 = matematica.piso(arriba / CASILLA)
-    sea f1 = matematica.piso((arriba + h - 1) / CASILLA)
-    para cada numero f en rango(f0, f1 + 1) {
-        para cada numero c en rango(c0, c1 + 1) {
-            si solido(c, f) { devolver verdadero }
-        }
-    }
-    devolver falso
-}
-
 funcion volver_a_salir(): nulo {
-    para cada numero f en rango(0, FILAS) {
-        para cada numero c en rango(0, COLUMNAS) {
-            si casilla(c, f) == "P" {
-                px = c * CASILLA + 5
-                py = f * CASILLA + 6
-            }
-        }
-    }
-    vx = 0
-    vy = 0
+    sea salida = juego.buscar_en_mapa(NIVEL, "P")[0]
+    yo["x"] = salida[0] * CASILLA + 5
+    yo["y"] = salida[1] * CASILLA + 6
+    yo["vx"] = 0
+    yo["vy"] = 0
 }
 
 funcion empezar(): nulo {
     monedas = []
     enemigos = []
-    para cada numero f en rango(0, FILAS) {
-        para cada numero c en rango(0, COLUMNAS) {
-            sea t = casilla(c, f)
-            si t == "o" { monedas.agregar({"x": c * CASILLA + 10, "y": f * CASILLA + 10, "viva": verdadero}) }
-            si t == "E" { enemigos.agregar({"x": c * CASILLA + 4, "y": f * CASILLA + 20, "dir": -1, "vivo": verdadero}) }
-        }
+    para cada lista p en juego.buscar_en_mapa(NIVEL, "o") {
+        monedas.agregar({"x": p[0] * CASILLA + 10, "y": p[1] * CASILLA + 10, "viva": verdadero})
+    }
+    para cada lista p en juego.buscar_en_mapa(NIVEL, "E") {
+        enemigos.agregar({"x": p[0] * CASILLA + 4, "y": p[1] * CASILLA + 20, "dir": -1, "vivo": verdadero})
     }
     recogidas = 0
     vidas = 3
@@ -159,48 +127,32 @@ funcion herido(): nulo {
 }
 
 # ── Física ───────────────────────────────────────────────────────────
-fijo JW = 22
-fijo JH = 26
+# ¿Se puede andar por encima de esta casilla? (suelo o plataforma)
+funcion pisable(val numero c, val numero f): logico {
+    devolver juego.solido(NIVEL, c, f) o juego.casilla(NIVEL, c, f) == "="
+}
 
 funcion mover_jugador(val numero dt): nulo {
-    vx = juego.direccion("izquierda", "derecha") * VELOCIDAD
-    si vx < 0 { mira_izquierda = verdadero }
-    si vx > 0 { mira_izquierda = falso }
-    si en_suelo y juego.accion_pulsada("saltar") {
-        vy = SALTO
+    yo["vx"] = juego.direccion("izquierda", "derecha") * VELOCIDAD
+    si yo["vx"] < 0 { mira_izquierda = verdadero }
+    si yo["vx"] > 0 { mira_izquierda = falso }
+    si yo["en_suelo"] y juego.accion_pulsada("saltar") {
+        yo["vy"] = SALTO
         juego.pitido(660, 50, 0.15)
         polvo()
     }
-    vy = matematica.minimo(vy + GRAVEDAD * dt, 900)
+    yo["vy"] = matematica.minimo(yo["vy"] + GRAVEDAD * dt, 900)
 
-    # horizontal: si choca, se arrima a la pared
-    sea nx = px + vx * dt
-    si choca(nx, py, JW, JH) {
-        si vx > 0 { nx = matematica.piso((nx + JW) / CASILLA) * CASILLA - JW }
-        si vx < 0 { nx = (matematica.piso(nx / CASILLA) + 1) * CASILLA }
-    }
-    px = nx
-
-    # vertical: al caer sobre algo se queda en el suelo
-    sea ny = py + vy * dt
-    sea estaba_en_suelo = en_suelo
-    en_suelo = falso
-    si choca(px, ny, JW, JH) {
-        si vy > 0 {
-            ny = matematica.piso((ny + JH) / CASILLA) * CASILLA - JH
-            en_suelo = verdadero
-            si no estaba_en_suelo y vy > 400 { polvo() }      # aterriza de una buena caída
-        } sino {
-            ny = (matematica.piso(ny / CASILLA) + 1) * CASILLA
-        }
-        vy = 0
-    }
-    py = ny
-    si py > FILAS * CASILLA { herido() }
-    si casilla(matematica.piso((px + JW / 2) / CASILLA), matematica.piso((py + JH / 2) / CASILLA)) == "M" {
+    # el mapa lo mueve sin atravesar paredes y dice si está en el suelo
+    sea cayendo = yo["vy"]
+    sea estaba_en_suelo = yo["en_suelo"]
+    juego.mover_en_mapa(NIVEL, yo, dt)
+    si yo["en_suelo"] y no estaba_en_suelo y cayendo > 400 { polvo() }      # aterriza de una buena caída
+    si yo["y"] > FILAS * CASILLA { herido() }
+    si juego.casilla(NIVEL, matematica.piso((yo["x"] + JW / 2) / CASILLA), matematica.piso((yo["y"] + JH / 2) / CASILLA)) == "M" {
         estado = "ganado"
         juego.pitido(880, 400)
-        juego.particulas(px + JW / 2, py, {"cantidad": 120, "color": [255, 220, 80], "color_final": [255, 80, 80, 0],
+        juego.particulas(yo["x"] + JW / 2, yo["y"], {"cantidad": 120, "color": [255, 220, 80], "color_final": [255, 80, 80, 0],
                                            "velocidad": [80, 320], "direccion": -90, "apertura": 120,
                                            "gravedad": 500, "vida": [0.8, 1.6], "tamaño": 5})
     }
@@ -215,16 +167,16 @@ funcion mover_enemigos(val numero dt): nulo {
             si bicho["dir"] > 0 { delante = nx + 24 }
             sea c = matematica.piso(delante / CASILLA)
             sea f = matematica.piso((bicho["y"] + 6) / CASILLA)
-            si solido(c, f) o no solido(c, f + 1) {
+            si juego.solido(NIVEL, c, f) o no pisable(c, f + 1) {
                 bicho["dir"] = -bicho["dir"]
             } sino {
                 bicho["x"] = nx
             }
             # ¿choca con el lince? Si cae encima, lo aplasta
-            si juego.colision(px, py, JW, JH, bicho["x"], bicho["y"], 24, 12) {
-                si vy > 0 y py + JH - bicho["y"] < 14 {
+            si juego.colision(yo["x"], yo["y"], JW, JH, bicho["x"], bicho["y"], 24, 12) {
+                si yo["vy"] > 0 y yo["y"] + JH - bicho["y"] < 14 {
                     bicho["vivo"] = falso
-                    vy = SALTO * 0.6
+                    yo["vy"] = SALTO * 0.6
                     juego.pitido(300, 80)
                     juego.particulas(bicho["x"] + 12, bicho["y"] + 6, {"cantidad": 25, "color": [120, 70, 160],
                                      "velocidad": [60, 200], "gravedad": 600, "vida": [0.4, 0.7], "tamaño": [3, 6]})
@@ -235,7 +187,7 @@ funcion mover_enemigos(val numero dt): nulo {
         }
     }
     para cada diccionario m en monedas {
-        si m["viva"] y juego.colision(px, py, JW, JH, m["x"], m["y"], 12, 12) {
+        si m["viva"] y juego.colision(yo["x"], yo["y"], JW, JH, m["x"], m["y"], 12, 12) {
             m["viva"] = falso
             recogidas = recogidas + 1
             juego.pitido(1320, 60, 0.15)
@@ -247,7 +199,7 @@ funcion mover_enemigos(val numero dt): nulo {
 
 # Polvo bajo los pies al saltar o al caer
 funcion polvo(): nulo {
-    juego.particulas(px + JW / 2, py + JH, {"cantidad": 10, "color": [235, 225, 200, 200], "velocidad": [20, 70],
+    juego.particulas(yo["x"] + JW / 2, yo["y"] + JH, {"cantidad": 10, "color": [235, 225, 200, 200], "velocidad": [20, 70],
                                              "direccion": -90, "apertura": 160, "vida": [0.2, 0.4],
                                              "tamaño": 5, "tamaño_final": 1})
 }
@@ -284,21 +236,21 @@ funcion nivel(val numero dt): nulo {
 
     # ── el mundo, con la cámara siguiendo al lince ──
     juego.limpiar([120, 190, 235])
-    sea cam_x = matematica.limitar(px - ANCHO / 2, 0, COLUMNAS * CASILLA - ANCHO)
+    sea cam_x = matematica.limitar(yo["x"] - ANCHO / 2, 0, COLUMNAS * CASILLA - ANCHO)
     juego.camara(cam_x, 0)
     sea c_ini = matematica.piso(cam_x / CASILLA)
     para cada numero f en rango(0, FILAS) {
         para cada numero c en rango(c_ini, c_ini + ANCHO / CASILLA + 2) {
-            sea t = casilla(c, f)
+            sea t = juego.casilla(NIVEL, c, f)
             sea x = c * CASILLA
             sea arriba = f * CASILLA
             si t == "#" {
                 juego.rectangulo(x, arriba, CASILLA, CASILLA, [150, 95, 55])
-                si no solido(c, f - 1) { juego.rectangulo(x, arriba, CASILLA, 8, [90, 180, 70]) }
+                si no juego.solido(NIVEL, c, f - 1) { juego.rectangulo(x, arriba, CASILLA, 8, [90, 180, 70]) }
             } sino si t == "=" {
                 juego.rectangulo(x, arriba, CASILLA, 12, [180, 130, 80])
                 juego.contorno(x, arriba, CASILLA, 12, [120, 80, 45])
-            } sino si t == "M" y casilla(c, f - 1) != "M" {
+            } sino si t == "M" y juego.casilla(NIVEL, c, f - 1) != "M" {
                 juego.rectangulo(x + 14, arriba, 4, CASILLA * 5, [240, 240, 240])
                 juego.rectangulo(x + 18, arriba + 2, 26, 18, [230, 60, 60])
             }
@@ -313,13 +265,13 @@ funcion nivel(val numero dt): nulo {
         si bicho["vivo"] { juego.dibujar(ESCARABAJO, bicho["x"], bicho["y"], {"escala": 2, "espejo": bicho["dir"] > 0}) }
     }
     sea cuadro = 0
-    si no en_suelo {
+    si no yo["en_suelo"] {
         cuadro = 1
-    } sino si vx != 0 {
+    } sino si yo["vx"] != 0 {
         cuadro = 1 + juego.cuadro(2, 10)
     }
     si invulnerable == 0 o matematica.piso(invulnerable * 12) % 2 == 0 {
-        juego.dibujar(LINCE, px - 1, py, {"celda": [12, 13], "cuadro": cuadro, "escala": 2, "espejo": mira_izquierda})
+        juego.dibujar(LINCE, yo["x"] - 1, yo["y"], {"celda": [12, 13], "cuadro": cuadro, "escala": 2, "espejo": mira_izquierda})
     }
 
     juego.dibujar_particulas()
@@ -348,6 +300,9 @@ juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:i
 juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
 juego.definir_accion("saltar", ["espacio", "arriba", "w", "mando:a"])
 juego.definir_accion("empezar", ["espacio", "entrar", "mando:a", "mando:inicio"])
+# El nivel como mapa de casillas: '#' es pared y '=' plataforma (se atraviesa desde abajo)
+fijo NIVEL = juego.mapa(MAPA, CASILLA, {"plataformas": "="})
+
 fijo LINCE = juego.sprite(hoja_del_lince(), COLORES_LINCE)
 fijo ESCARABAJO = juego.sprite([
     "...MMMMMM...",

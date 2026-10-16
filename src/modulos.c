@@ -1553,6 +1553,7 @@ static void cargar_pruebas(Entorno *entorno) {
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif
+#include <limits.h>
 #include "ogg.h"
 #include "imagen.h"
 #include "empaquetado.h"

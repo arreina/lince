@@ -50,3 +50,22 @@ para cada elemento f en figuras {
     area_total = area_total + f.area()
 }
 escribir(area_total)
+
+# cadenas como sentencia: métodos y asignaciones sobre elementos y campos
+sea dd = {"camino": [1, 2, 3], "m": [[1, 2], [3, 4]]}
+dd["camino"].eliminar(0)
+escribir(dd["camino"])
+dd["m"][1][0] = 9
+escribir(dd["m"])
+clase CajaCadena {
+    sea dentro = nulo
+}
+sea caja = CajaCadena()
+caja.dentro = CajaCadena()
+caja.dentro.dentro = 5
+escribir(caja.dentro.dentro)
+sea ll = [caja]
+ll[0].dentro.dentro = 7
+escribir(caja.dentro.dentro)
+dd["camino"].agregar(8)
+escribir(dd["camino"].longitud())

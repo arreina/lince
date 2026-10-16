@@ -152,4 +152,29 @@ for l in "circulos: verdadero falso" "circulo_rect: verdadero falso" "dentro: ve
 done
 grep -qF "opción desconocida 'cantida'" salida7.txt && ok "opción de partículas mal escrita" || mal "falta el error de opción desconocida"
 grep -q "^escena: partida verdadero" salida7.txt && ok "escena: partida verdadero" || mal "falta la línea: escena: partida"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt; exit 1; }
+# ── Sexta parte: mapas de casillas (plataformas y vista cenital) y caminos ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=5 timeout 20 "$LINCE" "$DIR/prueba5.lince" > salida8.txt 2>&1
+[ $? -eq 0 ] && ok "la sexta prueba termina bien" || mal "la sexta prueba falló"
+for l in "tamaño: 8x8 128" "casilla: #.=[]" "solido: verdadero falso verdadero falso" "buscar: 3" "casilla_en: 2 1" \
+         "cae: 112 verdadero 0" "pared: 112 1" "atraviesa: verdadero falso" "pisa: 32 verdadero" "cenital: 16 verdadero" \
+         "camino: 7 termina en 6" "sin camino: 0" "diagonal: 5"; do
+    grep -qxF "$l" salida8.txt && ok "mapa: $l" || mal "falta la línea: $l"
+done
+grep -qF "no es ASCII" salida8.txt && ok "mapa: carácter no ASCII" || mal "falta el error de carácter no ASCII"
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+d = open("mapa.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+def px(x, y):
+    fila = (abs(h) - 1 - y) if h > 0 else y
+    b, g, r, a = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 4]
+    return (r, g, b)
+casos = [((5, 5), (255, 0, 0), "pared"), ((60, 40), (0, 0, 255), "plataforma"), ((24, 24), (0, 0, 0), "suelo vacío")]
+mal = 0
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ dibujar_mapa:", nombre)
+    else: print("  ❌ dibujar_mapa:", nombre, "→", px(x, y)); mal += 1
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt; exit 1; }

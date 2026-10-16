@@ -1,6 +1,6 @@
 # 🐆 Minijuegos de ejemplo
 
-Ocho juegos pequeños y completos, cada uno pensado para enseñar una parte de
+Nueve juegos pequeños y completos, cada uno pensado para enseñar una parte de
 Lince. Se juegan así (necesitan SDL2; en Debian/Ubuntu: `sudo apt install libsdl2-2.0-0`):
 
 ```sh
@@ -24,7 +24,8 @@ Y se reparten como un único ejecutable:
 | `05_esquiva.lince` | flechas o A / D | **clases, herencia y polimorfismo** (`Objeto` → `Meteorito` y `Estrella`), `es` |
 | `06_memoria.lince` | ratón | el ratón, una máquina de estados y temporizadores sin bloquear el bucle |
 | `07_tres_en_raya.lince` | ratón | **recursión** (minimax): la máquina nunca pierde |
-| `08_plataformas.lince` | flechas / A-D y espacio, o **mando** | nivel escrito como texto, **sprites dibujados con texto** y animados (`juego.sprite`, hoja de sprites), gravedad y colisiones con el mapa, **cámara** con marcador fijo, **acciones** (cada control definido una vez para teclado y mando), **partículas**, **escenas** con fundido (portada y nivel) y animación con `juego.cuadro` |
+| `08_plataformas.lince` | flechas / A-D y espacio, o **mando** | nivel escrito como texto, **sprites dibujados con texto** y animados (`juego.sprite`, hoja de sprites), gravedad y un **mapa de casillas** (`juego.mapa`, `juego.mover_en_mapa`), **cámara** con marcador fijo, **acciones** (cada control definido una vez para teclado y mando), **partículas**, **escenas** con fundido (portada y nivel) y animación con `juego.cuadro` |
+| `09_mazmorra.lince` | flechas o WASD, o **mando** | un juego de **vista cenital**: el mismo mapa de casillas sin gravedad, casillas que cambian (`juego.poner_casilla`) y **enemigos que te persiguen** esquivando las paredes (`juego.camino`) |
 
 Todos terminan con **Esc**.
 
