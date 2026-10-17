@@ -70,14 +70,18 @@ int  recarga_completa(void) { return _completa; }
 void recarga_pedir_completa(int si) { _completa = si; }
 
 /* Un cambio cuenta cuando el archivo ya no se mueve: lo visto ahora es igual
-   a lo de la comprobación anterior. Así no se lee a medio guardar. */
+   a lo de la comprobación anterior. Así no se lee a medio guardar. Vacío
+   tampoco cuenta: muchos programas (cp, algunos editores) primero lo vacían y
+   luego lo escriben, y sin pantalla el juego comprueba en cada fotograma, tan
+   seguido que puede ver dos veces el archivo vacío y ejecutar un programa sin
+   nada. */
 int recarga_comprobar(int forzar) {
     if (!_activa) return 0;
     int cambiado = 0, quieto = 1;
     for (int i = 0; i < _nvig; i++) {
         long long m, t;
         recarga_huella(_vig[i].ruta, &m, &t);
-        if (m != _vig[i].visto_mtime || t != _vig[i].visto_tam) quieto = 0;
+        if (m != _vig[i].visto_mtime || t != _vig[i].visto_tam || t == 0) quieto = 0;
         _vig[i].visto_mtime = m;
         _vig[i].visto_tam = t;
         if (m != _vig[i].mtime || t != _vig[i].tam) cambiado = 1;
