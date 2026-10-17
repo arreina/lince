@@ -1797,15 +1797,15 @@ static void reclasificar(Valor *v, Entorno *e) {
 }
 
 /* El valor que el 'sea' de nombre 'id' tenía antes de recargar, o NULL */
-static Valor *conservado(Nodo *n, const char *id, Entorno *e) {
-    if (!_conservar_de || e != _conservar_en || n->declaracion.constante) return NULL;
+static Valor *conservado(const char *id, Entorno *e, int constante, int es_lista, int es_diccionario) {
+    if (!_conservar_de || e != _conservar_en || constante) return NULL;
     for (int i = 0; i < _conservar_de->cantidad; i++) {
         if (_conservar_de->vars[i].nombre != id) continue;
         Valor *v = _conservar_de->vars[i].valor;
         if (_conservar_de->vars[i].constante || v->es_modulo ||
             v->tipo == VAL_FUNCION || v->tipo == VAL_CLASE || v->tipo == VAL_ERROR) return NULL;
-        if (n->declaracion.es_lista && v->tipo != VAL_LISTA) return NULL;
-        if (n->declaracion.es_diccionario && v->tipo != VAL_DICCIONARIO) return NULL;
+        if (es_lista && v->tipo != VAL_LISTA) return NULL;
+        if (es_diccionario && v->tipo != VAL_DICCIONARIO) return NULL;
         _nvistos = 0;
         reclasificar(v, e);
         return valor_retener(v);
@@ -1814,7 +1814,8 @@ static Valor *conservado(Nodo *n, const char *id, Entorno *e) {
 }
 
 static Valor *exec_declaracion(Nodo *n, Entorno *e) {
-    Valor *v = _conservar_de ? conservado(n, NI(n, n->declaracion.nombre), e) : NULL;
+    Valor *v = _conservar_de ? conservado(NI(n, n->declaracion.nombre), e, n->declaracion.constante,
+                                          n->declaracion.es_lista, n->declaracion.es_diccionario) : NULL;
     if (!v) v = ejecutar(n->declaracion.valor, e);
     /* Comprobar el tipo anunciado en 'sea lista x' / 'sea
        diccionario x'. Se hace aquí y no en el parser porque sólo
@@ -1850,6 +1851,59 @@ static Valor *exec_declaracion(Nodo *n, Entorno *e) {
         return valor_nulo();
     }
     entorno_definir_i(e, id, v, n->declaracion.constante);
+    return valor_nulo();
+}
+
+/* sea [x, y] = pos  /  sea {x, y} = d  /  [a, b] = [b, a] */
+static Valor *exec_desestructurar(Nodo *n, Entorno *e) {
+    int num = n->desestructurar.num_nombres, dic = n->desestructurar.de_diccionario;
+    if (!n->desestructurar.nombres_i) {
+        n->desestructurar.nombres_i = malloc(sizeof(char*) * num);
+        for (int i = 0; i < num; i++) n->desestructurar.nombres_i[i] = intern(n->desestructurar.nombres[i]);
+    }
+    Valor *v = ejecutar(n->desestructurar.valor, e);
+    if (hay_error) { valor_destruir(v); return valor_nulo(); }
+
+    Valor *err = NULL;
+    if (dic && v->tipo != VAL_DICCIONARIO)
+        err = error_rt("ErrorTipo", n->linea, "Con '{...} =' el valor tiene que ser un diccionario.");
+    else if (!dic && v->tipo != VAL_LISTA)
+        err = error_rt("ErrorTipo", n->linea, "Con '[...] =' el valor tiene que ser una lista.");
+    else if (!dic && v->lista.cantidad != num)
+        err = error_rt("ErrorRango", n->linea,
+            "Hay %d nombre%s entre corchetes y la lista tiene %d elemento%s.",
+            num, num == 1 ? "" : "s", v->lista.cantidad, v->lista.cantidad == 1 ? "" : "s");
+    else if (dic)
+        for (int i = 0; i < num && !err; i++)
+            if (valor_diccionario_buscar(v, n->desestructurar.nombres[i]) < 0)
+                err = error_rt("ErrorRango", n->linea, "El diccionario no tiene la clave '%s'.",
+                               n->desestructurar.nombres[i]);
+    if (err) { valor_destruir(v); return err; }
+
+    /* Se toman todos antes de guardar ninguno: así '[a, b] = [b, a]' cambia
+       los dos (la lista de la derecha ya está hecha) */
+    Valor *vals[num > 0 ? num : 1];
+    for (int i = 0; i < num; i++)
+        vals[i] = valor_retener(dic ? v->diccionario.valores[valor_diccionario_buscar(v, n->desestructurar.nombres[i])]
+                                    : v->lista.elementos[i]);
+    valor_destruir(v);
+
+    for (int i = 0; i < num; i++) {
+        const char *id = n->desestructurar.nombres_i[i], *nombre = n->desestructurar.nombres[i];
+        if (hay_error) { valor_destruir(vals[i]); continue; }
+        if (!n->desestructurar.declarar) {
+            entorno_asignar_i(e, id, nombre, vals[i], n->linea);
+            continue;
+        }
+        Valor *c = _conservar_de ? conservado(id, e, n->desestructurar.constante, 0, 0) : NULL;
+        if (c) { valor_destruir(vals[i]); vals[i] = c; }
+        if (ya_definido_aqui_i(e, id) &&
+            redefinido(e, nombre, n->desestructurar.constante ? "'fijo'" : "'sea'", 1, n->linea)) {
+            valor_destruir(vals[i]);
+            continue;
+        }
+        entorno_definir_i(e, id, vals[i], n->desestructurar.constante);
+    }
     return valor_nulo();
 }
 
@@ -3509,6 +3563,17 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_PLANTILLA:
             return exec_plantilla(n, e);
+
+        case NODO_DESESTRUCTURAR:
+            return exec_desestructurar(n, e);
+
+        case NODO_SI_EXPR: {
+            Valor *c = ejecutar(n->si.condicion, e);
+            int ok = es_verdadero(c);
+            valor_destruir(c);
+            if (hay_error) return valor_nulo();
+            return ejecutar(ok ? n->si.entonces : n->si.sino, e);
+        }
 
         case NODO_ASIGNACION: {
             Valor *v = ejecutar(n->asignacion.valor, e);

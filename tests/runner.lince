@@ -127,7 +127,8 @@ sea lista tests = [
     "test_errores_capturables",
     "test_romper",
     "test_asignacion_compuesta",
-    "test_texto_con_valores"
+    "test_texto_con_valores",
+    "test_desestructurar"
 ]
 
 # ── Cabecera ───────────────────────────────────────────────────

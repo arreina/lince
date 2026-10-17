@@ -75,6 +75,25 @@ sea lista notas = [9, 7, 10]
 sea diccionario d = {"nombre": "Ana", "edad": 22}
 ```
 
+### Varios nombres de una vez
+
+Con corchetes, cada nombre toma un elemento de una lista; con llaves, el
+valor de su clave en un diccionario:
+
+```lince
+sea [ancho, alto] = [320, 180]
+sea [menor, mayor] = min_max(notas)     # una función que devuelve dos cosas
+sea {vida, nombre} = enemigo            # enemigo["vida"], enemigo["nombre"]
+fijo [COLUMNAS, FILAS] = [20, 15]
+[a, b] = [b, a]                         # sin 'sea': asigna (aquí, intercambia)
+```
+
+- En una lista tiene que haber tantos elementos como nombres (si no,
+  `ErrorRango`); en un diccionario, cada clave tiene que existir.
+- Las listas y diccionarios de dentro se comparten, igual que con `sea x = l[0]`.
+- Ojo: `y` y `o` son palabras del lenguaje y no valen como nombres, así que
+  `sea [x, y] = pos` no funciona; `sea [px, py] = pos` sí.
+
 ### Un nombre se define una sola vez
 
 Definir dos veces el mismo nombre **en el mismo ámbito** es un error, con
@@ -212,6 +231,20 @@ si condicion {
     ...
 }
 ```
+
+### `si` que da un valor
+
+Con una sola expresión en cada rama, un `si` también vale como valor, y
+`sino` es obligatorio (si no, no habría valor cuando la condición falla):
+
+```lince
+sea lado = si vel < 0 { -1 } sino { 1 }
+sea nota = si n >= 9 { "sobresaliente" } sino si n >= 5 { "aprobado" } sino { "suspenso" }
+juego.texto("{puntos} {si puntos == 1 { "punto" } sino { "puntos" }}", 10, 10)
+```
+
+Solo se evalúa la rama que toca. Cada rama lleva una expresión, no
+sentencias; para más, el `si` de siempre.
 
 ### Elegir / Caso
 

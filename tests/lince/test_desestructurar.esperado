@@ -1,0 +1,25 @@
+10 20
+57600
+1..9
+orco en 3,4
+2 1
+3
+7
+[1, 2, 3]
+Hay 2 nombres entre corchetes y la lista tiene 3 elementos.
+Hay 1 nombre entre corchetes y la lista tiene 0 elementos.
+Con '[...] =' el valor tiene que ser una lista.
+El diccionario no tiene la clave 'zz'.
+Con '{...} =' el valor tiene que ser un diccionario.
+Intentas asignar un valor a 'no_existe', pero nunca la definiste. ¿Querías escribir 'sea no_existe = ...' primero?
+fijo: verdadero
+-1
+sobresaliente aprobado suspenso
+tienes -3 puntos
+20
+bien
+verdadero
+verdadero
+verdadero
+verdadero
+normal

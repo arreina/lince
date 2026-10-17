@@ -74,6 +74,7 @@ static Nodo *sentencia(Parser *p);
 static Nodo *expresion(Parser *p);
 static Nodo *bloque(Parser *p);
 static Nodo *postfijo(Parser *p, Nodo *base);
+static Nodo *si_expresion(Parser *p);
 static TipoDato parsear_tipo(Parser *p, char **tipo_clase_out);
 static Nodo *sent_elegir(Parser *p);
 static Nodo *sent_enumeracion(Parser *p);
@@ -110,6 +111,35 @@ static const char *op_compuesto(TipoToken t) {
         case TOK_MODULO_IGUAL: return "%";
         default:               return NULL;
     }
+}
+
+/* Cada rama de un 'si' que da valor: '{', una expresión y '}' */
+static Nodo *rama_si(Parser *p) {
+    consumir(p, TOK_LLAVE_IZQ, "'{'");
+    if (coincide(p, TOK_LLAVE_DER))
+        error_sintaxis(p, "Cada rama de un 'si' que da un valor lleva dentro ese valor: si c { 1 } sino { 2 }.");
+    TipoToken t = actual(p)->tipo;
+    if (t == TOK_ESCRIBIR || t == TOK_SEA || t == TOK_FIJO || t == TOK_DEVOLVER ||
+        t == TOK_MIENTRAS || t == TOK_PARA || t == TOK_HACER || t == TOK_ROMPER || t == TOK_CONTINUAR ||
+        t == TOK_LANZAR || t == TOK_INTENTAR || t == TOK_ELEGIR)
+        error_sintaxis(p, "Cada rama de un 'si' que da un valor lleva solo una expresión, sin más sentencias.");
+    Nodo *v = expresion(p);
+    if (!coincide(p, TOK_LLAVE_DER))
+        error_sintaxis(p, "Cada rama de un 'si' que da un valor lleva solo una expresión, sin más sentencias.");
+    consumir(p, TOK_LLAVE_DER, "'}'");
+    return v;
+}
+
+static Nodo *si_expresion(Parser *p) {
+    consumir(p, TOK_SI, "'si'");
+    Nodo *n = nodo_nuevo(NODO_SI_EXPR, p);
+    n->si.condicion = expresion(p);
+    n->si.entonces  = rama_si(p);
+    if (!coincide(p, TOK_SINO))
+        error_sintaxis(p, "Un 'si' que da un valor necesita su 'sino': sea x = si c { 1 } sino { 2 }.");
+    consumir(p, TOK_SINO, "'sino'");
+    n->si.sino = coincide(p, TOK_SI) ? si_expresion(p) : rama_si(p);
+    return n;
 }
 
 static Nodo *postfijo(Parser *p, Nodo *base) {
@@ -298,6 +328,9 @@ static Nodo *primario(Parser *p) {
         n->numero = atof(t->valor);
         return n;
     }
+
+    /* si c { a } sino { b }: el valor de una de las dos ramas */
+    if (coincide(p, TOK_SI)) return si_expresion(p);
 
     /* Texto con valores dentro: "Vidas: {vidas}". El lexer deja los trozos
        alternos: TEXTO, expresión, TEXTO, ..., TEXTO. */
@@ -591,6 +624,52 @@ static Nodo *bloque(Parser *p) {
     return n;
 }
 
+/* [x, y] = valor  o  {x, y} = valor, ya pasado el 'sea' o el 'fijo' (si lo
+   hay). Los nombres van sueltos, sin tipo, separados por comas. */
+static Nodo *desestructurar(Parser *p, int constante, int declarar) {
+    int dic = coincide(p, TOK_LLAVE_IZQ);
+    TipoToken cierre = dic ? TOK_LLAVE_DER : TOK_CORCHETE_DER;
+    consumir_cualquiera(p);
+    int cap = 4, num = 0;
+    char **nombres = malloc(sizeof(char*) * cap);
+    do {
+        if (num > 0) consumir(p, TOK_COMA, "','");
+        Token *t = consumir(p, TOK_IDENTIFICADOR, dic ? "el nombre de una clave" : "un nombre de variable");
+        for (int i = 0; i < num; i++)
+            if (strcmp(nombres[i], t->valor) == 0) {
+                p->pos--;
+                error_sintaxis(p, "Ese nombre ya está en la lista: cada uno puede ir una sola vez.");
+            }
+        if (num == cap) { cap *= 2; nombres = realloc(nombres, sizeof(char*) * cap); }
+        nombres[num++] = strdup(t->valor);
+    } while (coincide(p, TOK_COMA));
+    consumir(p, cierre, dic ? "'}'" : "']'");
+    consumir(p, TOK_IGUAL, "'='");
+
+    Nodo *n = nodo_nuevo(NODO_DESESTRUCTURAR, p);
+    n->desestructurar.nombres        = nombres;
+    n->desestructurar.num_nombres    = num;
+    n->desestructurar.de_diccionario = dic;
+    n->desestructurar.constante      = constante;
+    n->desestructurar.declarar       = declarar;
+    n->desestructurar.valor          = expresion(p);
+    return n;
+}
+
+/* ¿Empieza aquí un '[a, b, ...] ='? (si no, el '[' es una lista) */
+static int viene_desestructurar(Parser *p) {
+    int i = p->pos;
+    if (p->tokens[i].tipo != TOK_CORCHETE_IZQ) return 0;
+    for (i++; i < p->cantidad; i += 2) {
+        if (p->tokens[i].tipo != TOK_IDENTIFICADOR) return 0;
+        if (i + 1 >= p->cantidad) return 0;
+        if (p->tokens[i + 1].tipo == TOK_CORCHETE_DER)
+            return i + 2 < p->cantidad && p->tokens[i + 2].tipo == TOK_IGUAL;
+        if (p->tokens[i + 1].tipo != TOK_COMA) return 0;
+    }
+    return 0;
+}
+
 static Nodo *sent_declaracion(Parser *p, int constante) {
     consumir_cualquiera(p); /* sea / fijo */
 
@@ -603,6 +682,10 @@ static Nodo *sent_declaracion(Parser *p, int constante) {
         es_diccionario = 1;
         consumir(p, TOK_DICCIONARIO, "'diccionario'");
     }
+
+    if (!es_lista && !es_diccionario &&
+        (coincide(p, TOK_CORCHETE_IZQ) || coincide(p, TOK_LLAVE_IZQ)))
+        return desestructurar(p, constante, 1);
 
     Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de variable");
     consumir(p, TOK_IGUAL, "'='");
@@ -1347,6 +1430,8 @@ static Nodo *sentencia_interna(Parser *p) {
         return nodo_nuevo(romper ? NODO_ROMPER : NODO_CONTINUAR, p);
     }
 
+    if (viene_desestructurar(p)) return desestructurar(p, 0, 0);
+
     if (coincide(p, TOK_INTENTAR))    return sent_intentar(p);
     if (coincide(p, TOK_LANZAR))      return sent_lanzar(p);
     if (coincide(p, TOK_IMPORTAR))    return sent_importar(p);
@@ -1530,6 +1615,18 @@ void nodo_destruir(Nodo *n) {
                 nodo_destruir(n->lista.elementos[i]);
             free(n->lista.elementos);
             break;
+        case NODO_DESESTRUCTURAR:
+            for (int i = 0; i < n->desestructurar.num_nombres; i++)
+                free(n->desestructurar.nombres[i]);
+            free(n->desestructurar.nombres);
+            free(n->desestructurar.nombres_i);
+            nodo_destruir(n->desestructurar.valor);
+            break;
+        case NODO_SI_EXPR:
+            nodo_destruir(n->si.condicion);
+            nodo_destruir(n->si.entonces);
+            nodo_destruir(n->si.sino);
+            break;
         case NODO_FUNCION:
             free(n->funcion.nombre);
             for (int i = 0; i < n->funcion.num_parametros; i++) {
@@ -1636,6 +1733,17 @@ void nodo_imprimir(Nodo *n, int nivel) {
             nodo_imprimir(n->devolver, nivel + 1);
             break;
         case NODO_ROMPER:    printf("Romper\n"); break;
+        case NODO_DESESTRUCTURAR:
+            printf("Desestructurar(%d nombres%s)\n", n->desestructurar.num_nombres,
+                   n->desestructurar.de_diccionario ? ", por clave" : "");
+            nodo_imprimir(n->desestructurar.valor, nivel + 1);
+            break;
+        case NODO_SI_EXPR:
+            printf("SiValor\n");
+            nodo_imprimir(n->si.condicion, nivel + 1);
+            nodo_imprimir(n->si.entonces, nivel + 1);
+            nodo_imprimir(n->si.sino, nivel + 1);
+            break;
         case NODO_CONTINUAR: printf("Continuar\n"); break;
         case NODO_PLANTILLA:
             printf("Plantilla(%d trozos)\n", n->lista.cantidad);

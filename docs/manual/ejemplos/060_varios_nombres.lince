@@ -1,0 +1,14 @@
+# @seccion: Primeros pasos
+# @titulo: Varios nombres de una vez
+# @nota: Con corchetes, de una lista (tantos nombres como elementos); con llaves, de un diccionario por clave. Sin `sea`, asigna.
+sea [ancho, alto] = [320, 180]
+escribir(ancho * alto)
+
+sea enemigo = {"vida": 50, "nombre": "orco", "fuerza": 7}
+sea {nombre, vida} = enemigo
+escribir("{nombre} con {vida} de vida")
+
+sea a = 1
+sea b = 2
+[a, b] = [b, a]
+escribir("{a} {b}")

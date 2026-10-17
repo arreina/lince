@@ -138,8 +138,8 @@
 
 <div class="envoltorio">
 <nav id="lateral">
-<div class="grupo"><a href="#primeros-pasos" class="sec">Primeros pasos</a><a href="#primeros-pasos-0" class="sub">Hola, mundo</a><a href="#primeros-pasos-1" class="sub">Variables y constantes</a><a href="#primeros-pasos-2" class="sub">Operar y guardar: +=, -=, *=, /=, %=</a><a href="#primeros-pasos-3" class="sub">Cada nombre se define una sola vez</a><a href="#primeros-pasos-4" class="sub">Tapar un nombre en un ámbito interior</a><a href="#primeros-pasos-5" class="sub">Dónde se declaran los tipos</a></div>
-<div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-2" class="sub">Romper y continuar</a><a href="#control-de-flujo-3" class="sub">Elegir / caso</a></div>
+<div class="grupo"><a href="#primeros-pasos" class="sec">Primeros pasos</a><a href="#primeros-pasos-0" class="sub">Hola, mundo</a><a href="#primeros-pasos-1" class="sub">Variables y constantes</a><a href="#primeros-pasos-2" class="sub">Operar y guardar: +=, -=, *=, /=, %=</a><a href="#primeros-pasos-3" class="sub">Cada nombre se define una sola vez</a><a href="#primeros-pasos-4" class="sub">Tapar un nombre en un ámbito interior</a><a href="#primeros-pasos-5" class="sub">Dónde se declaran los tipos</a><a href="#primeros-pasos-6" class="sub">Varios nombres de una vez</a></div>
+<div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">Un si que da un valor</a><a href="#control-de-flujo-2" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-3" class="sub">Romper y continuar</a><a href="#control-de-flujo-4" class="sub">Elegir / caso</a></div>
 <div class="grupo"><a href="#funciones" class="sec">Funciones</a><a href="#funciones-0" class="sub">Declarar y llamar</a><a href="#funciones-1" class="sub">Valores por defecto</a><a href="#funciones-2" class="sub">Lambdas y funciones como argumento</a><a href="#funciones-3" class="sub">Closures</a></div>
 <div class="grupo"><a href="#listas" class="sec">Listas</a><a href="#listas-0" class="sub">Crear, modificar y consultar</a><a href="#listas-1" class="sub">Operaciones que devuelven una lista nueva</a><a href="#listas-2" class="sub">Ordenar con tu propio criterio</a></div>
 <div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a></div>
@@ -153,7 +153,7 @@
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>43 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>45 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -205,7 +205,19 @@ fuera</pre></div><span class="fuente">040_tapar.lince</span></article><article c
     <span class="k">devolver</span> quien + <span class="s">&quot; tiene &quot;</span> + anios + <span class="s">&quot; años&quot;</span>
 }
 
-<span class="k">escribir</span>(presentar(ficha[<span class="s">&quot;nombre&quot;</span>], notas.longitud()))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Ana tiene 3 años</pre></div><span class="fuente">050_tipos.lince</span></article></section>
+<span class="k">escribir</span>(presentar(ficha[<span class="s">&quot;nombre&quot;</span>], notas.longitud()))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Ana tiene 3 años</pre></div><span class="fuente">050_tipos.lince</span></article><article class="ej" id="primeros-pasos-6"><h3>Varios nombres de una vez</h3><p class="nota">Con corchetes, de una lista (tantos nombres como elementos); con llaves, de un diccionario por clave. Sin `sea`, asigna.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> [ancho, alto] = [<span class="n">320</span>, <span class="n">180</span>]
+<span class="k">escribir</span>(ancho * alto)
+
+<span class="k">sea</span> enemigo = {<span class="s">&quot;vida&quot;</span>: <span class="n">50</span>, <span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;orco&quot;</span>, <span class="s">&quot;fuerza&quot;</span>: <span class="n">7</span>}
+<span class="k">sea</span> {nombre, vida} = enemigo
+<span class="k">escribir</span>(<span class="s">&quot;{nombre} con {vida} de vida&quot;</span>)
+
+<span class="k">sea</span> a = <span class="n">1</span>
+<span class="k">sea</span> b = <span class="n">2</span>
+[a, b] = [b, a]
+<span class="k">escribir</span>(<span class="s">&quot;{a} {b}&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>57600
+orco con 50 de vida
+2 1</pre></div><span class="fuente">060_varios_nombres.lince</span></article></section>
 <section id="control-de-flujo"><h2>Control de flujo</h2><article class="ej" id="control-de-flujo-0"><h3>Condicionales</h3><p class="nota">`si`, `sino si`, `sino`. Los operadores lógicos son `y`, `o`, `no`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nota = <span class="n">7</span>
 
 <span class="k">si</span> nota &gt;= <span class="n">9</span> {
@@ -219,7 +231,19 @@ fuera</pre></div><span class="fuente">040_tapar.lince</span></article><article c
 <span class="k">si</span> nota &gt; <span class="n">5</span> <span class="k">y</span> <span class="k">no</span> (nota == <span class="n">10</span>) {
     <span class="k">escribir</span>(<span class="s">&quot;entre 6 y 9&quot;</span>)
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>aprobado
-entre 6 y 9</pre></div><span class="fuente">110_condicionales.lince</span></article><article class="ej" id="control-de-flujo-1"><h3>Las cuatro formas de repetir</h3><p class="nota">`para` clásico, `mientras`, `hacer/mientras` y `para cada`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+entre 6 y 9</pre></div><span class="fuente">110_condicionales.lince</span></article><article class="ej" id="control-de-flujo-1"><h3>Un si que da un valor</h3><p class="nota">Una expresión en cada rama y `sino` obligatorio. Solo se evalúa la rama que toca.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> velocidad = -<span class="n">4</span>
+<span class="k">sea</span> lado = <span class="k">si</span> velocidad &lt; <span class="n">0</span> { <span class="s">&quot;izquierda&quot;</span> } <span class="k">sino</span> { <span class="s">&quot;derecha&quot;</span> }
+<span class="k">escribir</span>(lado)
+
+<span class="k">funcion</span> nota(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">texto</span> {
+    <span class="k">devolver</span> <span class="k">si</span> n &gt;= <span class="n">9</span> { <span class="s">&quot;sobresaliente&quot;</span> } <span class="k">sino</span> <span class="k">si</span> n &gt;= <span class="n">5</span> { <span class="s">&quot;aprobado&quot;</span> } <span class="k">sino</span> { <span class="s">&quot;suspenso&quot;</span> }
+}
+<span class="k">escribir</span>(nota(<span class="n">7</span>))
+
+<span class="k">sea</span> puntos = <span class="n">1</span>
+<span class="k">escribir</span>(<span class="s">&quot;{puntos} {si puntos == 1 { &quot;</span>punto<span class="s">&quot; } sino { &quot;</span>puntos<span class="s">&quot; }}&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>izquierda
+aprobado
+1 punto</pre></div><span class="fuente">115_si_con_valor.lince</span></article><article class="ej" id="control-de-flujo-2"><h3>Las cuatro formas de repetir</h3><p class="nota">`para` clásico, `mientras`, `hacer/mientras` y `para cada`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
     <span class="k">escribir</span>(<span class="s">&quot;para &quot;</span> + i)
 }
 
@@ -245,7 +269,7 @@ mientras 1
 hacer 0
 hacer 1
 cada 10
-cada 20</pre></div><span class="fuente">120_bucles.lince</span></article><article class="ej" id="control-de-flujo-2"><h3>Romper y continuar</h3><p class="nota">`romper` sale del bucle; `continuar` pasa a la vuelta siguiente. Con bucles uno dentro de otro, afectan al de dentro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> enemigos = [{<span class="s">&quot;vida&quot;</span>: <span class="n">0</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">5</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">8</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">2</span>}]
+cada 20</pre></div><span class="fuente">120_bucles.lince</span></article><article class="ej" id="control-de-flujo-3"><h3>Romper y continuar</h3><p class="nota">`romper` sale del bucle; `continuar` pasa a la vuelta siguiente. Con bucles uno dentro de otro, afectan al de dentro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> enemigos = [{<span class="s">&quot;vida&quot;</span>: <span class="n">0</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">5</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">8</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">2</span>}]
 
 <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> enemigos {
     <span class="k">si</span> e[<span class="s">&quot;vida&quot;</span>] == <span class="n">0</span> { <span class="k">continuar</span> }     <span class="c"># los muertos no cuentan</span>
@@ -264,7 +288,7 @@ vivo con 8
 0
 5
 10
-15</pre></div><span class="fuente">125_romper.lince</span></article><article class="ej" id="control-de-flujo-3"><h3>Elegir / caso</h3><p class="nota">`otro` es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
+15</pre></div><span class="fuente">125_romper.lince</span></article><article class="ej" id="control-de-flujo-4"><h3>Elegir / caso</h3><p class="nota">`otro` es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
 
 <span class="k">elegir</span> animal {
     <span class="k">caso</span> <span class="s">&quot;gato&quot;</span>  { <span class="k">escribir</span>(<span class="s">&quot;miau&quot;</span>) }

@@ -55,6 +55,8 @@ typedef enum {
     NODO_ROMPER,             /* romper: sale del bucle */
     NODO_CONTINUAR,          /* continuar: pasa a la vuelta siguiente */
     NODO_PLANTILLA,          /* "Vidas: {vidas}": usa 'lista' (trozos de texto y expresiones) */
+    NODO_DESESTRUCTURAR,     /* sea [x, y] = pos  /  sea {x, y} = d  /  [a, b] = [b, a] */
+    NODO_SI_EXPR,            /* si c { a } sino { b } como valor: usa 'si' (entonces y sino son expresiones) */
 } TipoNodo;
 
 /* ─────────────────────────────────────────
@@ -131,6 +133,17 @@ struct Nodo {
             int   vis;             /* campo de clase: 0 público, 1 privado, 2 protegido */
             int   estatico;        /* campo de clase estático */
         } declaracion;
+
+        /* NODO_DESESTRUCTURAR */
+        struct {
+            char **nombres;
+            int    num_nombres;
+            int    de_diccionario;  /* sea {x, y} = d: por clave */
+            int    constante;       /* fijo [x, y] = ... */
+            int    declarar;        /* 0 en '[a, b] = ...' (asigna a variables que ya existen) */
+            Nodo  *valor;
+            const char **nombres_i; /* internados (los rellena el intérprete) */
+        } desestructurar;
 
         /* NODO_ASIGNACION */
         struct {

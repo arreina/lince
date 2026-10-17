@@ -1,0 +1,14 @@
+# @seccion: Control de flujo
+# @titulo: Un si que da un valor
+# @nota: Una expresión en cada rama y `sino` obligatorio. Solo se evalúa la rama que toca.
+sea velocidad = -4
+sea lado = si velocidad < 0 { "izquierda" } sino { "derecha" }
+escribir(lado)
+
+funcion nota(val numero n): texto {
+    devolver si n >= 9 { "sobresaliente" } sino si n >= 5 { "aprobado" } sino { "suspenso" }
+}
+escribir(nota(7))
+
+sea puntos = 1
+escribir("{puntos} {si puntos == 1 { "punto" } sino { "puntos" }}")

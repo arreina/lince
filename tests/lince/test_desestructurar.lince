@@ -1,0 +1,84 @@
+# TEST: sea [x, y] = lista, sea {x, y} = diccionario, [a, b] = [b, a] y si como valor
+importar "archivos"
+importar "sistema"
+
+sea [x, z] = [10, 20]
+escribir("{x} {z}")
+fijo [ANCHO, ALTO] = [320, 180]
+escribir(ANCHO * ALTO)
+
+# De una función que devuelve varias cosas
+funcion min_max(val lista l): lista {
+    sea menor = l[0]
+    sea mayor = l[0]
+    para cada numero v en l {
+        si v < menor { menor = v }
+        si v > mayor { mayor = v }
+    }
+    devolver [menor, mayor]
+}
+sea [lo, hi] = min_max([4, 9, 1, 7])
+escribir("{lo}..{hi}")
+
+# Por clave, de un diccionario
+sea enemigo = {"px": 3, "py": 4, "vida": 50, "nombre": "orco"}
+sea {px, py, nombre} = enemigo
+escribir("{nombre} en {px},{py}")
+
+# Intercambiar sin variable auxiliar
+sea a = 1
+sea b = 2
+[a, b] = [b, a]
+escribir("{a} {b}")
+para cada lista par en [[1, 2], [3, 4]] {
+    sea [p, q] = par
+    escribir(p + q)
+}
+
+# Las listas se comparten, como con 'sea'
+sea [fila] = [[1, 2]]
+fila.agregar(3)
+escribir(fila)
+
+# Errores
+intentar { sea [m, n] = [1, 2, 3] } capturar (ErrorRango e) { escribir(e.mensaje) }
+intentar { sea [m] = [] } capturar (ErrorRango e) { escribir(e.mensaje) }
+intentar { sea [m, n] = 5 } capturar (ErrorTipo e) { escribir(e.mensaje) }
+intentar { sea {zz} = {"a": 1} } capturar (ErrorRango e) { escribir(e.mensaje) }
+intentar { sea {zz} = [1] } capturar (ErrorTipo e) { escribir(e.mensaje) }
+intentar { [a, no_existe] = [1, 2] } capturar (error e) { escribir(e.mensaje) }
+intentar {
+    ANCHO = 1
+} capturar (error e) { escribir("fijo: " + e.mensaje.contiene("constante")) }
+
+# si como valor
+sea vel = -3
+sea lado = si vel < 0 { -1 } sino { 1 }
+escribir(lado)
+funcion nota(val numero n): texto {
+    devolver si n >= 9 { "sobresaliente" } sino si n >= 5 { "aprobado" } sino { "suspenso" }
+}
+escribir(nota(9.5) + " " + nota(6) + " " + nota(2))
+escribir("tienes {vel} {si vel == 1 { "punto" } sino { "puntos" }}")
+escribir((si verdadero { 2 } sino { 3 }) * 10)
+# Solo se evalúa la rama que toca
+funcion falla(): numero { lanzar Error("no debería evaluarse") }
+escribir(si falso { falla() } sino { "bien" })
+
+# Errores de sintaxis
+fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
+fijo TMP = "test_desestructurar_tmp.lince"
+funcion comprobar(val texto codigo, val texto espera): nulo {
+    archivos.escribir(TMP, codigo)
+    sea salida = sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1")
+    escribir(salida.contiene(espera))
+}
+comprobar("sea v = si verdadero \{ 1 }\n", "necesita su 'sino'")
+comprobar("sea v = si verdadero \{ escribir(1)\n 2 } sino \{ 3 }\n", "solo una expresión")
+comprobar("sea v = si verdadero \{ } sino \{ 3 }\n", "lleva dentro ese valor")
+comprobar("sea [a, a] = [1, 2]\n", "una sola vez")
+archivos.eliminar(TMP)
+
+# Un 'si' que da valor dentro de otro
+sea nivel = 2
+escribir(si nivel > 1 { si nivel > 3 { "difícil" } sino { "normal" } } sino { "fácil" })
