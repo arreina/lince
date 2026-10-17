@@ -1,0 +1,28 @@
+3
+30
+25
+5
+1
+lince1
+[11, 2, 6]
+[[1, 2], [0, 4]]
+{"vida": 70, "nombre": Ana López}
+7
+100
+15
+25
+(11, 22)
+6 1
+i 0
+i 4
+i 8
+k 8
+k 4
+k 2
+k 1
+El diccionario no tiene la clave 'b': con '+=' tiene que existir antes.
+Operación '-' no soportada entre esos tipos.
+División por cero.
+Índice 3 fuera de rango. La lista tiene 1 elementos.
+La variable 'no_existe' no está definida.
+'K' es una constante definida con 'fijo' y no puede cambiar. Si necesitas que cambie, usa 'sea' en lugar de 'fijo'.

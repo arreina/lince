@@ -1,0 +1,61 @@
+# TEST: texto con valores dentro, "Vidas: {vidas}"
+importar "archivos"
+importar "sistema"
+importar "texto"
+
+sea vidas = 3
+sea nombre = "Ana"
+escribir("Vidas: {vidas}")
+escribir("{nombre} tiene {vidas} vidas y {vidas * 100} puntos")
+escribir("{vidas}")
+escribir("sin nada dentro")
+
+# Cualquier expresión: llamadas, índices, métodos, diccionarios
+funcion doble(val numero n): numero { devolver n * 2 }
+sea l = [10, 20, 30]
+sea d = {"x": 5}
+escribir("doble: {doble(vidas)}, último: {l[-1]}, x: {d["x"]}, largo: {nombre.longitud()}")
+escribir("diccionario: {{"a": 1}["a"]}")
+
+# Se escriben como con 'escribir'
+escribir("{[1, 2]} {{"a": 1}} {nulo} {verdadero} {1.5} {-2}")
+clase Punto {
+    sea px = 1
+    sea py = 2
+    funcion a_texto(): texto { devolver "({mi.px}, {mi.py})" }
+}
+escribir("punto {Punto()}")
+
+# Un texto dentro de otro
+escribir("fuera {"dentro {vidas + 1}"} fuera")
+
+# Unas llaves vacías se quedan como están (texto.formato las usa)
+escribir(texto.formato("Hola {}, tienes {} años", ["Ana", 22]))
+# Y con \{ se escribe una llave tal cual
+escribir("\{\"vidas\": {vidas}}")
+
+# Es un texto como cualquier otro
+sea s = "a{1 + 1}b"
+escribir(s.longitud())
+escribir("{vidas}".mayusculas() + "!")
+
+# En varias líneas y con espacios dentro de las llaves
+escribir("total: { vidas +
+    1 }")
+
+# Un error dentro se puede capturar
+intentar { escribir("{no_existe}") } capturar (error e) { escribir("error: " + e.mensaje) }
+
+# Errores de sintaxis con un mensaje que explica lo de las llaves
+fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
+fijo TMP = "test_texto_tmp.lince"
+funcion comprobar(val texto codigo): nulo {
+    archivos.escribir(TMP, codigo)
+    sea salida = sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1")
+    escribir(salida.contiene("para escribir una llave tal cual") o salida.contiene("Para escribir una llave tal cual"))
+}
+comprobar("sea s = \"\{\\\"a\\\": 1}\"\n")
+comprobar("sea s = \"\{x\"\n")
+comprobar("sea s = \"\{  }\"\n")
+comprobar("sea s = \"\{a: 1}\"\n")
+archivos.eliminar(TMP)

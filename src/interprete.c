@@ -22,6 +22,20 @@
 ───────────────────────────────────────── */
 static int    hay_retorno    = 0;
 
+/* 'romper' y 'continuar': como 'devolver', cortan las sentencias que quedan
+   hasta que el bucle que los contiene los recoge. El parser ya comprueba que
+   estén dentro de un bucle de la misma función. */
+enum { SALTO_NINGUNO, SALTO_ROMPER, SALTO_CONTINUAR };
+static int    hay_salto      = SALTO_NINGUNO;
+
+/* Tras el cuerpo de un bucle: 1 si hay que salir ('romper'). 'continuar' no
+   hace nada más: el cuerpo ya se ha cortado. */
+static inline int fin_de_vuelta(void) {
+    int romper = hay_salto == SALTO_ROMPER;
+    hay_salto = SALTO_NINGUNO;
+    return romper;
+}
+
 /* Ruta del fichero Lince que se está ejecutando ahora mismo. La fija main.c
    al arrancar, y NODO_IMPORTAR la cambia y la restaura alrededor de cada
    fichero importado, para que un 'importar "./x"' dentro de una librería se
@@ -1110,6 +1124,8 @@ static Valor *operador_objeto(Valor *izq, Valor *der, const char *op, int linea)
     return valor_booleano(res);
 }
 
+static Valor *operar(Valor *izq, Valor *der, const char *op, int linea);
+
 static Valor *exec_binario(Nodo *n, Entorno *e) {
     if (n->binario.operador[0] == 'e' && n->binario.operador[1] == 's' && !n->binario.operador[2])
         return exec_es(n, e);
@@ -1129,11 +1145,16 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
         return valor_booleano(d);
     }
     Valor *der = ejecutar(n->binario.derecha,   e);
+    return operar(izq, der, op, n->linea);
+}
+
+/* izq op der, quedándose con los dos valores. También lo usan '+=', '-='... */
+static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
     Valor *resultado = NULL;
 
     /* Un objeto a la izquierda: los operadores los define su clase */
     if (izq->tipo == VAL_OBJETO && op[0] != 'y' && op[0] != 'o') {
-        Valor *r = operador_objeto(izq, der, op, n->linea);
+        Valor *r = operador_objeto(izq, der, op, linea);
         if (r) return r;
     }
 
@@ -1162,7 +1183,7 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
                 case '*': resultado = valor_numero(a * b); break;
                 case '/':
                     if (b == 0) {
-                        valor_error = valor_error_nuevo("ErrorMatematico", "División por cero.", 0);
+                        valor_error = valor_error_nuevo("ErrorMatematico", "División por cero.", linea);
                         hay_error = 1;
                         valor_destruir(izq);
                         valor_destruir(der);
@@ -1237,7 +1258,7 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
         char msg[192];
         snprintf(msg, sizeof(msg),
             "Operación '%s' no soportada entre esos tipos.", op);
-        valor_error = valor_error_nuevo("ErrorTipo", msg, 0);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, linea);
         hay_error   = 1;
         return valor_nulo();
     }
@@ -1832,6 +1853,36 @@ static Valor *exec_declaracion(Nodo *n, Entorno *e) {
     return valor_nulo();
 }
 
+/* "Vidas: {vidas}": cada trozo se escribe como lo haría 'escribir' (y un
+   objeto, con su método a_texto()). */
+static Valor *exec_plantilla(Nodo *n, Entorno *e) {
+    size_t largo = 0, cap = 64;
+    char  *buf   = malloc(cap);
+    buf[0] = '\0';
+    for (int i = 0; i < n->lista.cantidad; i++) {
+        Nodo *parte = n->lista.elementos[i];
+        const char *t;
+        char *propio = NULL;
+        Valor *v = NULL;
+        if (parte->tipo == NODO_TEXTO) t = parte->texto;
+        else {
+            v = ejecutar(parte, e);
+            if (hay_error) { valor_destruir(v); free(buf); return valor_nulo(); }
+            t = v->tipo == VAL_TEXTO ? v->texto : (propio = valor_a_texto(v));
+        }
+        size_t l = strlen(t);
+        if (largo + l + 1 > cap) {
+            while (largo + l + 1 > cap) cap *= 2;
+            buf = realloc(buf, cap);
+        }
+        memcpy(buf + largo, t, l + 1);
+        largo += l;
+        free(propio);
+        if (v) valor_destruir(v);
+    }
+    return valor_texto_propio(buf);
+}
+
 static Valor *exec_si(Nodo *n, Entorno *e) {
     Valor *cond = ejecutar(n->si.condicion, e);
     int    ok   = es_verdadero(cond);
@@ -1878,7 +1929,13 @@ static Valor *exec_para(Nodo *n, Entorno *e) {
         Valor   *r = ejecutar(n->para.cuerpo, cuerpo_e);
         valor_destruir(r);
         entorno_destruir(cuerpo_e);
+        if (hay_salto && fin_de_vuelta()) break;
+        if (hay_retorno || hay_error) break;
 
+        if (n->para.paso) {                       /* i += 2 */
+            valor_destruir(ejecutar(n->para.paso, bucle));
+            continue;
+        }
         Valor *vactual = entorno_obtener_i(bucle, NI(n, n->para.var_incremento), n->para.var_incremento, n->linea);
         if (hay_error) { valor_destruir(vactual); break; }
         Valor *vnuevo;
@@ -1905,6 +1962,7 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
             entorno_definir_i(iter, NI(n, n->para_cada.variable), elem, 0);
             valor_destruir(ejecutar(n->para_cada.cuerpo, iter));
             entorno_destruir(iter);
+            if (hay_salto && fin_de_vuelta()) break;
         }
         valor_destruir(col);
         return valor_nulo();
@@ -1927,6 +1985,7 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
             Valor *r = ejecutar(n->para_cada.cuerpo, iter);
             valor_destruir(r);
             entorno_destruir(iter);
+            if (hay_salto && fin_de_vuelta()) break;
         }
         valor_destruir(col);
         return valor_nulo();
@@ -1944,6 +2003,7 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
             Valor *r = ejecutar(n->para_cada.cuerpo, iter);
             valor_destruir(r);
             entorno_destruir(iter);
+            if (hay_salto && fin_de_vuelta()) break;
         }
         valor_destruir(col);
         return valor_nulo();
@@ -1967,6 +2027,7 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
             Valor *r = ejecutar(n->para_cada.cuerpo, iter);
             valor_destruir(r);
             entorno_destruir(iter);
+            if (hay_salto && fin_de_vuelta()) break;
         }
         valor_destruir(col);
         return valor_nulo();
@@ -2248,10 +2309,45 @@ static Valor *exec_indice(Nodo *n, Entorno *e) {
     return valor_nulo();
 }
 
+/* lista[i] += v: el valor que hay ahora en obj[idx] (retenido), o NULL si
+   no lo hay. Lo que falte lo dice luego la asignación, con su mensaje. */
+static Valor *valor_en_indice(Valor *obj, Valor *idx) {
+    if (obj->tipo == VAL_BYTES) {
+        int i = pos_bytes(obj, idx);
+        return i >= 0 ? valor_numero(obj->bytes.datos[i]) : NULL;
+    }
+    if (obj->tipo == VAL_LISTA && idx->tipo == VAL_NUMERO) {
+        int i = (int)idx->numero;
+        if (i < 0) i += obj->lista.cantidad;
+        return i >= 0 && i < obj->lista.cantidad ? valor_retener(obj->lista.elementos[i]) : NULL;
+    }
+    if (obj->tipo == VAL_DICCIONARIO && idx->tipo == VAL_TEXTO) {
+        int i = valor_diccionario_buscar(obj, idx->texto);
+        return i >= 0 ? valor_retener(obj->diccionario.valores[i]) : NULL;
+    }
+    return NULL;
+}
+
 static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
     Valor *obj = ejecutar(n->asignacion_indice.objeto, e);
     Valor *idx = ejecutar(n->asignacion_indice.indice, e);
     Valor *val = ejecutar(n->asignacion_indice.valor,  e);
+
+    if (n->asignacion_indice.op[0] && !hay_error) {          /* lista[i] += v */
+        Valor *antes = valor_en_indice(obj, idx);
+        if (!antes && obj->tipo == VAL_DICCIONARIO && idx->tipo == VAL_TEXTO) {
+            Valor *err = error_rt("ErrorRango", n->linea,
+                "El diccionario no tiene la clave '%s': con '%s=' tiene que existir antes.",
+                idx->texto, n->asignacion_indice.op);
+            valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+            return err;
+        }
+        if (antes) val = operar(antes, val, n->asignacion_indice.op, n->linea);
+    }
+    if (hay_error) {
+        valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
+        return valor_nulo();
+    }
 
     if (obj->tipo == VAL_BYTES) {
         int i = pos_bytes(obj, idx), cant = obj->bytes.cantidad;
@@ -2971,9 +3067,12 @@ static Valor *exec_intentar(Nodo *n, Entorno *e) {
         Valor *err_guardado  = valor_error;
         int retorno_guardado = hay_retorno;
         Valor *ret_guardado  = valor_retorno;
+        int salto_guardado   = hay_salto;
 
         hay_error   = 0;
         valor_error = NULL;
+        hay_retorno = 0;
+        hay_salto   = SALTO_NINGUNO;
 
         Entorno *e_fin = entorno_crear(e);
         valor_destruir(ejecutar(n->intentar.finalmente, e_fin));   /* ver la nota de NODO_LLAMADA */
@@ -2995,6 +3094,7 @@ static Valor *exec_intentar(Nodo *n, Entorno *e) {
         } else {
             valor_destruir(ret_guardado);
         }
+        if (!hay_salto && !hay_retorno && !hay_error) hay_salto = salto_guardado;
     }
 
     return valor_nulo();
@@ -3019,11 +3119,11 @@ static inline CampoClase *campo_declarado(Nodo *n, ClaseLince *c, const char *ca
     return (CampoClase *)n->cache_cd;
 }
 
-static Valor *exec_acceso(Nodo *n, Entorno *e) {
-    Valor *obj = ejecutar(n->acceso.objeto, e);
+/* obj.campo con obj ya calculado (se queda con él). Lo usan la lectura y
+   'obj.campo += v'. */
+static Valor *acceso_en(Nodo *n, Valor *obj, const char *campo, Entorno *e) {
     /* Acceso a constante de módulo */
     if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
-        const char *campo = n->acceso.campo;
         {
             int i = valor_diccionario_buscar(obj, campo);
             if (i >= 0) {
@@ -3036,7 +3136,6 @@ static Valor *exec_acceso(Nodo *n, Entorno *e) {
         return error_rt("Error", n->linea, "El módulo no tiene el campo '%s'.", campo);
     }
     if (obj->tipo == VAL_OBJETO) {
-        const char *campo = n->acceso.campo;
         int i = campo_objeto(n, obj->objeto, campo);
         if (i >= 0) {
             {
@@ -3073,7 +3172,6 @@ static Valor *exec_acceso(Nodo *n, Entorno *e) {
     }
     /* Campo estático: Clase.campo */
     if (obj->tipo == VAL_CLASE) {
-        const char *campo = n->acceso.campo;
         CampoClase *cd = buscar_campo(obj->clase, campo, 1);
         Valor *err = NULL;
         if (!cd)
@@ -3090,6 +3188,10 @@ static Valor *exec_acceso(Nodo *n, Entorno *e) {
     }
     valor_destruir(obj);
     return error_rt("ErrorTipo", n->linea, "Acceso a campo en un tipo que no es objeto.");
+}
+
+static Valor *exec_acceso(Nodo *n, Entorno *e) {
+    return acceso_en(n, ejecutar(n->acceso.objeto, e), n->acceso.campo, e);
 }
 
 /* Crea el FuncionLince de un método de clase a partir de su nodo. */
@@ -3256,6 +3358,21 @@ static Valor *exec_asignacion_campo(Nodo *n, Entorno *e) {
     }
     const char *campo = n->asignacion_campo.campo;
 
+    if (n->asignacion_campo.op[0] && !hay_error) {            /* obj.campo += v */
+        if (!obj)
+            valor_destruir(error_rt("Error", n->linea,
+                "'mi' solo se puede usar dentro de un método de una clase."));
+        else {
+            Valor *antes = acceso_en(n, valor_retener(obj), campo, e);
+            val = operar(antes, val, n->asignacion_campo.op, n->linea);
+        }
+    }
+    if (hay_error) {
+        valor_destruir(val);
+        if (propio && obj) valor_destruir(obj);
+        return valor_nulo();
+    }
+
     /* Campo estático: Clase.campo = valor */
     if (obj && obj->tipo == VAL_CLASE) {
         CampoClase *cd = buscar_campo(obj->clase, campo, 1);
@@ -3340,7 +3457,7 @@ static Valor *exec_asignacion_campo(Nodo *n, Entorno *e) {
 }
 
 static Valor *ejecutar(Nodo *n, Entorno *e) {
-    if (!n || hay_retorno || hay_error) return valor_nulo();
+    if (!n || hay_retorno || hay_error || hay_salto) return valor_nulo();
 
     switch (n->tipo) {
 
@@ -3382,8 +3499,24 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return exec_declaracion(n, e);
 
 
+        case NODO_ROMPER:
+            hay_salto = SALTO_ROMPER;
+            return valor_nulo();
+
+        case NODO_CONTINUAR:
+            hay_salto = SALTO_CONTINUAR;
+            return valor_nulo();
+
+        case NODO_PLANTILLA:
+            return exec_plantilla(n, e);
+
         case NODO_ASIGNACION: {
             Valor *v = ejecutar(n->asignacion.valor, e);
+            if (n->asignacion.op[0] && !hay_error) {      /* x += v */
+                Valor *antes = entorno_obtener_i(e, NI(n, n->asignacion.nombre), n->asignacion.nombre, n->linea);
+                v = operar(antes, v, n->asignacion.op, n->linea);
+            }
+            if (hay_error) { valor_destruir(v); return valor_nulo(); }
             entorno_asignar_i(e, NI(n, n->asignacion.nombre), n->asignacion.nombre, v, n->linea);
             return valor_nulo();
         }
@@ -3430,7 +3563,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_BLOQUE: {
             Valor *ultimo = valor_nulo();
-            for (int i = 0; i < n->bloque.cantidad && !hay_retorno && !hay_error; i++) {
+            for (int i = 0; i < n->bloque.cantidad && !hay_retorno && !hay_error && !hay_salto; i++) {
                 valor_destruir(ultimo);
                 if (_hook_sentencia) _hook_sentencia(n->bloque.sentencias[i], e);
                 ultimo = ejecutar(n->bloque.sentencias[i], e);
@@ -3453,6 +3586,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 Entorno *nuevo = entorno_crear(e);
                 r = ejecutar(n->mientras.cuerpo, nuevo);
                 entorno_destruir(nuevo);
+                if (hay_salto && fin_de_vuelta()) break;
             }
             return r;
         }
@@ -3464,6 +3598,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 Entorno *nuevo = entorno_crear(e);
                 r = ejecutar(n->hacer.cuerpo, nuevo);
                 entorno_destruir(nuevo);
+                if (hay_salto && fin_de_vuelta()) break;
                 if (hay_retorno) break;
                 Valor *cond = ejecutar(n->hacer.condicion, e);
                 int    ok   = es_verdadero(cond);
@@ -4073,6 +4208,7 @@ int interprete_ejecutar_recargable(Interprete *interp, Nodo *programa, char *men
     valor_error = NULL;
     hay_error = 0;
     hay_retorno = 0;
+    hay_salto = SALTO_NINGUNO;
     return r;
 }
 

@@ -1,0 +1,101 @@
+# TEST: += -= *= /= %=
+sea x = 1
+x += 2
+escribir(x)
+x *= 10
+escribir(x)
+x -= 5
+escribir(x)
+x /= 5
+escribir(x)
+x %= 4
+escribir(x)
+
+# Con texto, += concatena
+sea t = "lin"
+t += "ce"
+t += 1
+escribir(t)
+
+# En listas (también con índices negativos) y diccionarios
+sea l = [1, 2, 3]
+l[0] += 10
+l[-1] *= 2
+escribir(l)
+sea m = [[1, 2], [3, 4]]
+m[1][0] -= 3
+escribir(m)
+sea d = {"vida": 100, "nombre": "Ana"}
+d["vida"] -= 30
+d["nombre"] += " López"
+escribir(d)
+
+# En campos, con 'mi' dentro de un método y desde fuera
+clase Nave {
+    sea vida = 10
+    sea puntos = 0
+    funcion dano(val numero n): nulo {
+        mi.vida -= n
+    }
+}
+sea nave = Nave()
+nave.dano(3)
+nave.puntos += 50
+nave.puntos *= 2
+escribir(nave.vida)
+escribir(nave.puntos)
+sea naves = [Nave(), Nave()]
+naves[1].vida += 5
+escribir(naves[1].vida)
+
+# Con propiedades: lee con 'obtener' y escribe con 'fijar'
+clase Termometro {
+    sea grados = 20
+    obtener kelvin(): numero { devolver mi.grados + 273 }
+    fijar kelvin(val numero k): nulo { mi.grados = k - 273 }
+}
+sea term = Termometro()
+term.kelvin += 5
+escribir(term.grados)
+
+# Con un objeto que define 'sumar'
+clase Vector {
+    sea vx = 0
+    sea vy = 0
+    funcion crear(val numero a, val numero b): nulo {
+        mi.vx = a
+        mi.vy = b
+    }
+    funcion sumar(val Vector v): Vector { devolver Vector(mi.vx + v.vx, mi.vy + v.vy) }
+    funcion a_texto(): texto { devolver "(" + mi.vx + ", " + mi.vy + ")" }
+}
+sea pos = Vector(1, 2)
+pos += Vector(10, 20)
+escribir(pos)
+
+# El índice se calcula una sola vez
+sea llamadas = 0
+funcion indice(): numero {
+    llamadas++
+    devolver 0
+}
+sea c = [5]
+c[indice()] += 1
+escribir(c[0] + " " + llamadas)
+
+# En el incremento del 'para' clásico
+para (i = 0; i < 10; i += 4) { escribir("i " + i) }
+para (k = 8; k >= 1; k /= 2) { escribir("k " + k) }
+
+# Errores
+intentar { sea dd = {"a": 1}
+    dd["b"] += 1 } capturar (ErrorRango e) { escribir(e.mensaje) }
+intentar { sea s = "a"
+    s -= 1 } capturar (ErrorTipo e) { escribir(e.mensaje) }
+intentar { sea z = 1
+    z /= 0 } capturar (ErrorMatematico e) { escribir(e.mensaje) }
+intentar { sea ll = [1]
+    ll[3] += 1 } capturar (ErrorRango e) { escribir(e.mensaje) }
+intentar { no_existe += 1 } capturar (error e) { escribir(e.mensaje) }
+fijo K = 1
+intentar { K += 1 } capturar (error e) { escribir(e.mensaje) }

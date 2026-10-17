@@ -51,6 +51,8 @@ typedef enum {
     TOK_ELEGIR,
     TOK_CASO,
     TOK_OTRO,
+    TOK_ROMPER,
+    TOK_CONTINUAR,
 
     /* Módulos */
     TOK_IMPORTAR,
@@ -91,6 +93,19 @@ typedef enum {
     /* Incremento/decremento */
     TOK_MAS_MAS,
     TOK_MENOS_MENOS,
+
+    /* Asignación compuesta: += -= *= /= %= */
+    TOK_MAS_IGUAL,
+    TOK_MENOS_IGUAL,
+    TOK_POR_IGUAL,
+    TOK_ENTRE_IGUAL,
+    TOK_MODULO_IGUAL,
+
+    /* Texto con valores dentro, "Vidas: {vidas}": PLANTILLA_INICIO, TEXTO,
+       expresión, TEXTO, expresión, ..., TEXTO, PLANTILLA_FIN. Siempre
+       alternan, con un TEXTO (quizá vacío) en cada extremo. */
+    TOK_PLANTILLA_INICIO,
+    TOK_PLANTILLA_FIN,
 
     /* Delimitadores */
     TOK_PAREN_IZQ,

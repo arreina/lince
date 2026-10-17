@@ -50,6 +50,8 @@ static PalabraClave PALABRAS_CLAVE[] = {
     { "elegir",      TOK_ELEGIR           },
     { "caso",        TOK_CASO             },
     { "otro",        TOK_OTRO             },
+    { "romper",      TOK_ROMPER           },
+    { "continuar",   TOK_CONTINUAR        },
     { "importar",    TOK_IMPORTAR         },
     { "val",         TOK_VAL              },
     { "ref",         TOK_REF              },
@@ -129,6 +131,8 @@ const char *nombre_token(TipoToken tipo) {
         case TOK_ELEGIR:       return "ELEGIR";
         case TOK_CASO:         return "CASO";
         case TOK_OTRO:         return "OTRO";
+        case TOK_ROMPER:       return "ROMPER";
+        case TOK_CONTINUAR:    return "CONTINUAR";
         case TOK_IMPORTAR:     return "IMPORTAR";
         case TOK_VAL:          return "VAL";
         case TOK_REF:          return "REF";
@@ -155,6 +159,13 @@ const char *nombre_token(TipoToken tipo) {
         case TOK_MAYOR_IGUAL:  return "MAYOR_IGUAL";
         case TOK_MAS_MAS:      return "MAS_MAS";
         case TOK_MENOS_MENOS:  return "MENOS_MENOS";
+        case TOK_MAS_IGUAL:    return "MAS_IGUAL";
+        case TOK_MENOS_IGUAL:  return "MENOS_IGUAL";
+        case TOK_POR_IGUAL:    return "POR_IGUAL";
+        case TOK_ENTRE_IGUAL:  return "ENTRE_IGUAL";
+        case TOK_MODULO_IGUAL: return "MODULO_IGUAL";
+        case TOK_PLANTILLA_INICIO: return "PLANTILLA_INICIO";
+        case TOK_PLANTILLA_FIN:    return "PLANTILLA_FIN";
         case TOK_PAREN_IZQ:    return "PAREN_IZQ";
         case TOK_PAREN_DER:    return "PAREN_DER";
         case TOK_LLAVE_IZQ:    return "LLAVE_IZQ";
@@ -287,26 +298,97 @@ static void leer_numero(Lexer *l, int linea) {
     free(buf);
 }
 
+static int lexer_paso(Lexer *l);
+
+/* Texto que se va llenando sin límite de tamaño */
+typedef struct { char *s; int n, cap; } Trozo;
+
+static void trozo_poner(Trozo *t, char c) {
+    if (t->n + 1 >= t->cap) {
+        t->cap *= 2;
+        t->s   = realloc(t->s, t->cap);
+    }
+    t->s[t->n++] = c;
+    t->s[t->n]   = '\0';
+}
+
+static void error_plantilla(int linea, const char *que) {
+    fprintf(stderr,
+        "\n❌ Error en línea %d:\n"
+        "   %s\n"
+        "   Dentro de un texto, las llaves meten un valor: \"Vidas: {vidas}\".\n"
+        "   Para escribir una llave tal cual, pon \\{ (por ejemplo \"\\{\\\"x\\\": 1}\").\n\n",
+        linea, que);
+    exit(1);
+}
+
+/* Lo que va entre las llaves de "...{expresión}...": se lee con el mismo lexer
+   hasta la '}' que la cierra (las de un diccionario de dentro cuentan). */
+static void leer_hueco(Lexer *l, int linea) {
+    avanzar(l); /* '{' */
+    int primero = l->cantidad, nivel = 0;
+    for (;;) {
+        while (l->pos < l->longitud && (actual(l) == ' ' || actual(l) == '\t' ||
+                                        actual(l) == '\r' || actual(l) == '\n'))
+            avanzar(l);
+        if (l->pos >= l->longitud)
+            error_plantilla(linea, "Abriste '{' dentro de un texto pero nunca la cerraste.");
+        if (actual(l) == '}' && nivel == 0) { avanzar(l); break; }
+        if (actual(l) == '\\')
+            error_plantilla(linea, "Hay una '\\' entre llaves dentro de un texto: ¿querías escribir las llaves tal cual?");
+        if (actual(l) == '"' && nivel == 0 && l->cantidad > primero) {
+            /* Tras un valor completo no puede venir otro texto: es la comilla
+               que cierra el de fuera y a la llave le falta su '}' */
+            TipoToken u = l->tokens[l->cantidad - 1].tipo;
+            if (u == TOK_IDENTIFICADOR || u == TOK_NUMERO || u == TOK_TEXTO || u == TOK_PAREN_DER ||
+                u == TOK_CORCHETE_DER || u == TOK_LLAVE_DER || u == TOK_PLANTILLA_FIN ||
+                u == TOK_VERDADERO || u == TOK_FALSO || u == TOK_NULO)
+                error_plantilla(linea, "Abriste '{' dentro de un texto pero no la cerraste con '}'.");
+        }
+        int antes = l->cantidad;
+        lexer_paso(l);
+        if (l->cantidad == antes) continue;
+        TipoToken t = l->tokens[l->cantidad - 1].tipo;
+        if (t == TOK_LLAVE_IZQ || t == TOK_PAREN_IZQ || t == TOK_CORCHETE_IZQ) nivel++;
+        else if (t == TOK_LLAVE_DER || t == TOK_PAREN_DER || t == TOK_CORCHETE_DER) nivel--;
+        else if (t == TOK_DOS_PUNTOS && nivel == 0)
+            /* "{\"x\": 1}" escrito como si fuera JSON */
+            error_plantilla(linea, "Hay un ':' entre llaves dentro de un texto: ¿querías escribir las llaves tal cual?");
+    }
+    if (l->cantidad == primero)
+        error_plantilla(linea, "Hay unas llaves con espacios y nada dentro.");
+}
+
 static void leer_texto(Lexer *l, int linea) {
     avanzar(l); /* consumir comilla inicial */
-    char buf[4096];
-    int  bi = 0;
+    Trozo buf = { calloc(64, 1), 0, 64 };
+    int plantilla = 0;
 
     while (l->pos < l->longitud && actual(l) != '"') {
         if (actual(l) == '\\') {
             avanzar(l);
             char esc = avanzar(l);
             switch (esc) {
-                case 'n':  buf[bi++] = '\n';   break;
-                case 't':  buf[bi++] = '\t';   break;
-                case '"':  buf[bi++] = '"';    break;
-                case '\\': buf[bi++] = '\\';   break;
-                case 'e':  buf[bi++] = '\x1b'; break;  /* ESC para colores ANSI */
-                case 'r':  buf[bi++] = '\r';   break;
-                default:   buf[bi++] = esc;    break;
+                case 'n':  trozo_poner(&buf, '\n');   break;
+                case 't':  trozo_poner(&buf, '\t');   break;
+                case '"':  trozo_poner(&buf, '"');    break;
+                case '\\': trozo_poner(&buf, '\\');   break;
+                case 'e':  trozo_poner(&buf, '\x1b'); break;  /* ESC para colores ANSI */
+                case 'r':  trozo_poner(&buf, '\r');   break;
+                default:   trozo_poner(&buf, esc);    break;  /* \{ y \} son llaves tal cual */
             }
+        } else if (actual(l) == '{' && siguiente(l) == '}') {
+            /* "{}" vacío se queda como está: texto.formatear("Hola {}", x) */
+            trozo_poner(&buf, avanzar(l));
+            trozo_poner(&buf, avanzar(l));
+        } else if (actual(l) == '{') {
+            if (!plantilla) agregar_token(l, TOK_PLANTILLA_INICIO, "\"", linea);
+            plantilla = 1;
+            agregar_token(l, TOK_TEXTO, buf.s, linea);
+            buf.n = 0; buf.s[0] = '\0';
+            leer_hueco(l, l->linea);
         } else {
-            buf[bi++] = avanzar(l);
+            trozo_poner(&buf, avanzar(l));
         }
     }
 
@@ -319,8 +401,9 @@ static void leer_texto(Lexer *l, int linea) {
     }
 
     avanzar(l); /* consumir comilla final */
-    buf[bi] = '\0';
-    agregar_token(l, TOK_TEXTO, buf, linea);
+    agregar_token(l, TOK_TEXTO, buf.s, linea);
+    if (plantilla) agregar_token(l, TOK_PLANTILLA_FIN, "\"", l->linea);
+    free(buf.s);
 }
 
 static void leer_identificador(Lexer *l, int linea) {
@@ -340,72 +423,88 @@ static void leer_identificador(Lexer *l, int linea) {
 /* ─────────────────────────────────────────
    LEXER — TOKENIZAR
 ───────────────────────────────────────── */
-Token *lexer_tokenizar(Lexer *l, int *cantidad) {
-    while (l->pos < l->longitud) {
-        saltar_espacios_y_comentarios(l);
-        if (l->pos >= l->longitud) break;
+/* Lee un token (o nada, si solo quedaban espacios y comentarios). Devuelve 0
+   al llegar al final. */
+static int lexer_paso(Lexer *l) {
+    saltar_espacios_y_comentarios(l);
+    if (l->pos >= l->longitud) return 0;
 
-        int  linea = l->linea;
-        char c     = actual(l);
+    int  linea = l->linea;
+    char c     = actual(l);
 
-        if (isdigit(c)) {
-            leer_numero(l, linea);
-            continue;
-        }
-
-        if (c == '"') {
-            leer_texto(l, linea);
-            continue;
-        }
-
-        if (isalpha(c) || c == '_') {
-            leer_identificador(l, linea);
-            continue;
-        }
-
-        /* Operadores y delimitadores */
-        avanzar(l);
-        switch (c) {
-            case '=':
-                if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_IGUAL_IGUAL, "==", linea); }
-                else                  {              agregar_token(l, TOK_IGUAL,        "=",  linea); }
-                break;
-            case '!':
-                if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_DIFERENTE, "!=", linea); }
-                else                  { error_lexico(l, '!'); }
-                break;
-            case '<':
-                if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_MENOR_IGUAL, "<=", linea); }
-                else                  {              agregar_token(l, TOK_MENOR,        "<",  linea); }
-                break;
-            case '>':
-                if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_MAYOR_IGUAL, ">=", linea); }
-                else                  {              agregar_token(l, TOK_MAYOR,        ">",  linea); }
-                break;
-            case '+':
-                if (actual(l) == '+') { avanzar(l); agregar_token(l, TOK_MAS_MAS, "++", linea); }
-                else                  {              agregar_token(l, TOK_MAS,      "+",  linea); }
-                break;
-            case '-':
-                if (actual(l) == '-') { avanzar(l); agregar_token(l, TOK_MENOS_MENOS, "--", linea); }
-                else                  {              agregar_token(l, TOK_MENOS,        "-",  linea); }
-                break;
-            case '*': agregar_token(l, TOK_ASTERISCO,  "*", linea); break;
-            case '/': agregar_token(l, TOK_BARRA,       "/", linea); break;
-            case '%': agregar_token(l, TOK_MODULO,      "%", linea); break;
-            case '(': agregar_token(l, TOK_PAREN_IZQ,    "(", linea); break;
-            case ')': agregar_token(l, TOK_PAREN_DER,    ")", linea); break;
-            case '{': agregar_token(l, TOK_LLAVE_IZQ,    "{", linea); break;
-            case '}': agregar_token(l, TOK_LLAVE_DER,    "}", linea); break;
-            case '[': agregar_token(l, TOK_CORCHETE_IZQ, "[", linea); break;
-            case ']': agregar_token(l, TOK_CORCHETE_DER, "]", linea); break;
-            case ';': agregar_token(l, TOK_PUNTO_COMA,   ";", linea); break;
-            case ',': agregar_token(l, TOK_COMA,         ",", linea); break;
-            case '.': agregar_token(l, TOK_PUNTO,        ".", linea); break;
-            case ':': agregar_token(l, TOK_DOS_PUNTOS,   ":", linea); break;
-            default:  error_lexico(l, c); break;
-        }
+    if (isdigit(c)) {
+        leer_numero(l, linea);
+        return 1;
     }
+
+    if (c == '"') {
+        leer_texto(l, linea);
+        return 1;
+    }
+
+    if (isalpha(c) || c == '_') {
+        leer_identificador(l, linea);
+        return 1;
+    }
+
+    /* Operadores y delimitadores */
+    avanzar(l);
+    switch (c) {
+        case '=':
+            if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_IGUAL_IGUAL, "==", linea); }
+            else                  {              agregar_token(l, TOK_IGUAL,        "=",  linea); }
+            break;
+        case '!':
+            if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_DIFERENTE, "!=", linea); }
+            else                  { error_lexico(l, '!'); }
+            break;
+        case '<':
+            if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_MENOR_IGUAL, "<=", linea); }
+            else                  {              agregar_token(l, TOK_MENOR,        "<",  linea); }
+            break;
+        case '>':
+            if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_MAYOR_IGUAL, ">=", linea); }
+            else                  {              agregar_token(l, TOK_MAYOR,        ">",  linea); }
+            break;
+        case '+':
+            if (actual(l) == '+')      { avanzar(l); agregar_token(l, TOK_MAS_MAS,   "++", linea); }
+            else if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_MAS_IGUAL, "+=", linea); }
+            else                       {              agregar_token(l, TOK_MAS,       "+",  linea); }
+            break;
+        case '-':
+            if (actual(l) == '-')      { avanzar(l); agregar_token(l, TOK_MENOS_MENOS, "--", linea); }
+            else if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_MENOS_IGUAL, "-=", linea); }
+            else                       {              agregar_token(l, TOK_MENOS,       "-",  linea); }
+            break;
+        case '*':
+            if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_POR_IGUAL, "*=", linea); }
+            else                  {              agregar_token(l, TOK_ASTERISCO, "*",  linea); }
+            break;
+        case '/':
+            if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_ENTRE_IGUAL, "/=", linea); }
+            else                  {              agregar_token(l, TOK_BARRA,       "/",  linea); }
+            break;
+        case '%':
+            if (actual(l) == '=') { avanzar(l); agregar_token(l, TOK_MODULO_IGUAL, "%=", linea); }
+            else                  {              agregar_token(l, TOK_MODULO,       "%",  linea); }
+            break;
+        case '(': agregar_token(l, TOK_PAREN_IZQ,    "(", linea); break;
+        case ')': agregar_token(l, TOK_PAREN_DER,    ")", linea); break;
+        case '{': agregar_token(l, TOK_LLAVE_IZQ,    "{", linea); break;
+        case '}': agregar_token(l, TOK_LLAVE_DER,    "}", linea); break;
+        case '[': agregar_token(l, TOK_CORCHETE_IZQ, "[", linea); break;
+        case ']': agregar_token(l, TOK_CORCHETE_DER, "]", linea); break;
+        case ';': agregar_token(l, TOK_PUNTO_COMA,   ";", linea); break;
+        case ',': agregar_token(l, TOK_COMA,         ",", linea); break;
+        case '.': agregar_token(l, TOK_PUNTO,        ".", linea); break;
+        case ':': agregar_token(l, TOK_DOS_PUNTOS,   ":", linea); break;
+        default:  error_lexico(l, c); break;
+    }
+    return 1;
+}
+
+Token *lexer_tokenizar(Lexer *l, int *cantidad) {
+    while (lexer_paso(l)) {}
 
     agregar_token(l, TOK_EOF, NULL, l->linea);
     *cantidad = l->cantidad;

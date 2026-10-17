@@ -53,7 +53,8 @@ def errores():
 # Cada palabra reservada tiene que estar en una categoría: si el lexer gana una
 # palabra nueva y nadie la ha clasificado, el generador se queda parado.
 CONTROL = ["si", "sino", "para", "cada", "mientras", "hacer", "devolver", "producir",
-           "intentar", "capturar", "finalmente", "lanzar", "elegir", "caso", "otro"]
+           "intentar", "capturar", "finalmente", "lanzar", "elegir", "caso", "otro",
+           "romper", "continuar"]
 DECLARACION = ["sea", "fijo", "funcion", "generador", "clase", "extiende", "implementa",
                "interfaz", "enumeracion", "mi", "padre", "importar", "val", "ref"]
 TIPOS = ["numero", "texto", "logico", "lista", "diccionario"]
@@ -98,8 +99,16 @@ def gramatica():
             "comentarios": {"name": "comment.line.number-sign.lince", "match": "#.*$"},
             "cadenas": {
                 "name": "string.quoted.double.lince", "begin": "\"", "end": "\"",
-                "patterns": [{"name": "constant.character.escape.lince",
-                              "match": "\\\\(n|t|\"|\\\\)"}]},
+                "patterns": [
+                    {"name": "constant.character.escape.lince",
+                     "match": "\\\\(n|t|r|e|\"|\\\\|\\{|\\})"},
+                    # "Vidas: {vidas}" (unas llaves vacías, "{}", son texto)
+                    {"name": "meta.interpolation.lince",
+                     "begin": "\\{(?!\\})", "end": "\\}",
+                     "beginCaptures": {"0": {"name": "punctuation.section.interpolation.begin.lince"}},
+                     "endCaptures": {"0": {"name": "punctuation.section.interpolation.end.lince"}},
+                     "contentName": "source.lince.embedded",
+                     "patterns": [{"include": "$self"}]}]},
             "numeros": {"name": "constant.numeric.lince", "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|[0-9]+\\.?[0-9]*)\\b"},
             "palabras_clave_control": {
                 "name": "keyword.control.lince",
@@ -129,6 +138,7 @@ def gramatica():
                 {"name": "entity.name.function.call.lince",
                  "match": "\\b([a-z_][a-zA-Z0-9_]*)(?=\\s*\\()"}]},
             "operadores": {"patterns": [
+                {"name": "keyword.operator.assignment.compound.lince", "match": "(\\+=|-=|\\*=|/=|%=)"},
                 {"name": "keyword.operator.arithmetic.lince", "match": "(\\+\\+|--|\\+|-|\\*|/|%)"},
                 {"name": "keyword.operator.comparison.lince", "match": "(==|!=|<=|>=|<|>)"},
                 {"name": "keyword.operator.assignment.lince", "match": "(?<!=)=(?!=)"},

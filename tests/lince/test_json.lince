@@ -2,7 +2,7 @@
 importar "json"
 
 # Parsear objeto simple
-sea d = json.parsear("{\"nombre\": \"Ana\", \"edad\": 22}")
+sea d = json.parsear("\{\"nombre\": \"Ana\", \"edad\": 22}")
 escribir(d["nombre"])
 escribir(d["edad"])
 
@@ -13,13 +13,13 @@ escribir(nums[0])
 escribir(nums[2])
 
 # Parsear booleanos y nulo
-sea b = json.parsear("{\"activo\": true, \"vacio\": null, \"ok\": false}")
+sea b = json.parsear("\{\"activo\": true, \"vacio\": null, \"ok\": false}")
 escribir(b["activo"])
 escribir(b["vacio"])
 escribir(b["ok"])
 
 # Parsear objeto anidado
-sea anidado = json.parsear("{\"persona\": {\"nombre\": \"Luis\"}, \"tags\": [\"a\", \"b\", \"c\"]}")
+sea anidado = json.parsear("\{\"persona\": \{\"nombre\": \"Luis\"}, \"tags\": [\"a\", \"b\", \"c\"]}")
 escribir(anidado["persona"]["nombre"])
 escribir(anidado["tags"].longitud())
 escribir(anidado["tags"][1])
@@ -44,7 +44,7 @@ escribir(json.texto(42))
 escribir(json.texto(3.14))
 
 # Parsear y re-serializar
-sea original = "{\"x\": 1, \"y\": 2}"
+sea original = "\{\"x\": 1, \"y\": 2}"
 sea obj = json.parsear(original)
 escribir(obj["x"])
 escribir(obj["y"])

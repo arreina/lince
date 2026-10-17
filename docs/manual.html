@@ -138,12 +138,12 @@
 
 <div class="envoltorio">
 <nav id="lateral">
-<div class="grupo"><a href="#primeros-pasos" class="sec">Primeros pasos</a><a href="#primeros-pasos-0" class="sub">Hola, mundo</a><a href="#primeros-pasos-1" class="sub">Variables y constantes</a><a href="#primeros-pasos-2" class="sub">Cada nombre se define una sola vez</a><a href="#primeros-pasos-3" class="sub">Tapar un nombre en un ámbito interior</a><a href="#primeros-pasos-4" class="sub">Dónde se declaran los tipos</a></div>
-<div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-2" class="sub">Elegir / caso</a></div>
+<div class="grupo"><a href="#primeros-pasos" class="sec">Primeros pasos</a><a href="#primeros-pasos-0" class="sub">Hola, mundo</a><a href="#primeros-pasos-1" class="sub">Variables y constantes</a><a href="#primeros-pasos-2" class="sub">Operar y guardar: +=, -=, *=, /=, %=</a><a href="#primeros-pasos-3" class="sub">Cada nombre se define una sola vez</a><a href="#primeros-pasos-4" class="sub">Tapar un nombre en un ámbito interior</a><a href="#primeros-pasos-5" class="sub">Dónde se declaran los tipos</a></div>
+<div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-2" class="sub">Romper y continuar</a><a href="#control-de-flujo-3" class="sub">Elegir / caso</a></div>
 <div class="grupo"><a href="#funciones" class="sec">Funciones</a><a href="#funciones-0" class="sub">Declarar y llamar</a><a href="#funciones-1" class="sub">Valores por defecto</a><a href="#funciones-2" class="sub">Lambdas y funciones como argumento</a><a href="#funciones-3" class="sub">Closures</a></div>
 <div class="grupo"><a href="#listas" class="sec">Listas</a><a href="#listas-0" class="sub">Crear, modificar y consultar</a><a href="#listas-1" class="sub">Operaciones que devuelven una lista nueva</a><a href="#listas-2" class="sub">Ordenar con tu propio criterio</a></div>
 <div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a></div>
-<div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a></div>
+<div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a><a href="#texto-1" class="sub">Texto con valores dentro</a></div>
 <div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
@@ -153,7 +153,7 @@
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>40 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>43 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -168,7 +168,20 @@
 nombre = <span class="s">&quot;Blanca&quot;</span>
 <span class="k">escribir</span>(nombre)
 <span class="k">escribir</span>(PI)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Blanca
-3.14159</pre></div><span class="fuente">020_variables.lince</span></article><article class="ej" id="primeros-pasos-2"><h3>Cada nombre se define una sola vez</h3><p class="nota">Definir dos veces en el mismo ámbito es un error, no un descarte silencioso. Para cambiar el valor, asigna.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> contador = <span class="n">1</span>
+3.14159</pre></div><span class="fuente">020_variables.lince</span></article><article class="ej" id="primeros-pasos-2"><h3>Operar y guardar: +=, -=, *=, /=, %=</h3><p class="nota">`x += 5` es `x = x + 5`. Vale para variables, elementos de listas y diccionarios, y campos.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> puntos = <span class="n">10</span>
+puntos += <span class="n">5</span>
+puntos *= <span class="n">2</span>
+<span class="k">escribir</span>(puntos)
+
+<span class="k">sea</span> nombre = <span class="s">&quot;Lin&quot;</span>
+nombre += <span class="s">&quot;ce&quot;</span>
+<span class="k">escribir</span>(nombre)
+
+<span class="k">sea</span> vidas = {<span class="s">&quot;Ana&quot;</span>: <span class="n">3</span>, <span class="s">&quot;Luis&quot;</span>: <span class="n">3</span>}
+vidas[<span class="s">&quot;Luis&quot;</span>] -= <span class="n">1</span>
+<span class="k">escribir</span>(vidas)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>30
+Lince
+{&quot;Ana&quot;: 3, &quot;Luis&quot;: 2}</pre></div><span class="fuente">025_operar_y_guardar.lince</span></article><article class="ej" id="primeros-pasos-3"><h3>Cada nombre se define una sola vez</h3><p class="nota">Definir dos veces en el mismo ámbito es un error, no un descarte silencioso. Para cambiar el valor, asigna.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> contador = <span class="n">1</span>
 contador = <span class="n">2</span>
 <span class="k">escribir</span>(contador)
 
@@ -176,7 +189,7 @@ contador = <span class="n">2</span>
     <span class="k">sea</span> contador = <span class="n">3</span>
 } <span class="k">capturar</span> (<span class="t">error</span> e) {
     <span class="k">escribir</span>(e.mensaje)
-}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>2</pre></div><span class="fuente">030_una_vez.lince</span></article><article class="ej" id="primeros-pasos-3"><h3>Tapar un nombre en un ámbito interior</h3><p class="nota">Esto no es redefinir: es otro ámbito. El de fuera queda intacto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> visible = <span class="s">&quot;fuera&quot;</span>
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>2</pre></div><span class="fuente">030_una_vez.lince</span></article><article class="ej" id="primeros-pasos-4"><h3>Tapar un nombre en un ámbito interior</h3><p class="nota">Esto no es redefinir: es otro ámbito. El de fuera queda intacto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> visible = <span class="s">&quot;fuera&quot;</span>
 
 <span class="k">funcion</span> dentro(): <span class="t">texto</span> {
     <span class="k">sea</span> visible = <span class="s">&quot;dentro&quot;</span>
@@ -185,7 +198,7 @@ contador = <span class="n">2</span>
 
 <span class="k">escribir</span>(dentro())
 <span class="k">escribir</span>(visible)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>dentro
-fuera</pre></div><span class="fuente">040_tapar.lince</span></article><article class="ej" id="primeros-pasos-4"><h3>Dónde se declaran los tipos</h3><p class="nota">En parámetros y retorno de función son obligatorios. En `sea` son opcionales y sólo para `lista` y `diccionario`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> <span class="t">lista</span> notas = [<span class="n">9</span>, <span class="n">7</span>, <span class="n">10</span>]
+fuera</pre></div><span class="fuente">040_tapar.lince</span></article><article class="ej" id="primeros-pasos-5"><h3>Dónde se declaran los tipos</h3><p class="nota">En parámetros y retorno de función son obligatorios. En `sea` son opcionales y sólo para `lista` y `diccionario`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> <span class="t">lista</span> notas = [<span class="n">9</span>, <span class="n">7</span>, <span class="n">10</span>]
 <span class="k">sea</span> <span class="t">diccionario</span> ficha = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>}
 
 <span class="k">funcion</span> presentar(<span class="k">val</span> <span class="t">texto</span> quien, <span class="k">val</span> <span class="t">numero</span> anios): <span class="t">texto</span> {
@@ -232,7 +245,26 @@ mientras 1
 hacer 0
 hacer 1
 cada 10
-cada 20</pre></div><span class="fuente">120_bucles.lince</span></article><article class="ej" id="control-de-flujo-2"><h3>Elegir / caso</h3><p class="nota">`otro` es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
+cada 20</pre></div><span class="fuente">120_bucles.lince</span></article><article class="ej" id="control-de-flujo-2"><h3>Romper y continuar</h3><p class="nota">`romper` sale del bucle; `continuar` pasa a la vuelta siguiente. Con bucles uno dentro de otro, afectan al de dentro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> enemigos = [{<span class="s">&quot;vida&quot;</span>: <span class="n">0</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">5</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">8</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">2</span>}]
+
+<span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> enemigos {
+    <span class="k">si</span> e[<span class="s">&quot;vida&quot;</span>] == <span class="n">0</span> { <span class="k">continuar</span> }     <span class="c"># los muertos no cuentan</span>
+    <span class="k">escribir</span>(<span class="s">&quot;vivo con &quot;</span> + e[<span class="s">&quot;vida&quot;</span>])
+    <span class="k">si</span> e[<span class="s">&quot;vida&quot;</span>] &gt; <span class="n">6</span> {
+        <span class="k">escribir</span>(<span class="s">&quot;¡uno fuerte! dejo de mirar&quot;</span>)
+        <span class="k">romper</span>
+    }
+}
+
+<span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">20</span>; i += <span class="n">5</span>) {
+    <span class="k">escribir</span>(i)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>vivo con 5
+vivo con 8
+¡uno fuerte! dejo de mirar
+0
+5
+10
+15</pre></div><span class="fuente">125_romper.lince</span></article><article class="ej" id="control-de-flujo-3"><h3>Elegir / caso</h3><p class="nota">`otro` es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
 
 <span class="k">elegir</span> animal {
     <span class="k">caso</span> <span class="s">&quot;gato&quot;</span>  { <span class="k">escribir</span>(<span class="s">&quot;miau&quot;</span>) }
@@ -314,7 +346,15 @@ ciudad = Córdoba</pre></div><span class="fuente">410_diccionarios.lince</span><
 <span class="k">escribir</span>(<span class="t">texto</span>.repetir(<span class="s">&quot;ab&quot;</span>, <span class="n">3</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>17
 AÑO DE LA CIGÜEÑA
 [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]
-ababab</pre></div><span class="fuente">510_texto.lince</span></article></section>
+ababab</pre></div><span class="fuente">510_texto.lince</span></article><article class="ej" id="texto-1"><h3>Texto con valores dentro</h3><p class="nota">Entre llaves va cualquier expresión. Para una llave tal cual, `\{`; unas llaves vacías `{}` se quedan como están.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nombre = <span class="s">&quot;Ana&quot;</span>
+<span class="k">sea</span> vidas = <span class="n">3</span>
+<span class="k">escribir</span>(<span class="s">&quot;{nombre} tiene {vidas} vidas&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;y {vidas * 100} puntos, {nombre.longitud()} letras&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;lista: {[1, 2, 3]}&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;\{\&quot;</span>vidas\<span class="s">&quot;: {vidas}}&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Ana tiene 3 vidas
+y 300 puntos, 3 letras
+lista: [1, 2, 3]
+{&quot;vidas&quot;: 3}</pre></div><span class="fuente">515_texto_con_valores.lince</span></article></section>
 <section id="clases"><h2>Clases</h2><article class="ej" id="clases-0"><h3>Clase, constructor y métodos</h3><p class="nota">`mi` es la instancia actual. El constructor se llama `crear`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Rectangulo {
     <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> ancho, <span class="k">val</span> <span class="t">numero</span> alto): <span class="k">nulo</span> {
         <span class="k">mi</span>.ancho = ancho

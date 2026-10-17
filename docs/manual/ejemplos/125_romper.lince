@@ -1,0 +1,17 @@
+# @seccion: Control de flujo
+# @titulo: Romper y continuar
+# @nota: `romper` sale del bucle; `continuar` pasa a la vuelta siguiente. Con bucles uno dentro de otro, afectan al de dentro.
+sea enemigos = [{"vida": 0}, {"vida": 5}, {"vida": 8}, {"vida": 2}]
+
+para cada diccionario e en enemigos {
+    si e["vida"] == 0 { continuar }     # los muertos no cuentan
+    escribir("vivo con " + e["vida"])
+    si e["vida"] > 6 {
+        escribir("¡uno fuerte! dejo de mirar")
+        romper
+    }
+}
+
+para (i = 0; i < 20; i += 5) {
+    escribir(i)
+}

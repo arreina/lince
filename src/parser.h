@@ -52,6 +52,9 @@ typedef enum {
     NODO_INTERFAZ,           /* interfaz Forma { funcion area(): numero } */
     NODO_GENERADOR,          /* generador contar(val numero n): numero { producir i } */
     NODO_PRODUCIR,           /* producir valor */
+    NODO_ROMPER,             /* romper: sale del bucle */
+    NODO_CONTINUAR,          /* continuar: pasa a la vuelta siguiente */
+    NODO_PLANTILLA,          /* "Vidas: {vidas}": usa 'lista' (trozos de texto y expresiones) */
 } TipoNodo;
 
 /* ─────────────────────────────────────────
@@ -133,6 +136,7 @@ struct Nodo {
         struct {
             char *nombre;
             Nodo *valor;
+            char  op[4];           /* "" con '=', "+" con '+=', "-" con '-='... */
         } asignacion;
 
         /* NODO_INCREMENTO */
@@ -179,6 +183,7 @@ struct Nodo {
             Nodo *condicion;
             char *var_incremento;
             char  op_incremento[4];
+            Nodo *paso;            /* con 'i += 2': la asignación; NULL con ++ y -- */
             Nodo *cuerpo;
         } para;
 
@@ -241,6 +246,7 @@ struct Nodo {
             Nodo *objeto;
             Nodo *indice;
             Nodo *valor;
+            char  op[4];           /* como en 'asignacion' */
         } asignacion_indice;
 
         /* NODO_METODO: objeto.metodo(args) */
@@ -282,6 +288,7 @@ struct Nodo {
             Nodo *objeto;
             char *campo;
             Nodo *valor;
+            char  op[4];           /* como en 'asignacion' */
         } asignacion_campo;
 
         /* NODO_PADRE: padre(args) */
@@ -364,6 +371,7 @@ typedef struct {
     Token *tokens;
     int    cantidad;
     int    pos;
+    int    bucles;   /* bucles abiertos en la función actual (para 'romper') */
 } Parser;
 
 /* ─────────────────────────────────────────

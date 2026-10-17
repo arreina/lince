@@ -1,0 +1,9 @@
+# @seccion: Texto
+# @titulo: Texto con valores dentro
+# @nota: Entre llaves va cualquier expresión. Para una llave tal cual, `\{`; unas llaves vacías `{}` se quedan como están.
+sea nombre = "Ana"
+sea vidas = 3
+escribir("{nombre} tiene {vidas} vidas")
+escribir("y {vidas * 100} puntos, {nombre.longitud()} letras")
+escribir("lista: {[1, 2, 3]}")
+escribir("\{\"vidas\": {vidas}}")

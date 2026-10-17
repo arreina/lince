@@ -26,6 +26,7 @@ Lince es un lenguaje de programación **para videojuegos, en español**, impleme
 | `para` | for clásico |
 | `cada` | usado con `para cada` |
 | `mientras` | while |
+| `romper` / `continuar` | break / continue |
 | `hacer` | do (do-while) |
 | `elegir` / `caso` / `otro` | switch / case / default |
 | `clase` / `extiende` / `implementa` | class / extends / implements |
@@ -105,6 +106,7 @@ funcion f(): texto {
 | `+` | suma / concatenación de texto |
 | `-` `*` `/` `%` | resta, multiplicación, división, módulo |
 | `++` `--` | incremento / decremento |
+| `+=` `-=` `*=` `/=` `%=` | operar y guardar: `x += 5` es `x = x + 5` |
 | `==` `!=` `<` `>` `<=` `>=` | comparación |
 | `y` `o` `no` | lógicos |
 
@@ -141,6 +143,24 @@ escribir(doble(5))  # 10
 funcion aplicar(val numero x, val funcion f): numero { devolver f(x) }
 escribir(aplicar(5, doble))  # 10
 ```
+
+### Asignación compuesta
+
+`+=`, `-=`, `*=`, `/=` y `%=` operan y guardan en un solo paso, en
+variables, elementos y campos:
+
+```lince
+x += vx * dt            # x = x + vx * dt
+puntos *= 2
+nombre += "!"           # con texto, concatena
+vidas[jugador] -= 1     # en una lista o un diccionario
+mi.energia += 10        # en un campo
+pos += Vector(1, 0)     # con objetos, usa el método 'sumar' de su clase
+```
+
+El índice y el objeto se calculan una sola vez (`l[f()] += 1` llama a `f`
+una vez). En un diccionario la clave tiene que existir: `d["nueva"] += 1`
+da `ErrorRango`.
 
 ### Reglas
 
@@ -223,6 +243,32 @@ para cada texto clave en diccionario { escribir(clave) }
 para cada texto c en "hola" { escribir(c) }
 ```
 
+El incremento del `para` clásico también puede ser `i += 2`, `i -= 5`,
+`i *= 2`...: `para (i = 0; i < 100; i += 10) { ... }`.
+
+### `romper` y `continuar`
+
+`romper` sale del bucle en el que está; `continuar` se salta lo que queda de
+la vuelta y pasa a la siguiente (en el `para` clásico, después del
+incremento; en `hacer`, después de mirar la condición):
+
+```lince
+para cada enemigo e en enemigos {
+    si e["muerto"] { continuar }      # este no cuenta
+    si colision(jugador, e) {
+        vidas -= 1
+        romper                        # con un golpe por fotograma basta
+    }
+}
+```
+
+- Con bucles uno dentro de otro, solo sale del de **dentro**.
+- Dentro de un `elegir`, sale del bucle que lo rodea (no hay que "romper"
+  cada `caso`, que nunca siguen de uno a otro).
+- Un `finalmente` se ejecuta igual, aunque se salga con `romper`.
+- Fuera de un bucle es un error de sintaxis. Una función definida dentro de
+  un bucle tampoco puede romperlo: el bucle es de quien la llama.
+
 ---
 
 ## Listas
@@ -284,6 +330,27 @@ d.eliminar("edad")
 ```
 
 ---
+
+## Texto con valores dentro
+
+Entre llaves, dentro de un texto, va cualquier expresión, y su valor se
+escribe en ese sitio tal como lo haría `escribir`:
+
+```lince
+escribir("Vidas: {vidas}")
+escribir("{nombre} tiene {puntos * 10} puntos")
+juego.texto("Nivel {nivel + 1} de {niveles.longitud()}", 10, 10)
+escribir("posición {pos}")      # un objeto se escribe con su a_texto()
+```
+
+Es lo mismo que sumar trozos (`"Vidas: " + vidas`), pero se lee mejor y no
+hace falta `a_texto`.
+
+- Para escribir una llave tal cual se pone `\{`: `"\{\"x\": {x}}"` da
+  `{"x": 5}`. La `}` sola no hace falta escaparla.
+- Unas llaves vacías, `{}`, se quedan como están (`texto.formato` las usa).
+- Si lo de dentro no es una expresión (por ejemplo, JSON escrito sin `\{`),
+  el error lo dice y recuerda lo de `\{`.
 
 ## Texto — métodos
 
@@ -723,10 +790,14 @@ sistema.salir(0)
 ### `json`
 
 ```lince
-sea datos = json.parsear("{\"nombre\": \"Ana\"}")
+sea datos = json.parsear("\{\"nombre\": \"Ana\"}")   # \{: la llave tal cual
 escribir(datos["nombre"])
 escribir(json.texto({"clave": "valor"}))
 ```
+
+Lo normal es leer el JSON de un archivo (`json.parsear(archivos.leer("datos.json"))`);
+escrito dentro de un texto, cada `{` lleva delante `\` para que no se tome por
+un valor metido en el texto (ver «Texto con valores dentro»).
 
 ### Fechas (`tiempo`)
 

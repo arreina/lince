@@ -61,7 +61,28 @@
       "patterns": [
         {
           "name": "constant.character.escape.lince",
-          "match": "\\\\(n|t|\"|\\\\)"
+          "match": "\\\\(n|t|r|e|\"|\\\\|\\{|\\})"
+        },
+        {
+          "name": "meta.interpolation.lince",
+          "begin": "\\{(?!\\})",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.begin.lince"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.section.interpolation.end.lince"
+            }
+          },
+          "contentName": "source.lince.embedded",
+          "patterns": [
+            {
+              "include": "$self"
+            }
+          ]
         }
       ]
     },
@@ -71,7 +92,7 @@
     },
     "palabras_clave_control": {
       "name": "keyword.control.lince",
-      "match": "\\b(si|sino|para|cada|mientras|hacer|devolver|producir|intentar|capturar|finalmente|lanzar|elegir|caso|otro|en)\\b"
+      "match": "\\b(si|sino|para|cada|mientras|hacer|devolver|producir|intentar|capturar|finalmente|lanzar|elegir|caso|otro|romper|continuar|en)\\b"
     },
     "palabras_clave_declaracion": {
       "name": "keyword.declaration.lince",
@@ -131,6 +152,10 @@
     },
     "operadores": {
       "patterns": [
+        {
+          "name": "keyword.operator.assignment.compound.lince",
+          "match": "(\\+=|-=|\\*=|/=|%=)"
+        },
         {
           "name": "keyword.operator.arithmetic.lince",
           "match": "(\\+\\+|--|\\+|-|\\*|/|%)"

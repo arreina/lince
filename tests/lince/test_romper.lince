@@ -1,0 +1,109 @@
+# TEST: romper y continuar
+importar "archivos"
+importar "sistema"
+
+# para cada: continuar salta la vuelta, romper sale
+para cada numero k en rango(10) {
+    si k == 2 { continuar }
+    si k == 5 { romper }
+    escribir("cada " + k)
+}
+
+# mientras
+sea j = 0
+mientras verdadero {
+    j++
+    si j % 2 == 0 { continuar }
+    si j > 6 { romper }
+    escribir("mientras " + j)
+}
+
+# hacer / mientras: continuar vuelve a mirar la condición
+sea h = 0
+hacer {
+    h++
+    si h == 2 { continuar }
+    escribir("hacer " + h)
+} mientras (h < 4)
+
+# para clásico: continuar no se salta el incremento
+para (i = 0; i < 6; i++) {
+    si i % 2 == 1 { continuar }
+    si i == 4 { romper }
+    escribir("para " + i)
+}
+
+# texto y diccionario también
+para cada texto c en "lince" {
+    si c == "n" { romper }
+    escribir(c)
+}
+para cada texto clave en {"a": 1, "b": 2, "c": 3} {
+    si clave == "b" { continuar }
+    escribir("clave " + clave)
+}
+
+# Solo sale del bucle de dentro
+para cada numero a en rango(3) {
+    para cada numero b en rango(3) {
+        si b == 1 { romper }
+        escribir("par " + a + "," + b)
+    }
+}
+
+# Dentro de 'elegir' sale del bucle, no del elegir
+para cada numero v en [1, 2, 3, 4] {
+    elegir v {
+        caso 2 { continuar }
+        caso 3 { romper }
+        otro { escribir("elegir " + v) }
+    }
+}
+
+# 'finalmente' se ejecuta aunque se rompa el bucle
+para cada numero v en [1, 2] {
+    intentar {
+        si v == 1 { continuar }
+        romper
+    } capturar (error e) {
+        escribir("no debería")
+    } finalmente {
+        escribir("finalmente " + v)
+    }
+}
+
+# En una función, con 'devolver' después
+funcion primero_par(val lista l): numero {
+    sea encontrado = -1
+    para cada numero x en l {
+        si x % 2 == 0 {
+            encontrado = x
+            romper
+        }
+    }
+    devolver encontrado
+}
+escribir("primer par: " + primero_par([3, 5, 8, 10]))
+
+# El bucle de un juego: se sale con romper
+sea vueltas = 0
+mientras verdadero {
+    vueltas++
+    si vueltas == 3 { romper }
+}
+escribir("vueltas: " + vueltas)
+
+# Fuera de un bucle es un error de sintaxis, también dentro de una función
+# que está dentro de un bucle (no puede romper el bucle de quien la llama)
+fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
+fijo TMP = "test_romper_tmp.lince"
+funcion comprobar(val texto codigo): nulo {
+    archivos.escribir(TMP, codigo)
+    sea salida = sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1")
+    escribir(salida.contiene("solo puede ir dentro de un bucle"))
+}
+comprobar("romper\n")
+comprobar("continuar\n")
+comprobar("mientras verdadero \{\n funcion f(): nulo \{ romper }\n}\n")
+comprobar("para cada numero x en [1] \{\n sea f = funcion(): nulo \{ continuar }\n}\n")
+archivos.eliminar(TMP)

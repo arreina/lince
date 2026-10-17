@@ -83,6 +83,35 @@ static Nodo *sent_generador(Parser *p);
 /* ─────────────────────────────────────────
    POSTFIJO: obj[i], obj.metodo(), obj.campo
 ───────────────────────────────────────── */
+/* El cuerpo de una función empieza sin bucles abiertos: un 'romper' dentro
+   de una función no puede salir de un bucle de quien la llama. */
+static Nodo *cuerpo_funcion(Parser *p) {
+    int antes = p->bucles;
+    p->bucles = 0;
+    Nodo *c = bloque(p);
+    p->bucles = antes;
+    return c;
+}
+
+static Nodo *cuerpo_bucle(Parser *p) {
+    p->bucles++;
+    Nodo *c = bloque(p);
+    p->bucles--;
+    return c;
+}
+
+/* += -= *= /= %=: el operador que hay que aplicar ("+", "-"...), o NULL */
+static const char *op_compuesto(TipoToken t) {
+    switch (t) {
+        case TOK_MAS_IGUAL:    return "+";
+        case TOK_MENOS_IGUAL:  return "-";
+        case TOK_POR_IGUAL:    return "*";
+        case TOK_ENTRE_IGUAL:  return "/";
+        case TOK_MODULO_IGUAL: return "%";
+        default:               return NULL;
+    }
+}
+
 static Nodo *postfijo(Parser *p, Nodo *base) {
     while (1) {
         /* Si el base es un NODO_ACCESO y viene '(' — convertir a NODO_METODO */
@@ -215,7 +244,7 @@ static Nodo *primario(Parser *p) {
         consumir(p, TOK_DOS_PUNTOS, "':'");
         char *tipo_ret_clase = NULL;
         TipoDato tipo_retorno = parsear_tipo(p, &tipo_ret_clase);
-        Nodo *cuerpo = bloque(p);
+        Nodo *cuerpo = cuerpo_funcion(p);
 
         Nodo *n = nodo_nuevo(NODO_LAMBDA, p);
         n->lambda.parametros         = params;
@@ -268,6 +297,29 @@ static Nodo *primario(Parser *p) {
         Nodo *n = nodo_nuevo(NODO_NUMERO, p);
         n->numero = atof(t->valor);
         return n;
+    }
+
+    /* Texto con valores dentro: "Vidas: {vidas}". El lexer deja los trozos
+       alternos: TEXTO, expresión, TEXTO, ..., TEXTO. */
+    if (coincide(p, TOK_PLANTILLA_INICIO)) {
+        consumir_cualquiera(p);
+        int cap = 8, cant = 0;
+        Nodo **partes = malloc(sizeof(Nodo*) * cap);
+        for (;;) {
+            Token *tt = consumir(p, TOK_TEXTO, "'}' para cerrar el valor metido en el texto");
+            if (cant + 2 > cap) { cap *= 2; partes = realloc(partes, sizeof(Nodo*) * cap); }
+            if (tt->valor[0]) {
+                Nodo *tx = nodo_nuevo(NODO_TEXTO, p);
+                tx->texto = strdup(tt->valor);
+                partes[cant++] = tx;
+            }
+            if (coincide(p, TOK_PLANTILLA_FIN)) { consumir_cualquiera(p); break; }
+            partes[cant++] = expresion(p);
+        }
+        Nodo *n = nodo_nuevo(NODO_PLANTILLA, p);
+        n->lista.elementos = partes;
+        n->lista.cantidad  = cant;
+        return postfijo(p, n);
     }
 
     /* Texto */
@@ -523,10 +575,12 @@ static Nodo *expresion(Parser *p) {
 ───────────────────────────────────────── */
 static Nodo *bloque(Parser *p) {
     consumir(p, TOK_LLAVE_IZQ, "'{'");
-    Nodo **sentencias = malloc(sizeof(Nodo*) * 256);
+    int cap = 16;
+    Nodo **sentencias = malloc(sizeof(Nodo*) * cap);
     int cantidad = 0;
 
     while (!coincide(p, TOK_LLAVE_DER) && !coincide(p, TOK_EOF)) {
+        if (cantidad == cap) { cap *= 2; sentencias = realloc(sentencias, sizeof(Nodo*) * cap); }
         sentencias[cantidad++] = sentencia(p);
     }
     consumir(p, TOK_LLAVE_DER, "'}'");
@@ -570,12 +624,13 @@ static Nodo *sent_declaracion(Parser *p, int constante) {
 
 static Nodo *sent_asignacion(Parser *p) {
     Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de variable");
-    consumir(p, TOK_IGUAL, "'='");
+    const char *op = op_compuesto(consumir_cualquiera(p)->tipo);   /* '=' o '+='... */
     Nodo *valor = expresion(p);
 
     Nodo *n = nodo_nuevo(NODO_ASIGNACION, p);
     n->asignacion.nombre = strdup(nombre->valor);
     n->asignacion.valor  = valor;
+    if (op) strcpy(n->asignacion.op, op);
     return n;
 }
 
@@ -626,7 +681,7 @@ static Nodo *sent_si(Parser *p) {
 static Nodo *sent_mientras(Parser *p) {
     consumir(p, TOK_MIENTRAS, "'mientras'");
     Nodo *condicion = expresion(p);
-    Nodo *cuerpo    = bloque(p);
+    Nodo *cuerpo    = cuerpo_bucle(p);
 
     Nodo *n = nodo_nuevo(NODO_MIENTRAS, p);
     n->mientras.condicion = condicion;
@@ -636,7 +691,7 @@ static Nodo *sent_mientras(Parser *p) {
 
 static Nodo *sent_hacer(Parser *p) {
     consumir(p, TOK_HACER, "'hacer'");
-    Nodo *cuerpo = bloque(p);
+    Nodo *cuerpo = cuerpo_bucle(p);
     consumir(p, TOK_MIENTRAS, "'mientras'");
     consumir(p, TOK_PAREN_IZQ, "'('");
     Nodo *condicion = expresion(p);
@@ -675,7 +730,7 @@ static Nodo *sent_para(Parser *p) {
 
         /* colección */
         Nodo *coleccion = expresion(p);
-        Nodo *cuerpo    = bloque(p);
+        Nodo *cuerpo    = cuerpo_bucle(p);
 
         Nodo *n = nodo_nuevo(NODO_PARA_CADA, p);
         n->para_cada.tipo       = tipo;
@@ -696,14 +751,22 @@ static Nodo *sent_para(Parser *p) {
     consumir(p, TOK_PUNTO_COMA, "';'");
     Token *var_inc = consumir(p, TOK_IDENTIFICADOR, "variable de incremento");
     Token *op_inc;
+    Nodo  *paso = NULL;
     if (coincide(p, TOK_MAS_MAS) || coincide(p, TOK_MENOS_MENOS)) {
         op_inc = consumir_cualquiera(p);
+    } else if (op_compuesto(actual(p)->tipo)) {
+        /* para (i = 0; i < 10; i += 2) */
+        op_inc = consumir_cualquiera(p);
+        paso = nodo_nuevo(NODO_ASIGNACION, p);
+        paso->asignacion.nombre = strdup(var_inc->valor);
+        strcpy(paso->asignacion.op, op_compuesto(op_inc->tipo));
+        paso->asignacion.valor = expresion(p);
     } else {
-        error_sintaxis(p, "Se esperaba '++' o '--' en el incremento del bucle 'para'.");
+        error_sintaxis(p, "Se esperaba '++', '--' o algo como '+= 2' en el incremento del bucle 'para'.");
         return NULL;
     }
     consumir(p, TOK_PAREN_DER, "')'");
-    Nodo *cuerpo = bloque(p);
+    Nodo *cuerpo = cuerpo_bucle(p);
 
     Nodo *n = nodo_nuevo(NODO_PARA, p);
     n->para.var_inicio     = strdup(var->valor);
@@ -711,6 +774,7 @@ static Nodo *sent_para(Parser *p) {
     n->para.condicion      = condicion;
     n->para.var_incremento = strdup(var_inc->valor);
     strncpy(n->para.op_incremento, op_inc->valor, 3);
+    n->para.paso           = paso;
     n->para.cuerpo         = cuerpo;
     return n;
 }
@@ -792,7 +856,7 @@ static Nodo *funcion_desde_parametros(Parser *p, Token *nombre, int sin_cuerpo_o
     char *tipo_ret_clase = NULL;
     TipoDato tipo_retorno = parsear_tipo(p, &tipo_ret_clase);
 
-    Nodo *cuerpo = (sin_cuerpo_ok && !coincide(p, TOK_LLAVE_IZQ)) ? NULL : bloque(p);
+    Nodo *cuerpo = (sin_cuerpo_ok && !coincide(p, TOK_LLAVE_IZQ)) ? NULL : cuerpo_funcion(p);
 
     Nodo *n = nodo_nuevo(NODO_FUNCION, p);
     n->funcion.nombre             = strdup(nombre->valor);
@@ -1116,7 +1180,7 @@ static Nodo *sent_generador(Parser *p) {
     char *tipo_clase = NULL;
     TipoDato tipo_retorno = parsear_tipo(p, &tipo_clase);
     (void)tipo_clase;
-    Nodo *cuerpo = bloque(p);
+    Nodo *cuerpo = cuerpo_funcion(p);
 
     Nodo *n = nodo_nuevo(NODO_GENERADOR, p);
     n->generador.nombre         = strdup(nombre->valor);
@@ -1195,6 +1259,35 @@ static Nodo *sent_intentar(Parser *p) {
     return n;
 }
 
+/* Una cadena ya leída (lista[i], a[i][j], obj.campo, mi.a.b...): si le sigue
+   '=' o '+='..., su último eslabón es lo que se asigna; si no, es una
+   expresión usada como sentencia. */
+static Nodo *asignar_a_cadena(Parser *p, Nodo *base) {
+    if (!coincide(p, TOK_IGUAL) && !op_compuesto(actual(p)->tipo)) return base;
+    const char *op = op_compuesto(consumir_cualquiera(p)->tipo);
+    Nodo *valor = expresion(p);
+    if (base->tipo == NODO_INDICE) {
+        Nodo *n = nodo_nuevo(NODO_ASIGNACION_INDICE, p);
+        n->asignacion_indice.objeto = base->acceso_indice.objeto;
+        n->asignacion_indice.indice = base->acceso_indice.indice;
+        n->asignacion_indice.valor  = valor;
+        if (op) strcpy(n->asignacion_indice.op, op);
+        free(base);
+        return n;
+    }
+    if (base->tipo == NODO_ACCESO) {
+        Nodo *n = nodo_nuevo(NODO_ASIGNACION_CAMPO, p);
+        n->asignacion_campo.objeto = base->acceso.objeto;
+        n->asignacion_campo.campo  = base->acceso.campo;
+        n->asignacion_campo.valor  = valor;
+        if (op) strcpy(n->asignacion_campo.op, op);
+        free(base);
+        return n;
+    }
+    error_sintaxis(p, "A esto no se le puede asignar un valor: solo a una variable, a un elemento (lista[i]) o a un campo (objeto.campo).");
+    return NULL;
+}
+
 static Nodo *sentencia_interna(Parser *p) {
     if (coincide(p, TOK_SEA))      return sent_declaracion(p, 0);
     if (coincide(p, TOK_FIJO))     return sent_declaracion(p, 1);
@@ -1244,6 +1337,16 @@ static Nodo *sentencia_interna(Parser *p) {
         return n;
     }
 
+    if (coincide(p, TOK_ROMPER) || coincide(p, TOK_CONTINUAR)) {
+        int romper = coincide(p, TOK_ROMPER);
+        if (p->bucles == 0)
+            error_sintaxis(p, romper
+                ? "'romper' solo puede ir dentro de un bucle (mientras, hacer, para o para cada)."
+                : "'continuar' solo puede ir dentro de un bucle (mientras, hacer, para o para cada).");
+        consumir_cualquiera(p);
+        return nodo_nuevo(romper ? NODO_ROMPER : NODO_CONTINUAR, p);
+    }
+
     if (coincide(p, TOK_INTENTAR))    return sent_intentar(p);
     if (coincide(p, TOK_LANZAR))      return sent_lanzar(p);
     if (coincide(p, TOK_IMPORTAR))    return sent_importar(p);
@@ -1284,29 +1387,17 @@ static Nodo *sentencia_interna(Parser *p) {
         consumir(p, TOK_MI, "'mi'");
         consumir(p, TOK_PUNTO, "'.'");
         Token *campo = consumir(p, TOK_IDENTIFICADOR, "nombre de campo");
-        /* ¿Es asignación o llamada? */
-        if (coincide(p, TOK_IGUAL)) {
-            consumir(p, TOK_IGUAL, "'='");
-            Nodo *valor = expresion(p);
-            Nodo *obj = nodo_nuevo(NODO_ESTO, p);
-            Nodo *n = nodo_nuevo(NODO_ASIGNACION_CAMPO, p);
-            n->asignacion_campo.objeto = obj;
-            n->asignacion_campo.campo  = strdup(campo->valor);
-            n->asignacion_campo.valor  = valor;
-            return n;
-        }
-        /* Es acceso a campo o método como sentencia */
         Nodo *obj = nodo_nuevo(NODO_ESTO, p);
         Nodo *acc = nodo_nuevo(NODO_ACCESO, p);
         acc->acceso.objeto = obj;
         acc->acceso.campo  = strdup(campo->valor);
-        return postfijo(p, acc);
+        return asignar_a_cadena(p, postfijo(p, acc));
     }
 
     /* Asignación, incremento, o asignación a índice */
     if (coincide(p, TOK_IDENTIFICADOR)) {
         TipoToken sig = ver_siguiente(p)->tipo;
-        if (sig == TOK_IGUAL)                              return sent_asignacion(p);
+        if (sig == TOK_IGUAL || op_compuesto(sig))         return sent_asignacion(p);
         if (sig == TOK_MAS_MAS || sig == TOK_MENOS_MENOS) {
             Token *var = consumir_cualquiera(p);
             Token *op  = consumir_cualquiera(p);
@@ -1323,27 +1414,7 @@ static Nodo *sentencia_interna(Parser *p) {
             Token *var = consumir_cualquiera(p);
             Nodo *base = nodo_nuevo(NODO_IDENTIFICADOR, p);
             base->identificador = strdup(var->valor);
-            base = postfijo(p, base);
-            if (!coincide(p, TOK_IGUAL)) return base;
-            consumir(p, TOK_IGUAL, "'='");
-            Nodo *valor = expresion(p);
-            if (base->tipo == NODO_INDICE) {
-                Nodo *n = nodo_nuevo(NODO_ASIGNACION_INDICE, p);
-                n->asignacion_indice.objeto = base->acceso_indice.objeto;
-                n->asignacion_indice.indice = base->acceso_indice.indice;
-                n->asignacion_indice.valor  = valor;
-                free(base);
-                return n;
-            }
-            if (base->tipo == NODO_ACCESO) {
-                Nodo *n = nodo_nuevo(NODO_ASIGNACION_CAMPO, p);
-                n->asignacion_campo.objeto = base->acceso.objeto;
-                n->asignacion_campo.campo  = base->acceso.campo;
-                n->asignacion_campo.valor  = valor;
-                free(base);
-                return n;
-            }
-            error_sintaxis(p, "A esto no se le puede asignar un valor: solo a una variable, a un elemento (lista[i]) o a un campo (objeto.campo).");
+            return asignar_a_cadena(p, postfijo(p, base));
         }
     }
 
@@ -1373,6 +1444,7 @@ Parser *parser_crear(Token *tokens, int cantidad) {
     p->tokens   = tokens;
     p->cantidad = cantidad;
     p->pos      = 0;
+    p->bucles   = 0;
     return p;
 }
 
@@ -1381,10 +1453,12 @@ void parser_destruir(Parser *p) {
 }
 
 Nodo *parser_parsear(Parser *p) {
-    Nodo **sentencias = malloc(sizeof(Nodo*) * 1024);
+    int    cap        = 64;
+    Nodo **sentencias = malloc(sizeof(Nodo*) * cap);
     int    cantidad   = 0;
 
     while (!coincide(p, TOK_EOF)) {
+        if (cantidad == cap) { cap *= 2; sentencias = realloc(sentencias, sizeof(Nodo*) * cap); }
         sentencias[cantidad++] = sentencia(p);
     }
 
@@ -1448,7 +1522,13 @@ void nodo_destruir(Nodo *n) {
             nodo_destruir(n->para.val_inicio);
             nodo_destruir(n->para.condicion);
             free(n->para.var_incremento);
+            nodo_destruir(n->para.paso);
             nodo_destruir(n->para.cuerpo);
+            break;
+        case NODO_PLANTILLA:
+            for (int i = 0; i < n->lista.cantidad; i++)
+                nodo_destruir(n->lista.elementos[i]);
+            free(n->lista.elementos);
             break;
         case NODO_FUNCION:
             free(n->funcion.nombre);
@@ -1509,7 +1589,7 @@ void nodo_imprimir(Nodo *n, int nivel) {
             nodo_imprimir(n->declaracion.valor, nivel + 1);
             break;
         case NODO_ASIGNACION:
-            printf("Asignacion(%s)\n", n->asignacion.nombre);
+            printf("Asignacion(%s %s=)\n", n->asignacion.nombre, n->asignacion.op);
             nodo_imprimir(n->asignacion.valor, nivel + 1);
             break;
         case NODO_INCREMENTO:
@@ -1554,6 +1634,13 @@ void nodo_imprimir(Nodo *n, int nivel) {
         case NODO_DEVOLVER:
             printf("Devolver\n");
             nodo_imprimir(n->devolver, nivel + 1);
+            break;
+        case NODO_ROMPER:    printf("Romper\n"); break;
+        case NODO_CONTINUAR: printf("Continuar\n"); break;
+        case NODO_PLANTILLA:
+            printf("Plantilla(%d trozos)\n", n->lista.cantidad);
+            for (int i = 0; i < n->lista.cantidad; i++)
+                nodo_imprimir(n->lista.elementos[i], nivel + 1);
             break;
         default:
             printf("Nodo desconocido\n"); break;
