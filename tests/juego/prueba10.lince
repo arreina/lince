@@ -1,0 +1,75 @@
+# Prueba de caja(): el rectángulo de lo que se ve de cada cuadro (sin el
+# hueco transparente de la celda), con las mismas opciones que dibujar(), y
+# colision() / dentro() con cajas.
+importar "juego"
+juego.abrir("Caja", 100, 60)
+# dos cuadros de 6×4: el primero se ve en x 1-2, y 1-3; el segundo en x 3-5, y 0-1
+fijo DIBUJO = juego.sprite([
+    ".........BBB",
+    ".AA......BBB",
+    ".AA.........",
+    ".AA........."
+], {"A": [255, 0, 0], "B": [0, 0, 255]})
+fijo HOJA = juego.hoja(DIBUJO, {"columnas": 2})
+
+funcion texto_caja(val lista c): texto {
+    devolver a_texto(c[0]) + " " + a_texto(c[1]) + " " + a_texto(c[2]) + " " + a_texto(c[3])
+}
+
+escribir("cuadro 0: " + texto_caja(juego.caja(HOJA, 10, 20, {"cuadro": 0})))
+escribir("cuadro 1: " + texto_caja(juego.caja(HOJA, 10, 20, {"cuadro": 1})))
+escribir("escala: " + texto_caja(juego.caja(HOJA, 10, 20, {"cuadro": 1, "escala": 2})))
+escribir("espejo: " + texto_caja(juego.caja(HOJA, 10, 20, {"cuadro": 0, "espejo": verdadero})))
+escribir("voltear: " + texto_caja(juego.caja(HOJA, 10, 20, {"cuadro": 1, "voltear": verdadero})))
+escribir("centrado: " + texto_caja(juego.caja(HOJA, 10, 20, {"cuadro": 0, "centrado": verdadero})))
+escribir("margen: " + texto_caja(juego.caja(HOJA, 10, 20, {"cuadro": 1, "margen": 0.5})))
+escribir("imagen: " + texto_caja(juego.caja(DIBUJO, 10, 20)))
+escribir("ancho: " + texto_caja(juego.caja(DIBUJO, 0, 0, {"ancho": 24})))
+
+# hoja sola: cada figura en su celda
+fijo SOLA = juego.hoja(juego.sprite([
+    "......BBB",
+    ".AA...BBB",
+    ".AA......",
+    ".AA......"
+], {"A": [255, 0, 0], "B": [0, 0, 255]}))
+escribir("sola: celda " + a_texto(SOLA["celda"][0]) + "x" + a_texto(SOLA["celda"][1]) + ", " +
+         texto_caja(juego.caja(SOLA, 0, 0, {"cuadro": 0})) + " / " + texto_caja(juego.caja(SOLA, 0, 0, {"cuadro": 1})))
+
+# un animador: la caja del cuadro que toca ahora
+sea pj = juego.animador(HOJA, {"quieto": {"cuadros": [1]}, "otro": {"cuadros": [0]}})
+escribir("animador: " + texto_caja(juego.caja(pj, 10, 20)))
+juego.animacion(pj, "otro")
+escribir("animador otro: " + texto_caja(juego.caja(pj, 10, 20)))
+
+# choques con cajas
+fijo A = juego.caja(HOJA, 0, 0, {"cuadro": 0})
+escribir("choca: " + a_texto(juego.colision(A, [2, 3, 5, 5])) + " " + a_texto(juego.colision(A, [3, 0, 5, 5])) + " " +
+         a_texto(juego.colision(A, 2.5, 3.5, 1, 1)) + " " + a_texto(juego.colision(0, 0, 1, 1, 0.5, 0.5, 1, 1)))
+escribir("dentro: " + a_texto(juego.dentro(1, 1, A)) + " " + a_texto(juego.dentro(0, 0, A)))
+escribir("circulo: " + a_texto(juego.colision_circulo_rect(4, 2, 1.5, A)) + " " + a_texto(juego.colision_circulo_rect(5, 2, 1, A)))
+
+intentar {
+    juego.colision(A, 1, 2)
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.colision(A, [1, 2, 3])
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.caja("x", 0, 0)
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.caja(HOJA, 0, 0, {"fila": 3})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+mientras juego.abierto() {
+    juego.limpiar([0, 0, 0])
+    juego.presentar()
+}

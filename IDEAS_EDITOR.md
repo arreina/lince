@@ -27,6 +27,9 @@ lenguaje no pueda hacer también escribiendo código.
 - **Editor de animaciones del animador** (`juego.animador`): nombre, fila,
   cuadros (arrastrándolos a una tira), cuadros por segundo, repetir y
   siguiente, con la animación en bucle al lado. Que genere el diccionario.
+- **Ver las cajas de choque** (`juego.caja`) de cada cuadro encima de la
+  animación, y ajustar el `margen` viéndolo; en el juego en marcha, una tecla
+  para enseñarlas todas (hoy se dibujan a mano con `contorno`).
 - **Diagrama de transiciones**: qué animación va después de cuál
   (`"siguiente"`).
 - **Línea de tiempo con las pisadas** (`juego.pisadas`): las detectadas

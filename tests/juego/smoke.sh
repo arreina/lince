@@ -262,6 +262,18 @@ done
 for e in "no hay ninguna animación 'volar'" '"fila" va de 0 a 1' "no conozco 'filas'" '"siguiente" es el nombre' "pisada() espera un animador"; do
     grep -qF "$e" salida13.txt && ok "animador: error «$e»" || mal "falta el error: $e"
 done
+# ── caja(): lo que se ve de cada cuadro, y colision/dentro con cajas ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba10.lince" > salida14.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de caja termina bien" || mal "la prueba de caja falló"
+for l in "cuadro 0: 11 21 2 3" "cuadro 1: 13 20 3 2" "escala: 16 20 6 4" "espejo: 13 21 2 3" "voltear: 13 22 3 2" \
+         "centrado: 8 19 2 3" "margen: 13.5 20.5 2 1" "imagen: 11 20 11 4" "ancho: 2 0 22 4" "sola: celda 3x3, 0 1 3 2 / 0 0 2 3" \
+         "animador: 13 20 3 2" "animador otro: 11 21 2 3" "choca: verdadero falso verdadero verdadero" \
+         "dentro: verdadero falso" "circulo: verdadero falso"; do
+    grep -qxF "$l" salida14.txt && ok "caja: $l" || mal "falta la línea: $l"
+done
+for e in "colision() espera (x1, y1" "caja() espera una imagen, una hoja o un animador" "no hay fila 3"; do
+    grep -qF "$e" salida14.txt && ok "caja: error «$e»" || mal "falta el error: $e"
+done
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
@@ -308,4 +320,4 @@ if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida5b.txt; exit 1; }
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida5b.txt; exit 1; }

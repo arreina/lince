@@ -2071,6 +2071,7 @@ typedef struct {
     int imagen;                 /* la imagen de la que se recortan los cuadros */
     int total, nf, cw, ch, cols, *por_fila;
     JgRect *rec;
+    JgRect *caja;               /* lo que se ve de cada cuadro, en coordenadas de su celda (para chocar) */
     int version;
 } JgHoja;
 static JgHoja _jg_hojas[JG_MAX_HOJAS];
@@ -2078,9 +2079,30 @@ static int _jg_nhojas;
 
 static int jg_resto(int a, int m) { int r = a % m; return r < 0 ? r + m : r; }
 
+/* El rectángulo de lo que se ve (alfa > 64) dentro de 'r', relativo a 'r';
+   todo a 0 si no se ve nada */
+static JgRect jg_visible(const unsigned char *px, int W, int H, JgRect r) {
+    int x0 = r.w, y0 = r.h, x1 = -1, y1 = -1;
+    for (int y = 0; y < r.h; y++) {
+        int sy = r.y + y;
+        if (sy < 0 || sy >= H) continue;
+        for (int x = 0; x < r.w; x++) {
+            int sx = r.x + x;
+            if (sx < 0 || sx >= W || px[((size_t)sy * W + sx) * 4 + 3] <= 64) continue;
+            if (x < x0) x0 = x;
+            if (x > x1) x1 = x;
+            if (y < y0) y0 = y;
+            if (y > y1) y1 = y;
+        }
+    }
+    JgRect v = {0, 0, 0, 0};
+    if (x1 >= 0) { v.x = x0; v.y = y0; v.w = x1 - x0 + 1; v.h = y1 - y0 + 1; }
+    return v;
+}
+
 static void jg_hojas_liberar(void) {
     for (int i = 0; i < _jg_nhojas; i++) {
-        free(_jg_hojas[i].quitar); free(_jg_hojas[i].por_fila); free(_jg_hojas[i].rec);
+        free(_jg_hojas[i].quitar); free(_jg_hojas[i].por_fila); free(_jg_hojas[i].rec); free(_jg_hojas[i].caja);
     }
     memset(_jg_hojas, 0, sizeof _jg_hojas);
     _jg_nhojas = 0;
@@ -2183,8 +2205,23 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
     int forma = h->version > 0 && (total != h->total || nf != h->nf || cw != h->cw || ch != h->ch);
     for (int f = 0; f < nf && h->version > 0 && !forma; f++) forma = pf[f] != h->por_fila[f];
     if (forma) _jg_recargar_codigo = 1;
-    free(h->rec); free(h->por_fila);
-    h->rec = rec; h->por_fila = pf;
+    /* la caja de cada cuadro, dentro de su celda (como lo coloca jg_hoja_cuadro) */
+    JgRect *caja = malloc(sizeof(JgRect) * total);
+    if (!caja) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+    {
+        JgImagen *ci = &_jgs.imagenes[imagen];
+        unsigned char *px = jg_pixeles(imagen);
+        for (int i = 0; i < total; i++) {
+            JgRect v = {0, 0, rec[i].w, rec[i].h};
+            if (px) v = jg_visible(px, ci->ancho, ci->alto, rec[i]);
+            v.x += (cw - rec[i].w) / 2;
+            v.y += ch - rec[i].h;
+            caja[i] = v;
+        }
+        free(px);
+    }
+    free(h->rec); free(h->por_fila); free(h->caja);
+    h->rec = rec; h->por_fila = pf; h->caja = caja;
     h->total = total; h->nf = nf; h->cw = cw; h->ch = ch; h->cols = cols;
     h->fuente = fuente; h->imagen = imagen;
     h->version++;
@@ -2212,7 +2249,7 @@ static int jg_hoja_obtener(const JgHoja *receta, char *msg, size_t max) {
         if (!h->quitar) { snprintf(msg, max, "sin memoria"); return -1; }
         memcpy(h->quitar, receta->quitar, sizeof(int) * receta->nquitar);
     }
-    h->imagen = -1; h->fuente = -1; h->rec = NULL; h->por_fila = NULL; h->version = 0;
+    h->imagen = -1; h->fuente = -1; h->rec = NULL; h->por_fila = NULL; h->caja = NULL; h->version = 0;
     if (!jg_hoja_calcular(i, msg, max)) { free(h->quitar); memset(h, 0, sizeof *h); return -1; }
     _jg_nhojas++;
     return i;
@@ -3234,6 +3271,87 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     return valor_nulo();
 }
 
+/* caja(cosa, x, y[, opciones]): el rectángulo [x, y, ancho, alto] de lo que se
+   ve de verdad al dibujar 'cosa' así (con las mismas x, y y opciones que
+   dibujar: escala, ancho, alto, centrado, espejo, voltear, cuadro, fila), sin
+   el hueco transparente de alrededor. Con un animador, el cuadro que toca
+   ahora. "margen" la encoge (o la agranda, si es negativo) por cada lado, en
+   píxeles de pantalla. El ángulo no cuenta. Va directa a colision(). */
+static struct { void *tex; JgRect r; } _jg_caja_imagen[JG_MAX_IMAGENES];
+static Valor *fn_jg_caja(Valor **a, int n) {
+    JG_ABIERTA();
+    JgHoja *hoja = NULL;
+    int fila = -1, cuadro = 0, es_animador = n > 0 && a[0]->tipo == VAL_DICCIONARIO && jg_dic(a[0], "animador");
+    Valor *op = n > 3 ? a[3] : NULL;
+    if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
+        return jg_error("ErrorTipo", "caja(): las opciones van en un diccionario, como en dibujar()");
+    double v;
+    if (es_animador) {
+        JgAnimEstado *e = malloc(sizeof *e);
+        if (!e) return jg_error("Error", "sin memoria");
+        int ok = jg_anim_estado(a[0], e);
+        if (ok) { hoja = e->h; fila = e->fila; cuadro = e->cuadros[e->pos]; }
+        free(e);
+        if (!ok) return jg_error("Error", "caja(): el animador no tiene ninguna animación puesta");
+    } else if (n > 0 && (hoja = jg_hoja_de(a[0])) != NULL) {
+        if (jg_opcion(op, "cuadro", &v)) cuadro = (int)floor(v);
+        if (jg_opcion(op, "fila", &v)) {
+            if (v < 0) return jg_error("Error", "caja(): \"fila\" empieza en 0");
+            fila = (int)floor(v);
+        }
+    }
+    int k = hoja ? hoja->imagen : n > 0 ? jg_id_de(a[0], "imagen") : -1;
+    if (k < 0 || k >= _jgs.nimagenes)
+        return jg_error("ErrorTipo", "caja() espera una imagen, una hoja o un animador, como dibujar()");
+    double x, y;
+    if (!jg_num(a, n, 1, &x, "caja") || !jg_num(a, n, 2, &y, "caja")) return valor_nulo();
+    JgRect c;
+    int cw, ch;
+    if (hoja) {
+        JgRect src;
+        int ox, oy;
+        char msg[200];
+        int i = jg_hoja_cuadro(hoja, fila, cuadro, &src, &ox, &oy, msg, sizeof msg);
+        if (i < 0) {
+            char m2[260];
+            snprintf(m2, sizeof m2, "caja(): %s", msg);
+            return jg_error("Error", m2);
+        }
+        c = hoja->caja[i];
+        cw = hoja->cw; ch = hoja->ch;
+    } else {
+        JgImagen *im = &_jgs.imagenes[k];
+        if (_jg_caja_imagen[k].tex != im->tex) {      /* se calcula una vez (y otra si la imagen cambia) */
+            JgRect todo = {0, 0, im->ancho, im->alto};
+            unsigned char *px = jg_pixeles(k);
+            _jg_caja_imagen[k].r = px ? jg_visible(px, im->ancho, im->alto, todo) : todo;
+            _jg_caja_imagen[k].tex = im->tex;
+            free(px);
+        }
+        c = _jg_caja_imagen[k].r;
+        cw = im->ancho; ch = im->alto;
+    }
+    double escala = 1, fx, fy;
+    jg_opcion(op, "escala", &escala);
+    fx = fy = escala;
+    if (jg_opcion(op, "ancho", &v)) fx = v / cw;
+    if (jg_opcion(op, "alto", &v)) fy = v / ch;
+    if (jg_opcion(op, "centrado", &v) && v) { x -= cw * fx / 2; y -= ch * fy / 2; }
+    double bx = (jg_opcion(op, "espejo", &v) && v) ? cw - c.x - c.w : c.x;
+    double by = (jg_opcion(op, "voltear", &v) && v) ? ch - c.y - c.h : c.y;
+    double rx = x + bx * fx, ry = y + by * fy, rw = c.w * fx, rh = c.h * fy, m = 0;
+    if (jg_opcion(op, "margen", &m) && (c.w > 0 || m < 0)) {
+        double mx = fmin(m, rw / 2), my = fmin(m, rh / 2);
+        rx += mx; ry += my; rw -= 2 * mx; rh -= 2 * my;
+    }
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(rx));
+    lista_agregar(l, valor_numero(ry));
+    lista_agregar(l, valor_numero(rw));
+    lista_agregar(l, valor_numero(rh));
+    return l;
+}
+
 /* ── Cámara y pantalla ── */
 /* camara(x, y): lo que se dibuja se desplaza; camara() vuelve a (0, 0). Devuelve [x, y] */
 static Valor *fn_jg_camara(Valor **a, int n) {
@@ -3580,10 +3698,31 @@ static Valor *fn_jg_direccion(Valor **a, int n) {
     return valor_numero(jg_accion_fuerza(pos, 0) - jg_accion_fuerza(neg, 0));
 }
 
-/* colision(x1, y1, w1, h1, x2, y2, w2, h2): ¿se solapan los dos rectángulos? */
+/* Los 'cuantos' números de los argumentos, donde un rectángulo puede ir en
+   una lista [x, y, ancho, alto] (como los que da caja()) */
+static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, const char *forma) {
+    int k = 0, ok = 1;
+    for (int i = 0; i < n && ok; i++) {
+        if (a[i]->tipo == VAL_NUMERO) { if (k < cuantos) v[k] = a[i]->numero; k++; continue; }
+        ok = a[i]->tipo == VAL_LISTA && a[i]->lista.cantidad == 4;
+        for (int j = 0; ok && j < 4; j++) {
+            ok = a[i]->lista.elementos[j]->tipo == VAL_NUMERO;
+            if (ok && k < cuantos) v[k] = a[i]->lista.elementos[j]->numero;
+            k++;
+        }
+    }
+    if (ok && k == cuantos) return 1;
+    char msg[200];
+    snprintf(msg, sizeof msg, "%s() espera %s (cada rectángulo, en números o en una lista [x, y, ancho, alto])", fn, forma);
+    jg_error("ErrorTipo", msg);
+    return 0;
+}
+
+/* colision(x1, y1, w1, h1, x2, y2, w2, h2): ¿se solapan los dos rectángulos?
+   También colision(caja1, caja2), con listas [x, y, ancho, alto]. */
 static Valor *fn_jg_colision(Valor **a, int n) {
     double v[8];
-    for (int i = 0; i < 8; i++) if (!jg_num(a, n, i, &v[i], "colision")) return valor_nulo();
+    if (!jg_numeros(a, n, v, 8, "colision", "(x1, y1, ancho1, alto1, x2, y2, ancho2, alto2)")) return valor_nulo();
     return valor_booleano(v[0] < v[4] + v[6] && v[0] + v[2] > v[4] &&
                           v[1] < v[5] + v[7] && v[1] + v[3] > v[5]);
 }
@@ -3601,7 +3740,7 @@ static Valor *fn_jg_colision_circulos(Valor **a, int n) {
 /* colision_circulo_rect(cx, cy, radio, x, y, ancho, alto): ¿toca el círculo al rectángulo? */
 static Valor *fn_jg_colision_circulo_rect(Valor **a, int n) {
     double v[7];
-    for (int i = 0; i < 7; i++) if (!jg_num(a, n, i, &v[i], "colision_circulo_rect")) return valor_nulo();
+    if (!jg_numeros(a, n, v, 7, "colision_circulo_rect", "(cx, cy, radio, x, y, ancho, alto)")) return valor_nulo();
     double px = v[0] < v[3] ? v[3] : v[0] > v[3] + v[5] ? v[3] + v[5] : v[0];   /* punto del rectángulo más cercano */
     double py = v[1] < v[4] ? v[4] : v[1] > v[4] + v[6] ? v[4] + v[6] : v[1];
     double dx = v[0] - px, dy = v[1] - py;
@@ -3611,7 +3750,7 @@ static Valor *fn_jg_colision_circulo_rect(Valor **a, int n) {
 /* dentro(px, py, x, y, ancho, alto): ¿está el punto dentro del rectángulo? (botones, clics) */
 static Valor *fn_jg_dentro(Valor **a, int n) {
     double v[6];
-    for (int i = 0; i < 6; i++) if (!jg_num(a, n, i, &v[i], "dentro")) return valor_nulo();
+    if (!jg_numeros(a, n, v, 6, "dentro", "(px, py, x, y, ancho, alto)")) return valor_nulo();
     return valor_booleano(v[0] >= v[2] && v[0] < v[2] + v[4] && v[1] >= v[3] && v[1] < v[3] + v[5]);
 }
 
@@ -4497,7 +4636,8 @@ static void cargar_juego(Entorno *entorno) {
         {"presentar",       fn_jg_presentar,        0},
         {"captura",         fn_jg_captura,          1},
         {"pitido",          fn_jg_pitido,          -1},
-        {"colision",        fn_jg_colision,         8},
+        {"colision",        fn_jg_colision,        -1},
+        {"caja",            fn_jg_caja,            -1},
         {"imagen",          fn_jg_imagen,           1},
         {"dibujar",         fn_jg_dibujar,         -1},
         {"sprite",          fn_jg_sprite,           2},
@@ -4533,8 +4673,8 @@ static void cargar_juego(Entorno *entorno) {
         {"direccion",       fn_jg_direccion,        2},
         {"recargado",       fn_jg_recargado,        0},
         {"colision_circulos", fn_jg_colision_circulos, 6},
-        {"colision_circulo_rect", fn_jg_colision_circulo_rect, 7},
-        {"dentro",          fn_jg_dentro,           6},
+        {"colision_circulo_rect", fn_jg_colision_circulo_rect, -1},
+        {"dentro",          fn_jg_dentro,          -1},
         {"cuadro",          fn_jg_cuadro,          -1},
         {"particulas",      fn_jg_particulas,      -1},
         {"dibujar_particulas", fn_jg_dibujar_particulas, 0},

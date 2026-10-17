@@ -842,9 +842,13 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 
 | Función | Qué hace |
 |---|---|
-| `colision(x1, y1, w1, h1, x2, y2, w2, h2)` | ¿se solapan dos rectángulos? |
+| `colision(x1, y1, w1, h1, x2, y2, w2, h2)` · `colision(caja1, caja2)` | ¿se solapan dos rectángulos? |
 | `colision_circulos(x1, y1, r1, x2, y2, r2)` · `colision_circulo_rect(cx, cy, r, x, y, w, h)` | ¿se tocan dos círculos? · ¿toca el círculo al rectángulo? |
 | `dentro(px, py, x, y, w, h)` | ¿está el punto dentro del rectángulo? (botones, clics) |
+| `caja(cosa, x, y[, opciones])` | el rectángulo `[x, y, ancho, alto]` de lo que se ve de verdad al dibujar `cosa` (una imagen, una hoja o un animador) con esas mismas `x`, `y` y opciones, sin el hueco transparente de alrededor (ver abajo) |
+
+En `colision`, `colision_circulo_rect` y `dentro`, cada rectángulo puede ir en cuatro números o en una
+lista `[x, y, ancho, alto]`, como las que da `caja()`.
 | `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
 
 **Hojas de sprites.** La manera tradicional de animar: todos los fotogramas dibujados en una sola
@@ -947,6 +951,26 @@ juego.dibujar(pj, x, y, {"centrado": verdadero, "espejo": mira_izquierda})
 | `dibujar(animador, x, y[, opciones])` | dibuja el cuadro que toca, con las mismas opciones que una imagen |
 | `pisada(animador)` | ¿ha tocado un pie el suelo desde la última vez que se preguntó? Llámala una vez por fotograma |
 | `acabada(animador)` | ¿ha llegado al final una animación que no se repite? |
+
+**Choques con lo que se ve.** En una hoja cada cuadro es una celda del mismo tamaño, y la figura
+no la llena: en una hoja descargada o hecha con IA suele haber mucho hueco transparente alrededor,
+y cambia de un cuadro a otro (las piernas abiertas son más anchas). Chocar con la celda es chocar
+con el aire. `caja()` da el rectángulo de lo que se ve en el cuadro que toca, colocado como lo pone
+`dibujar()` con las mismas opciones (`escala`, `ancho`, `alto`, `centrado`, `espejo`, `voltear`, y
+`cuadro` y `fila` con una hoja; con un animador, el cuadro que toca ahora). Se calcula al dividir la
+hoja, así que no cuesta nada pedirla en cada fotograma. `margen` la encoge por cada lado, en píxeles
+de pantalla (o la agranda si es negativo), para que un choque de refilón no cuente. El ángulo no se
+tiene en cuenta.
+
+```lince
+fijo OPCIONES = {"escala": 2, "centrado": verdadero}
+juego.dibujar(pj, x, y, OPCIONES)
+si juego.colision(juego.caja(pj, x, y, OPCIONES), juego.caja(PINCHO, px, py)) { vidas = vidas - 1 }
+```
+
+Para moverse por un mapa de casillas suele ir mejor un rectángulo fijo (el ancho del cuerpo y la
+altura de pie): si la caja cambiara con cada cuadro, al andar el personaje se engancharía en las
+paredes. `caja()` es para los golpes, los pinchos, las monedas y los enemigos.
 
 Se pueden leer `pj["actual"]` (el nombre de la animación) y `pj["cuadro"]` (el cuadro de la hoja
 que se dibujó). Ejemplo: `10_paseo`, con las tres animaciones generadas por `animar()`.
