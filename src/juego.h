@@ -133,6 +133,8 @@ typedef struct {
 #define JG_EJES         6
 #define JG_ESCRITO      512       /* texto tecleado en un fotograma ('\b' = borrar) */
 #define JG_ACCIONES     64
+#define JG_HISTORIAL    32
+#define JG_GUION        256
 #define JG_ENTRADAS     16
 #define JG_PARTICULAS   8192
 #define JG_MAPAS        256
@@ -155,6 +157,7 @@ typedef struct {
 typedef struct {
     float x, y, vx, vy, grav, vida, total, tam, tam_fin;
     unsigned char c[4], c_fin[4];
+    unsigned char sumar;                 /* "mezcla": "sumar": brilla (se suma a lo de debajo) */
 } JgParticula;
 
 static struct {
@@ -173,6 +176,8 @@ static struct {
        el juego llama a editar() o texto_escrito();
        LINCE_JUEGO_CAPTURA=ruta.bmp guarda el último fotograma, y
        LINCE_JUEGO_FOTOS=carpeta todos (00000.bmp, 00001.bmp...);
+       LINCE_JUEGO_GUION=30:derecha:20,50:z mantiene derecha desde el
+       fotograma 30 durante 20 y pulsa z en el 50 (para probar combos);
        LINCE_JUEGO_SEMILLA=n fija la semilla de matematica.aleatorio() y
        LINCE_JUEGO_AUDIO=ruta.wav guarda el sonido (1/60 s por fotograma, a la par
        que LINCE_JUEGO_FOTOS: sirve para hacer un vídeo con sonido). */
@@ -223,6 +228,21 @@ static struct {
     int hay_siguiente, escena_nueva, fase;   /* fase 1: oscurece; 2: aclara */
     double t_escena, t_fundido, fundido;
     double t_vigilar;                    /* última comprobación de archivos cambiados */
+    /* el reloj del juego: avanza con dt, que se para con congelar() y va más
+       lento o más rápido con velocidad() (las escenas van con el reloj de verdad) */
+    double reloj, velocidad, congelar_hasta;
+    int reloj_propio;                    /* se ha usado congelar() o velocidad(): ya no es el de verdad */
+    /* temblor(): la cámara que pidió el juego (cu_x, cu_y) más el temblor de
+       este fotograma, salvo tras camara() sin nada (el marcador no tiembla) */
+    double cu_x, cu_y, tem_x, tem_y, tem_fuerza, tem_desde, tem_dur;
+    int cam_quieta;
+    unsigned tem_semilla;
+    /* las últimas acciones pulsadas, para combo() */
+    struct { int accion; double t; int usada; } hist[JG_HISTORIAL];
+    int nhist;
+    /* LINCE_JUEGO_GUION: teclas mantenidas desde un fotograma durante otros tantos */
+    struct { long desde, cuantos; int tecla; } guion[JG_GUION];
+    int nguion;
 } _jgs;
 
 static int jg_tecla_codigo(const char *nombre);
@@ -238,6 +258,8 @@ static int jg_escribir(const char *t, int x, int y, int e, int ancho);
 static void jg_glifo(int ch, int px, int py, int e, int ac);
 static int jg_vigilar(void);
 static double jg_reloj(void);
+static double jg_reloj_real(void);
+static void jg_historial(void);
 static void jg_escenas(void);
 static void jg_aviso_error(const char *msg, int pantalla);
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
@@ -245,6 +267,7 @@ static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
 static void jg_hojas_liberar(void);
 static void jg_fuentes_liberar(void);
+static void jg_blancas_liberar(void);
 static int _jg_recargar_codigo;          /* una hoja cambió de forma: volver a ejecutar el programa */
 static double jg_reloj(void);
 static int jg_opcion(Valor *op, const char *clave, double *out);
@@ -255,6 +278,12 @@ static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
     valor_error = valor_error_nuevo(tipo, msg, 0);
     return valor_nulo();
+}
+
+/* La cámara con la que se dibuja: la del juego más el temblor */
+static void jg_cam_aplicar(void) {
+    _jgs.cam_x = _jgs.cu_x + (_jgs.cam_quieta ? 0 : _jgs.tem_x);
+    _jgs.cam_y = _jgs.cu_y + (_jgs.cam_quieta ? 0 : _jgs.tem_y);
 }
 
 static int jg_cargar(void) {
@@ -429,6 +458,7 @@ static void jg_cerrar_todo(void) {
         free(_jgs.imagenes[i].px);
     }
     _jgs.nimagenes = 0;
+    jg_blancas_liberar();
     jg_hojas_liberar();
     jg_fuentes_liberar();
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
@@ -456,22 +486,29 @@ static char *jg_entorno_utf8(const char *nombre) {
 #endif
 }
 
-/* abrir(titulo, ancho, alto) */
+/* abrir(titulo, ancho, alto[, {"escala": n}]): con escala, la ventana es n
+   veces mayor y cada píxel del juego se ve como un cuadrado de n × n (para
+   juegos de píxeles grandes, como los de las consolas portátiles) */
 static Valor *fn_jg_abrir(Valor **a, int n) {
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "abrir() espera (título, ancho, alto)");
-    double w = 800, h = 600;
+    double w = 800, h = 600, z = 1;
     if (n > 1 && !jg_num(a, n, 1, &w, "abrir")) return valor_nulo();
     if (n > 2 && !jg_num(a, n, 2, &h, "abrir")) return valor_nulo();
+    if (n > 3 && a[3]->tipo != VAL_DICCIONARIO && a[3]->tipo != VAL_NULO)
+        return jg_error("ErrorTipo", "abrir(): las opciones van en un diccionario, por ejemplo {\"escala\": 3}");
+    if (n > 3 && jg_opcion(a[3], "escala", &z) && (z < 1 || z > 16 || z != floor(z)))
+        return jg_error("Error", "abrir(): \"escala\" es un número entero de 1 a 16");
     if (w < 1 || h < 1 || w > 16384 || h > 16384) return jg_error("Error", "abrir(): tamaño de ventana no válido");
     if (_jgs.abierta && _jgs.reabrir) {          /* programa recargado: la ventana sigue */
         _jgs.reabrir = 0;
         _jg.SetTitle(_jgs.ventana, a[0]->texto);
         if ((int)w != _jgs.ancho || (int)h != _jgs.alto) {
-            if (_jg.SetWindowSize && !_jgs.completa) _jg.SetWindowSize(_jgs.ventana, (int)w, (int)h);
+            if (_jg.SetWindowSize && !_jgs.completa) _jg.SetWindowSize(_jgs.ventana, (int)(w * z), (int)(h * z));
             _jg.LogicalSize(_jgs.render, (int)w, (int)h);
             _jgs.ancho = (int)w; _jgs.alto = (int)h;
         }
-        _jgs.cam_x = _jgs.cam_y = 0;
+        _jgs.cu_x = _jgs.cu_y = 0;
+        jg_cam_aplicar();
         _jgs.cierre = 0;
         return valor_nulo();
     }
@@ -485,7 +522,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         return jg_error("ErrorJuego", msg);
     }
     _jgs.abierta = 1;
-    _jgs.ventana = _jg.CrearVentana(a[0]->texto, 0x2FFF0000, 0x2FFF0000, (int)w, (int)h, 0);
+    _jgs.ventana = _jg.CrearVentana(a[0]->texto, 0x2FFF0000, 0x2FFF0000, (int)(w * z), (int)(h * z), 0);
     if (_jgs.ventana) {
         _jgs.render = _jg.CreateRenderer(_jgs.ventana, -1, 2 | 4);       /* acelerado + vsync */
         if (!_jgs.render) _jgs.render = _jg.CreateRenderer(_jgs.ventana, -1, 1);   /* por software */
@@ -505,7 +542,10 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     memset(_jgs.ejes_prev, 0, sizeof(_jgs.ejes_prev));
     _jgs.nescrito = 0; _jgs.mov_x = _jgs.mov_y = 0;
     if (_jg.StartTextInput) _jg.StartTextInput();          /* recibir texto tecleado (tildes, ñ…) */
-    _jgs.cam_x = _jgs.cam_y = 0;
+    _jgs.cam_x = _jgs.cam_y = _jgs.cu_x = _jgs.cu_y = _jgs.tem_x = _jgs.tem_y = 0;
+    _jgs.tem_dur = 0; _jgs.cam_quieta = 0; _jgs.tem_semilla = 12345;
+    _jgs.reloj = 0; _jgs.velocidad = 1; _jgs.congelar_hasta = 0; _jgs.reloj_propio = 0;
+    _jgs.nhist = 0;
     _jgs.completa = 0;
     _jgs.njoy = -1;
     _jgs.volumen = 1;
@@ -522,6 +562,22 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         for (char *t = strtok(buf, ","); t && _jgs.npulsar < 16; t = strtok(NULL, ",")) {
             int c = jg_tecla_codigo(t);
             if (c >= 0) _jgs.pulsar[_jgs.npulsar++] = c;
+        }
+    }
+    _jgs.nguion = 0;
+    e = getenv("LINCE_JUEGO_GUION");
+    if (e) {
+        char buf[4096];
+        snprintf(buf, sizeof buf, "%s", e);
+        for (char *t = strtok(buf, ","); t && _jgs.nguion < JG_GUION; t = strtok(NULL, ",")) {
+            char tecla[32];
+            long desde, cuantos = 1;
+            if (sscanf(t, "%ld:%31[^:]:%ld", &desde, tecla, &cuantos) < 2) continue;
+            int c = jg_tecla_codigo(tecla);
+            if (c < 0 || cuantos < 1) continue;
+            _jgs.guion[_jgs.nguion].desde = desde;
+            _jgs.guion[_jgs.nguion].cuantos = cuantos;
+            _jgs.guion[_jgs.nguion++].tecla = c;
         }
     }
     free(_jgs.escribir_prueba);
@@ -864,6 +920,21 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     if (_jgs.dt > 0.1) _jgs.dt = 0.1;
     if (_jgs.limite) _jgs.dt = 1.0 / 60;
     _jgs.total++;
+    /* el reloj del juego: parado mientras dura congelar(), al ritmo de velocidad() */
+    double real = jg_reloj_real();
+    _jgs.dt *= real < _jgs.congelar_hasta ? 0 : _jgs.velocidad;
+    _jgs.reloj = _jgs.reloj_propio ? _jgs.reloj + _jgs.dt : real;
+    /* temblor: cada fotograma, un desplazamiento al azar que se va apagando */
+    _jgs.tem_x = _jgs.tem_y = 0;
+    if (_jgs.tem_dur > 0 && real < _jgs.tem_desde + _jgs.tem_dur) {
+        double f = _jgs.tem_fuerza * (1 - (real - _jgs.tem_desde) / _jgs.tem_dur);
+        _jgs.tem_semilla = _jgs.tem_semilla * 1103515245u + 12345u;
+        _jgs.tem_x = f * (((_jgs.tem_semilla >> 8) & 0xFFFF) / 32767.5 - 1);
+        _jgs.tem_semilla = _jgs.tem_semilla * 1103515245u + 12345u;
+        _jgs.tem_y = f * (((_jgs.tem_semilla >> 8) & 0xFFFF) / 32767.5 - 1);
+    }
+    _jgs.cam_quieta = 0;
+    jg_cam_aplicar();
     if (_jgs.limite && _jgs.total >= _jgs.limite) _jgs.cierre = 1;
     _jgs.t_ultimo = t;
     _jgs.cuadros++;
@@ -928,6 +999,10 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         for (int i = 0; i < _jgs.npulsar; i++) _jgs.teclas[_jgs.pulsar[i]] = 1;
         if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; _jgs.raton |= 1; }
     } else if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; }
+    for (int i = 0; i < _jgs.nguion; i++)
+        if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos)
+            _jgs.teclas[_jgs.guion[i].tecla] = 1;
+    jg_historial();
     /* Código nuevo listo: se corta el programa que corre y main lo relanza */
     if (recargar) return jg_error(ERROR_RECARGA, "recarga en caliente");
     return valor_nulo();
@@ -2601,7 +2676,10 @@ static int jg_anim_secuencia(const JgHoja *h, Valor *cfg, int *fila, int *cuadro
     if (c) {
         for (int i = 0; i < c->lista.cantidad && n < max; i++) cuadros[n++] = (int)c->lista.elementos[i]->numero;
     } else {
-        int total = fl >= 0 ? h->por_fila[*fila] : h->total;
+        int total = fl >= 0 ? h->por_fila[*fila] : h->total, base = 0;
+        for (int f = 0; fl >= 0 && f < *fila; f++) base += h->por_fila[f];
+        /* en una rejilla, las celdas vacías del final de la fila no son cuadros de la animación */
+        while (total > 1 && h->caja && h->caja[base + total - 1].w == 0) total--;
         for (int i = 0; i < total && n < max; i++) cuadros[n++] = i;
     }
     return n;
@@ -2706,9 +2784,22 @@ static Valor *fn_jg_animador(Valor **a, int n) {
                 ok = v->tipo == VAL_LISTA && v->lista.cantidad > 0 && v->lista.cantidad <= JG_MAX_SECUENCIA;
                 for (int q = 0; ok && q < v->lista.cantidad; q++) ok = v->lista.elementos[q]->tipo == VAL_NUMERO;
                 if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"cuadros\" es la lista de cuadros que se van mostrando", nombre);
+            } else if (!strcmp(c, "golpes")) {
+                ok = v->tipo == VAL_LISTA;
+                for (int q = 0; ok && q < v->lista.cantidad; q++) {
+                    Valor *g = v->lista.elementos[q];
+                    ok = g->tipo == VAL_LISTA && g->lista.cantidad == 5;
+                    for (int r = 0; ok && r < 5; r++) ok = g->lista.elementos[r]->tipo == VAL_NUMERO;
+                    if (ok) ok = g->lista.elementos[0]->numero >= 0 && g->lista.elementos[3]->numero > 0 && g->lista.elementos[4]->numero > 0;
+                }
+                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"golpes\" es una lista de [cuadro, x, y, ancho, alto] "
+                                  "(la caja que golpea en ese cuadro, medida dentro de la celda)", nombre);
+            } else if (!strcmp(c, "cancelar")) {
+                ok = v->tipo == VAL_NUMERO && v->numero >= 0;
+                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"cancelar\" es el cuadro desde el que se puede pasar a otra animación", nombre);
             } else {
                 snprintf(msg, sizeof msg, "animador(): en \"%s\", no conozco '%s' (hay \"fila\", \"cuadros\", \"por_segundo\", "
-                         "\"repetir\", \"siguiente\", \"pisadas\" y \"hoja\")", nombre, c);
+                         "\"repetir\", \"siguiente\", \"pisadas\", \"golpes\", \"cancelar\" y \"hoja\")", nombre, c);
                 return jg_error("Error", msg);
             }
             if (!ok) return jg_error("Error", msg);
@@ -3197,9 +3288,32 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
     return valor_nulo();
 }
 
+/* La silueta blanca de una imagen (para el destello de "blanco"): se hace la
+   primera vez y otra si la imagen cambia */
+static struct { void *tex, *blanca; } _jg_blanca[JG_MAX_IMAGENES];
+static void *jg_textura_blanca(int k) {
+    JgImagen *im = &_jgs.imagenes[k];
+    if (_jg_blanca[k].tex == im->tex && _jg_blanca[k].blanca) return _jg_blanca[k].blanca;
+    if (_jg_blanca[k].blanca) _jg.DestroyTexture(_jg_blanca[k].blanca);
+    _jg_blanca[k].blanca = NULL;
+    _jg_blanca[k].tex = im->tex;
+    unsigned char *px = jg_pixeles(k);
+    if (!px) return NULL;
+    for (size_t i = 0; i < (size_t)im->ancho * im->alto; i++) px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = 255;
+    _jg_blanca[k].blanca = jg_textura_rgba(px, im->ancho, im->alto);
+    free(px);
+    return _jg_blanca[k].blanca;
+}
+static void jg_blancas_liberar(void) {
+    for (int i = 0; i < JG_MAX_IMAGENES; i++) if (_jg_blanca[i].blanca) _jg.DestroyTexture(_jg_blanca[i].blanca);
+    memset(_jg_blanca, 0, sizeof _jg_blanca);
+}
+
 /* dibujar(imagen, x, y[, opciones]). Opciones (todas opcionales):
      escala, ancho, alto, angulo (grados), espejo, voltear, centrado, alfa (0-255),
      color ([r, g, b] para teñir), recorte ([x, y, ancho, alto]),
+     blanco (0 a 1: el destello de cuando a alguien le dan), mezcla ("sumar"
+     para brillos y energía, "multiplicar" para sombras),
      cuadro (y fila) de una hoja de hoja() o animar(); con una imagen
      normal, cuadro + celda ([ancho, alto] de cada cuadro).
    Con una hoja, x, y (y "centrado") se refieren a la celda entera, así los
@@ -3278,15 +3392,38 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     /* el cuadro dentro de su celda (de lado a lado si está en espejo) */
     x += ((volteo & 1) ? cw - src.w - ox : ox) * fx;
     y += ((volteo & 2) ? ch - src.h - oy : oy) * fy;
-    double alfa = 255;
+    double alfa = 255, blanco = 0;
     jg_opcion(op, "alfa", &alfa);
+    jg_opcion(op, "blanco", &blanco);
+    if (alfa < 0) alfa = 0;
+    if (alfa > 255) alfa = 255;
+    if (blanco < 0 || blanco > 1) return jg_error("Error", "dibujar(): \"blanco\" va de 0 (nada) a 1 (todo blanco)");
+    int mezcla = 1;                                 /* SDL_BLENDMODE_BLEND */
+    Valor *mz = jg_opcion_valor(op, "mezcla");
+    if (mz) {
+        if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "normal")) mezcla = 1;
+        else if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "sumar")) mezcla = 2;
+        else if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "multiplicar")) mezcla = 4;
+        else return jg_error("Error", "dibujar(): \"mezcla\" es \"normal\", \"sumar\" (brillos, energía) o \"multiplicar\" (sombras)");
+    }
     unsigned char tinte[4] = {255, 255, 255, 255};
     Valor *col = jg_opcion_valor(op, "color");
     if (col) { Valor *arg[1] = {col}; if (!jg_color(arg, 1, 0, tinte)) return valor_nulo(); }
-    _jg.TextureAlpha(img->tex, (unsigned char)(alfa < 0 ? 0 : alfa > 255 ? 255 : alfa));
-    _jg.TextureColor(img->tex, tinte[0], tinte[1], tinte[2]);
     JgRect dst = {(int)floor(x - _jgs.cam_x), (int)floor(y - _jgs.cam_y), (int)ceil(w), (int)ceil(h)};
-    _jg.RenderCopyEx(_jgs.render, img->tex, &src, &dst, angulo, NULL, volteo);
+    if (blanco < 1) {
+        _jg.TextureAlpha(img->tex, (unsigned char)alfa);
+        _jg.TextureColor(img->tex, tinte[0], tinte[1], tinte[2]);
+        if (mezcla != 1) _jg.TextureBlend(img->tex, mezcla);
+        _jg.RenderCopyEx(_jgs.render, img->tex, &src, &dst, angulo, NULL, volteo);
+        if (mezcla != 1) _jg.TextureBlend(img->tex, 1);
+    }
+    void *bl = blanco > 0 ? jg_textura_blanca(k) : NULL;
+    if (bl) {                                       /* la silueta blanca encima */
+        _jg.TextureAlpha(bl, (unsigned char)(alfa * blanco));
+        if (mezcla != 1) _jg.TextureBlend(bl, mezcla);
+        _jg.RenderCopyEx(_jgs.render, bl, &src, &dst, angulo, NULL, volteo);
+        if (mezcla != 1) _jg.TextureBlend(bl, 1);
+    }
     return valor_nulo();
 }
 
@@ -3297,6 +3434,31 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
    ahora. "margen" la encoge (o la agranda, si es negativo) por cada lado, en
    píxeles de pantalla. El ángulo no cuenta. Va directa a colision(). */
 static struct { void *tex; JgRect r; } _jg_caja_imagen[JG_MAX_IMAGENES];
+
+/* Una caja medida dentro de una celda de cw × ch, puesta en pantalla como la
+   pondría dibujar(…, x, y, op) (escala, ancho, alto, centrado, espejo,
+   voltear), y encogida por "margen" */
+static Valor *jg_caja_en_pantalla(JgRect c, int cw, int ch, double x, double y, Valor *op) {
+    double escala = 1, fx, fy, v;
+    jg_opcion(op, "escala", &escala);
+    fx = fy = escala;
+    if (jg_opcion(op, "ancho", &v)) fx = v / cw;
+    if (jg_opcion(op, "alto", &v)) fy = v / ch;
+    if (jg_opcion(op, "centrado", &v) && v) { x -= cw * fx / 2; y -= ch * fy / 2; }
+    double bx = (jg_opcion(op, "espejo", &v) && v) ? cw - c.x - c.w : c.x;
+    double by = (jg_opcion(op, "voltear", &v) && v) ? ch - c.y - c.h : c.y;
+    double rx = x + bx * fx, ry = y + by * fy, rw = c.w * fx, rh = c.h * fy, m = 0;
+    if (jg_opcion(op, "margen", &m) && (c.w > 0 || m < 0)) {
+        double mx = fmin(m, rw / 2), my = fmin(m, rh / 2);
+        rx += mx; ry += my; rw -= 2 * mx; rh -= 2 * my;
+    }
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(rx));
+    lista_agregar(l, valor_numero(ry));
+    lista_agregar(l, valor_numero(rw));
+    lista_agregar(l, valor_numero(rh));
+    return l;
+}
 static Valor *fn_jg_caja(Valor **a, int n) {
     JG_ABIERTA();
     JgHoja *hoja = NULL;
@@ -3350,25 +3512,60 @@ static Valor *fn_jg_caja(Valor **a, int n) {
         c = _jg_caja_imagen[k].r;
         cw = im->ancho; ch = im->alto;
     }
-    double escala = 1, fx, fy;
-    jg_opcion(op, "escala", &escala);
-    fx = fy = escala;
-    if (jg_opcion(op, "ancho", &v)) fx = v / cw;
-    if (jg_opcion(op, "alto", &v)) fy = v / ch;
-    if (jg_opcion(op, "centrado", &v) && v) { x -= cw * fx / 2; y -= ch * fy / 2; }
-    double bx = (jg_opcion(op, "espejo", &v) && v) ? cw - c.x - c.w : c.x;
-    double by = (jg_opcion(op, "voltear", &v) && v) ? ch - c.y - c.h : c.y;
-    double rx = x + bx * fx, ry = y + by * fy, rw = c.w * fx, rh = c.h * fy, m = 0;
-    if (jg_opcion(op, "margen", &m) && (c.w > 0 || m < 0)) {
-        double mx = fmin(m, rw / 2), my = fmin(m, rh / 2);
-        rx += mx; ry += my; rw -= 2 * mx; rh -= 2 * my;
+    return jg_caja_en_pantalla(c, cw, ch, x, y, op);
+}
+
+/* golpe(animador, x, y[, opciones]): la caja [x, y, ancho, alto] con la que
+   golpea ahora el animador (la de "golpes" del cuadro que toca), puesta como
+   se dibuja (las mismas opciones que dibujar: escala, centrado, espejo...).
+   nulo si en este cuadro no golpea. Varias cajas en el mismo cuadro se juntan. */
+static Valor *fn_jg_golpe(Valor **a, int n) {
+    JG_ABIERTA();
+    Valor *pj = jg_animador_arg(a, n, "golpe");
+    if (!pj) return valor_nulo();
+    Valor *op = n > 3 ? a[3] : NULL;
+    if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
+        return jg_error("ErrorTipo", "golpe(): las opciones van en un diccionario, como en dibujar()");
+    double x, y;
+    if (!jg_num(a, n, 1, &x, "golpe") || !jg_num(a, n, 2, &y, "golpe")) return valor_nulo();
+    JgAnimEstado *e = malloc(sizeof *e);
+    if (!e) return jg_error("Error", "sin memoria");
+    int ok = jg_anim_estado(pj, e);
+    Valor *gs = ok ? jg_dic(e->cfg, "golpes") : NULL;
+    int x0 = 0, y0 = 0, x1 = 0, y1 = 0, hay = 0, pos = ok ? e->pos : 0, cw = ok ? e->h->cw : 0, ch = ok ? e->h->ch : 0;
+    if (ok && e->acabada) gs = NULL;             /* quieta en el último cuadro: ya no golpea */
+    free(e);
+    for (int i = 0; gs && i < gs->lista.cantidad; i++) {
+        Valor **g = gs->lista.elementos[i]->lista.elementos;
+        if ((int)g[0]->numero != pos) continue;
+        int gx0 = (int)g[1]->numero, gy0 = (int)g[2]->numero, gx1 = gx0 + (int)g[3]->numero, gy1 = gy0 + (int)g[4]->numero;
+        if (!hay || gx0 < x0) x0 = gx0;
+        if (!hay || gy0 < y0) y0 = gy0;
+        if (!hay || gx1 > x1) x1 = gx1;
+        if (!hay || gy1 > y1) y1 = gy1;
+        hay = 1;
     }
-    Valor *l = valor_lista_crear();
-    lista_agregar(l, valor_numero(rx));
-    lista_agregar(l, valor_numero(ry));
-    lista_agregar(l, valor_numero(rw));
-    lista_agregar(l, valor_numero(rh));
-    return l;
+    if (!hay) return valor_nulo();
+    JgRect c = {x0, y0, x1 - x0, y1 - y0};
+    return jg_caja_en_pantalla(c, cw, ch, x, y, op);
+}
+
+/* libre(animador): ¿se puede pasar ya a otra animación? Sí si la actual se
+   repite, si ha acabado o si ha llegado a su cuadro "cancelar" (así se
+   encadenan los golpes de un combo sin esperar a que acabe cada uno). */
+static Valor *fn_jg_libre(Valor **a, int n) {
+    JG_ABIERTA();
+    Valor *pj = jg_animador_arg(a, n, "libre");
+    if (!pj) return valor_nulo();
+    JgAnimEstado *e = malloc(sizeof *e);
+    if (!e) return jg_error("Error", "sin memoria");
+    int libre = 1;
+    if (jg_anim_estado(pj, e) && !e->repetir && !e->acabada) {
+        Valor *c = jg_dic(e->cfg, "cancelar");
+        libre = c && e->k >= (long)c->numero;
+    }
+    free(e);
+    return valor_booleano(libre);
 }
 
 /* ── Fuentes ──
@@ -3766,21 +3963,67 @@ static Valor *fn_jg_fuente(Valor **a, int n) {
 }
 
 /* ── Cámara y pantalla ── */
-/* camara(x, y): lo que se dibuja se desplaza; camara() vuelve a (0, 0). Devuelve [x, y] */
+/* camara(x, y): lo que se dibuja se desplaza; camara() vuelve a (0, 0) y sin
+   temblor (para el marcador). Devuelve [x, y] */
 static Valor *fn_jg_camara(Valor **a, int n) {
     if (n >= 2) {
         double x, y;
         if (!jg_num(a, n, 0, &x, "camara") || !jg_num(a, n, 1, &y, "camara")) return valor_nulo();
-        _jgs.cam_x = x; _jgs.cam_y = y;
+        _jgs.cu_x = x; _jgs.cu_y = y;
+        _jgs.cam_quieta = 0;
     } else if (n == 0) {
-        _jgs.cam_x = _jgs.cam_y = 0;
+        _jgs.cu_x = _jgs.cu_y = 0;
+        _jgs.cam_quieta = 1;
     } else {
         return jg_error("ErrorTipo", "camara() espera (x, y) o nada");
     }
+    jg_cam_aplicar();
     Valor *l = valor_lista_crear();
-    lista_agregar(l, valor_numero(_jgs.cam_x));
-    lista_agregar(l, valor_numero(_jgs.cam_y));
+    lista_agregar(l, valor_numero(_jgs.cu_x));
+    lista_agregar(l, valor_numero(_jgs.cu_y));
     return l;
+}
+
+/* temblor(fuerza[, segundos]): la cámara tiembla hasta 'fuerza' píxeles y se
+   va calmando (0,3 s si no se dice). Uno nuevo más fuerte sustituye al de antes. */
+static Valor *fn_jg_temblor(Valor **a, int n) {
+    JG_ABIERTA();
+    double f, s = 0.3;
+    if (!jg_num(a, n, 0, &f, "temblor")) return valor_nulo();
+    if (n > 1 && !jg_num(a, n, 1, &s, "temblor")) return valor_nulo();
+    if (f < 0 || s < 0) return jg_error("Error", "temblor(): la fuerza y los segundos no pueden ser negativos");
+    double real = jg_reloj_real(), queda = 0;
+    if (_jgs.tem_dur > 0 && real < _jgs.tem_desde + _jgs.tem_dur)
+        queda = _jgs.tem_fuerza * (1 - (real - _jgs.tem_desde) / _jgs.tem_dur);
+    if (f >= queda) { _jgs.tem_fuerza = f; _jgs.tem_desde = real; _jgs.tem_dur = s; }
+    return valor_nulo();
+}
+
+/* congelar(segundos): el juego se para ese tiempo (de verdad, no del juego):
+   dt() da 0 y las animaciones, partículas y suavizar() se quedan quietas. Es
+   el parón de cuando un golpe acierta; las escenas y el temblor siguen. */
+static Valor *fn_jg_congelar(Valor **a, int n) {
+    JG_ABIERTA();
+    double s;
+    if (!jg_num(a, n, 0, &s, "congelar")) return valor_nulo();
+    if (s < 0 || s > 10) return jg_error("Error", "congelar(): los segundos van de 0 a 10");
+    if (!_jgs.reloj_propio) { _jgs.reloj = jg_reloj_real(); _jgs.reloj_propio = 1; }
+    double hasta = jg_reloj_real() + s;
+    if (hasta > _jgs.congelar_hasta) _jgs.congelar_hasta = hasta;
+    return valor_nulo();
+}
+
+/* velocidad([v]): lo rápido que pasa el tiempo del juego (1 normal, 0,3 cámara
+   lenta, 0 pausa). Sin nada, dice la que hay. */
+static Valor *fn_jg_velocidad(Valor **a, int n) {
+    if (n > 0) {
+        double v;
+        if (!jg_num(a, n, 0, &v, "velocidad")) return valor_nulo();
+        if (v < 0 || v > 10) return jg_error("Error", "velocidad(): va de 0 (parado) a 10 (1 es lo normal)");
+        if (!_jgs.reloj_propio) { _jgs.reloj = jg_reloj_real(); _jgs.reloj_propio = 1; }
+        _jgs.velocidad = v;
+    }
+    return valor_numero(_jgs.velocidad);
 }
 
 /* pantalla_completa([sí/no]): sin argumento alterna. El juego se escala sin deformarse. */
@@ -3792,12 +4035,18 @@ static Valor *fn_jg_pantalla_completa(Valor **a, int n) {
     return valor_booleano(_jgs.completa);
 }
 
-/* tiempo(): segundos desde que se abrió la ventana (para animaciones) */
-/* Segundos desde que se abrió la ventana (en el modo de prueba, fotogramas / 60) */
-static double jg_reloj(void) {
+/* Segundos de verdad desde que se abrió la ventana (en el modo de prueba, fotogramas / 60) */
+static double jg_reloj_real(void) {
     if (!_jgs.abierta) return 0;
     if (_jgs.limite) return _jgs.total / 60.0;
     return jg_ahora() - _jgs.t_inicio;
+}
+
+/* tiempo(): segundos de juego desde que se abrió la ventana (para animaciones):
+   la suma de los dt, así que se para con congelar() y sigue a velocidad() */
+static double jg_reloj(void) {
+    if (!_jgs.abierta) return 0;
+    return _jgs.reloj_propio ? _jgs.reloj : jg_reloj_real();
 }
 
 static Valor *fn_jg_tiempo(Valor **a, int n) {
@@ -4100,6 +4349,49 @@ static Valor *fn_jg_accion(Valor **a, int n)          { return jg_accion(a, n, 0
 static Valor *fn_jg_accion_pulsada(Valor **a, int n)  { return jg_accion(a, n, 1, "accion_pulsada"); }
 static Valor *fn_jg_accion_soltada(Valor **a, int n)  { return jg_accion(a, n, 2, "accion_soltada"); }
 
+/* En presentar(): apunta las acciones que se acaban de pulsar (para combo()) */
+static void jg_historial(void) {
+    double t = jg_reloj_real();
+    for (int i = 0; i < _jgs.nacciones; i++) {
+        if (jg_accion_fuerza(&_jgs.acciones[i], 0) < 0.5f || jg_accion_fuerza(&_jgs.acciones[i], 1) >= 0.5f) continue;
+        if (_jgs.nhist == JG_HISTORIAL) memmove(_jgs.hist, _jgs.hist + 1, sizeof _jgs.hist[0] * --_jgs.nhist);
+        _jgs.hist[_jgs.nhist].accion = i;
+        _jgs.hist[_jgs.nhist].t = t;
+        _jgs.hist[_jgs.nhist++].usada = 0;
+    }
+}
+
+/* combo(acciones[, segundos]): ¿se han pulsado esas acciones en ese orden en
+   los últimos 'segundos' (0,5 si no se dice)? Puede haber otras pulsaciones en
+   medio. Cuando da verdadero, esas pulsaciones se gastan: no valen para otro
+   combo (así que se pregunta antes por los combos largos). Con una sola
+   acción sirve para no perder una pulsación hecha un poco antes de tiempo:
+   combo(["golpe"], 0.2) en vez de accion_pulsada("golpe"). */
+static Valor *fn_jg_combo(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_LISTA || a[0]->lista.cantidad < 1 || a[0]->lista.cantidad > JG_HISTORIAL)
+        return jg_error("ErrorTipo", "combo() espera (lista de acciones[, segundos]), por ejemplo ([\"abajo\", \"adelante\", \"golpe\"], 0.5)");
+    double s = 0.5;
+    if (n > 1 && !jg_num(a, n, 1, &s, "combo")) return valor_nulo();
+    int m = a[0]->lista.cantidad, idx[JG_HISTORIAL], usadas[JG_HISTORIAL];
+    for (int i = 0; i < m; i++) {
+        Valor *v = a[0]->lista.elementos[i];
+        Valor *arg[1] = {v};
+        JgAccion *acc = jg_accion_arg(arg, 1, 0, "combo");
+        if (!acc) return valor_nulo();
+        idx[i] = (int)(acc - _jgs.acciones);
+    }
+    double limite = jg_reloj_real() - s - 1e-9;
+    int j = _jgs.nhist - 1;
+    for (int i = m - 1; i >= 0; i--) {
+        while (j >= 0 && _jgs.hist[j].t >= limite && (_jgs.hist[j].usada || _jgs.hist[j].accion != idx[i])) j--;
+        if (j < 0 || _jgs.hist[j].t < limite) return valor_booleano(0);
+        usadas[i] = j--;
+    }
+    for (int i = 0; i < m; i++) _jgs.hist[usadas[i]].usada = 1;
+    return valor_booleano(1);
+}
+
 /* direccion(negativa, positiva): de -1 a 1, gradual con el stick y entera con teclas.
    Ejemplo: x = x + juego.direccion("izquierda", "derecha") * velocidad * juego.dt() */
 static Valor *fn_jg_direccion(Valor **a, int n) {
@@ -4293,7 +4585,7 @@ static Valor *fn_jg_acercar(Valor **a, int n) {
    las mueve y las dibuja (llámala cada fotograma, donde quieras que salgan). */
 static const char *const JG_OPC_PART[] = {
     "cantidad", "color", "color_final", "velocidad", "direccion", "apertura", "vida",
-    "tamaño", "tamano", "tamaño_final", "tamano_final", "gravedad", NULL };
+    "tamaño", "tamano", "tamaño_final", "tamano_final", "gravedad", "mezcla", NULL };
 
 /* Número u [mínimo, máximo] (al azar entre los dos) */
 static int jg_rango(Valor *op, const char *clave, double *min, double *max) {
@@ -4328,7 +4620,7 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
             if (!bien) {
                 char msg[400];
                 snprintf(msg, sizeof msg, "particulas(): opción desconocida '%s'. Las opciones son: cantidad, color, "
-                         "color_final, velocidad, direccion, apertura, vida, tamaño, tamaño_final y gravedad", k);
+                         "color_final, velocidad, direccion, apertura, vida, tamaño, tamaño_final, gravedad y mezcla", k);
                 return jg_error("Error", msg);
             }
         }
@@ -4351,6 +4643,13 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
     memcpy(c_fin, c, 4);
     c_fin[3] = 0;                                           /* por defecto se desvanece */
     if (vf) { arg[0] = vf; if (!jg_color(arg, 1, 0, c_fin)) return valor_nulo(); }
+    int sumar = 0;
+    Valor *mz = jg_opcion_valor(op, "mezcla");
+    if (mz) {
+        if (mz->tipo != VAL_TEXTO || (strcmp(mz->texto, "sumar") && strcmp(mz->texto, "normal")))
+            return jg_error("Error", "particulas(): \"mezcla\" es \"normal\" o \"sumar\" (para chispas y energía que brillan)");
+        sumar = !strcmp(mz->texto, "sumar");
+    }
     int cuantas = cantidad < 0 ? 0 : cantidad > JG_PARTICULAS ? JG_PARTICULAS : (int)cantidad;
     for (int i = 0; i < cuantas; i++) {
         JgParticula *p;
@@ -4366,6 +4665,7 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
         p->tam_fin = fin0 < 0 ? p->tam : (float)jg_azar_entre(fin0, fin1);
         memcpy(p->c, c, 4);
         memcpy(p->c_fin, c_fin, 4);
+        p->sumar = (unsigned char)sumar;
     }
     return valor_nulo();
 }
@@ -4375,7 +4675,7 @@ static Valor *fn_jg_dibujar_particulas(Valor **a, int n) {
     (void)a; (void)n;
     JG_ABIERTA();
     float dt = (float)_jgs.dt;
-    int vivas = 0;
+    int vivas = 0, modo = 0;
     _jg.SetBlend(_jgs.render, 1);
     for (int i = 0; i < _jgs.npart; i++) {
         JgParticula p = _jgs.part[i];
@@ -4390,12 +4690,14 @@ static Valor *fn_jg_dibujar_particulas(Valor **a, int n) {
         for (int k = 0; k < 4; k++) c[k] = (unsigned char)(p.c[k] + (p.c_fin[k] - p.c[k]) * t);
         float tam = p.tam + (p.tam_fin - p.tam) * t;
         if (tam < 0.5f || c[3] == 0) continue;
+        if (p.sumar != modo) { modo = p.sumar; _jg.SetBlend(_jgs.render, modo ? 2 : 1); }
         _jg.SetDrawColor(_jgs.render, c[0], c[1], c[2], c[3]);
         JgRect r = {(int)floorf(p.x - tam / 2 - (float)_jgs.cam_x), (int)floorf(p.y - tam / 2 - (float)_jgs.cam_y),
                     (int)ceilf(tam), (int)ceilf(tam)};
         _jg.FillRect(_jgs.render, &r);
     }
     _jgs.npart = vivas;
+    if (modo) _jg.SetBlend(_jgs.render, 1);
     return valor_numero(vivas);
 }
 
@@ -4429,7 +4731,7 @@ static Valor *fn_jg_cambiar_escena(Valor **a, int n) {
     snprintf(_jgs.siguiente, sizeof _jgs.siguiente, "%s", a[0]->texto);
     _jgs.hay_siguiente = 1;
     _jgs.fundido = f > 0 ? f : 0;
-    if (f > 0 && _jgs.fase != 1) { _jgs.fase = 1; _jgs.t_fundido = jg_reloj(); }
+    if (f > 0 && _jgs.fase != 1) { _jgs.fase = 1; _jgs.t_fundido = jg_reloj_real(); }
     return valor_nulo();
 }
 
@@ -4440,7 +4742,7 @@ static Valor *fn_jg_tiempo_escena(Valor **a, int n) { (void)a; (void)n; return v
 /* En presentar(): hace el cambio pendiente y dibuja el fundido */
 static void jg_escenas(void) {
     _jgs.escena_nueva = 0;
-    double ahora = jg_reloj();
+    double ahora = jg_reloj_real();           /* el fundido no se para con congelar() */
     if (_jgs.hay_siguiente && _jgs.fase != 1) {
         _jgs.hay_siguiente = 0;
         jg_poner_escena(_jgs.siguiente);
@@ -5162,6 +5464,8 @@ static void cargar_juego(Entorno *entorno) {
         {"animador",        fn_jg_animador,        -1},
         {"animacion",       fn_jg_animacion,       -1},
         {"acabada",         fn_jg_acabada,          1},
+        {"golpe",           fn_jg_golpe,           -1},
+        {"libre",           fn_jg_libre,            1},
         {"pisada",          fn_jg_pisada,           1},
         {"animar",          fn_jg_animar,          -1},
         {"guardar_imagen",  fn_jg_guardar_imagen,   2},
@@ -5171,6 +5475,9 @@ static void cargar_juego(Entorno *entorno) {
         {"musica",          fn_jg_musica,          -1},
         {"volumen",         fn_jg_volumen,         -1},
         {"camara",          fn_jg_camara,          -1},
+        {"temblor",         fn_jg_temblor,         -1},
+        {"congelar",        fn_jg_congelar,         1},
+        {"velocidad",       fn_jg_velocidad,       -1},
         {"pantalla_completa", fn_jg_pantalla_completa, -1},
         {"tiempo",          fn_jg_tiempo,           0},
         {"mandos",          fn_jg_mandos,           0},
@@ -5186,6 +5493,7 @@ static void cargar_juego(Entorno *entorno) {
         {"accion",          fn_jg_accion,           1},
         {"accion_pulsada",  fn_jg_accion_pulsada,   1},
         {"accion_soltada",  fn_jg_accion_soltada,   1},
+        {"combo",           fn_jg_combo,           -1},
         {"direccion",       fn_jg_direccion,        2},
         {"recargado",       fn_jg_recargado,        0},
         {"colision_circulos", fn_jg_colision_circulos, 6},

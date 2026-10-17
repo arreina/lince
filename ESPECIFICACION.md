@@ -767,10 +767,10 @@ mientras juego.abierto() {
 
 | Función | Qué hace |
 |---|---|
-| `abrir(título, ancho, alto)` / `cerrar()` / `salir()` | abre la ventana / la destruye / pide terminar el bucle (`abierto()` pasa a falso, como al pulsar la X) |
+| `abrir(título, ancho, alto[, {"escala": n}])` / `cerrar()` / `salir()` | abre la ventana / la destruye / pide terminar el bucle (`abierto()` pasa a falso, como al pulsar la X). Con `escala`, la ventana es `n` veces mayor y cada píxel del juego se ve como un cuadrado de n × n: `abrir("Pelea", 320, 180, {"escala": 3})` para un juego de píxeles grandes, como los de consola portátil; todo se sigue midiendo en 320 × 180 |
 | `abierto()` · `titulo(t)` · `ancho()` · `alto()` | estado y tamaño |
 | `presentar()` | muestra lo dibujado, espera al siguiente fotograma y actualiza la entrada y `dt()` |
-| `dt()` · `fps()` · `tiempo()` | segundos del último fotograma · fotogramas por segundo · segundos desde que se abrió |
+| `dt()` · `fps()` · `tiempo()` | segundos del último fotograma · fotogramas por segundo · segundos desde que se abrió. Son tiempo de juego: se paran con `congelar()` y van más despacio con `velocidad()` (ver **Peleas**) |
 | `pantalla_completa([sí/no])` | sin argumento alterna; el juego se escala sin deformarse y el ratón sigue en coordenadas del juego |
 
 **Dibujo**
@@ -782,7 +782,7 @@ mientras juego.abierto() {
 | `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
 | `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
 | `texto(t, x, y, opciones)` · `ancho_texto(t, opciones)` · `medir_texto(t[, opciones])` | con otra fuente, alineado o partido en líneas (ver **Letras**, abajo). `medir_texto` da `[ancho, alto]` |
-| `camara(x, y)` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador |
+| `camara(x, y)` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador, que tampoco tiembla con `temblor()` |
 | `captura(ruta)` | guarda la ventana como `.bmp` |
 
 **Letras.** Además de la fuente incluida, `fuente()` carga una fuente TrueType u OpenType
@@ -820,7 +820,7 @@ minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del j
 | `hoja(imagen o ruta[, cómo dividirla])` | una imagen con varios cuadros (los fotogramas de una animación, los tiles de un mapa) partida en esos cuadros; ver **Hojas de sprites** más abajo. También vale una imagen hecha con `sprite()` |
 | `animar(imagen o ruta, tipo[, opciones])` | genera una animación a partir de un solo dibujo y la devuelve como hoja (ver abajo) |
 | `guardar_imagen(imagen, ruta)` | guarda una imagen (un sprite, una hoja generada...) como `.png`, por ejemplo para retocarla en un editor |
-| `dibujar(imagen, x, y[, opciones])` | dibuja la imagen; `opciones` es un diccionario con cualquiera de: `escala`, `ancho`, `alto`, `angulo` (grados), `espejo`, `voltear`, `centrado` (x, y es el centro), `alfa` (0–255), `color` (tinte), `recorte` (`[x, y, ancho, alto]`), `cuadro` (el número de cuadro de una hoja; con una imagen normal, indica también `celda`: `[ancho, alto]` de cada cuadro) y `fila` (en una hoja con una animación por fila, cuenta `cuadro` dentro de esa fila) |
+| `dibujar(imagen, x, y[, opciones])` | dibuja la imagen; `opciones` es un diccionario con cualquiera de: `escala`, `ancho`, `alto`, `angulo` (grados), `espejo`, `voltear`, `centrado` (x, y es el centro), `alfa` (0–255), `color` (tinte), `blanco` (de 0 a 1: lo tiñe de blanco, el destello de cuando a alguien le dan), `mezcla` (`"sumar"`: lo dibujado se suma a lo de debajo y brilla, para energía, fuego y luces; `"multiplicar"`: oscurece, para sombras), `recorte` (`[x, y, ancho, alto]`), `cuadro` (el número de cuadro de una hoja; con una imagen normal, indica también `celda`: `[ancho, alto]` de cada cuadro) y `fila` (en una hoja con una animación por fila, cuenta `cuadro` dentro de esa fila) |
 
 **Entrada**
 
@@ -995,11 +995,12 @@ juego.dibujar(pj, x, y, {"centrado": verdadero, "espejo": mira_izquierda})
 
 | Función | Qué hace |
 |---|---|
-| `animador(hoja, animaciones[, inicial])` | crea el animador. Cada animación tiene un nombre y un diccionario con: `fila` (de la hoja; si no se dice, todos los cuadros), `cuadros` (cuáles y en qué orden, contando dentro de la fila: `[0, 1, 2, 1]`), `por_segundo` (10), `repetir` (verdadero; falso: se queda en el último cuadro), `siguiente` (la que va después de una que no se repite), `pisadas` (verdadero, falso o la lista de cuadros con pisada; si no se dice, se calculan en las que se repiten) y `hoja` (si esa animación está en otra hoja, por ejemplo una de `animar()`). Empieza con `inicial`, o con la primera |
+| `animador(hoja, animaciones[, inicial])` | crea el animador. Cada animación tiene un nombre y un diccionario con: `fila` (de la hoja; si no se dice, todos los cuadros), `cuadros` (cuáles y en qué orden, contando dentro de la fila: `[0, 1, 2, 1]`), `por_segundo` (10), `repetir` (verdadero; falso: se queda en el último cuadro), `siguiente` (la que va después de una que no se repite), `pisadas` (verdadero, falso o la lista de cuadros con pisada; si no se dice, se calculan en las que se repiten), `golpes` y `cancelar` (ver **Peleas**) y `hoja` (si esa animación está en otra hoja, por ejemplo una de `animar()`). Empieza con `inicial`, o con la primera. Sin `cuadros`, una animación de una hoja en rejilla no cuenta las celdas vacías del final de su fila (una fila de 8 celdas con 6 dibujos es una animación de 6 cuadros) |
 | `animacion(animador, nombre[, desde_el_principio])` | pone esa animación. Si ya estaba puesta sigue por donde iba (se puede llamar en cada fotograma), salvo que se pida `desde_el_principio` |
 | `dibujar(animador, x, y[, opciones])` | dibuja el cuadro que toca, con las mismas opciones que una imagen |
 | `pisada(animador)` | ¿ha tocado un pie el suelo desde la última vez que se preguntó? Llámala una vez por fotograma |
 | `acabada(animador)` | ¿ha llegado al final una animación que no se repite? |
+| `golpe(animador, x, y[, opciones])` · `libre(animador)` | la caja con la que golpea ahora (o `nulo`) · ¿se puede pasar ya a otra animación? Ver **Peleas** |
 
 **Choques con lo que se ve.** En una hoja cada cuadro es una celda del mismo tamaño, y la figura
 no la llena: en una hoja descargada o hecha con IA suele haber mucho hueco transparente alrededor,
@@ -1020,6 +1021,62 @@ si juego.colision(juego.caja(pj, x, y, OPCIONES), juego.caja(PINCHO, px, py)) { 
 Para moverse por un mapa de casillas suele ir mejor un rectángulo fijo (el ancho del cuerpo y la
 altura de pie): si la caja cambiara con cada cuadro, al andar el personaje se engancharía en las
 paredes. `caja()` es para los golpes, los pinchos, las monedas y los enemigos.
+
+**Peleas.** En un juego de lucha o un beat'em up no basta con saber dónde está el cuerpo: hay que
+saber con qué golpea cada cuadro (el puño estirado, la espada, el pie) y en cuáles no golpea
+nada. Cada animación del animador puede llevar `"golpes"`: una lista de `[cuadro, x, y, ancho,
+alto]`, la caja que golpea en ese cuadro (contado en la secuencia de la animación, como
+`pisadas`), medida dentro de la celda con el personaje mirando a la derecha. `golpe()` la da
+colocada como la pone `dibujar()` con las mismas opciones (también girada con `espejo`), o `nulo`
+si en el cuadro que toca no golpea. Con `"cancelar": n`, desde ese cuadro se puede pasar a otra
+animación sin esperar a que acabe: así se encadenan los golpes de un combo. `libre()` dice si ya
+se puede (también si la animación se repite o ya acabó).
+
+```lince
+sea pj = juego.animador(LUCHADOR, {
+    "quieto":  {"fila": 0},
+    "golpe1":  {"fila": 3, "cuadros": [0, 1, 1], "repetir": falso, "siguiente": "quieto",
+                "golpes": [[1, 38, 24, 12, 12]], "cancelar": 2},
+    "golpe2":  {"fila": 3, "cuadros": [2, 3, 3], "repetir": falso, "siguiente": "quieto",
+                "golpes": [[1, 36, 26, 12, 12]]}
+})
+# en cada fotograma:
+si juego.libre(pj) y juego.combo(["golpe"], 0.25) {
+    si pj["actual"] == "golpe1" { juego.animacion(pj, "golpe2", verdadero) } sino { juego.animacion(pj, "golpe1", verdadero) }
+    ataque = ataque + 1                                # cada ataque golpea una vez a cada enemigo
+}
+sea g = juego.golpe(pj, x, y, {"espejo": mira < 0})
+si g != nulo {
+    para cada diccionario e en enemigos {
+        si e["golpeado_por"] != ataque y juego.colision(g, cuerpo(e)) {
+            e["golpeado_por"] = ataque
+            e["vida"] = e["vida"] - 1
+            e["destello"] = juego.tiempo()           # y al dibujarlo: {"blanco": ...}
+            juego.congelar(0.05)                     # el parón que hace que el golpe pese
+            juego.temblor(2)
+        }
+    }
+}
+```
+
+| Función | Qué hace |
+|---|---|
+| `golpe(animador, x, y[, opciones])` | la caja `[x, y, ancho, alto]` con la que golpea ahora, o `nulo`. Si en el mismo cuadro hay varias, las junta. Una animación que no se repite deja de golpear al acabar |
+| `libre(animador)` | ¿se puede cambiar ya de animación? (se repite, ha acabado o ha llegado a su `cancelar`) |
+| `combo(acciones[, segundos])` | ¿se han pulsado esas acciones en ese orden en los últimos `segundos` (0,5)? Puede haber otras pulsaciones en medio. Al dar verdadero, esas pulsaciones se gastan y ya no valen para otro combo, así que se pregunta antes por los largos: `["abajo", "adelante", "golpe"]` antes que `["golpe"]`. Con una sola acción sirve para no perder una pulsación que llega un poco antes de que el personaje pueda atacar: `combo(["golpe"], 0.25)` |
+| `congelar(segundos)` | para el juego ese tiempo (de verdad, no del juego): `dt()` da 0, y las animaciones, las partículas, `suavizar()` y `tiempo()` se quedan quietos. Unas centésimas al acertar un golpe (0,05 uno flojo, 0,1 uno fuerte) es lo que hace que se note. Los fundidos de las escenas y el temblor siguen |
+| `velocidad([v])` | lo rápido que pasa el tiempo del juego: 1 normal, 0,3 cámara lenta (el golpe final), 0 pausa. Sin nada, dice la que hay |
+| `temblor(fuerza[, segundos])` | la cámara tiembla hasta `fuerza` píxeles y se calma en `segundos` (0,3). Lo que se dibuja después de `camara()` (el marcador) no tiembla |
+
+`combo()` mira las acciones de `definir_accion()`. «Adelante» depende de hacia dónde mire el
+personaje: `combo(["abajo", "derecha", "golpe"])` si mira a la derecha. Los combos no pierden
+pulsaciones durante `congelar()`: se miden en tiempo de verdad.
+
+La inteligencia de los enemigos se escribe en Lince, normalmente como una máquina de estados: un
+`"estado"` en el diccionario de cada uno (acercarse, atacar, esperar, recibir, por los aires, en el
+suelo...) y lo que hace en cada uno, con `tiempo()` para saber cuánto lleva. Un truco de los
+beat'em up: que solo ataque uno a la vez y los demás ronden a cierta distancia, y que cada ataque
+empiece con un amago de unas décimas para que se pueda esquivar.
 
 Se pueden leer `pj["actual"]` (el nombre de la animación) y `pj["cuadro"]` (el cuadro de la hoja
 que se dibujó). Ejemplo: `10_paseo`, con las tres animaciones generadas por `animar()`.
@@ -1114,7 +1171,8 @@ Opciones (todas opcionales; las que admiten `[mínimo, máximo]` toman un valor 
 rango para cada partícula): `cantidad` (20), `color` (blanco), `color_final` (el mismo
 transparente: se desvanecen), `velocidad` en píxeles por segundo (`[60, 180]`), `direccion` en
 grados (0 = derecha, −90 = arriba) y `apertura` (360: en todas direcciones), `vida` en segundos
-(`[0.4, 0.8]`), `tamaño` (4) y `tamaño_final`, y `gravedad` (0). Una opción mal escrita da error.
+(`[0.4, 0.8]`), `tamaño` (4) y `tamaño_final`, `gravedad` (0) y `mezcla` (`"sumar"`: brillan, como
+las chispas de un golpe o la estela de una bola de energía). Una opción mal escrita da error.
 
 **Escenas.** Un nombre para cada parte del juego (portada, partida, fin...):
 
@@ -1166,7 +1224,9 @@ se omite es blanco. Teclas: `"a"`–`"z"`, `"0"`–`"9"`, `"arriba"`, `"abajo"`,
 
 Para pruebas automáticas (sin pantalla, con `SDL_VIDEODRIVER=dummy`): `LINCE_JUEGO_FOTOGRAMAS=N`
 cierra el juego tras N fotogramas de 1/60 s; `LINCE_JUEGO_PULSAR=espacio,derecha` y
-`LINCE_JUEGO_CLIC=x,y` pulsan en los fotogramas impares; `LINCE_JUEGO_ESCRIBIR=texto` teclea
+`LINCE_JUEGO_CLIC=x,y` pulsan en los fotogramas impares; `LINCE_JUEGO_GUION=30:derecha:20,50:z`
+mantiene derecha desde el fotograma 30 durante 20 y pulsa z en el 50 (un guion de teclas, para
+probar combos); `LINCE_JUEGO_ESCRIBIR=texto` teclea
 (`<` borra); `LINCE_JUEGO_CAPTURA=ruta.bmp` guarda el último fotograma y
 `LINCE_JUEGO_FOTOS=carpeta` todos; `LINCE_JUEGO_AUDIO=ruta.wav` guarda el sonido sincronizado con
 esos fotogramas (para hacer un vídeo con sonido) y `LINCE_JUEGO_SEMILLA=n` hace las partidas repetibles.

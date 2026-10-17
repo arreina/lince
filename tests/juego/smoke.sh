@@ -306,6 +306,44 @@ for (x, y), esp, nombre in casos:
     else: print("  ❌ letras:", nombre, "→", px(x, y)); mal += 1
 exit(1 if mal else 0)
 PY
+# ── Pelear: golpes por cuadro, combos, congelar, velocidad, temblor, blanco y mezcla ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100 \
+    LINCE_JUEGO_GUION=50:abajo,53:derecha,56:z,60:z,70:derecha,72:abajo,74:z \
+    timeout 20 "$LINCE" "$DIR/prueba12.lince" > salida16.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de pelear termina bien" || mal "la prueba de pelear falló"
+for l in "ventana: 120x60" "celdas: 6" "f0: golpe verdadero libre falso" "f3: golpe verdadero libre falso" "golpe: 105 22 5 6" \
+         "espejo: 100 22 5 6" "escala: 100 14 10 12" "libre: falso" "cancelar: verdadero verdadero" "despues: quieto verdadero" \
+         "vacias fuera: 0" "congelado: 0 0" "sigue: 10 5" "velocidad: 0.5" "lento: 10" "combo en 56, luego golpe solo: falso" \
+         "guardado en 66: verdadero" "guardado en 67: falso" "camara: 10"; do
+    grep -qxF "$l" salida16.txt && ok "pelear: $l" || mal "falta la línea: $l"
+done
+[ "$(grep -c '^combo en' salida16.txt)" -eq 1 ] && ok "pelear: el combo sale una sola vez" || mal "el combo sale más de una vez (o ninguna)"
+for e in "golpe() espera un animador" '"golpes" es una lista de [cuadro, x, y, ancho, alto]' '"cancelar" es el cuadro' \
+         "la acción 'nada' no está definida" "combo() espera (lista de acciones" "congelar(): los segundos van de 0 a 10" \
+         "velocidad(): va de 0" "temblor(): la fuerza" '"blanco" va de 0' '"mezcla" es "normal", "sumar"' 'particulas(): "mezcla"'; do
+    grep -qF "$e" salida16.txt && ok "pelear: error «$e»" || mal "falta el error: $e"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct
+d = open("golpes.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+def px(x, y):
+    fila = (abs(h) - 1 - y) if h > 0 else y
+    b, g, r = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 3]
+    return (r, g, b)
+mal = 0
+if (w, abs(h)) == (240, 120): print("  ✅ pelear: con escala 2 la ventana mide el doble")
+else: print("  ❌ pelear: la ventana mide", w, abs(h)); mal += 1
+casos = [((0, 0), (255, 255, 255), "tras camara() no tiembla"), ((10, 10), (100, 100, 100), "y acaba donde debe"),
+         ((121, 81), (255, 255, 255), "blanco 1: todo blanco"), ((141, 81), (255, 100, 100), "mezcla sumar"),
+         ((161, 81), (255, 127, 127), "blanco 0,5: a medias"), ((181, 81), (255, 0, 0), "sin nada: rojo"),
+         ((61, 61), (200, 100, 100), "partículas que suman")]
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ pelear:", nombre)
+    else: print("  ❌ pelear:", nombre, "→", px(x, y)); mal += 1
+exit(1 if mal else 0)
+PY
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
@@ -352,4 +390,4 @@ if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida5b.txt; exit 1; }
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida5b.txt; exit 1; }

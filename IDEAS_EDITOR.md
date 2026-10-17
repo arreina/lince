@@ -30,8 +30,12 @@ lenguaje no pueda hacer también escribiendo código.
 - **Ver las cajas de choque** (`juego.caja`) de cada cuadro encima de la
   animación, y ajustar el `margen` viéndolo; en el juego en marcha, una tecla
   para enseñarlas todas (hoy se dibujan a mano con `contorno`).
+- **Dibujar las cajas de golpe** (`"golpes"` del animador) con el ratón
+  sobre cada cuadro: el puño, la espada, el pie. Que escriba la lista
+  `[cuadro, x, y, ancho, alto]` y marque en la tira desde qué cuadro se puede
+  cancelar (`"cancelar"`).
 - **Diagrama de transiciones**: qué animación va después de cuál
-  (`"siguiente"`).
+  (`"siguiente"`), y qué golpe se encadena con cuál en un combo.
 - **Línea de tiempo con las pisadas** (`juego.pisadas`): las detectadas
   marcadas sobre los cuadros, para corregirlas a mano (`"pisadas": [...]`) y
   oírlas con el sonido de pasos elegido.
@@ -54,6 +58,15 @@ lenguaje no pueda hacer también escribiendo código.
 - **Ver las curvas** de `juego.suavizar` (`"rebote"`, `"elastico"`...)
   moviendo una bola, y elegir la que va con un clic.
 
+## Peleas
+
+- **Probar combos** (`juego.combo`): pulsar teclas y ver la lista de las
+  últimas acciones con su tiempo, y cuáles ha gastado cada combo.
+- **Ajustar el peso de los golpes** viendo uno en bucle: cuánto `congelar`,
+  cuánto `temblor` y cuánto dura el destello `blanco`.
+- **Ver la IA de los enemigos**: el estado de cada uno escrito encima
+  (acercarse, atacar, en el suelo...) y quién tiene el turno de atacar.
+
 ## Mapas
 
 - **Editor de mapas de casillas** (`juego.mapa`): pintar el nivel con los
@@ -74,7 +87,8 @@ lenguaje no pueda hacer también escribiendo código.
 
 - **Grabar un vídeo con sonido** del juego: lo que hoy se hace a mano con
   `LINCE_JUEGO_FOTOS`, `LINCE_JUEGO_AUDIO` y gstreamer, con un guion de
-  entradas (qué teclas y cuándo) que se pueda grabar jugando.
+  entradas (`LINCE_JUEGO_GUION`: qué teclas y cuándo) que se pueda grabar
+  jugando.
 - **Errores en el editor**: el mismo aviso que sale en la ventana del juego
   (recarga en caliente), con un enlace a la línea.
 - **Vista de partículas**: ajustar las opciones de `juego.particulas` viendo

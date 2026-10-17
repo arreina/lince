@@ -1,0 +1,103 @@
+# Prueba de lo de pelear: golpes por cuadro (golpe, "golpes", "cancelar",
+# libre), combos (combo, con LINCE_JUEGO_GUION), congelar, velocidad,
+# temblor, dibujar con "blanco" y "mezcla" y abrir con "escala".
+# Se ejecuta 100 fotogramas con
+#   LINCE_JUEGO_GUION=50:abajo,53:derecha,56:z,60:z,70:derecha,72:abajo,74:z
+importar "juego"
+importar "matematica"
+juego.abrir("Golpes", 120, 60, {"escala": 2})
+escribir("ventana: " + a_texto(juego.ancho()) + "x" + a_texto(juego.alto()))
+
+# una fila de 6 celdas de 10 × 10: 4 dibujadas y 2 vacías al final
+sea filas = []
+para cada numero i en rango(0, 10) { filas.agregar("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX....................") }
+fijo HOJA = juego.hoja(juego.sprite(filas, {"X": [255, 0, 0]}), 10, 10)
+escribir("celdas: " + a_texto(HOJA["por_fila"][0]))
+sea pj = juego.animador(HOJA, {
+    "quieto": {"fila": 0, "por_segundo": 10},
+    "golpe":  {"cuadros": [0, 1, 2], "por_segundo": 10, "repetir": falso, "siguiente": "quieto",
+               "golpes": [[1, 6, 2, 4, 3], [1, 5, 6, 2, 2]], "cancelar": 2}
+}, "golpe")
+juego.definir_accion("abajo", ["abajo"])
+juego.definir_accion("adelante", ["derecha"])
+juego.definir_accion("golpe", ["z"])
+
+funcion caja(val lista c): texto {
+    devolver a_texto(c[0]) + " " + a_texto(c[1]) + " " + a_texto(c[2]) + " " + a_texto(c[3])
+}
+
+intentar { juego.golpe(5, 0, 0) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar {
+    juego.animador(HOJA, {"a": {"golpes": [[0, 1, 2]]}})
+} capturar (error e) { escribir("error: " + e.mensaje) }
+intentar {
+    juego.animador(HOJA, {"a": {"cancelar": "ya"}})
+} capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.combo(["nada"]) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.combo("golpe") } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.congelar(-1) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.velocidad(20) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.temblor(-1) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.dibujar(HOJA, 0, 0, {"blanco": 2}) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.dibujar(HOJA, 0, 0, {"mezcla": "rara"}) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.particulas(0, 0, {"mezcla": "rara"}) } capturar (error e) { escribir("error: " + e.mensaje) }
+
+fijo ROJO = juego.sprite(["RRRR", "RRRR", "RRRR", "RRRR"], {"R": [255, 0, 0]})
+sea f = 0
+sea t1 = 0
+mientras juego.abierto() {
+    si f == 0 o f == 3 {
+        escribir("f" + a_texto(f) + ": golpe " + a_texto(juego.golpe(pj, 100, 20) == nulo) + " libre " + a_texto(juego.libre(pj)))
+    }
+    si f == 7 {
+        escribir("golpe: " + caja(juego.golpe(pj, 100, 20)))
+        escribir("espejo: " + caja(juego.golpe(pj, 100, 20, {"espejo": verdadero})))
+        escribir("escala: " + caja(juego.golpe(pj, 100, 20, {"escala": 2, "centrado": verdadero})))
+        escribir("libre: " + a_texto(juego.libre(pj)))
+    }
+    si f == 13 { escribir("cancelar: " + a_texto(juego.libre(pj)) + " " + a_texto(juego.golpe(pj, 0, 0) == nulo)) }
+    si f == 20 {
+        sea l = juego.libre(pj)                     # (de paso pasa a la siguiente)
+        escribir("despues: " + pj["actual"] + " " + a_texto(l))
+    }
+    si f == 42 {
+        juego.dibujar(pj, 0, 0)
+        escribir("vacias fuera: " + a_texto(pj["cuadro"]))
+    }
+    # congelar: el reloj del juego se para 0,1 s (6 fotogramas)
+    si f == 43 {
+        t1 = juego.tiempo()
+        juego.congelar(0.1)
+    }
+    si f == 46 { escribir("congelado: " + a_texto(juego.dt()) + " " + a_texto(juego.tiempo() - t1)) }
+    si f == 53 { escribir("sigue: " + a_texto(matematica.redondear(juego.dt() * 600)) + " " + a_texto(matematica.redondear((juego.tiempo() - t1) * 60))) }
+    si f == 55 { escribir("velocidad: " + a_texto(juego.velocidad(0.5))) }
+    si f == 57 {
+        escribir("lento: " + a_texto(matematica.redondear(juego.dt() * 1200)))
+        juego.velocidad(1)
+    }
+    # combos (las teclas las pulsa LINCE_JUEGO_GUION)
+    si f >= 50 y f < 80 {
+        si juego.combo(["abajo", "adelante", "golpe"], 0.5) {
+            escribir("combo en " + a_texto(f) + ", luego golpe solo: " + a_texto(juego.combo(["golpe"], 0.2)))
+        }
+    }
+    si f == 66 o f == 67 { escribir("guardado en " + a_texto(f) + ": " + a_texto(juego.combo(["golpe"], 0.2))) }
+    # temblor: el mundo tiembla, lo dibujado tras camara() no
+    si f == 80 {
+        juego.temblor(5, 0.5)
+        escribir("camara: " + a_texto(juego.camara(10, 0)[0]))
+    }
+    juego.limpiar([100, 100, 100])
+    juego.camara()
+    juego.rectangulo(0, 0, 5, 5, [255, 255, 255])
+    juego.dibujar(ROJO, 60, 40, {"blanco": 1})
+    juego.dibujar(ROJO, 70, 40, {"mezcla": "sumar"})
+    juego.dibujar(ROJO, 80, 40, {"blanco": 0.5})
+    juego.dibujar(ROJO, 90, 40)
+    si f == 98 { juego.particulas(30, 30, {"cantidad": 1, "mezcla": "sumar", "velocidad": 0, "color": [100, 0, 0], "color_final": [100, 0, 0]}) }
+    juego.dibujar_particulas()
+    si f == 98 { juego.captura("golpes.bmp") }
+    f = f + 1
+    juego.presentar()
+}
