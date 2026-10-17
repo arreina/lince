@@ -1,0 +1,66 @@
+# Prueba de lo de los juegos de lucha: mantenida (golpes cargados),
+# pulsaciones (machacar un botón), "colores" al cargar una imagen o una hoja
+# (otro traje), reproducir con "lado" y "tono" y partículas que multiplican.
+# Se ejecuta 80 fotogramas con
+#   LINCE_JUEGO_GUION=10:z:30,50:x,52:x,54:x  y  LINCE_JUEGO_AUDIO=lado.wav
+importar "juego"
+importar "matematica"
+
+intentar { juego.velocidad(0.5) } capturar (error e) { escribir("error: " + e.mensaje) }
+juego.abrir("Lucha", 60, 30)
+juego.definir_accion("cargar", ["z"])
+juego.definir_accion("puño", ["x"])
+
+intentar { juego.mantenida("nada") } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.mantenida("cargar", -1) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.pulsaciones("puño", 20) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.combo(["puño"], -0.2) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.particulas(0, 0, {"mezcla": "rara"}) } capturar (error e) { escribir("error: " + e.mensaje) }
+
+# Una tira de 5 píxeles: rojo, rojo oscuro, azul, gris y piel. Se cambia el
+# rojo por verde: el oscuro pasa a verde oscuro, lo demás no se toca.
+fijo TIRA = juego.sprite(["RODGP"], {"R": [200, 40, 40], "O": [100, 20, 20], "D": [40, 40, 200], "G": [128, 128, 128], "P": [200, 150, 120]})
+juego.guardar_imagen(TIRA, "tira.png")
+fijo VERDE = juego.imagen("tira.png", {"colores": [[[200, 40, 40], [40, 200, 40]]]})
+fijo OTRA = juego.imagen("tira.png", {"colores": [[[200, 40, 40], [40, 40, 200]]]})
+escribir("distintas: " + a_texto(VERDE["imagen"] != OTRA["imagen"]))
+escribir("la misma: " + a_texto(juego.imagen("tira.png", {"colores": [[[200, 40, 40], [40, 200, 40]]]})["imagen"] == VERDE["imagen"]))
+fijo HOJA = juego.hoja("tira.png", 1, 1, {"colores": [[[200, 40, 40], [40, 200, 40]]]})
+intentar { juego.imagen("tira.png", {"colores": [[1, 2]]}) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.imagen("tira.png", {"tinte": 1}) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.hoja("tira.png", 1, 1, {"tinte": 1}) } capturar (error e) { escribir("error: " + e.mensaje) }
+
+fijo PITO = juego.crear_efecto("moneda")
+intentar { juego.reproducir(PITO, {"lado": 2}) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.reproducir(PITO, {"tono": 9}) } capturar (error e) { escribir("error: " + e.mensaje) }
+intentar { juego.reproducir(PITO, {"volumen": 0.5, "eco": 1}) } capturar (error e) { escribir("error: " + e.mensaje) }
+
+sea f = 0
+mientras juego.abierto() {
+    si f == 0 { escribir("voz: " + a_texto(juego.reproducir(PITO, {"lado": 1, "volumen": 0.5}) > 0)) }
+    si f == 9 o f == 25 {
+        escribir("cargando " + a_texto(f) + ": " + a_texto(matematica.redondear(juego.mantenida("cargar") * 60)))
+    }
+    si f == 42 {
+        escribir("soltada: " + a_texto(juego.mantenida("cargar")) + " con margen: " +
+                 a_texto(matematica.redondear(juego.mantenida("cargar", 0.2) * 60)))
+    }
+    si f == 60 { escribir("tarde: " + a_texto(juego.mantenida("cargar", 0.2))) }
+    si f == 51 { escribir("gastada: " + a_texto(juego.combo(["puño"]))) }
+    si f == 56 {
+        escribir("pulsaciones: " + a_texto(juego.pulsaciones("puño")) + " en 0,05 s: " + a_texto(juego.pulsaciones("puño", 0.05)))
+    }
+    si f == 70 { escribir("tono: " + a_texto(juego.reproducir(PITO, {"tono": 2, "volumen": 0.5}) > 0)) }
+    juego.limpiar([200, 200, 200])
+    juego.camara()
+    juego.dibujar(VERDE, 0, 0)
+    juego.dibujar(HOJA, 0, 2, {"cuadro": 0})
+    juego.dibujar(HOJA, 1, 2, {"cuadro": 1})
+    si f == 78 {
+        juego.particulas(20, 20, {"cantidad": 1, "velocidad": 0, "mezcla": "multiplicar", "color": [128, 255, 255], "color_final": [128, 255, 255]})
+    }
+    juego.dibujar_particulas()
+    si f == 78 { juego.captura("lucha.bmp") }
+    f = f + 1
+    juego.presentar()
+}

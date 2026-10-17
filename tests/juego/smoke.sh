@@ -344,6 +344,50 @@ for (x, y), esp, nombre in casos:
     else: print("  ❌ pelear:", nombre, "→", px(x, y)); mal += 1
 exit(1 if mal else 0)
 PY
+# ── Lucha: mantenida, pulsaciones, "colores", reproducir con "lado" y "tono", partículas que multiplican ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=80 LINCE_JUEGO_GUION=10:z:30,50:x,52:x,54:x \
+    LINCE_JUEGO_AUDIO=lado.wav timeout 20 "$LINCE" "$DIR/prueba13.lince" > salida17.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de lucha termina bien" || mal "la prueba de lucha falló"
+for l in "distintas: verdadero" "la misma: verdadero" "voz: verdadero" "cargando 9: 0" "cargando 25: 15" "soltada: 0 con margen: 30" \
+         "gastada: verdadero" "pulsaciones: 3 en 0,05 s: 1" "tarde: 0" "tono: verdadero"; do
+    grep -qxF "$l" salida17.txt && ok "lucha: $l" || mal "falta la línea: $l"
+done
+for e in "la ventana no está abierta" "mantenida(): la acción 'nada' no está definida" "mantenida(): el margen va de 0 a 10" \
+         "pulsaciones(): los segundos van de 0 a 10" "combo(): los segundos van de 0 a 10" '"colores" es una lista de hasta 16 pares' \
+         'imagen(): no conozco la opción '"'"'tinte'"'"' (hay "fondo", "escala" y "colores")' '"escala" y "colores")' \
+         '"lado" va de -1' '"tono" va de 0.25 a 4' "no conozco la opción 'eco'" '"multiplicar" (humo que oscurece)'; do
+    grep -qF "$e" salida17.txt && ok "lucha: error «$e»" || mal "falta el error: $e"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, array
+d = open("lucha.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+def px(x, y):
+    fila = (abs(h) - 1 - y) if h > 0 else y
+    b, g, r = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 3]
+    return (r, g, b)
+casos = [((0, 0), (40, 200, 40), "colores: el rojo pasa a verde"), ((1, 0), (20, 100, 20), "colores: su sombra, a verde oscuro"),
+         ((2, 0), (40, 40, 200), "colores: el azul no se toca"), ((3, 0), (128, 128, 128), "colores: el gris no se toca"),
+         ((4, 0), (200, 150, 120), "colores: la piel no se toca"), ((0, 2), (40, 200, 40), "colores: también en una hoja"),
+         ((1, 2), (20, 100, 20), "colores: la hoja, la sombra"), ((20, 20), (100, 200, 200), "partículas que multiplican")]
+mal = 0
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ lucha:", nombre)
+    else: print("  ❌ lucha:", nombre, "→", px(x, y)); mal += 1
+s = array.array("h", open("lado.wav", "rb").read()[44:])
+izq, der = s[0::2], s[1::2]
+corte = 70 * 735                                            # la segunda voz empieza en el fotograma 70
+primera = [i for i in range(corte) if der[i]]
+segunda = [i for i in range(corte, len(der)) if der[i]]
+if primera and not any(izq[:corte]): print("  ✅ lucha: \"lado\": 1 suena solo a la derecha")
+else: print("  ❌ lucha: \"lado\": 1 suena también a la izquierda"); mal += 1
+largo1 = primera[-1] - primera[0] if primera else 0
+largo2 = segunda[-1] - segunda[0] if segunda else 0
+if largo1 and abs(largo2 * 2 - largo1) < 10: print("  ✅ lucha: \"tono\": 2 dura la mitad")
+else: print("  ❌ lucha: \"tono\": 2 dura", largo2, "y el normal", largo1); mal += 1
+exit(1 if mal else 0)
+PY
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
@@ -390,4 +434,4 @@ if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida5b.txt; exit 1; }
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida5b.txt; exit 1; }

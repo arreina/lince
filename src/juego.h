@@ -115,13 +115,17 @@ typedef struct { char tipo[16]; int cuadros, piernas, centro, frente; double int
    falta. origen: la imagen de la que se generó la animación, o -1. */
 /* Cómo se prepara una imagen descargada: quitar el fondo (modo 0 nada, 1 auto,
    2 color) y reducirla (ver jg_preparar) */
-typedef struct { int modo; unsigned char color[3]; double escala; } JgPreparar;
-typedef struct { void *tex; int ancho, alto; char *ruta; long long mtime, tam;
+#define JG_COLORES 16
+typedef struct { int modo; unsigned char color[3]; double escala;
+                 int ncolores; unsigned char colores[JG_COLORES][6]; } JgPreparar;   /* "colores": [de, a] */
+/* version: cambia cada vez que cambia la textura (para las cachés que salen de ella) */
+typedef struct { void *tex; unsigned version; int ancho, alto; char *ruta; long long mtime, tam;
                  unsigned char *px; int origen; JgReceta receta; JgPreparar prep; } JgImagen;
 typedef struct { short *datos; int muestras; char *ruta; long long mtime, tam; } JgSonido;   /* muestras por canal */
 typedef struct {
-    const short *datos; int muestras, pos, bucle, activa, id;
-    float vol;
+    const short *datos; int muestras, bucle, activa, id;
+    double pos;           /* en muestras por canal; avanza 'paso' cada vez (el "tono") */
+    float vol, izq, der, paso;
     short *propio;        /* pitidos: la voz es dueña de sus datos */
 } JgVoz;
 
@@ -142,7 +146,9 @@ typedef struct {
 /* Una entrada de una acción: tecla, botón del mando, botón del ratón o eje del mando
    hacia un lado. mando = -1: cualquiera. */
 typedef struct { char tipo; int codigo, mando, signo; } JgEntrada;
-typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; int n; } JgAccion;
+/* desde: cuándo se empezó a pulsar (-1: no está pulsada); soltada: cuándo se
+   soltó la última vez, tras 'duro' segundos pulsada (para mantenida()) */
+typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; int n; double desde, soltada, duro; } JgAccion;
 
 /* Mapa de casillas: un carácter ASCII por casilla, fila a fila */
 typedef struct {
@@ -157,7 +163,7 @@ typedef struct {
 typedef struct {
     float x, y, vx, vy, grav, vida, total, tam, tam_fin;
     unsigned char c[4], c_fin[4];
-    unsigned char sumar;                 /* "mezcla": "sumar": brilla (se suma a lo de debajo) */
+    unsigned char mezcla;                /* como en SDL: 1 normal, 2 "sumar" (brilla), 4 "multiplicar" (oscurece) */
 } JgParticula;
 
 static struct {
@@ -243,7 +249,11 @@ static struct {
     /* LINCE_JUEGO_GUION: teclas mantenidas desde un fotograma durante otros tantos */
     struct { long desde, cuantos; int tecla; } guion[JG_GUION];
     int nguion;
+    int zoom;                   /* la "escala" de abrir() */
 } _jgs;
+
+static unsigned _jg_version_tex;
+static void jg_poner_textura(JgImagen *im, void *tex) { im->tex = tex; im->version = ++_jg_version_tex; }
 
 static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
@@ -502,12 +512,16 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     if (_jgs.abierta && _jgs.reabrir) {          /* programa recargado: la ventana sigue */
         _jgs.reabrir = 0;
         _jg.SetTitle(_jgs.ventana, a[0]->texto);
-        if ((int)w != _jgs.ancho || (int)h != _jgs.alto) {
+        if ((int)w != _jgs.ancho || (int)h != _jgs.alto || (int)z != _jgs.zoom) {
             if (_jg.SetWindowSize && !_jgs.completa) _jg.SetWindowSize(_jgs.ventana, (int)(w * z), (int)(h * z));
             _jg.LogicalSize(_jgs.render, (int)w, (int)h);
-            _jgs.ancho = (int)w; _jgs.alto = (int)h;
+            _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.zoom = (int)z;
         }
-        _jgs.cu_x = _jgs.cu_y = 0;
+        /* el tiempo vuelve a correr normal y se olvidan temblor y pulsaciones */
+        _jgs.cu_x = _jgs.cu_y = _jgs.tem_x = _jgs.tem_y = 0;
+        _jgs.tem_dur = 0;
+        _jgs.velocidad = 1; _jgs.congelar_hasta = 0;
+        _jgs.nhist = 0;
         jg_cam_aplicar();
         _jgs.cierre = 0;
         return valor_nulo();
@@ -551,7 +565,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     _jgs.volumen = 1;
     _jgs.voz_musica = 0;
     _jgs.t_inicio = jg_ahora();
-    _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.cierre = 0;
+    _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.zoom = (int)z; _jgs.cierre = 0;
     _jgs.limite = 0; _jgs.total = 0; _jgs.npulsar = 0; _jgs.hay_clic = 0;
     const char *e = getenv("LINCE_JUEGO_FOTOGRAMAS");
     if (e && atol(e) > 0) _jgs.limite = atol(e);
@@ -1025,7 +1039,7 @@ static void jg_recargar_recursos(void) {
         void *tex;
         if (!jg_leer_textura(im->ruta, &tex, msg, sizeof msg)) continue;   /* a medio guardar: luego */
         _jg.DestroyTexture(im->tex);
-        im->tex = tex;
+        jg_poner_textura(im, tex);
         _jg.QueryTexture(tex, NULL, NULL, &im->ancho, &im->alto);
         im->mtime = m; im->tam = t;
         jg_rehacer_animaciones(i);              /* las generadas con animar() a partir de ella */
@@ -1044,7 +1058,7 @@ static void jg_recargar_recursos(void) {
             if (vz->datos != so->datos) continue;
             vz->datos = datos;
             vz->muestras = muestras;
-            if (vz->pos >= muestras) vz->pos = 0;
+            if ((int)vz->pos >= muestras) vz->pos = 0;
         }
         short *viejo = so->datos;
         so->datos = datos;
@@ -1171,25 +1185,29 @@ static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
     (void)datos;
     short *salida = (short *)flujo;
     int muestras = largo / (int)sizeof(short);           /* L y R intercaladas */
-    for (int i = 0; i < muestras; i++) {
-        int acc = 0;
+    for (int i = 0; i + 1 < muestras; i += 2) {
+        float acc[2] = {0, 0};
         for (int v = 0; v < JG_VOCES; v++) {
             JgVoz *voz = &_jgs.voces[v];
             if (!voz->activa) continue;
-            int total = voz->muestras * JG_CANALES;
-            if (voz->pos >= total) {
-                if (voz->bucle && total > 0) voz->pos = 0;
+            if ((int)voz->pos >= voz->muestras) {
+                if (voz->bucle && voz->muestras > 0) voz->pos = 0;
                 else { voz->activa = 0; continue; }
             }
-            acc += (int)(voz->datos[voz->pos++] * voz->vol);
+            const short *m = voz->datos + (size_t)voz->pos * JG_CANALES;
+            acc[0] += m[0] * voz->vol * voz->izq;
+            acc[1] += m[1] * voz->vol * voz->der;
+            voz->pos += voz->paso;
         }
-        if (_jgs.flujo.activa && _jgs.flujo.lleno > 0) {           /* música en streaming */
-            acc += (int)(_jgs.flujo.anillo[_jgs.flujo.lee] * _jgs.flujo.vol);
-            _jgs.flujo.lee = (_jgs.flujo.lee + 1) % _jgs.flujo.cap;
-            _jgs.flujo.lleno--;
+        for (int c = 0; c < 2; c++) {
+            if (_jgs.flujo.activa && _jgs.flujo.lleno > 0) {       /* música en streaming */
+                acc[c] += _jgs.flujo.anillo[_jgs.flujo.lee] * _jgs.flujo.vol;
+                _jgs.flujo.lee = (_jgs.flujo.lee + 1) % _jgs.flujo.cap;
+                _jgs.flujo.lleno--;
+            }
+            int t = (int)(acc[c] * _jgs.volumen);
+            salida[i + c] = (short)(t > 32767 ? 32767 : t < -32768 ? -32768 : t);
         }
-        acc = (int)(acc * _jgs.volumen);
-        salida[i] = (short)(acc > 32767 ? 32767 : acc < -32768 ? -32768 : acc);
     }
 }
 
@@ -1253,6 +1271,7 @@ static int jg_sonar(const short *datos, int muestras, float vol, int bucle, shor
     JgVoz *voz = &_jgs.voces[libre];
     voz->datos = datos; voz->muestras = muestras; voz->pos = 0;
     voz->vol = vol; voz->bucle = bucle; voz->propio = propio;
+    voz->izq = voz->der = voz->paso = 1;
     voz->id = ++_jgs.siguiente_voz;
     voz->activa = 1;
     _jg.UnlockAudio(_jgs.audio);
@@ -1518,11 +1537,45 @@ static JgSonido *jg_sonido_arg(Valor **a, int n, const char *fn) {
     return &_jgs.sonidos[k];
 }
 
-/* reproducir(sonido[, volumen[, bucle]]): devuelve el número de la voz */
+/* reproducir(sonido[, volumen[, bucle]]) o reproducir(sonido, opciones):
+   devuelve el número de la voz. Opciones: "volumen" (0 a 1), "bucle",
+   "lado" (-1 izquierda, 0 en medio, 1 derecha: suena de donde pasa) y
+   "tono" (1 normal, 2 una octava más agudo y el doble de rápido, 0.5 más
+   grave; variarlo un poco hace que un golpe repetido no suene a calco). */
 static Valor *fn_jg_reproducir(Valor **a, int n) {
     JG_ABIERTA();
     JgSonido *s = jg_sonido_arg(a, n, "reproducir");
     if (!s) return valor_nulo();
+    if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
+        Valor *op = a[1];
+        for (int j = 0; j < op->diccionario.cantidad; j++) {
+            const char *c = op->diccionario.claves[j];
+            if (strcmp(c, "volumen") && strcmp(c, "bucle") && strcmp(c, "lado") && strcmp(c, "tono")) {
+                char msg[200];
+                snprintf(msg, sizeof msg, "reproducir(): no conozco la opción '%s' (hay \"volumen\", \"bucle\", \"lado\" y \"tono\")", c);
+                return jg_error("Error", msg);
+            }
+        }
+        double vol = 1, lado = 0, tono = 1, b = 0;
+        jg_opcion(op, "volumen", &vol); jg_opcion(op, "lado", &lado); jg_opcion(op, "tono", &tono);
+        Valor *vb = jg_opcion_valor(op, "bucle");
+        if (vb) { if (vb->tipo != VAL_BOOLEANO) return jg_error("ErrorTipo", "reproducir(): \"bucle\" es verdadero o falso"); b = vb->booleano; }
+        if (vol < 0 || vol > 1) return jg_error("Error", "reproducir(): \"volumen\" va de 0 a 1");
+        if (lado < -1 || lado > 1) return jg_error("Error", "reproducir(): \"lado\" va de -1 (izquierda) a 1 (derecha)");
+        if (tono < 0.25 || tono > 4) return jg_error("Error", "reproducir(): \"tono\" va de 0.25 a 4 (1 es el normal)");
+        int id = jg_sonar(s->datos, s->muestras, (float)vol, (int)b, NULL);
+        if (id > 0) {
+            _jg.LockAudio(_jgs.audio);
+            for (int v = 0; v < JG_VOCES; v++)
+                if (_jgs.voces[v].id == id) {
+                    _jgs.voces[v].izq = (float)(lado > 0 ? 1 - lado : 1);
+                    _jgs.voces[v].der = (float)(lado < 0 ? 1 + lado : 1);
+                    _jgs.voces[v].paso = (float)tono;
+                }
+            _jg.UnlockAudio(_jgs.audio);
+        }
+        return valor_numero(id);
+    }
     int bucle = n > 2 && a[2]->tipo == VAL_BOOLEANO && a[2]->booleano;
     return valor_numero(jg_sonar(s->datos, s->muestras, jg_volumen_arg(a, n, 1, 1), bucle, NULL));
 }
@@ -1658,7 +1711,7 @@ static Valor *jg_imagen_archivo(Valor **a, int n) {
     int k = _jgs.nimagenes++;
     memset(&_jgs.imagenes[k], 0, sizeof _jgs.imagenes[k]);
     _jgs.imagenes[k].origen = -1;
-    _jgs.imagenes[k].tex = tex;
+    jg_poner_textura(&_jgs.imagenes[k], tex);
     _jgs.imagenes[k].ruta = strdup(a[0]->texto);
     recarga_huella(a[0]->texto, &_jgs.imagenes[k].mtime, &_jgs.imagenes[k].tam);
     _jg.QueryTexture(tex, NULL, NULL, &_jgs.imagenes[k].ancho, &_jgs.imagenes[k].alto);
@@ -1681,7 +1734,7 @@ static int jg_nueva_imagen(const char *nombre, unsigned char *rgba, int ancho, i
     if (!tex) { free(rgba); return -1; }
     int k = _jgs.nimagenes++;
     memset(&_jgs.imagenes[k], 0, sizeof _jgs.imagenes[k]);
-    _jgs.imagenes[k].tex = tex;
+    jg_poner_textura(&_jgs.imagenes[k], tex);
     _jgs.imagenes[k].ruta = strdup(nombre);
     _jgs.imagenes[k].ancho = ancho;
     _jgs.imagenes[k].alto = alto;
@@ -1812,6 +1865,55 @@ static unsigned char *jg_reducir(const unsigned char *px, int w, int h, double f
     return o;
 }
 
+/* "colores": cada par [de, a] cambia el color 'de', y sus sombras y brillos
+   (los de un tono parecido), por 'a', conservando cuánto más claros u oscuros
+   eran: así se cambia la ropa de un personaje (el segundo jugador con otro
+   traje) con un solo color. */
+static void jg_rgb_hsv(const unsigned char *c, double *h, double *s, double *v) {
+    double r = c[0] / 255.0, g = c[1] / 255.0, b = c[2] / 255.0;
+    double mx = fmax(r, fmax(g, b)), mn = fmin(r, fmin(g, b)), d = mx - mn;
+    *v = mx; *s = mx > 0 ? d / mx : 0;
+    if (d <= 0) *h = 0;
+    else if (mx == r) *h = fmod((g - b) / d + 6, 6) * 60;
+    else if (mx == g) *h = ((b - r) / d + 2) * 60;
+    else *h = ((r - g) / d + 4) * 60;
+}
+static void jg_hsv_rgb(double h, double s, double v, unsigned char *c) {
+    h = fmod(h + 360, 360);
+    double f = h / 60, x = v * s * (1 - fabs(fmod(f, 2) - 1)), m = v - v * s, r, g, b;
+    double k = v * s;
+    if (f < 1) { r = k; g = x; b = 0; } else if (f < 2) { r = x; g = k; b = 0; }
+    else if (f < 3) { r = 0; g = k; b = x; } else if (f < 4) { r = 0; g = x; b = k; }
+    else if (f < 5) { r = x; g = 0; b = k; } else { r = k; g = 0; b = x; }
+    c[0] = (unsigned char)lround((r + m) * 255); c[1] = (unsigned char)lround((g + m) * 255); c[2] = (unsigned char)lround((b + m) * 255);
+}
+static void jg_cambiar_colores(unsigned char *px, int w, int h, const JgPreparar *p) {
+    if (p->ncolores == 0) return;
+    double dh[JG_COLORES], ds[JG_COLORES], dv[JG_COLORES], ah[JG_COLORES], as[JG_COLORES], av[JG_COLORES];
+    for (int j = 0; j < p->ncolores; j++) {
+        jg_rgb_hsv(p->colores[j], &dh[j], &ds[j], &dv[j]);
+        jg_rgb_hsv(p->colores[j] + 3, &ah[j], &as[j], &av[j]);
+    }
+    for (size_t i = 0; i < (size_t)w * h; i++) {
+        unsigned char *q = px + i * 4;
+        if (q[3] == 0) continue;
+        int mejor = -1;
+        double hh, ss, vv, cerca = 1e9;
+        jg_rgb_hsv(q, &hh, &ss, &vv);
+        for (int j = 0; j < p->ncolores; j++) {
+            if (!memcmp(q, p->colores[j], 3)) { mejor = j; break; }     /* el mismo color */
+            double dt = fabs(hh - dh[j]);
+            if (dt > 180) dt = 360 - dt;
+            /* de un tono parecido, con color (los grises y la piel no) */
+            if (ds[j] > 0.15 && ss > 0.15 && vv > 0.08 && dt < 20 && dt < cerca) { cerca = dt; mejor = j; }
+        }
+        if (mejor < 0) continue;
+        int j = mejor;
+        double s2 = ds[j] > 0 ? ss * as[j] / ds[j] : as[j], v2 = dv[j] > 0 ? vv * av[j] / dv[j] : av[j];
+        jg_hsv_rgb(hh + ah[j] - dh[j], s2 > 1 ? 1 : s2, v2 > 1 ? 1 : v2, q);
+    }
+}
+
 /* Lee "fondo" y "escala" de unas opciones ('p->modo' trae el fondo por
    defecto). 0 si están mal: el motivo en 'msg', o ya puesto (hay_error). */
 static int jg_leer_preparar(Valor *op, JgPreparar *p, const char *fn, char *msg, size_t max) {
@@ -1840,6 +1942,26 @@ static int jg_leer_preparar(Valor *op, JgPreparar *p, const char *fn, char *msg,
         }
         p->escala = e->numero;
     }
+    Valor *cs = jg_opcion_valor(op, "colores");
+    if (cs) {
+        int ok = cs->tipo == VAL_LISTA && cs->lista.cantidad <= JG_COLORES;
+        for (int j = 0; ok && j < cs->lista.cantidad; j++) {
+            Valor *par = cs->lista.elementos[j];
+            ok = par->tipo == VAL_LISTA && par->lista.cantidad == 2;
+            for (int m = 0; ok && m < 2; m++) {
+                unsigned char c[4];
+                Valor *arg[1] = {par->lista.elementos[m]};
+                ok = arg[0]->tipo == VAL_LISTA && jg_color(arg, 1, 0, c);
+                if (hay_error) return 0;
+                if (ok) memcpy(p->colores[j] + m * 3, c, 3);
+            }
+        }
+        if (!ok) {
+            snprintf(msg, max, "%s(): \"colores\" es una lista de hasta %d pares [de, a], por ejemplo [[[213, 89, 106], [60, 110, 220]]]", fn, JG_COLORES);
+            return 0;
+        }
+        p->ncolores = cs->lista.cantidad;
+    }
     return 1;
 }
 
@@ -1847,15 +1969,19 @@ static int jg_leer_preparar(Valor *op, JgPreparar *p, const char *fn, char *msg,
    preparación de la misma imagen se reutiliza. Devuelve su número (k si no
    hay nada que hacer) o -1 con el motivo en 'msg'. */
 static int jg_preparar(int k, const JgPreparar *p, char *msg, size_t max) {
-    if (p->modo == 0 && p->escala >= 1) return k;
+    if (p->modo == 0 && p->escala >= 1 && p->ncolores == 0) return k;
     char nombre[160];
-    snprintf(nombre, sizeof nombre, "<preparada %d %d %d,%d,%d %g>", k, p->modo, p->color[0], p->color[1], p->color[2], p->escala);
+    unsigned huella = 2166136261u;                      /* de los colores, para distinguir las preparaciones */
+    for (int j = 0; j < p->ncolores * 6; j++) huella = (huella ^ p->colores[j / 6][j % 6]) * 16777619u;
+    snprintf(nombre, sizeof nombre, "<preparada %d %d %d,%d,%d %g %d:%08x>", k, p->modo, p->color[0], p->color[1], p->color[2],
+             p->escala, p->ncolores, huella);
     for (int i = 0; i < _jgs.nimagenes; i++)
         if (strcmp(_jgs.imagenes[i].ruta, nombre) == 0) return i;
     unsigned char *px = jg_pixeles(k);
     if (!px) { snprintf(msg, max, "no se pudieron leer los píxeles de la imagen"); return -1; }
     int w = _jgs.imagenes[k].ancho, h = _jgs.imagenes[k].alto;
     jg_quitar_fondo(px, w, h, p->modo, p->color);
+    jg_cambiar_colores(px, w, h, p);
     if (p->escala < 1) {
         int nw, nh;
         unsigned char *r = jg_reducir(px, w, h, p->escala, &nw, &nh);
@@ -1873,7 +1999,8 @@ static int jg_preparar(int k, const JgPreparar *p, char *msg, size_t max) {
 
 /* imagen(ruta[, opciones]): carga un PNG, JPG, BMP, GIF o TGA. Opciones:
    "fondo" ("auto": el color de las esquinas, si no tiene transparencia;
-   o un color) lo vuelve transparente, y "escala" (hasta 1) la reduce. */
+   o un color) lo vuelve transparente, "escala" (hasta 1) la reduce y
+   "colores" cambia colores (ver jg_cambiar_colores). */
 static Valor *fn_jg_imagen(Valor **a, int n) {
     Valor *img = jg_imagen_archivo(a, n < 1 ? 0 : 1);
     if (hay_error || n < 2 || a[1]->tipo == VAL_NULO) return img;
@@ -1882,13 +2009,14 @@ static Valor *fn_jg_imagen(Valor **a, int n) {
         return jg_error("ErrorTipo", "imagen(): las opciones van en un diccionario, por ejemplo {\"fondo\": \"auto\"}");
     for (int j = 0; j < a[1]->diccionario.cantidad; j++) {
         const char *c = a[1]->diccionario.claves[j];
-        if (strcmp(c, "fondo") && strcmp(c, "escala")) {
-            snprintf(msg, sizeof msg, "imagen(): no conozco la opción '%s' (hay \"fondo\" y \"escala\")", c);
+        if (strcmp(c, "fondo") && strcmp(c, "escala") && strcmp(c, "colores")) {
+            snprintf(msg, sizeof msg, "imagen(): no conozco la opción '%s' (hay \"fondo\", \"escala\" y \"colores\")", c);
             valor_destruir(img);
             return jg_error("Error", msg);
         }
     }
-    JgPreparar p = {0, {0, 0, 0}, 1};
+    JgPreparar p;
+    memset(&p, 0, sizeof p);
     if (!jg_leer_preparar(a[1], &p, "imagen", msg, sizeof msg)) {
         valor_destruir(img);
         return hay_error ? valor_nulo() : jg_error("Error", msg);
@@ -2235,7 +2363,7 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
             JgImagen *hm = &_jgs.imagenes[h->imagen];
             _jg.DestroyTexture(hm->tex);
             free(hm->px);
-            hm->tex = tex; hm->px = nueva; hm->ancho = W; hm->alto = H;
+            jg_poner_textura(hm, tex); hm->px = nueva; hm->ancho = W; hm->alto = H;
             imagen = h->imagen;
         } else {
             char nombre[48];
@@ -2555,7 +2683,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
         for (int j = 0; j < op->diccionario.cantidad; j++) {
             const char *c = op->diccionario.claves[j];
             Valor *v = op->diccionario.valores[j];
-            if (!strcmp(c, "fondo") || !strcmp(c, "escala")) continue;      /* se leen abajo */
+            if (!strcmp(c, "fondo") || !strcmp(c, "escala") || !strcmp(c, "colores")) continue;      /* se leen abajo */
             if (!strcmp(c, "quitar")) {
                 if (v->tipo != VAL_LISTA)
                     return jg_error("ErrorTipo", "hoja(): \"quitar\" es la lista de los cuadros que no se usan, por ejemplo [0, 1, 2]");
@@ -2564,7 +2692,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
             int de_cuenta = !strcmp(c, "columnas") || !strcmp(c, "filas");
             if (strcmp(c, "separacion") && strcmp(c, "margen") && !de_cuenta) {
                 snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"columnas\", \"filas\", "
-                         "\"separacion\", \"margen\", \"quitar\", \"fondo\" y \"escala\")", c);
+                         "\"separacion\", \"margen\", \"quitar\", \"fondo\", \"escala\" y \"colores\")", c);
                 return jg_error("Error", msg);
             }
             if (de_cuenta && r.modo == JG_HOJA_TAMANO)
@@ -3148,6 +3276,7 @@ static int jg_rehacer_imagen(int j) {
     if (!px) return 0;
     if (!strcmp(im->receta.tipo, "preparar")) {
         jg_quitar_fondo(px, w, h, im->prep.modo, im->prep.color);
+        jg_cambiar_colores(px, w, h, &im->prep);
         if (im->prep.escala < 1) {
             int nw, nh;
             unsigned char *r = jg_reducir(px, w, h, im->prep.escala, &nw, &nh);
@@ -3167,7 +3296,7 @@ static int jg_rehacer_imagen(int j) {
     if (!tex) { free(px); return 0; }
     _jg.DestroyTexture(im->tex);
     free(im->px);
-    im->tex = tex; im->px = px; im->ancho = w; im->alto = h;
+    jg_poner_textura(im, tex); im->px = px; im->ancho = w; im->alto = h;
     return 1;
 }
 
@@ -3290,13 +3419,13 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
 
 /* La silueta blanca de una imagen (para el destello de "blanco"): se hace la
    primera vez y otra si la imagen cambia */
-static struct { void *tex, *blanca; } _jg_blanca[JG_MAX_IMAGENES];
+static struct { unsigned version; void *blanca; } _jg_blanca[JG_MAX_IMAGENES];
 static void *jg_textura_blanca(int k) {
     JgImagen *im = &_jgs.imagenes[k];
-    if (_jg_blanca[k].tex == im->tex && _jg_blanca[k].blanca) return _jg_blanca[k].blanca;
+    if (_jg_blanca[k].version == im->version && _jg_blanca[k].blanca) return _jg_blanca[k].blanca;
     if (_jg_blanca[k].blanca) _jg.DestroyTexture(_jg_blanca[k].blanca);
     _jg_blanca[k].blanca = NULL;
-    _jg_blanca[k].tex = im->tex;
+    _jg_blanca[k].version = im->version;
     unsigned char *px = jg_pixeles(k);
     if (!px) return NULL;
     for (size_t i = 0; i < (size_t)im->ancho * im->alto; i++) px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = 255;
@@ -3324,11 +3453,9 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     JgHoja *hoja = NULL;
     int anim_fila = -1, anim_cuadro = 0, es_animador = n > 0 && a[0]->tipo == VAL_DICCIONARIO && jg_dic(a[0], "animador");
     if (es_animador) {
-        JgAnimEstado *e = malloc(sizeof *e);
-        if (!e) return jg_error("Error", "sin memoria");
+        JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
         int ok = jg_anim_estado(a[0], e);
         if (ok) { hoja = e->h; anim_fila = e->fila; anim_cuadro = e->cuadros[e->pos]; }
-        free(e);
         if (!ok) return jg_error("Error", "dibujar(): el animador no tiene una animación que se pueda dibujar");
     } else if (n > 0) hoja = jg_hoja_de(a[0]);
     int k = hoja ? hoja->imagen : n > 0 ? jg_id_de(a[0], "imagen") : -1;
@@ -3433,7 +3560,7 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
    el hueco transparente de alrededor. Con un animador, el cuadro que toca
    ahora. "margen" la encoge (o la agranda, si es negativo) por cada lado, en
    píxeles de pantalla. El ángulo no cuenta. Va directa a colision(). */
-static struct { void *tex; JgRect r; } _jg_caja_imagen[JG_MAX_IMAGENES];
+static struct { unsigned version; JgRect r; } _jg_caja_imagen[JG_MAX_IMAGENES];
 
 /* Una caja medida dentro de una celda de cw × ch, puesta en pantalla como la
    pondría dibujar(…, x, y, op) (escala, ancho, alto, centrado, espejo,
@@ -3468,11 +3595,9 @@ static Valor *fn_jg_caja(Valor **a, int n) {
         return jg_error("ErrorTipo", "caja(): las opciones van en un diccionario, como en dibujar()");
     double v;
     if (es_animador) {
-        JgAnimEstado *e = malloc(sizeof *e);
-        if (!e) return jg_error("Error", "sin memoria");
+        JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
         int ok = jg_anim_estado(a[0], e);
         if (ok) { hoja = e->h; fila = e->fila; cuadro = e->cuadros[e->pos]; }
-        free(e);
         if (!ok) return jg_error("Error", "caja(): el animador no tiene ninguna animación puesta");
     } else if (n > 0 && (hoja = jg_hoja_de(a[0])) != NULL) {
         if (jg_opcion(op, "cuadro", &v)) cuadro = (int)floor(v);
@@ -3502,11 +3627,11 @@ static Valor *fn_jg_caja(Valor **a, int n) {
         cw = hoja->cw; ch = hoja->ch;
     } else {
         JgImagen *im = &_jgs.imagenes[k];
-        if (_jg_caja_imagen[k].tex != im->tex) {      /* se calcula una vez (y otra si la imagen cambia) */
+        if (_jg_caja_imagen[k].version != im->version) {      /* se calcula una vez (y otra si la imagen cambia) */
             JgRect todo = {0, 0, im->ancho, im->alto};
             unsigned char *px = jg_pixeles(k);
             _jg_caja_imagen[k].r = px ? jg_visible(px, im->ancho, im->alto, todo) : todo;
-            _jg_caja_imagen[k].tex = im->tex;
+            _jg_caja_imagen[k].version = im->version;
             free(px);
         }
         c = _jg_caja_imagen[k].r;
@@ -3528,13 +3653,11 @@ static Valor *fn_jg_golpe(Valor **a, int n) {
         return jg_error("ErrorTipo", "golpe(): las opciones van en un diccionario, como en dibujar()");
     double x, y;
     if (!jg_num(a, n, 1, &x, "golpe") || !jg_num(a, n, 2, &y, "golpe")) return valor_nulo();
-    JgAnimEstado *e = malloc(sizeof *e);
-    if (!e) return jg_error("Error", "sin memoria");
+    JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
     int ok = jg_anim_estado(pj, e);
     Valor *gs = ok ? jg_dic(e->cfg, "golpes") : NULL;
     int x0 = 0, y0 = 0, x1 = 0, y1 = 0, hay = 0, pos = ok ? e->pos : 0, cw = ok ? e->h->cw : 0, ch = ok ? e->h->ch : 0;
     if (ok && e->acabada) gs = NULL;             /* quieta en el último cuadro: ya no golpea */
-    free(e);
     for (int i = 0; gs && i < gs->lista.cantidad; i++) {
         Valor **g = gs->lista.elementos[i]->lista.elementos;
         if ((int)g[0]->numero != pos) continue;
@@ -3557,14 +3680,12 @@ static Valor *fn_jg_libre(Valor **a, int n) {
     JG_ABIERTA();
     Valor *pj = jg_animador_arg(a, n, "libre");
     if (!pj) return valor_nulo();
-    JgAnimEstado *e = malloc(sizeof *e);
-    if (!e) return jg_error("Error", "sin memoria");
+    JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
     int libre = 1;
     if (jg_anim_estado(pj, e) && !e->repetir && !e->acabada) {
         Valor *c = jg_dic(e->cfg, "cancelar");
         libre = c && e->k >= (long)c->numero;
     }
-    free(e);
     return valor_booleano(libre);
 }
 
@@ -3995,7 +4116,7 @@ static Valor *fn_jg_temblor(Valor **a, int n) {
     double real = jg_reloj_real(), queda = 0;
     if (_jgs.tem_dur > 0 && real < _jgs.tem_desde + _jgs.tem_dur)
         queda = _jgs.tem_fuerza * (1 - (real - _jgs.tem_desde) / _jgs.tem_dur);
-    if (f >= queda) { _jgs.tem_fuerza = f; _jgs.tem_desde = real; _jgs.tem_dur = s; }
+    if (f >= queda && s > 0) { _jgs.tem_fuerza = f; _jgs.tem_desde = real; _jgs.tem_dur = s; }
     return valor_nulo();
 }
 
@@ -4016,6 +4137,7 @@ static Valor *fn_jg_congelar(Valor **a, int n) {
 /* velocidad([v]): lo rápido que pasa el tiempo del juego (1 normal, 0,3 cámara
    lenta, 0 pausa). Sin nada, dice la que hay. */
 static Valor *fn_jg_velocidad(Valor **a, int n) {
+    JG_ABIERTA();
     if (n > 0) {
         double v;
         if (!jg_num(a, n, 0, &v, "velocidad")) return valor_nulo();
@@ -4309,8 +4431,10 @@ static Valor *fn_jg_definir_accion(Valor **a, int n) {
         if (_jgs.nacciones == JG_ACCIONES) return jg_error("Error", "definir_accion(): como mucho 64 acciones");
         acc = &_jgs.acciones[_jgs.nacciones++];
         acc->nombre = strdup(a[0]->texto);
+        acc->desde = acc->soltada = -1; acc->duro = 0;
     }
     nueva.nombre = acc->nombre;
+    nueva.desde = acc->desde; nueva.soltada = acc->soltada; nueva.duro = acc->duro;   /* se puede redefinir sin perder la carga */
     *acc = nueva;
     return valor_nulo();
 }
@@ -4353,7 +4477,11 @@ static Valor *fn_jg_accion_soltada(Valor **a, int n)  { return jg_accion(a, n, 2
 static void jg_historial(void) {
     double t = jg_reloj_real();
     for (int i = 0; i < _jgs.nacciones; i++) {
-        if (jg_accion_fuerza(&_jgs.acciones[i], 0) < 0.5f || jg_accion_fuerza(&_jgs.acciones[i], 1) >= 0.5f) continue;
+        JgAccion *acc = &_jgs.acciones[i];
+        int ahora = jg_accion_fuerza(acc, 0) >= 0.5f;
+        if (!ahora && acc->desde >= 0) { acc->soltada = t; acc->duro = t - acc->desde; acc->desde = -1; }
+        if (ahora && acc->desde < 0) acc->desde = t;
+        if (!ahora || jg_accion_fuerza(acc, 1) >= 0.5f) continue;
         if (_jgs.nhist == JG_HISTORIAL) memmove(_jgs.hist, _jgs.hist + 1, sizeof _jgs.hist[0] * --_jgs.nhist);
         _jgs.hist[_jgs.nhist].accion = i;
         _jgs.hist[_jgs.nhist].t = t;
@@ -4373,6 +4501,7 @@ static Valor *fn_jg_combo(Valor **a, int n) {
         return jg_error("ErrorTipo", "combo() espera (lista de acciones[, segundos]), por ejemplo ([\"abajo\", \"adelante\", \"golpe\"], 0.5)");
     double s = 0.5;
     if (n > 1 && !jg_num(a, n, 1, &s, "combo")) return valor_nulo();
+    if (s < 0 || s > 10) return jg_error("Error", "combo(): los segundos van de 0 a 10");
     int m = a[0]->lista.cantidad, idx[JG_HISTORIAL], usadas[JG_HISTORIAL];
     for (int i = 0; i < m; i++) {
         Valor *v = a[0]->lista.elementos[i];
@@ -4390,6 +4519,41 @@ static Valor *fn_jg_combo(Valor **a, int n) {
     }
     for (int i = 0; i < m; i++) _jgs.hist[usadas[i]].usada = 1;
     return valor_booleano(1);
+}
+
+/* pulsaciones(accion[, segundos]): cuántas veces se ha pulsado en los últimos
+   'segundos' (0,5 si no se dice), también las que ya ha gastado combo(). Para
+   los golpes de machacar un botón (pulsar puño muy deprisa) y para soltarse
+   de un agarre. */
+static Valor *fn_jg_pulsaciones(Valor **a, int n) {
+    JG_ABIERTA();
+    JgAccion *acc = jg_accion_arg(a, n, 0, "pulsaciones");
+    if (!acc) return valor_nulo();
+    double s = 0.5;
+    if (n > 1 && !jg_num(a, n, 1, &s, "pulsaciones")) return valor_nulo();
+    if (s < 0 || s > 10) return jg_error("Error", "pulsaciones(): los segundos van de 0 a 10");
+    int k = (int)(acc - _jgs.acciones), cuenta = 0;
+    double limite = jg_reloj_real() - s - 1e-9;
+    for (int i = _jgs.nhist - 1; i >= 0 && _jgs.hist[i].t >= limite; i--)
+        if (_jgs.hist[i].accion == k) cuenta++;
+    return valor_numero(cuenta);
+}
+
+/* mantenida(accion[, margen]): cuántos segundos lleva pulsada (0 si no lo
+   está). Con 'margen', si se soltó hace menos de esos segundos dice cuánto
+   estuvo pulsada: para los golpes cargados (mantener atrás un segundo y
+   luego adelante y golpe: al pulsar adelante, atrás ya se ha soltado). */
+static Valor *fn_jg_mantenida(Valor **a, int n) {
+    JG_ABIERTA();
+    JgAccion *acc = jg_accion_arg(a, n, 0, "mantenida");
+    if (!acc) return valor_nulo();
+    double margen = 0;
+    if (n > 1 && !jg_num(a, n, 1, &margen, "mantenida")) return valor_nulo();
+    if (margen < 0 || margen > 10) return jg_error("Error", "mantenida(): el margen va de 0 a 10 segundos");
+    double t = jg_reloj_real();
+    if (acc->desde >= 0) return valor_numero(t - acc->desde);
+    if (margen > 0 && acc->soltada >= 0 && t - acc->soltada <= margen + 1e-9) return valor_numero(acc->duro);
+    return valor_numero(0);
 }
 
 /* direccion(negativa, positiva): de -1 a 1, gradual con el stick y entera con teclas.
@@ -4643,12 +4807,13 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
     memcpy(c_fin, c, 4);
     c_fin[3] = 0;                                           /* por defecto se desvanece */
     if (vf) { arg[0] = vf; if (!jg_color(arg, 1, 0, c_fin)) return valor_nulo(); }
-    int sumar = 0;
+    int mezcla = 1;
     Valor *mz = jg_opcion_valor(op, "mezcla");
     if (mz) {
-        if (mz->tipo != VAL_TEXTO || (strcmp(mz->texto, "sumar") && strcmp(mz->texto, "normal")))
-            return jg_error("Error", "particulas(): \"mezcla\" es \"normal\" o \"sumar\" (para chispas y energía que brillan)");
-        sumar = !strcmp(mz->texto, "sumar");
+        if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "sumar")) mezcla = 2;
+        else if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "multiplicar")) mezcla = 4;
+        else if (mz->tipo != VAL_TEXTO || strcmp(mz->texto, "normal"))
+            return jg_error("Error", "particulas(): \"mezcla\" es \"normal\", \"sumar\" (chispas y energía que brillan) o \"multiplicar\" (humo que oscurece)");
     }
     int cuantas = cantidad < 0 ? 0 : cantidad > JG_PARTICULAS ? JG_PARTICULAS : (int)cantidad;
     for (int i = 0; i < cuantas; i++) {
@@ -4665,7 +4830,7 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
         p->tam_fin = fin0 < 0 ? p->tam : (float)jg_azar_entre(fin0, fin1);
         memcpy(p->c, c, 4);
         memcpy(p->c_fin, c_fin, 4);
-        p->sumar = (unsigned char)sumar;
+        p->mezcla = (unsigned char)mezcla;
     }
     return valor_nulo();
 }
@@ -4675,7 +4840,7 @@ static Valor *fn_jg_dibujar_particulas(Valor **a, int n) {
     (void)a; (void)n;
     JG_ABIERTA();
     float dt = (float)_jgs.dt;
-    int vivas = 0, modo = 0;
+    int vivas = 0, modo = 1;
     _jg.SetBlend(_jgs.render, 1);
     for (int i = 0; i < _jgs.npart; i++) {
         JgParticula p = _jgs.part[i];
@@ -4690,14 +4855,16 @@ static Valor *fn_jg_dibujar_particulas(Valor **a, int n) {
         for (int k = 0; k < 4; k++) c[k] = (unsigned char)(p.c[k] + (p.c_fin[k] - p.c[k]) * t);
         float tam = p.tam + (p.tam_fin - p.tam) * t;
         if (tam < 0.5f || c[3] == 0) continue;
-        if (p.sumar != modo) { modo = p.sumar; _jg.SetBlend(_jgs.render, modo ? 2 : 1); }
+        if (p.mezcla != modo) { modo = p.mezcla; _jg.SetBlend(_jgs.render, modo); }
+        if (modo == 4)              /* al multiplicar no cuenta la transparencia: se acerca al blanco */
+            for (int k = 0; k < 3; k++) c[k] = (unsigned char)(255 - (255 - c[k]) * c[3] / 255);
         _jg.SetDrawColor(_jgs.render, c[0], c[1], c[2], c[3]);
         JgRect r = {(int)floorf(p.x - tam / 2 - (float)_jgs.cam_x), (int)floorf(p.y - tam / 2 - (float)_jgs.cam_y),
                     (int)ceilf(tam), (int)ceilf(tam)};
         _jg.FillRect(_jgs.render, &r);
     }
     _jgs.npart = vivas;
-    if (modo) _jg.SetBlend(_jgs.render, 1);
+    if (modo != 1) _jg.SetBlend(_jgs.render, 1);
     return valor_numero(vivas);
 }
 
@@ -5494,6 +5661,8 @@ static void cargar_juego(Entorno *entorno) {
         {"accion_pulsada",  fn_jg_accion_pulsada,   1},
         {"accion_soltada",  fn_jg_accion_soltada,   1},
         {"combo",           fn_jg_combo,           -1},
+        {"mantenida",       fn_jg_mantenida,       -1},
+        {"pulsaciones",     fn_jg_pulsaciones,     -1},
         {"direccion",       fn_jg_direccion,        2},
         {"recargado",       fn_jg_recargado,        0},
         {"colision_circulos", fn_jg_colision_circulos, 6},

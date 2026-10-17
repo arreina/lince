@@ -66,6 +66,17 @@ lenguaje no pueda hacer también escribiendo código.
   cuánto `temblor` y cuánto dura el destello `blanco`.
 - **Ver la IA de los enemigos**: el estado de cada uno escrito encima
   (acercarse, atacar, en el suelo...) y quién tiene el turno de atacar.
+- **Sacar animaciones de una hoja enorme** sin nombres (las de MUGEN, con
+  más de mil cuadros seguidos): ver los cuadros numerados, marcar dónde
+  empieza y acaba cada movimiento, ponerle nombre y que escriba los
+  `"cuadros"` del animador. Hoy se hace mirando la hoja a ojo.
+- **Elegir los `"colores"` del segundo traje** pinchando en la ropa del
+  personaje y en una paleta, viendo los dos a la vez.
+- **Ver las entradas de cada jugador** como en los modos de entrenamiento:
+  las flechas y botones de los últimos segundos, `mantenida()` de cada
+  dirección (la carga) y qué especial ha reconocido.
+- **Datos de cada golpe**: cuántos cuadros tarda en salir, cuántos golpea y
+  cuántos tarda en recuperarse, calculados de `"golpes"` y `"por_segundo"`.
 
 ## Mapas
 

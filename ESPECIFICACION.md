@@ -815,7 +815,7 @@ minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del j
 
 | Función | Qué hace |
 |---|---|
-| `imagen(ruta[, opciones])` | carga un PNG, JPG, BMP, GIF o TGA; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo. Opciones para imágenes descargadas: `fondo` (`"auto"`: el color de las esquinas, si la imagen no tiene transparencia; o un color, `[255, 255, 255]`) lo vuelve transparente, y `escala` (de 0 a 1) la reduce al cargarla, que queda mucho mejor que reducirla al dibujar |
+| `imagen(ruta[, opciones])` | carga un PNG, JPG, BMP, GIF o TGA; devuelve `{"imagen", "ancho", "alto", "ruta"}`. Cargar la misma ruta dos veces no repite el trabajo. Opciones para imágenes descargadas: `fondo` (`"auto"`: el color de las esquinas, si la imagen no tiene transparencia; o un color, `[255, 255, 255]`) lo vuelve transparente, y `escala` (de 0 a 1) la reduce al cargarla, que queda mucho mejor que reducirla al dibujar. `colores` cambia colores: cada par `[de, a]` cambia el color `de` por `a` y también sus sombras y brillos (los de un tono parecido), conservando cuánto más claros u oscuros eran; así se le cambia la ropa a un personaje con un solo color, como el segundo jugador de un juego de lucha: `{"colores": [[[213, 89, 106], [70, 200, 120]]]}` (hasta 16 pares; los grises y los colores de otro tono no se tocan) |
 | `sprite(filas, colores)` | crea una imagen a partir de texto, un carácter por píxel: `juego.sprite([".X.", "XXX"], {"X": [255, 0, 0]})`; los caracteres sin color son transparentes |
 | `hoja(imagen o ruta[, cómo dividirla])` | una imagen con varios cuadros (los fotogramas de una animación, los tiles de un mapa) partida en esos cuadros; ver **Hojas de sprites** más abajo. También vale una imagen hecha con `sprite()` |
 | `animar(imagen o ruta, tipo[, opciones])` | genera una animación a partir de un solo dibujo y la devuelve como hoja (ver abajo) |
@@ -856,7 +856,7 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | Función | Qué hace |
 |---|---|
 | `sonido(ruta)` | carga un `.wav` o un `.ogg` (Ogg Vorbis, mucho más pequeño: mejor para la música); devuelve `{"sonido", "duracion", "ruta"}` |
-| `reproducir(sonido[, volumen[, bucle]])` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz |
+| `reproducir(sonido[, volumen[, bucle]])` · `reproducir(sonido, opciones)` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz. Opciones: `volumen` (0 a 1), `bucle`, `lado` (−1 izquierda, 0 en medio, 1 derecha: que suene de donde pasa) y `tono` (1 normal, 2 una octava más agudo y el doble de rápido, 0,5 más grave; variarlo un poco, de 0,9 a 1,1, hace que un golpe repetido no suene siempre igual) |
 | `detener([voz])` | para esa voz o, sin argumento, todo |
 | `musica(ruta o sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para. Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
 | `volumen([v])` | volumen general de 0 a 1 |
@@ -916,7 +916,7 @@ juego.dibujar(HEROE, x, y, {"cuadro": juego.cuadro(HEROE["cuadros"], 8)})   # 8 
 | `hoja("tiles.png", 16)` · `hoja("tiles.png", 16, 24)` | en cuadros iguales, diciendo lo que mide cada uno (lo normal en los tiles) |
 
 Las dos últimas admiten `separacion` (píxeles entre cuadros) y `margen` (alrededor), como en muchas
-hojas descargadas: `hoja("tiles.png", 16, {"separacion": 1})`. Las tres admiten `fondo` y `escala`,
+hojas descargadas: `hoja("tiles.png", 16, {"separacion": 1})`. Las tres admiten `fondo`, `escala` y `colores`,
 como `imagen()`: para una hoja enorme, `hoja("explorador.jpg", {"escala": 0.15})` (los tamaños de la
 última se dan en píxeles de la imagen original). Quitar el fondo rellena desde los bordes de la
 imagen, así lo que es del mismo color pero está dentro del dibujo (ojos, calcetines blancos) se
@@ -1067,6 +1067,8 @@ si g != nulo {
 | `congelar(segundos)` | para el juego ese tiempo (de verdad, no del juego): `dt()` da 0, y las animaciones, las partículas, `suavizar()` y `tiempo()` se quedan quietos. Unas centésimas al acertar un golpe (0,05 uno flojo, 0,1 uno fuerte) es lo que hace que se note. Los fundidos de las escenas y el temblor siguen |
 | `velocidad([v])` | lo rápido que pasa el tiempo del juego: 1 normal, 0,3 cámara lenta (el golpe final), 0 pausa. Sin nada, dice la que hay |
 | `temblor(fuerza[, segundos])` | la cámara tiembla hasta `fuerza` píxeles y se calma en `segundos` (0,3). Lo que se dibuja después de `camara()` (el marcador) no tiembla |
+| `mantenida(acción[, margen])` | cuántos segundos lleva pulsada (0 si no lo está). Con `margen`, si se soltó hace menos de esos segundos dice cuánto estuvo pulsada: para los golpes cargados, como «mantener atrás un segundo y luego adelante y patada» (al pulsar adelante, atrás ya se ha soltado): `mantenida("atras", 0.3) >= 1 y combo(["adelante", "patada"], 0.3)`. Se puede volver a definir la acción sin perder la carga |
+| `pulsaciones(acción[, segundos])` | cuántas veces se ha pulsado en los últimos `segundos` (0,5), también las que ya ha gastado `combo()`: para los golpes de machacar un botón (`pulsaciones("puño", 0.6) >= 4`) o para soltarse de un agarre |
 
 `combo()` mira las acciones de `definir_accion()`. «Adelante» depende de hacia dónde mire el
 personaje: `combo(["abajo", "derecha", "golpe"])` si mira a la derecha. Los combos no pierden
@@ -1172,7 +1174,8 @@ rango para cada partícula): `cantidad` (20), `color` (blanco), `color_final` (e
 transparente: se desvanecen), `velocidad` en píxeles por segundo (`[60, 180]`), `direccion` en
 grados (0 = derecha, −90 = arriba) y `apertura` (360: en todas direcciones), `vida` en segundos
 (`[0.4, 0.8]`), `tamaño` (4) y `tamaño_final`, `gravedad` (0) y `mezcla` (`"sumar"`: brillan, como
-las chispas de un golpe o la estela de una bola de energía). Una opción mal escrita da error.
+las chispas de un golpe o la estela de una bola de energía; `"multiplicar"`: oscurecen lo de debajo,
+como el humo, y al apagarse se aclaran en vez de volverse transparentes). Una opción mal escrita da error.
 
 **Escenas.** Un nombre para cada parte del juego (portada, partida, fin...):
 
