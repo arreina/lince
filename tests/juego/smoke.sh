@@ -274,6 +274,38 @@ done
 for e in "colision() espera (x1, y1" "caja() espera una imagen, una hoja o un animador" "no hay fila 3"; do
     grep -qF "$e" salida14.txt && ok "caja: error «$e»" || mal "falta el error: $e"
 done
+# ── Fuentes (TrueType y dibujadas), texto con opciones y movimiento suave ──
+python3 "$DIR/hacer_fuente.py" cajas.ttf
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba11.lince" > salida15.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de letras termina bien" || mal "la prueba de letras falló"
+for l in "alto: 20" "AB: 18 20" "A B: 26 20" "lineas: 24 40" "partido: 30 40" "parecidas: 28" "escala: 36" "misma: verdadero" \
+         "lince: 69 21 69" "dibujada: 9 4 espacio 6" "rejilla: 9" "curvas: 0.25 0.125 0.875 0.5 1 1088 0 1" \
+         "suavizar: 50 0 10 20" "acercar: 15 9 100 5"; do
+    grep -qxF "$l" salida15.txt && ok "letras: $l" || mal "falta la línea: $l"
+done
+for e in "no se encuentra la fuente 'no_existe.ttf'" "encuentro 3 letras en la imagen y hay 2 caracteres" "no conozco la opción 'colr'" \
+         '"alinear" es "izquierda"' "listas de números del mismo largo" 'la curva es "lineal"' "fuente() espera (ruta de la fuente, tamaño"; do
+    grep -qF "$e" salida15.txt && ok "letras: error «$e»" || mal "falta el error: $e"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct
+d = open("letras.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+def px(x, y):
+    fila = (abs(h) - 1 - y) if h > 0 else y
+    b, g, r = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 3]
+    return (r, g, b)
+casos = [((15, 20), (255, 0, 0), "la A, en rojo"), ((11, 20), (0, 0, 0), "a la izquierda de la A, nada"),
+         ((15, 11), (0, 0, 0), "encima de la A, nada"), ((21, 20), (0, 0, 0), "entre la A y la B (con kerning)"),
+         ((23, 20), (255, 0, 0), "la B"), ((100, 50), (255, 255, 255), "centrada: en medio"), ((95, 50), (0, 0, 0), "centrada: fuera"),
+         ((158, 10), (255, 255, 0), "dibujada a escala 4: la H"), ((175, 15), (0, 0, 0), "dibujada: el hueco de la O")]
+mal = 0
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ letras:", nombre)
+    else: print("  ❌ letras:", nombre, "→", px(x, y)); mal += 1
+exit(1 if mal else 0)
+PY
 # ── Animaciones generadas a partir de un dibujo (animar) y guardar_imagen ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 timeout 20 "$LINCE" "$DIR/prueba8.lince" > salida12.txt 2>&1
 [ $? -eq 0 ] && ok "la prueba de animar termina bien" || mal "la prueba de animar falló"
@@ -320,4 +352,4 @@ if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida5b.txt; exit 1; }
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida5b.txt; exit 1; }

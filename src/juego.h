@@ -2,8 +2,8 @@
    MÓDULO: juego  (se incluye desde modulos.c)
    Ventana 2D, dibujo, imágenes, texto, teclado, ratón, mando y sonido. Usa SDL2,
    cargada en tiempo de ejecución (dlopen / LoadLibrary): Lince no la necesita
-   para compilarse, y si falta solo falla juego.abrir(). Las imágenes (stb_image)
-   y el OGG (stb_vorbis) los lee el propio Lince.
+   para compilarse, y si falta solo falla juego.abrir(). Las imágenes (stb_image),
+   el OGG (stb_vorbis) y las fuentes .ttf (stb_truetype) los lee el propio Lince.
    Estructura típica:
        juego.abrir("Mi juego", 800, 600)
        mientras juego.abierto() { ...dibujar...; juego.presentar() }
@@ -244,6 +244,7 @@ static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *e
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
 static void jg_hojas_liberar(void);
+static void jg_fuentes_liberar(void);
 static int _jg_recargar_codigo;          /* una hoja cambió de forma: volver a ejecutar el programa */
 static double jg_reloj(void);
 static int jg_opcion(Valor *op, const char *clave, double *out);
@@ -429,6 +430,7 @@ static void jg_cerrar_todo(void) {
     }
     _jgs.nimagenes = 0;
     jg_hojas_liberar();
+    jg_fuentes_liberar();
     for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
     if (_jgs.render) _jg.DestroyRenderer(_jgs.render);
     if (_jgs.ventana) _jg.DestroyWindow(_jgs.ventana);
@@ -643,32 +645,47 @@ static const unsigned char JG_FUENTE[64][5] = {
     {0x02,0x04,0x08,0x10,0x20},{0x00,0x41,0x41,0x7F,0x00},{0x04,0x02,0x01,0x02,0x04},{0x40,0x40,0x40,0x40,0x40},
 };
 
-/* Decodifica el siguiente carácter UTF-8 de *p; devuelve el carácter ASCII base
-   (vocales acentuadas, ü, ñ, ¿, ¡ incluidos) y pone *acento a 1 si lleva marca. */
-static int jg_siguiente(const unsigned char **p, int *acento) {
+/* El siguiente carácter UTF-8 de *p (su número Unicode); '?' si está mal formado */
+static int jg_cp(const unsigned char **p) {
     const unsigned char *s = *p;
-    *acento = 0;
     if (s[0] < 0x80) { *p = s + 1; return s[0]; }
-    if ((s[0] & 0xE0) == 0xC0 && (s[1] & 0xC0) == 0x80) {
-        int cp = ((s[0] & 0x1F) << 6) | (s[1] & 0x3F);
-        *p = s + 2;
-        switch (cp) {
-            case 0xE1: case 0xC1: *acento = 1; return 'A';
-            case 0xE9: case 0xC9: *acento = 1; return 'E';
-            case 0xED: case 0xCD: *acento = 1; return 'I';
-            case 0xF3: case 0xD3: *acento = 1; return 'O';
-            case 0xFA: case 0xDA: case 0xFC: case 0xDC: *acento = 1; return 'U';
-            case 0xF1: case 0xD1: *acento = 1; return 'N';
-            case 0xBF: return '?';
-            case 0xA1: return '!';
-            default: return '?';
-        }
+    int k = (s[0] & 0xE0) == 0xC0 ? 2 : (s[0] & 0xF0) == 0xE0 ? 3 : (s[0] & 0xF8) == 0xF0 ? 4 : 0;
+    int cp = k == 2 ? s[0] & 0x1F : k == 3 ? s[0] & 0x0F : s[0] & 0x07;
+    for (int i = 1; i < k; i++) {
+        if ((s[i] & 0xC0) != 0x80) { k = 0; break; }
+        cp = (cp << 6) | (s[i] & 0x3F);
     }
-    int k = 1;                                    /* secuencia más larga: se salta entera */
-    while ((s[k] & 0xC0) == 0x80) k++;
+    if (k == 0) {                                 /* mal formado: se salta entero */
+        int j = 1;
+        while ((s[j] & 0xC0) == 0x80) j++;
+        *p = s + j;
+        return '?';
+    }
     *p = s + k;
-    return '?';
+    return cp;
 }
+
+/* El carácter de la fuente de Lince para 'cp': el ASCII base (vocales
+   acentuadas, ü, ñ, ¿, ¡ incluidos), con *acento a 1 si lleva marca */
+static int jg_base(int cp, int *acento) {
+    *acento = 0;
+    if (cp < 0x80) return cp;
+    switch (cp) {
+        case 0xE1: case 0xC1: *acento = 1; return 'A';
+        case 0xE9: case 0xC9: *acento = 1; return 'E';
+        case 0xED: case 0xCD: *acento = 1; return 'I';
+        case 0xF3: case 0xD3: *acento = 1; return 'O';
+        case 0xFA: case 0xDA: case 0xFC: case 0xDC: *acento = 1; return 'U';
+        case 0xF1: case 0xD1: *acento = 1; return 'N';
+        case 0xA1: return '!';
+        default: return '?';
+    }
+}
+
+static int jg_siguiente(const unsigned char **p, int *acento) { return jg_base(jg_cp(p), acento); }
+
+/* texto() y ancho_texto() con un diccionario de opciones (y fuentes): más abajo */
+static Valor *jg_texto_opciones(Valor **a, int n, int medir);
 
 static int jg_ancho_texto(const char *t, int escala) {
     int cuenta = 0;
@@ -681,7 +698,8 @@ static int jg_ancho_texto(const char *t, int escala) {
 /* texto(contenido, x, y[, escala[, color]]) */
 static Valor *fn_jg_texto(Valor **a, int n) {
     JG_ABIERTA();
-    if (n < 3 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "texto() espera (contenido, x, y[, escala[, color]])");
+    if (n < 3 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "texto() espera (contenido, x, y[, escala[, color]]) o (contenido, x, y, opciones)");
+    if (n > 3 && a[3]->tipo == VAL_DICCIONARIO) return jg_texto_opciones(a, n, 0);
     double x, y, esc = 2;
     if (!jg_num(a, n, 1, &x, "texto") || !jg_num(a, n, 2, &y, "texto")) return valor_nulo();
     if (n > 3 && !jg_num(a, n, 3, &esc, "texto")) return valor_nulo();
@@ -751,6 +769,7 @@ static void jg_glifo(int ch, int px, int py, int e, int ac) {
 /* ancho_texto(contenido[, escala]): para centrar o alinear */
 static Valor *fn_jg_ancho_texto(Valor **a, int n) {
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "ancho_texto() espera un texto");
+    if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) return jg_texto_opciones(a, n, 1);
     double esc = 2;
     if (n > 1 && !jg_num(a, n, 1, &esc, "ancho_texto")) return valor_nulo();
     return valor_numero(jg_ancho_texto(a[0]->texto, esc < 1 ? 1 : (int)esc));
@@ -3352,6 +3371,400 @@ static Valor *fn_jg_caja(Valor **a, int n) {
     return l;
 }
 
+/* ── Fuentes ──
+   fuente("letra.ttf", 32): una fuente TrueType u OpenType a ese tamaño (las
+   letras se dibujan una vez en una imagen y luego se copian, así que es tan
+   rápido como dibujar sprites). fuente(imagen, "ABC...") hace una fuente con
+   letras dibujadas en una imagen: cada letra separada de la siguiente por
+   columnas transparentes (y las filas, por filas transparentes), o en cuadros
+   iguales con {"celda": [ancho, alto]}. Se usan con texto(t, x, y, FUENTE) o
+   texto(t, x, y, {"fuente": FUENTE, "color": ..., "alinear": ..., "ancho": ...}). */
+#define JG_MAX_FUENTES 64
+typedef struct {
+    char *clave;
+    int imagen;                 /* de donde se copian las letras */
+    LetraGlifo *g;
+    int ng;
+    short indice[256];          /* posición en g de los caracteres < 256, o -1 */
+    float *kerning;
+    float ascenso, alto_linea, espacio;
+} JgFuente;
+static JgFuente _jg_fuentes[JG_MAX_FUENTES];
+static int _jg_nfuentes;
+
+static void jg_fuentes_liberar(void) {
+    for (int i = 0; i < _jg_nfuentes; i++) { free(_jg_fuentes[i].clave); free(_jg_fuentes[i].g); free(_jg_fuentes[i].kerning); }
+    memset(_jg_fuentes, 0, sizeof _jg_fuentes);
+    _jg_nfuentes = 0;
+}
+
+static Valor *jg_fuente_valor(int i) {
+    Valor *d = valor_diccionario_crear();
+    valor_diccionario_agregar(d, "fuente", valor_numero(i));
+    valor_diccionario_agregar(d, "alto", valor_numero(_jg_fuentes[i].alto_linea));
+    return d;
+}
+
+/* La fuente de un diccionario de fuente() (o de unas opciones con "fuente"), o NULL */
+static JgFuente *jg_fuente_de(Valor *v) {
+    for (int vueltas = 0; vueltas < 2 && v && v->tipo == VAL_DICCIONARIO; vueltas++) {
+        int k = valor_diccionario_buscar(v, "fuente");
+        if (k < 0) return NULL;
+        v = v->diccionario.valores[k];
+        if (v->tipo == VAL_NUMERO) {
+            int i = (int)v->numero;
+            return i >= 0 && i < _jg_nfuentes ? &_jg_fuentes[i] : NULL;
+        }
+    }
+    return NULL;
+}
+
+static int jg_fuente_nueva(const char *clave, JgFuente *f) {
+    if (_jg_nfuentes == JG_MAX_FUENTES) return -1;
+    f->clave = strdup(clave);
+    for (int c = 0; c < 256; c++) f->indice[c] = -1;
+    for (int i = 0; i < f->ng; i++) if (f->g[i].cp >= 0 && f->g[i].cp < 256) f->indice[f->g[i].cp] = (short)i;
+    _jg_fuentes[_jg_nfuentes] = *f;
+    return _jg_nfuentes++;
+}
+
+static const LetraGlifo *jg_letra_exacta(const JgFuente *f, int cp) {
+    if (cp >= 0 && cp < 256) return f->indice[cp] >= 0 ? &f->g[f->indice[cp]] : NULL;
+    for (int i = 0; i < f->ng; i++) if (f->g[i].cp == cp) return &f->g[i];
+    return NULL;
+}
+
+/* La letra, o la más parecida que tenga la fuente: en mayúscula o minúscula
+   (muchas fuentes dibujadas solo tienen una), sin tilde, o '?' */
+static const LetraGlifo *jg_letra(const JgFuente *f, int cp) {
+    const LetraGlifo *g = jg_letra_exacta(f, cp);
+    if (g) return g;
+    int ac, base = cp >= 0x80 ? jg_base(cp, &ac) : cp;
+    if (base == '?' && cp != '?') base = cp;
+    if (cp >= 0xE0 && cp <= 0xFF && base >= 'A' && base <= 'Z') base += 32;   /* á → a, no A */
+    int otras[3] = {base, base >= 'a' && base <= 'z' ? base - 32 : base >= 'A' && base <= 'Z' ? base + 32 : -1, '?'};
+    for (int i = 0; i < 3; i++) if (otras[i] >= 0 && (g = jg_letra_exacta(f, otras[i]))) return g;
+    return NULL;
+}
+
+/* Cuánto avanza el carácter cp (seguido de sig) en la fuente f (NULL: la de Lince) a escala e */
+static double jg_avance(const JgFuente *f, double e, int cp, int sig) {
+    if (!f) return 6 * e;
+    if (cp == ' ' && !jg_letra_exacta(f, ' ')) return f->espacio * e;
+    const LetraGlifo *g = jg_letra(f, cp);
+    double a = g ? g->avance : f->espacio;
+    if (f->kerning && cp >= 32 && cp < 127 && sig >= 32 && sig < 127) a += f->kerning[(cp - 32) * 95 + (sig - 32)];
+    return a * e;
+}
+
+/* El ancho de t[desde, hasta) */
+static double jg_ancho_tramo(const JgFuente *f, double e, const unsigned char *p, const unsigned char *hasta) {
+    double w = 0;
+    int n = 0;
+    while (p < hasta) {
+        int cp = jg_cp(&p);
+        const unsigned char *q = p;
+        int sig = q < hasta ? jg_cp(&q) : 0;
+        w += jg_avance(f, e, cp, sig);
+        n++;
+    }
+    return !f && n ? w - e : w;               /* la de Lince: sin el hueco tras la última */
+}
+
+/* Parte el texto en líneas (por los saltos de línea y, con ancho > 0, por los
+   espacios para no pasar de ese ancho). Devuelve cuántas; en ini/fin el
+   principio y el final de cada una (hasta 'max'). */
+static int jg_lineas(const JgFuente *f, double e, const char *t, double ancho,
+                     const unsigned char **ini, const unsigned char **fin, int max) {
+    const unsigned char *p = (const unsigned char *)t, *inicio = p;
+    int nl = 0;
+    while (1) {
+        const unsigned char *corte = NULL;      /* el último espacio de la línea */
+        const unsigned char *q = inicio;
+        while (*q && *q != '\n') {
+            if (ancho > 0 && *q == ' ' && q > inicio) {
+                if (jg_ancho_tramo(f, e, inicio, q) > ancho && corte) break;
+                corte = q;
+            }
+            q += utf8_tam((const char *)q);
+        }
+        const unsigned char *final = q;
+        if (ancho > 0 && corte && jg_ancho_tramo(f, e, inicio, final) > ancho) final = corte;
+        if (nl < max) { ini[nl] = inicio; fin[nl] = final; }
+        nl++;
+        if (!*final) break;
+        inicio = final + 1;                     /* el espacio o el salto de línea no se escriben */
+    }
+    return nl;
+}
+
+static double jg_alto_linea(const JgFuente *f, double e) { return f ? f->alto_linea * e : 9 * e; }
+
+/* texto(t, x, y, opciones) y ancho_texto / medir_texto(t, opciones).
+   Opciones: fuente, escala, color, alinear ("izquierda", "centro", "derecha";
+   x es entonces el centro o el borde derecho), ancho (parte las líneas). */
+static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
+    const char *fn = medir == 0 ? "texto" : medir == 1 ? "ancho_texto" : "medir_texto";
+    Valor *op = medir ? (n > 1 ? a[1] : NULL) : a[3];
+    char msg[300];
+    if (op && op->tipo == VAL_NULO) op = NULL;
+    if (op && op->tipo != VAL_DICCIONARIO) {
+        snprintf(msg, sizeof msg, "%s(): las opciones van en un diccionario, por ejemplo {\"fuente\": LETRA, \"color\": [255, 255, 255]}", fn);
+        return jg_error("ErrorTipo", msg);
+    }
+    JgFuente *f = NULL;
+    int es_fuente = op && valor_diccionario_buscar(op, "fuente") >= 0 && op->diccionario.valores[valor_diccionario_buscar(op, "fuente")]->tipo == VAL_NUMERO;
+    if (op && !es_fuente) {                     /* unas opciones (no una fuente pasada tal cual) */
+        for (int j = 0; j < op->diccionario.cantidad; j++) {
+            const char *c = op->diccionario.claves[j];
+            if (strcmp(c, "fuente") && strcmp(c, "escala") && strcmp(c, "color") && strcmp(c, "alinear") && strcmp(c, "ancho")) {
+                snprintf(msg, sizeof msg, "%s(): no conozco la opción '%s' (hay \"fuente\", \"escala\", \"color\", \"alinear\" y \"ancho\")", fn, c);
+                return jg_error("Error", msg);
+            }
+        }
+    }
+    if (op && valor_diccionario_buscar(op, "fuente") >= 0) {
+        f = jg_fuente_de(op);
+        if (!f) {
+            snprintf(msg, sizeof msg, "%s(): \"fuente\" es una fuente de juego.fuente()", fn);
+            return jg_error("ErrorTipo", msg);
+        }
+    }
+    double e = f ? 1 : 2, ancho = 0, v;
+    if (jg_opcion(op, "escala", &v)) e = v;
+    if (e <= 0) { snprintf(msg, sizeof msg, "%s(): \"escala\" es mayor que 0", fn); return jg_error("Error", msg); }
+    if (!f) e = e < 1 ? 1 : e > 64 ? 64 : (int)e;        /* la de Lince va en píxeles enteros */
+    jg_opcion(op, "ancho", &ancho);
+    int alinear = 0;
+    Valor *al = jg_opcion_valor(op, "alinear");
+    if (al) {
+        if (al->tipo == VAL_TEXTO && !strcmp(al->texto, "izquierda")) alinear = 0;
+        else if (al->tipo == VAL_TEXTO && !strcmp(al->texto, "centro")) alinear = 1;
+        else if (al->tipo == VAL_TEXTO && !strcmp(al->texto, "derecha")) alinear = 2;
+        else { snprintf(msg, sizeof msg, "%s(): \"alinear\" es \"izquierda\", \"centro\" o \"derecha\"", fn); return jg_error("Error", msg); }
+    }
+    enum { MAXL = 512 };
+    const unsigned char *ini[MAXL], *fin[MAXL];
+    int nl = jg_lineas(f, e, a[0]->texto, ancho, ini, fin, MAXL);
+    if (nl > MAXL) nl = MAXL;
+    double alto = jg_alto_linea(f, e);
+    if (medir) {
+        double w = 0;
+        for (int l = 0; l < nl; l++) { double lw = jg_ancho_tramo(f, e, ini[l], fin[l]); if (lw > w) w = lw; }
+        if (medir == 1) return valor_numero(w);
+        Valor *r = valor_lista_crear();
+        lista_agregar(r, valor_numero(w));
+        lista_agregar(r, valor_numero(f ? nl * alto : nl * alto - 2 * e));    /* la de Lince: 7 de alto + 2 entre líneas */
+        return r;
+    }
+    double x, y;
+    if (!jg_num(a, n, 1, &x, fn) || !jg_num(a, n, 2, &y, fn)) return valor_nulo();
+    unsigned char c[4] = {255, 255, 255, 255};
+    Valor *col = jg_opcion_valor(op, "color");
+    if (col) { Valor *arg[1] = {col}; if (!jg_color(arg, 1, 0, c)) return valor_nulo(); }
+    JgImagen *img = f ? &_jgs.imagenes[f->imagen] : NULL;
+    if (img) { _jg.TextureColor(img->tex, c[0], c[1], c[2]); _jg.TextureAlpha(img->tex, c[3]); }
+    else jg_pintar(c);
+    for (int l = 0; l < nl; l++) {
+        double px = x - _jgs.cam_x, py = y - _jgs.cam_y + l * alto;
+        if (alinear) px -= jg_ancho_tramo(f, e, ini[l], fin[l]) * (alinear == 1 ? 0.5 : 1);
+        const unsigned char *p = ini[l];
+        while (p < fin[l]) {
+            int cp = jg_cp(&p);
+            const unsigned char *q = p;
+            int sig = q < fin[l] ? jg_cp(&q) : 0;
+            if (!f) {
+                int ac, ch = jg_base(cp, &ac);
+                jg_glifo(ch, (int)floor(px), (int)floor(py), (int)e, ac);
+            } else if (cp != ' ') {
+                const LetraGlifo *g = jg_letra(f, cp);
+                if (g && g->sw > 0 && g->sh > 0) {
+                    JgRect src = {g->sx, g->sy, g->sw, g->sh};
+                    JgRect dst = {(int)floor(px + g->dx * e + 0.5), (int)floor(py + (f->ascenso + g->dy) * e + 0.5),
+                                  (int)floor(g->sw * e + 0.5), (int)floor(g->sh * e + 0.5)};
+                    _jg.RenderCopyEx(_jgs.render, img->tex, &src, &dst, 0, NULL, 0);
+                }
+            }
+            px += jg_avance(f, e, cp, sig);
+        }
+    }
+    if (img) { _jg.TextureColor(img->tex, 255, 255, 255); _jg.TextureAlpha(img->tex, 255); }
+    return valor_nulo();
+}
+
+/* medir_texto(t[, opciones]): [ancho, alto] que ocupa (con "ancho", ya partido en líneas) */
+static Valor *fn_jg_medir_texto(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "medir_texto() espera (texto[, opciones])");
+    return jg_texto_opciones(a, n, 2);
+}
+
+static int jg_termina_en(const char *s, const char *fin) {
+    size_t a = strlen(s), b = strlen(fin);
+    if (a < b) return 0;
+    for (size_t i = 0; i < b; i++) if ((s[a - b + i] | 32) != fin[i]) return 0;
+    return 1;
+}
+
+/* Las letras de una imagen: por huecos transparentes, o en cuadros de 'celda' */
+static int jg_fuente_imagen(int k, const char *caracteres, int cw, int ch, int sep, int espacio, JgFuente *f, char *msg, size_t max) {
+    JgImagen *im = &_jgs.imagenes[k];
+    unsigned char *px = jg_pixeles(k);
+    if (!px) { snprintf(msg, max, "no se pudieron leer los píxeles de la imagen"); return 0; }
+    int W = im->ancho, H = im->alto;
+    #define JG_OPACO(x, y) (px[((size_t)(y) * W + (x)) * 4 + 3] > 0)
+    /* los caracteres (los espacios solo cuentan en cuadros iguales: en la imagen no se ven) */
+    int cps[1024], ncps = 0;
+    const unsigned char *p = (const unsigned char *)caracteres;
+    while (*p && ncps < 1024) { int cp = jg_cp(&p); if (cw > 0 || cp != ' ') cps[ncps++] = cp; }
+    JgRect r[1024];
+    int nr = 0, alto_max = 0;
+    if (cw > 0) {
+        int cols = W / cw, filas = H / ch;
+        for (int f2 = 0; f2 < filas; f2++)
+            for (int c = 0; c < cols && nr < 1024; c++) { JgRect q = {c * cw, f2 * ch, cw, ch}; r[nr++] = q; }
+        alto_max = ch;
+        if (ncps > nr) {
+            snprintf(msg, max, "la imagen tiene %d cuadros de %d×%d y hay %d caracteres", nr, cw, ch, ncps);
+            free(px); return 0;
+        }
+        nr = ncps;
+    } else {
+        int y = 0;
+        while (y < H) {                         /* bandas: filas con algo, entre filas vacías */
+            int hay = 0;
+            for (int x = 0; x < W && !hay; x++) hay = JG_OPACO(x, y);
+            if (!hay) { y++; continue; }
+            int y0 = y;
+            while (y < H) {
+                hay = 0;
+                for (int x = 0; x < W && !hay; x++) hay = JG_OPACO(x, y);
+                if (!hay) break;
+                y++;
+            }
+            if (y - y0 > alto_max) alto_max = y - y0;
+            for (int x = 0; x < W;) {           /* letras: columnas con algo, entre columnas vacías */
+                int col = 0;
+                for (int yy = y0; yy < y && !col; yy++) col = JG_OPACO(x, yy);
+                if (!col) { x++; continue; }
+                int x0 = x;
+                while (x < W) {
+                    col = 0;
+                    for (int yy = y0; yy < y && !col; yy++) col = JG_OPACO(x, yy);
+                    if (!col) break;
+                    x++;
+                }
+                if (nr < 1024) { JgRect q = {x0, y0, x - x0, y - y0}; r[nr] = q; }
+                nr++;
+            }
+        }
+        if (nr != ncps) {
+            snprintf(msg, max, "encuentro %d letras en la imagen y hay %d caracteres (sin contar los espacios)%s", nr, ncps,
+                     nr > ncps ? "; si una letra tiene partes separadas (\", %), di lo que mide cada una: {\"celda\": [ancho, alto]}" : "");
+            free(px); return 0;
+        }
+    }
+    #undef JG_OPACO
+    free(px);
+    f->g = malloc(sizeof(LetraGlifo) * (size_t)(nr ? nr : 1));
+    if (!f->g) { snprintf(msg, max, "sin memoria"); return 0; }
+    double suma = 0;
+    for (int i = 0; i < nr; i++) {
+        LetraGlifo g = {cps[i], r[i].x, r[i].y, r[i].w, r[i].h, 0, 0, (float)(r[i].w + sep)};
+        f->g[i] = g;
+        suma += r[i].w;
+    }
+    f->ng = nr;
+    f->imagen = k;
+    f->ascenso = 0;
+    f->alto_linea = (float)(alto_max + (alto_max + 3) / 4);
+    f->espacio = espacio >= 0 ? (float)(espacio + sep) : (float)(nr ? floor(suma / nr * 0.6 + 0.5) + sep : alto_max / 2);
+    return 1;
+}
+
+/* fuente(ruta.ttf, tamaño) · fuente(imagen, caracteres[, opciones]) */
+static Valor *fn_jg_fuente(Valor **a, int n) {
+    JG_ABIERTA();
+    char clave[1200], msg[400];
+    JgFuente f;
+    memset(&f, 0, sizeof f);
+    if (n >= 1 && a[0]->tipo == VAL_TEXTO && (jg_termina_en(a[0]->texto, ".ttf") || jg_termina_en(a[0]->texto, ".otf"))) {
+        if (n < 2 || a[1]->tipo != VAL_NUMERO)
+            return jg_error("ErrorTipo", "fuente() espera (ruta de la fuente, tamaño en píxeles), por ejemplo (\"letra.ttf\", 24)");
+        double tam = a[1]->numero;
+        if (tam < 4 || tam > 400) return jg_error("Error", "fuente(): el tamaño va de 4 a 400 píxeles");
+        snprintf(clave, sizeof clave, "ttf|%s|%g", a[0]->texto, tam);
+        for (int i = 0; i < _jg_nfuentes; i++) if (!strcmp(_jg_fuentes[i].clave, clave)) return jg_fuente_valor(i);
+        size_t largo = 0;
+        char *bytes = interprete_leer_bytes(a[0]->texto, &largo);
+        if (!bytes) { snprintf(msg, sizeof msg, "fuente(): no se encuentra la fuente '%s'", a[0]->texto); return jg_error("ErrorJuego", msg); }
+        /* lo visible del ASCII y del Latin-1 (tildes, ñ, ¿, ¡...), más comillas, guiones, puntos suspensivos y el euro */
+        int cps[256], ncps = 0;
+        for (int c = 32; c < 127; c++) cps[ncps++] = c;
+        for (int c = 161; c < 256; c++) cps[ncps++] = c;
+        static const int MAS[] = {0x20AC, 0x2026, 0x201C, 0x201D, 0x2018, 0x2019, 0x2013, 0x2014, 0x2022};
+        for (size_t i = 0; i < sizeof MAS / sizeof MAS[0]; i++) cps[ncps++] = MAS[i];
+        LetraAtlas at;
+        int ok = letra_preparar((const unsigned char *)bytes, largo, (float)tam, cps, ncps, &at);
+        free(bytes);
+        if (!ok) { snprintf(msg, sizeof msg, "fuente(): '%s' no es una fuente TrueType u OpenType que Lince pueda leer", a[0]->texto); return jg_error("ErrorJuego", msg); }
+        char nombre[1300];
+        snprintf(nombre, sizeof nombre, "<fuente %s>", clave);
+        int k = jg_nueva_imagen(nombre, at.rgba, at.ancho, at.alto);
+        at.rgba = NULL;                          /* ya es de la imagen */
+        if (k < 0) { letra_liberar(&at); return jg_error("ErrorJuego", "fuente(): no se pudo crear la imagen de las letras"); }
+        f.imagen = k;
+        f.g = at.glifos; f.ng = at.nglifos; f.kerning = at.kerning;
+        f.ascenso = at.ascenso; f.alto_linea = at.alto_linea;
+        const LetraGlifo *esp = NULL;
+        for (int i = 0; i < f.ng; i++) if (f.g[i].cp == ' ') esp = &f.g[i];
+        f.espacio = esp ? esp->avance : (float)(tam / 4);
+        at.glifos = NULL; at.kerning = NULL;
+    } else {
+        Valor *img = NULL;
+        if (n >= 1 && a[0]->tipo == VAL_TEXTO) {
+            img = jg_imagen_archivo(a, 1);
+            if (hay_error) return valor_nulo();
+        }
+        int k = jg_id_de(img ? img : n >= 1 ? a[0] : NULL, "imagen");
+        if (img) valor_destruir(img);
+        if (k < 0 || k >= _jgs.nimagenes || n < 2 || a[1]->tipo != VAL_TEXTO || !a[1]->texto[0])
+            return jg_error("ErrorTipo", "fuente() espera (\"letra.ttf\", tamaño) o (imagen con las letras, \"ABC...\"[, opciones])");
+        Valor *op = n > 2 ? a[2] : NULL;
+        if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
+            return jg_error("ErrorTipo", "fuente(): las opciones van en un diccionario, por ejemplo {\"celda\": [8, 8]}");
+        for (int j = 0; op && op->tipo == VAL_DICCIONARIO && j < op->diccionario.cantidad; j++) {
+            const char *c = op->diccionario.claves[j];
+            if (strcmp(c, "celda") && strcmp(c, "separacion") && strcmp(c, "espacio")) {
+                snprintf(msg, sizeof msg, "fuente(): no conozco la opción '%s' (hay \"celda\", \"separacion\" y \"espacio\")", c);
+                return jg_error("Error", msg);
+            }
+        }
+        int cw = 0, ch = 0, espacio = -1;
+        double v, sep;
+        Valor *celda = jg_opcion_valor(op, "celda");
+        if (celda) {
+            if (celda->tipo != VAL_LISTA || celda->lista.cantidad != 2 || celda->lista.elementos[0]->tipo != VAL_NUMERO ||
+                celda->lista.elementos[1]->tipo != VAL_NUMERO || celda->lista.elementos[0]->numero < 1 || celda->lista.elementos[1]->numero < 1)
+                return jg_error("Error", "fuente(): \"celda\" es [ancho, alto] de cada letra");
+            cw = (int)celda->lista.elementos[0]->numero; ch = (int)celda->lista.elementos[1]->numero;
+        }
+        sep = cw > 0 ? 0 : 1;
+        if (jg_opcion(op, "separacion", &v)) sep = v;
+        if (jg_opcion(op, "espacio", &v)) espacio = (int)v;
+        if (sep < 0 || sep > 100) return jg_error("Error", "fuente(): \"separacion\" va de 0 a 100 píxeles");
+        snprintf(clave, sizeof clave, "img|%d|%d|%d|%g|%d|%.1000s", k, cw, ch, sep, espacio, a[1]->texto);
+        for (int i = 0; i < _jg_nfuentes; i++) if (!strcmp(_jg_fuentes[i].clave, clave)) return jg_fuente_valor(i);
+        if (!jg_fuente_imagen(k, a[1]->texto, cw, ch, (int)sep, espacio, &f, msg, sizeof msg)) {
+            char m2[460];
+            snprintf(m2, sizeof m2, "fuente(): %s", msg);
+            return jg_error("Error", m2);
+        }
+    }
+    int i = jg_fuente_nueva(clave, &f);
+    if (i < 0) { free(f.g); free(f.kerning); return jg_error("ErrorJuego", "fuente(): demasiadas fuentes"); }
+    return jg_fuente_valor(i);
+}
+
 /* ── Cámara y pantalla ── */
 /* camara(x, y): lo que se dibuja se desplaza; camara() vuelve a (0, 0). Devuelve [x, y] */
 static Valor *fn_jg_camara(Valor **a, int n) {
@@ -3775,6 +4188,104 @@ static Valor *fn_jg_cuadro(Valor **a, int n) {
     else if (k >= total) k = total - 1;
     if (a[0]->tipo == VAL_LISTA) { Valor *e = a[0]->lista.elementos[k]; e->refs++; return e; }
     return valor_numero((double)k);
+}
+
+/* ── Movimiento suave ──
+   Una curva dice cómo se reparte un cambio en el tiempo: t va de 0 (empieza)
+   a 1 (acaba) y la curva da cuánto del camino se ha hecho. "lineal" va igual
+   todo el rato; las demás arrancan o paran poco a poco, se pasan un poco y
+   vuelven ("atras"), rebotan al llegar ("rebote") o vibran como un muelle
+   ("elastico"). */
+static const char *const JG_CURVAS[] = { "lineal", "suave", "entrar", "salir", "rebote", "elastico", "atras", NULL };
+
+static double jg_curva(int c, double t) {
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    switch (c) {
+        case 0: return t;
+        case 1: return t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2;
+        case 2: return t * t * t;
+        case 3: return 1 - pow(1 - t, 3);
+        case 4: {
+            const double n1 = 7.5625, d1 = 2.75;
+            if (t < 1 / d1) return n1 * t * t;
+            if (t < 2 / d1) { t -= 1.5 / d1; return n1 * t * t + 0.75; }
+            if (t < 2.5 / d1) { t -= 2.25 / d1; return n1 * t * t + 0.9375; }
+            t -= 2.625 / d1;
+            return n1 * t * t + 0.984375;
+        }
+        case 5:
+            if (t == 0 || t == 1) return t;
+            return pow(2, -10 * t) * sin((t * 10 - 0.75) * (2 * M_PI / 3)) + 1;
+        default: {
+            const double c1 = 1.70158, c3 = c1 + 1;
+            return 1 + c3 * pow(t - 1, 3) + c1 * pow(t - 1, 2);
+        }
+    }
+}
+
+/* El número de la curva a[i] ("suave" si no se dice); -1 con el error puesto */
+static int jg_curva_arg(Valor **a, int n, int i, const char *fn) {
+    if (i >= n || a[i]->tipo == VAL_NULO) return 1;
+    if (a[i]->tipo == VAL_TEXTO)
+        for (int c = 0; JG_CURVAS[c]; c++) if (!strcmp(a[i]->texto, JG_CURVAS[c])) return c;
+    char msg[300];
+    snprintf(msg, sizeof msg, "%s(): la curva es \"lineal\", \"suave\", \"entrar\", \"salir\", \"rebote\", \"elastico\" o \"atras\"", fn);
+    jg_error("Error", msg);
+    return -1;
+}
+
+/* desde + (hasta - desde) * f, con números o con listas de números (posiciones, colores) */
+static Valor *jg_interpolar(Valor *desde, Valor *hasta, double f, const char *fn) {
+    if (desde->tipo == VAL_NUMERO && hasta->tipo == VAL_NUMERO) return valor_numero(desde->numero + (hasta->numero - desde->numero) * f);
+    int ok = desde->tipo == VAL_LISTA && hasta->tipo == VAL_LISTA && desde->lista.cantidad == hasta->lista.cantidad;
+    for (int i = 0; ok && i < desde->lista.cantidad; i++)
+        ok = desde->lista.elementos[i]->tipo == VAL_NUMERO && hasta->lista.elementos[i]->tipo == VAL_NUMERO;
+    if (!ok) {
+        char msg[200];
+        snprintf(msg, sizeof msg, "%s(): los dos valores son números, o listas de números del mismo largo (como [x, y] o un color)", fn);
+        return jg_error("ErrorTipo", msg);
+    }
+    Valor *r = valor_lista_crear();
+    for (int i = 0; i < desde->lista.cantidad; i++) {
+        double a = desde->lista.elementos[i]->numero, b = hasta->lista.elementos[i]->numero;
+        lista_agregar(r, valor_numero(a + (b - a) * f));
+    }
+    return r;
+}
+
+/* curva(nombre, t): cuánto del camino se ha hecho en el momento t (de 0 a 1) */
+static Valor *fn_jg_curva(Valor **a, int n) {
+    double t;
+    if (n < 2 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "curva() espera (nombre de la curva, t de 0 a 1)");
+    int c = jg_curva_arg(a, n, 0, "curva");
+    if (c < 0 || !jg_num(a, n, 1, &t, "curva")) return valor_nulo();
+    return valor_numero(jg_curva(c, t));
+}
+
+/* suavizar(desde, hasta, segundos, inicio[, curva]): el valor que toca ahora
+   en un cambio de 'desde' a 'hasta' que empezó en 'inicio' (un juego.tiempo())
+   y dura 'segundos'; antes de empezar, 'desde', y al acabar, 'hasta' */
+static Valor *fn_jg_suavizar(Valor **a, int n) {
+    double seg, inicio;
+    if (n < 4) return jg_error("ErrorTipo", "suavizar() espera (desde, hasta, segundos, inicio[, curva])");
+    if (!jg_num(a, n, 2, &seg, "suavizar") || !jg_num(a, n, 3, &inicio, "suavizar")) return valor_nulo();
+    int c = jg_curva_arg(a, n, 4, "suavizar");
+    if (c < 0) return valor_nulo();
+    double t = seg > 0 ? (jg_reloj() - inicio) / seg : 1;
+    return jg_interpolar(a[0], a[1], jg_curva(c, t), "suavizar");
+}
+
+/* acercar(actual, objetivo, rapidez): un paso de 'actual' hacia 'objetivo' en
+   este fotograma, más largo cuanto más lejos (frena al llegar). Con rapidez 10
+   recorre en una décima de segundo unos dos tercios de lo que le falta, vaya
+   el juego a los fotogramas que vaya. Para una cámara que sigue al jugador,
+   una barra de vida que baja... */
+static Valor *fn_jg_acercar(Valor **a, int n) {
+    double r;
+    if (n < 3) return jg_error("ErrorTipo", "acercar() espera (actual, objetivo, rapidez)");
+    if (!jg_num(a, n, 2, &r, "acercar")) return valor_nulo();
+    if (r < 0) return jg_error("Error", "acercar(): la rapidez no es negativa");
+    return jg_interpolar(a[0], a[1], 1 - exp(-r * _jgs.dt), "acercar");
 }
 
 /* ── Partículas ──
@@ -4626,6 +5137,8 @@ static void cargar_juego(Entorno *entorno) {
         {"circulo",         fn_jg_circulo,         -1},
         {"texto",           fn_jg_texto,           -1},
         {"ancho_texto",     fn_jg_ancho_texto,     -1},
+        {"medir_texto",     fn_jg_medir_texto,     -1},
+        {"fuente",          fn_jg_fuente,          -1},
         {"tecla",           fn_jg_tecla,            1},
         {"tecla_pulsada",   fn_jg_tecla_pulsada,    1},
         {"tecla_soltada",   fn_jg_tecla_soltada,    1},
@@ -4637,6 +5150,9 @@ static void cargar_juego(Entorno *entorno) {
         {"captura",         fn_jg_captura,          1},
         {"pitido",          fn_jg_pitido,          -1},
         {"colision",        fn_jg_colision,        -1},
+        {"curva",           fn_jg_curva,           -1},
+        {"suavizar",        fn_jg_suavizar,        -1},
+        {"acercar",         fn_jg_acercar,         -1},
         {"caja",            fn_jg_caja,            -1},
         {"imagen",          fn_jg_imagen,           1},
         {"dibujar",         fn_jg_dibujar,         -1},

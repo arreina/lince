@@ -781,8 +781,35 @@ mientras juego.abierto() {
 | `rectangulo(x, y, ancho, alto[, color])` · `contorno(...)` | rectángulo relleno / solo borde |
 | `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
 | `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
+| `texto(t, x, y, opciones)` · `ancho_texto(t, opciones)` · `medir_texto(t[, opciones])` | con otra fuente, alineado o partido en líneas (ver **Letras**, abajo). `medir_texto` da `[ancho, alto]` |
 | `camara(x, y)` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador |
 | `captura(ruta)` | guarda la ventana como `.bmp` |
+
+**Letras.** Además de la fuente incluida, `fuente()` carga una fuente TrueType u OpenType
+(`.ttf`, `.otf`, como las de Google Fonts) a un tamaño, o hace una con letras dibujadas en una
+imagen (pixel art):
+
+```lince
+fijo LETRA = juego.fuente("redondita.ttf", 28)         # 28 píxeles de alto
+fijo PIXEL = juego.fuente("letras.png", "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ0123456789.,!?")
+
+juego.texto("¡Hola, Ñandú!", 20, 20, LETRA)
+juego.texto("PUNTOS: 120", 400, 20, {"fuente": PIXEL, "escala": 3, "color": [255, 220, 0], "alinear": "centro"})
+juego.texto(dialogo, 40, 300, {"fuente": LETRA, "ancho": 560})     # parte las líneas por los espacios
+```
+
+| Función | Qué hace |
+|---|---|
+| `fuente(ruta, tamaño)` | una fuente `.ttf` u `.otf` a ese tamaño en píxeles. Las letras se dibujan una vez al cargarla, así que escribir es tan rápido como dibujar sprites. Trae el español entero (tildes, ñ, ü, ¿, ¡), comillas, guiones, puntos suspensivos y el euro, y junta los pares de letras que la fuente diga ("AV") |
+| `fuente(imagen, caracteres[, opciones])` | una fuente hecha con las letras dibujadas en una imagen (o en su ruta), en el orden de `caracteres`. Cada letra se separa de la siguiente por columnas transparentes y cada fila de letras por filas transparentes. Si una letra tiene partes separadas (`"`, `%`), o es de ancho fijo, `{"celda": [ancho, alto]}` la parte en cuadros iguales. `separacion`: píxeles entre letras (1; 0 con `celda`); `espacio`: el ancho del espacio |
+
+Con un diccionario de opciones en lugar de la escala, `texto()` admite `fuente`, `escala`, `color`
+(con alfa: `[255, 255, 255, 128]`), `alinear` (`"izquierda"`, `"centro"` o `"derecha"`: `x` es
+entonces el centro o el borde derecho) y `ancho` (parte en líneas para no pasar de ese ancho; los
+saltos de línea `\n` también cuentan). También se le puede pasar la fuente tal cual, como en la
+primera línea. Si a la fuente le falta una letra usa la más parecida: la mayúscula si no tiene
+minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del juego al hacer
+`lince compilar` o `lince repartir`, como las imágenes.
 
 **Imágenes y sprites**
 
@@ -850,6 +877,28 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 En `colision`, `colision_circulo_rect` y `dentro`, cada rectángulo puede ir en cuatro números o en una
 lista `[x, y, ancho, alto]`, como las que da `caja()`.
 | `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
+
+**Movimiento suave.** Para que las cosas no aparezcan de golpe: un menú que entra desde un lado,
+una moneda que vuela al marcador, un título que cae y rebota, una cámara que sigue al jugador sin
+tirones.
+
+```lince
+sea inicio = juego.tiempo()                                   # cuando empieza el movimiento
+# en cada fotograma:
+sea y = juego.suavizar(-80, 120, 0.8, inicio, "rebote")       # cae de -80 a 120 en 0,8 s y rebota
+juego.texto("¡NIVEL 2!", 400, y, {"fuente": LETRA, "alinear": "centro"})
+camara_x = juego.acercar(camara_x, jugador_x - 400, 6)        # la cámara va detrás, frenando al llegar
+```
+
+| Función | Qué hace |
+|---|---|
+| `suavizar(desde, hasta, segundos, inicio[, curva])` | el valor que toca ahora en un cambio de `desde` a `hasta` que empezó en `inicio` (un `tiempo()`) y dura `segundos`. Antes de empezar da `desde`, y al acabar, `hasta`. Valen números o listas de números del mismo largo: `[x, y]`, un color... |
+| `acercar(actual, objetivo, rapidez)` | un paso de `actual` hacia `objetivo` en este fotograma, más largo cuanto más lejos, así que frena al llegar. Con rapidez 10 recorre en una décima de segundo unos dos tercios de lo que le falta, vaya el juego a los fotogramas que vaya. También con listas |
+| `curva(nombre, t)` | cuánto del camino se ha hecho en el momento `t` (de 0 a 1), para usar las curvas en cualquier cosa |
+
+Las curvas: `"lineal"` (igual todo el rato), `"suave"` (arranca y frena poco a poco; la que se usa si no
+se dice), `"entrar"` (arranca despacio), `"salir"` (frena al final), `"rebote"` (rebota al llegar, como
+una pelota), `"elastico"` (se pasa y vibra, como un muelle) y `"atras"` (se pasa un poco y vuelve).
 
 **Hojas de sprites.** La manera tradicional de animar: todos los fotogramas dibujados en una sola
 imagen, uno al lado del otro (y, si hay varias animaciones, una por fila). `hoja()` la divide
@@ -1416,8 +1465,9 @@ lince/
 │   ├── recarga.c/h     # recarga en caliente de los juegos
 │   ├── imagen.c/h      # PNG, JPG... (stb_image)
 │   ├── ogg.c/h         # Ogg Vorbis (stb_vorbis)
+│   ├── letra.c/h       # fuentes .ttf y .otf (stb_truetype)
 │   ├── juego.h         # módulo juego (SDL2 cargada al ejecutar)
-│   ├── terceros/       # stb_image y stb_vorbis, tal cual
+│   ├── terceros/       # stb_image, stb_vorbis y stb_truetype, tal cual
 │   ├── repl.c/h        # REPL interactivo con historial
 │   ├── paquetes.c/h    # gestor de paquetes
 │   └── plataforma.h    # compatibilidad multiplataforma

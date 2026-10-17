@@ -45,6 +45,14 @@ lenguaje no pueda hacer también escribiendo código.
 - **Editor de píxeles para `juego.sprite`**: que lea y escriba la lista de
   filas de texto y la paleta del código, para seguir sin archivos.
 - **Paleta de colores** compartida entre sprites.
+- **Probar fuentes** (`juego.fuente`): escribir un texto y verlo con cada
+  fuente y tamaño; para una fuente dibujada en una imagen, ver qué letra ha
+  tocado a cada carácter y avisar si sobra o falta alguna.
+
+## Movimiento
+
+- **Ver las curvas** de `juego.suavizar` (`"rebote"`, `"elastico"`...)
+  moviendo una bola, y elegir la que va con un clic.
 
 ## Mapas
 

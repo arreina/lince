@@ -1556,6 +1556,7 @@ static void cargar_pruebas(Entorno *entorno) {
 #include <limits.h>
 #include "ogg.h"
 #include "imagen.h"
+#include "letra.h"
 #include "empaquetado.h"
 #include "recarga.h"
 #include "juego.h"

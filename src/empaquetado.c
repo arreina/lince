@@ -201,10 +201,10 @@ static void recoger(const char *codigo, const char *actual) {
     Token  *tok = lexer_tokenizar(lx, &cnt);
     Parser *pa  = parser_crear(tok, cnt);
     parser_parsear(pa);
-    /* Imágenes y sonidos nombrados en el código: van dentro sin --incluir.
+    /* Imágenes, sonidos y fuentes nombrados en el código: van dentro sin --incluir.
        Sólo estos tipos: un .txt o un .json puede ser un archivo que el juego
        escribe (récords), y empaquetado taparía la versión del disco. */
-    static const char *const MEDIOS[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".wav", ".ogg", NULL };
+    static const char *const MEDIOS[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".wav", ".ogg", ".ttf", ".otf", NULL };
     for (int i = 0; i < cnt; i++) {
         if (tok[i].tipo != TOK_TEXTO || !tok[i].valor) continue;
         const char *v = tok[i].valor, *ext = strrchr(v, '.');

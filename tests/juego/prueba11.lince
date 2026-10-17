@@ -1,0 +1,89 @@
+# Prueba de fuentes (TrueType y dibujadas en una imagen), texto con opciones
+# y movimiento suave (curva, suavizar, acercar). cajas.ttf la hace
+# hacer_fuente.py: a 20 px, A avanza 12, B 8, a 10, ? 10, el espacio 6, y
+# A seguida de B se junta 2.
+importar "juego"
+importar "matematica"
+juego.abrir("Letras", 200, 80)
+
+funcion par(val lista l): texto {
+    devolver a_texto(matematica.redondear(l[0])) + " " + a_texto(matematica.redondear(l[1]))
+}
+
+fijo F = juego.fuente("cajas.ttf", 20)
+escribir("alto: " + a_texto(F["alto"]))
+escribir("AB: " + par(juego.medir_texto("AB", {"fuente": F})))
+escribir("A B: " + par(juego.medir_texto("A B", F)))
+escribir("lineas: " + par(juego.medir_texto("AA\nB", F)))
+escribir("partido: " + par(juego.medir_texto("A A A A", {"fuente": F, "ancho": 30})))
+escribir("parecidas: " + a_texto(juego.ancho_texto("ábé", F)))
+escribir("escala: " + a_texto(juego.ancho_texto("AB", {"fuente": F, "escala": 2})))
+escribir("misma: " + a_texto(juego.fuente("cajas.ttf", 20)["fuente"] == F["fuente"]))
+escribir("lince: " + par(juego.medir_texto("HOLA", {"escala": 3})) + " " + a_texto(juego.ancho_texto("HOLA", 3)))
+
+# una fuente dibujada: I (1 de ancho), H (2) y O (3), separadas por columnas vacías
+fijo DIBUJO = juego.sprite([
+    "X.XX..XXX",
+    "X.XX..X.X",
+    "X.XX..XXX"
+], {"X": [255, 255, 0]})
+fijo P = juego.fuente(DIBUJO, "IHO")
+escribir("dibujada: " + par(juego.medir_texto("IHO", P)) + " espacio " + a_texto(juego.ancho_texto("I I", P)))
+fijo R = juego.fuente(DIBUJO, "ABC", {"celda": [3, 3]})
+escribir("rejilla: " + a_texto(juego.ancho_texto("ABC", R)))
+
+juego.limpiar([0, 0, 0])
+juego.texto("AB", 10, 10, {"fuente": F, "color": [255, 0, 0]})
+juego.texto("A", 100, 40, {"fuente": F, "alinear": "centro"})
+juego.texto("IHO", 150, 10, {"fuente": P, "escala": 4})
+juego.captura("letras.bmp")
+
+# movimiento suave
+escribir("curvas: " + a_texto(juego.curva("lineal", 0.25)) + " " + a_texto(juego.curva("entrar", 0.5)) + " " +
+         a_texto(juego.curva("salir", 0.5)) + " " + a_texto(juego.curva("suave", 0.5)) + " " +
+         a_texto(juego.curva("rebote", 1)) + " " + a_texto(matematica.redondear(juego.curva("atras", 0.5) * 1000)) + " " +
+         a_texto(juego.curva("elastico", 0)) + " " + a_texto(juego.curva("lineal", 7)))
+fijo AHORA = juego.tiempo()
+escribir("suavizar: " + a_texto(matematica.redondear(juego.suavizar(0, 100, 1, AHORA - 0.5, "lineal"))) + " " +
+         a_texto(juego.suavizar(0, 100, 1, AHORA + 5)) + " " + par(juego.suavizar([0, 0], [10, 20], 1, AHORA - 2, "rebote")))
+escribir("acercar: " + a_texto(matematica.redondear(juego.acercar(0, 100, 10))) + " " +
+         par(juego.acercar([0, 100], [60, 100], 10)) + " " + a_texto(juego.acercar(5, 100, 0)))
+
+intentar {
+    juego.fuente("no_existe.ttf", 20)
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.fuente(DIBUJO, "AB")
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.texto("x", 0, 0, {"colr": [1, 2, 3]})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.texto("x", 0, 0, {"alinear": "medio"})
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.suavizar(0, [1], 1, 0)
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.curva("rara", 0.5)
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+intentar {
+    juego.fuente("cajas.ttf")
+} capturar (error e) {
+    escribir("error: " + e.mensaje)
+}
+mientras juego.abierto() {
+    juego.presentar()
+}
