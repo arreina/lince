@@ -9,7 +9,7 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.6-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-0.7-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-31%2F31-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows-6A2D72.svg)]()
 
@@ -57,7 +57,11 @@ Diez minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, e
 
 ## Instalación
 
-### Linux
+### Descargar
+
+En [Versiones](https://github.com/arreina/lince/releases/latest) está Lince ya compilado para Linux (`lince-X.Y.Z-linux.tar.gz`) y para Windows (`lince-X.Y.Z-windows.zip`, con SDL2 dentro). Se descomprime y se usa: `lince examples/01_pong.lince`. En Linux, para abrir ventanas hace falta SDL2 (`sudo apt install libsdl2-2.0-0`). Lo que ha cambiado en cada versión está en [NOVEDADES.md](NOVEDADES.md).
+
+### Compilarlo en Linux
 
 ```bash
 git clone https://github.com/arreina/lince.git
@@ -67,7 +71,7 @@ sudo make install   # opcional
 sudo apt install libsdl2-2.0-0   # para abrir ventanas
 ```
 
-### Windows (MSYS2, terminal UCRT64)
+### Compilarlo en Windows (MSYS2, terminal UCRT64)
 
 ```bash
 pacman -S mingw-w64-ucrt-x86_64-gcc make mingw-w64-ucrt-x86_64-SDL2

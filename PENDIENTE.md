@@ -33,10 +33,10 @@ Nada pendiente ahora mismo.
     verdad sin mando, en el emulador y las tareas en arm64 con `qemu-aarch64`.
   - **Publicar en Google Play**: pide un `.aab` (no un `.apk`) firmado; hoy solo se hace el
     `.apk` (con la llave de cada uno, que ya vale para instalarlo y actualizarlo).
-  - **La plantilla en la versión**: la CI la hace y la adjunta a cada versión nueva; la
-    siguiente versión de Lince es la primera que la llevará.
 
 ## Decisiones ya tomadas
+
+- **Versiones:** el número está en `src/version.h` y lo nuevo de cada una en `NOVEDADES.md`. Al subir la etiqueta `vX.Y.Z`, la CI publica la versión con Lince para Linux y Windows, la plantilla de Android y la extensión de VS Code.
 
 - Lince es un lenguaje para videojuegos, no de propósito general. Los módulos de servidor, bases de datos, red, etc. se quitaron (siguen en el historial).
 - **Este repositorio es solo el lenguaje.** El editor visual será lince-motor, un proyecto aparte.

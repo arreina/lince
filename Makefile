@@ -22,7 +22,7 @@ RM = rm -f
 # ── Compilar ──────────────────────────────
 all: $(BIN)
 
-$(BIN): $(SRC) src/corrutina.h src/juego.h src/ogg.h src/imagen.h src/letra.h src/biblioteca_juego.h
+$(BIN): $(SRC) src/version.h src/corrutina.h src/juego.h src/ogg.h src/imagen.h src/letra.h src/biblioteca_juego.h
 	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
 	@echo "✅ Lince compilado — usa: ./$(BIN) archivo.lince"
 

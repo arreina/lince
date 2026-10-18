@@ -5,6 +5,11 @@
 # memoria, el tercero lo compila y lo prueba en Windows (MSYS2/UCRT64) y el
 # cuarto hace la plantilla de Android (lince-android.apk) y prueba
 # 'lince repartir --android' con ella.
+#
+# Al subir una etiqueta vX.Y.Z, si los cuatro pasan, un quinto publica la
+# versión en GitHub: Lince para Linux y para Windows (cada uno con la
+# plantilla de Android al lado), la plantilla suelta y la extensión de VS Code,
+# con el apartado de NOVEDADES.md de esa versión.
 
 name: CI
 
@@ -119,11 +124,24 @@ jobs:
           bash tests/juego/smoke.sh ./lince.exe
           bash tests/juego/ejemplos.sh ./lince.exe
 
+      # Para la versión: lince.exe con SDL2.dll y las DLL de MSYS2 que necesiten
+      - name: Lince para Windows
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p windows
+          cp lince.exe /ucrt64/bin/SDL2.dll windows/
+          ldd lince.exe /ucrt64/bin/SDL2.dll | awk '$3 ~ /^\/ucrt64\// {print $3}' | sort -u | xargs -r -I{} cp {} windows/
+          ls windows
+
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: lince-windows
+          path: windows/
+
   android:
     name: Android
     runs-on: ubuntu-latest
-    permissions:
-      contents: write          # para adjuntar la plantilla a una versión
     steps:
       - uses: actions/checkout@v5
 
@@ -161,8 +179,54 @@ jobs:
           name: lince-android
           path: lince-android.apk
 
-      - name: Adjuntar la plantilla a la versión
-        if: startsWith(github.ref, 'refs/tags/v')
+  publicar:
+    name: Publicar la versión
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [tests, sanitizer, windows, android]
+    # El Ubuntu más antiguo que da GitHub: el lince de Linux sirve así en más
+    # sistemas (pide una glibc igual o más nueva que la de donde se compila)
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: La etiqueta es la versión de src/version.h
+        run: |
+          V="$(sed -n 's/^#define LINCE_VERSION "\(.*\)"/\1/p' src/version.h)"
+          [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "La etiqueta $GITHUB_REF_NAME no es v$V (src/version.h)"; exit 1; }
+          echo "V=$V" >> "$GITHUB_ENV"
+
+      - name: Compilar Lince
+        run: make
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: descargas
+
+      - name: Paquetes
+        run: |
+          comun="README.md LICENSE NOVEDADES.md examples"
+          plantilla=descargas/lince-android/lince-android.apk
+          # Linux
+          L="lince-$V-linux"
+          mkdir "$L" && cp -r lince $comun "$plantilla" "$L"/
+          tar -czf "$L.tar.gz" "$L"
+          # Windows
+          W="lince-$V-windows"
+          mkdir "$W" && cp -r descargas/lince-windows/* $comun "$plantilla" "$W"/
+          zip -qr "$W.zip" "$W"
+          # La plantilla suelta y la extensión de VS Code
+          cp "$plantilla" .
+          make vsix
+          # Las notas: el apartado de esta versión en NOVEDADES.md
+          awk -v v="## $V" '$0 == v {dentro=1; next} /^## / {dentro=0} dentro' NOVEDADES.md > notas.md
+          [ -s notas.md ] || { echo "NOVEDADES.md no tiene el apartado '## $V'"; exit 1; }
+          ls -l *.tar.gz *.zip *.apk build/*.vsix
+
+      - name: Versión en GitHub
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" lince-android.apk --clobber
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "Lince $V" --notes-file notas.md \
+            "lince-$V-linux.tar.gz" "lince-$V-windows.zip" lince-android.apk build/*.vsix

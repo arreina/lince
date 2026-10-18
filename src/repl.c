@@ -11,8 +11,8 @@
 #include "interprete.h"
 #include "modulos.h"
 #include "plataforma.h"
+#include "version.h"
 
-#define VERSION     "0.1"
 #define MAX_LINEA   4096
 #define HISTORIAL   64
 
@@ -377,7 +377,7 @@ static int leer_linea(char *buf, int max, const char *prompt) {
 void repl_iniciar(void) {
     usar_colores = lince_colores_disponibles();
 
-    printf("%s%s\n🐆 Lince v" VERSION "%s"
+    printf("%s%s\n🐆 Lince v" LINCE_VERSION "%s"
            " — Escribe %s:ayuda%s para ver los comandos\n\n",
            C(CYAN), C(NEGRITA), C(RESET), C(AMARILLO), C(RESET));
 

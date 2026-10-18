@@ -21,6 +21,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "interprete.h"
+#include "version.h"
 
 static const char *_ruta_analizada = NULL;   /* ver lsp_fijar_ruta */
 
@@ -85,6 +86,7 @@ void lsp_analizar(const char *texto) {
 #include <sys/wait.h>
 #endif
 #include "interprete.h"
+#include "version.h"
 #include "modulos.h"
 
 /* ─────────────────────────────────────────
@@ -814,7 +816,7 @@ static void atender(const char *msg, int *salir, int *apagado) {
             "{\"capabilities\":{\"textDocumentSync\":1,"
             "\"completionProvider\":{\"triggerCharacters\":[\".\"]},"
             "\"documentSymbolProvider\":true,\"definitionProvider\":true},"
-            "\"serverInfo\":{\"name\":\"lince\"}}");
+            "\"serverInfo\":{\"name\":\"lince\",\"version\":\"" LINCE_VERSION "\"}}");
     } else if (strcmp(metodo, "shutdown") == 0) {
         *apagado = 1;
         responder(id, "null");

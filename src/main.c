@@ -19,6 +19,7 @@
 #include "repartir.h"
 #include "apk.h"
 #include "nuevo.h"
+#include "version.h"
 
 static char *leer_archivo(const char *ruta) {
     FILE *f = fopen(ruta, "r");
@@ -40,7 +41,7 @@ static char *leer_archivo(const char *ruta) {
 }
 
 static void mostrar_ayuda(void) {
-    printf("\n🐆 Lince v0.6\n\n");
+    printf("\n🐆 Lince " LINCE_VERSION "\n\n");
     printf("Uso:\n");
     printf("  lince nuevo <nombre>                     Crea un juego nuevo listo para cambiarlo\n");
     printf("  lince <archivo.lince>                    Ejecuta un programa\n");
@@ -56,6 +57,7 @@ static void mostrar_ayuda(void) {
     printf("  lince instalar <url>                     Instala un paquete\n");
     printf("  lince desinstalar <nombre>               Desinstala un paquete\n");
     printf("  lince listar                             Lista paquetes instalados\n");
+    printf("  lince version                            Dice qué versión de Lince es\n");
     printf("  lince ayuda                              Muestra esta ayuda\n\n");
     printf("Ejemplos:\n");
     printf("  lince programa.lince\n");
@@ -162,6 +164,11 @@ int main(int argc, char *argv[]) {
 
     /* Servidor de lenguaje para editores: 'lince lsp' */
     if (strcmp(cmd, "lsp") == 0) return lsp_servir();
+
+    if (strcmp(cmd, "version") == 0 || strcmp(cmd, "versión") == 0 || strcmp(cmd, "--version") == 0) {
+        printf("Lince %s\n", LINCE_VERSION);
+        return 0;
+    }
 
     /* Depurador interactivo: 'lince depurar archivo.lince [args]' */
     if (strcmp(cmd, "depurar") == 0) {
