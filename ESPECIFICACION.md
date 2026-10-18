@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v0.7
+# 🐆 Lince — Especificación del Lenguaje v0.8
 
 ## Filosofía
 

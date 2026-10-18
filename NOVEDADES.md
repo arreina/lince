@@ -3,7 +3,18 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
-## 0.8.0 (en preparación)
+## 0.8.0
+
+Publicar en Google Play, partidas guardadas, y menús y diálogos.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-0.8.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-0.8.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-0.8.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-0.8.0.vsix` |
 
 ### Google Play
 
