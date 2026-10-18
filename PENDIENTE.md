@@ -38,6 +38,12 @@ Nada pendiente ahora mismo.
 
 ## Plataformas
 
+- [ ] **Consolas: Nintendo Switch 1 y 2 y PlayStation 5.** Más adelante se verá cómo hacerlo. Lo que se sabe:
+  - Hace falta registrarse como desarrollador en Nintendo y en Sony, que lo aprueban ellos, y usar sus kits de desarrollo.
+  - Sus herramientas y SDK van con un acuerdo de confidencialidad, así que el código para cada consola no podría ir en este repositorio público. Tendría que ir aparte, en privado, como lince-motor.
+  - SDL2 tiene versiones para estas consolas, pero solo se dan a desarrolladores aprobados.
+  - Lince ya está en C sin dependencias y sus tareas tienen el cambio de pila escrito a mano para arm64 (Switch) y x86_64 (PS5), lo que ayudará.
+
 - [ ] **Android**: hecho lo básico (`lince repartir --android`, `android/construir.sh`, táctil, mando en la pantalla, botones,
   «atrás», archivos en su carpeta, tareas en arm64). Falta:
   - **Probarlo con un mando Bluetooth** en el móvil (lo hace el autor): que se lea y
