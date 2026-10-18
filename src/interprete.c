@@ -14,6 +14,7 @@
 #include "modulos.h"
 #include "paquetes.h"
 #include "recarga.h"
+#include "corrutina.h"
 
 /* ─────────────────────────────────────────
    SEÑAL DE RETORNO
@@ -84,9 +85,6 @@ int  interprete_pila(int nivel, const char **nombre, int *linea) {
 static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
                             Valor **args, int nargs, int linea);
 static FuncionLince *buscar_metodo(ClaseLince *cls, const char *nombre);
-#define MAX_GENERADOR   10000  /* límite de seguridad para generadores */
-static int    hay_producir   = 0;
-static Valor *generador_actual = NULL; /* lista acumulando valores producidos */
 int    hay_error     = 0;
 Valor *valor_error   = NULL;
 
@@ -270,6 +268,11 @@ static Valor *valor_retener(Valor *v) {
     return v;
 }
 
+typedef struct TareaLince TareaLince;
+static void tarea_liberar(TareaLince *t);
+static void generador_liberar(TareaLince *g);
+static const char *tarea_nombre(TareaLince *t);
+
 /* Decrementa referencias y destruye si llega a 0 */
 static void valor_liberar(Valor *v) {
     if (!v) return;
@@ -315,11 +318,8 @@ static void valor_liberar(Valor *v) {
         free(v->funcion);
     }
     if (v->tipo == VAL_BYTES) free(v->bytes.datos);
-    if (v->tipo == VAL_GENERADOR) {
-        for (int i = 0; i < v->generador.cantidad; i++)
-            valor_liberar(v->generador.elementos[i]);
-        free(v->generador.elementos);
-    }
+    if (v->tipo == VAL_TAREA) tarea_liberar(v->tarea);
+    if (v->tipo == VAL_GENERADOR && v->generador.productor) generador_liberar(v->generador.productor);
     if (v->tipo == VAL_ERROR) {
         free(v->error->tipo);
         free(v->error->mensaje);
@@ -533,19 +533,10 @@ static Valor *valor_generador_crear(void) {
     v->tipo              = VAL_GENERADOR;
     v->refs              = 1;
     v->es_modulo         = 0;
-    v->generador.cantidad  = 0;
-    v->generador.capacidad = 8;
-    v->generador.elementos = malloc(sizeof(Valor*) * 8);
+    v->generador.productor = NULL;
+    v->generador.desde = v->generador.hasta = 0;
+    v->generador.paso  = 1;
     return v;
-}
-
-static void generador_agregar(Valor *gen, Valor *elem) {
-    if (gen->generador.cantidad >= gen->generador.capacidad) {
-        gen->generador.capacidad *= 2;
-        gen->generador.elementos = realloc(gen->generador.elementos,
-            sizeof(Valor*) * gen->generador.capacidad);
-    }
-    gen->generador.elementos[gen->generador.cantidad++] = elem;
 }
 
 /* Un texto se comparte entre variables (nunca se modifica), así que la
@@ -574,6 +565,7 @@ static Valor *valor_copiar(Valor *v) {
         case VAL_CLASE:
         case VAL_OBJETO:
         case VAL_BYTES:
+        case VAL_TAREA:
             return valor_retener(v);
         default:              return valor_nulo();
     }
@@ -596,6 +588,9 @@ static char *valor_a_texto(Valor *v) {
             return strdup(v->booleano ? "verdadero" : "falso");
         case VAL_FUNCION:
             snprintf(buf, sizeof(buf), "<funcion %s>", v->funcion->nombre);
+            return strdup(buf);
+        case VAL_TAREA:
+            snprintf(buf, sizeof(buf), "<tarea %s>", tarea_nombre(v->tarea));
             return strdup(buf);
         case VAL_CLASE:
             snprintf(buf, sizeof(buf), "<clase %s>", v->clase->nombre);
@@ -1053,6 +1048,7 @@ static Valor *exec_es(Nodo *n, Entorno *e) {
     else if (strcmp(nm, "diccionario") == 0) r = v->tipo == VAL_DICCIONARIO && !v->es_modulo;
     else if (strcmp(nm, "nulo") == 0)        r = v->tipo == VAL_NULO;
     else if (strcmp(nm, "funcion") == 0)     r = v->tipo == VAL_FUNCION;
+    else if (strcmp(nm, "tarea") == 0)       r = v->tipo == VAL_TAREA;
     else {
         Valor *t = entorno_obtener(e, nm, n->linea);
         if (hay_error) { valor_destruir(v); valor_destruir(t); return valor_nulo(); }
@@ -1296,6 +1292,11 @@ static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
         resultado = valor_booleano(op[0] == '=' ? ig : !ig);
     }
 
+    /* Tareas: iguales si son la misma */
+    if (!resultado && izq->tipo == VAL_TAREA && der->tipo == VAL_TAREA &&
+        (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0))
+        resultado = valor_booleano((izq->tarea == der->tarea) == (op[0] == '='));
+
     /* Comparaciones entre lógicos. Sin esto caerían en el caso general
        de más abajo, que sólo sabe comparar nulos, y 'verdadero ==
        verdadero' daba falso. */
@@ -1363,14 +1364,14 @@ static void validar_tipo(Valor *v, TipoDato tipo, const char *contexto,
         };
         const char *recibido[] = {
             "numero", "texto", "logico", "nulo", "funcion",
-            "lista", "diccionario", "clase", "objeto", "error", "generador", "bytes"
+            "lista", "diccionario", "clase", "objeto", "error", "generador", "bytes", "tarea"
         };
         char msg[256];
         snprintf(msg, sizeof(msg),
             "Error de tipo en %s '%s': se esperaba '%s' pero se recibió '%s'.",
             contexto, nombre,
             tipo < 8 ? esperado[tipo] : "?",
-            v->tipo <= VAL_BYTES ? recibido[v->tipo] : "?");
+            v->tipo <= VAL_TAREA ? recibido[v->tipo] : "?");
         valor_error = valor_error_nuevo("ErrorTipo", msg, linea);
         hay_error = 1;
     }
@@ -1385,6 +1386,438 @@ static Valor *tomar_retorno(void) {
     Valor *r      = valor_retorno;
     valor_retorno = NULL;
     hay_retorno   = 0;
+    return r;
+}
+
+/* ─────────────────────────────────────────
+   TAREAS
+   'tarea nombre(...) { ... }' es una función que, al llamarla, empieza a
+   correr y devuelve la tarea en cuanto se pone a esperar: esperar() (al
+   siguiente fotograma), esperar(segundos) o esperar(otra_tarea). Cada tarea
+   tiene su propia pila de C (corrutina.h), así que se puede esperar desde
+   cualquier función que llame, y se sigue justo donde se quedó.
+
+   Quien tiene el bucle de fotogramas (juego.presentar) las hace seguir con
+   interprete_avanzar_tareas(), una vez por fotograma y con su reloj. Sin él,
+   un esperar() fuera de las tareas es quien las hace avanzar. Las que quedan
+   al acabar el programa se paran, y se ejecutan sus 'finalmente'.
+───────────────────────────────────────── */
+#define ERROR_PARADA "TareaParada"   /* deshace la tarea que se para; nadie lo captura */
+
+enum { TAREA_NUEVA, TAREA_CORRIENDO, TAREA_ESPERANDO, TAREA_TERMINADA };
+enum { ESPERA_FOTOGRAMA, ESPERA_SEGUNDOS, ESPERA_TAREA };
+
+struct TareaLince {
+    Corrutina    *co;
+    FuncionLince *f;
+    Entorno      *fn_e;         /* sus parámetros */
+    Valor        *esto;         /* el objeto, si es un método (lo retiene) */
+    int           estado, parar, espera;
+    double        hasta;        /* ESPERA_SEGUNDOS: hasta qué hora */
+    long          fotograma;    /* _tareas_fotograma cuando se puso a esperar */
+    Valor        *otra;         /* ESPERA_TAREA: a cuál */
+    Valor        *resultado;    /* lo que devolvió, al acabar */
+    int           linea;        /* donde se llamó */
+    /* Lo del intérprete que es suyo mientras está parada */
+    int           niveles;      /* llamadas abiertas dentro de ella */
+    const char  **pila_nombre;
+    int          *pila_linea;
+    int           pila_cap;
+    Valor        *esto_actual;
+    ClaseLince   *clase_actual;
+    int           en_biblioteca;
+    int           es_generador; /* el cuerpo de un 'generador', no una tarea */
+    Valor        *producido;    /* lo último que ha producido */
+    char          archivo[sizeof _archivo_actual];
+};
+
+static TareaLince *_tarea_actual = NULL;     /* la que corre ahora; NULL: el programa */
+static Valor     **_tareas       = NULL;     /* las que no han acabado, en orden de inicio */
+static int         _ntareas      = 0, _cap_tareas = 0;
+static long        _tareas_fotograma = 0;    /* veces que se han avanzado */
+static double    (*_reloj_tareas)(void) = NULL;
+static int         _avanzando    = 0;
+
+void interprete_reloj_tareas(double (*reloj)(void)) { _reloj_tareas = reloj; }
+static double tareas_ahora(void) { return _reloj_tareas ? _reloj_tareas() : corrutina_reloj(); }
+
+/* La línea desde la que se ha llamado a la función nativa que corre ahora */
+static int linea_llamada(void) {
+    return profundidad > 0 && profundidad < PILA_MAX ? _pila_linea[profundidad] : 0;
+}
+
+static void tarea_liberar(TareaLince *t) {
+    corrutina_destruir(t->co);
+    valor_destruir(t->resultado);
+    valor_destruir(t->otra);
+    valor_destruir(t->producido);
+    free(t->pila_nombre);
+    free(t->pila_linea);
+    free(t);
+}
+
+static const char *tarea_nombre(TareaLince *t) { return t->f->nombre; }
+
+static int es_tarea_parada(void) {
+    return hay_error && valor_error && valor_error->tipo == VAL_ERROR &&
+           strcmp(valor_error->error->tipo, ERROR_PARADA) == 0;
+}
+
+/* Sigue la tarea 't' hasta que espere o acabe. Mientras corre, la pila de
+   llamadas, el objeto de 'mi', etc. son los suyos; al volver, los de quien
+   la ha hecho seguir. */
+static void tarea_entrar(TareaLince *t) {
+    TareaLince *antes   = _tarea_actual;
+    int         base    = profundidad < 0 ? 0 : profundidad;
+    Valor      *esto_g  = esto_actual;
+    ClaseLince *clase_g = clase_actual;
+    int         bib_g   = _en_biblioteca;
+    char        archivo_g[sizeof _archivo_actual];
+    memcpy(archivo_g, _archivo_actual, sizeof archivo_g);
+
+    for (int i = 0; i < t->niveles && base + 1 + i < PILA_MAX; i++) {
+        _pila_nombre[base + 1 + i] = t->pila_nombre[i];
+        _pila_linea[base + 1 + i]  = t->pila_linea[i];
+    }
+    profundidad      = base + t->niveles;
+    esto_actual      = t->esto_actual;
+    clase_actual     = t->clase_actual;
+    _en_biblioteca   = t->en_biblioteca;
+    memcpy(_archivo_actual, t->archivo, sizeof _archivo_actual);
+    _tarea_actual    = t;
+    t->estado        = TAREA_CORRIENDO;
+
+    corrutina_entrar(t->co);
+
+    _tarea_actual = antes;
+    t->niveles = profundidad - base;
+    if (t->niveles < 0) t->niveles = 0;
+    if (t->niveles > t->pila_cap) {
+        t->pila_cap    = t->niveles + 8;
+        t->pila_nombre = realloc(t->pila_nombre, sizeof(const char *) * (size_t)t->pila_cap);
+        t->pila_linea  = realloc(t->pila_linea, sizeof(int) * (size_t)t->pila_cap);
+    }
+    for (int i = 0; i < t->niveles && base + 1 + i < PILA_MAX; i++) {
+        t->pila_nombre[i] = _pila_nombre[base + 1 + i];
+        t->pila_linea[i]  = _pila_linea[base + 1 + i];
+    }
+    t->esto_actual   = esto_actual;
+    t->clase_actual  = clase_actual;
+    t->en_biblioteca = _en_biblioteca;
+    memcpy(t->archivo, _archivo_actual, sizeof t->archivo);
+
+    profundidad      = base;
+    esto_actual      = esto_g;
+    clase_actual     = clase_g;
+    _en_biblioteca   = bib_g;
+    memcpy(_archivo_actual, archivo_g, sizeof archivo_g);
+}
+
+/* Lo que corre en la pila de la tarea */
+static void tarea_cuerpo(void *arg) {
+    TareaLince *t = (TareaLince *)arg;
+    valor_destruir(ejecutar(t->f->cuerpo, t->fn_e));   /* ver la nota de NODO_LLAMADA */
+    Valor *r = tomar_retorno();
+    hay_salto = SALTO_NINGUNO;
+    if (es_tarea_parada()) {                /* se ha parado: no es un error */
+        valor_destruir(valor_error);
+        valor_error = NULL;
+        hay_error   = 0;
+    } else if (!hay_error && !t->es_generador) {
+        validar_tipo(r, t->f->tipo_tarea, "retorno de tarea", t->f->nombre, linea_llamada());
+    }
+    if (t->es_generador) valor_destruir(r);     /* un 'devolver' en un generador no le llega a nadie */
+    else t->resultado = r;
+    entorno_destruir(t->fn_e);
+    t->fn_e = NULL;
+    valor_destruir(t->esto);
+    t->esto = NULL;
+    t->estado = TAREA_TERMINADA;
+    /* Un error se queda puesto: le llega a quien la ha hecho seguir */
+}
+
+static Valor *valor_tarea(TareaLince *t) {
+    Valor *v = valor_alloc();
+    v->tipo = VAL_TAREA;
+    v->refs = 1; v->es_modulo = 0;
+    v->tarea = t;
+    return v;
+}
+
+/* Llamar a una tarea: la crea con los parámetros ya puestos en 'fn_e' y la
+   sigue hasta que espere por primera vez (o acabe) */
+static TareaLince *tarea_nueva(FuncionLince *f, Entorno *fn_e, int linea) {
+    TareaLince *t = calloc(1, sizeof(TareaLince));
+    if (t) t->co = corrutina_crear(tarea_cuerpo, t);
+    if (!t || !t->co) {
+        free(t);
+        error_rt("Error", linea, "No hay memoria para empezar '%s'.", f->nombre);
+        return NULL;
+    }
+    t->f = f;
+    t->fn_e = fn_e;
+    fn_e->refs++;
+    t->esto          = esto_actual ? valor_retener(esto_actual) : NULL;
+    t->esto_actual   = esto_actual;
+    t->clase_actual  = clase_actual;
+    t->en_biblioteca = _en_biblioteca;
+    t->linea         = linea;
+    memcpy(t->archivo, _archivo_actual, sizeof t->archivo);
+    return t;
+}
+
+static Valor *tarea_empezar(FuncionLince *f, Entorno *fn_e) {
+    TareaLince *t = tarea_nueva(f, fn_e, linea_llamada());
+    if (!t) return valor_nulo();
+    Valor *v = valor_tarea(t);
+    if (_ntareas == _cap_tareas) {
+        _cap_tareas = _cap_tareas ? _cap_tareas * 2 : 16;
+        _tareas = realloc(_tareas, sizeof(Valor *) * (size_t)_cap_tareas);
+    }
+    _tareas[_ntareas++] = valor_retener(v);
+    tarea_entrar(t);
+    return v;
+}
+
+/* Una función declarada con 'tarea': su llamada da la tarea, y el tipo
+   declarado es el de lo que devuelve al acabar */
+static void marcar_tarea(FuncionLince *f, Nodo *n) {
+    if (!n->funcion.es_tarea) return;
+    f->es_tarea     = 1;
+    f->tipo_tarea   = f->tipo_retorno;
+    f->tipo_retorno = TIPO_CUALQUIERA;
+}
+
+/* El cuerpo de una función ya llamada, con sus parámetros en 'fn_e'. Si es
+   una tarea, la empieza y deja la tarea como lo que devuelve la llamada. */
+static Valor *cuerpo_de_tarea(FuncionLince *f, Entorno *fn_e) {
+    Valor *t = tarea_empezar(f, fn_e);
+    if (hay_error) { valor_destruir(t); return valor_nulo(); }
+    valor_retorno = t;
+    hay_retorno   = 1;
+    return valor_nulo();
+}
+static inline Valor *ejecutar_cuerpo(FuncionLince *f, Entorno *fn_e) {
+    if (__builtin_expect(!f->es_tarea, 1)) return ejecutar(f->cuerpo, fn_e);
+    return cuerpo_de_tarea(f, fn_e);
+}
+
+/* Suelta las que han acabado */
+static void tareas_recoger(void) {
+    int j = 0;
+    for (int i = 0; i < _ntareas; i++) {
+        if (_tareas[i]->tarea->estado == TAREA_TERMINADA) valor_destruir(_tareas[i]);
+        else _tareas[j++] = _tareas[i];
+    }
+    _ntareas = j;
+}
+
+static int tarea_lista(TareaLince *t, double ahora) {
+    switch (t->espera) {
+        case ESPERA_TAREA:    return t->otra->tarea->estado == TAREA_TERMINADA;
+        case ESPERA_SEGUNDOS: return t->fotograma < _tareas_fotograma && ahora >= t->hasta;
+        default:              return t->fotograma < _tareas_fotograma;
+    }
+}
+
+void interprete_avanzar_tareas(void) {
+    if (_avanzando || hay_error) return;
+    _avanzando = 1;
+    double ahora = tareas_ahora();
+    int n = _ntareas;                 /* las que empiecen ahora ya han corrido */
+    for (int i = 0; i < n && !hay_error; i++) {
+        TareaLince *t = _tareas[i]->tarea;
+        if (t->estado == TAREA_ESPERANDO && tarea_lista(t, ahora)) tarea_entrar(t);
+    }
+    _tareas_fotograma++;
+    tareas_recoger();
+    _avanzando = 0;
+}
+
+/* Para la tarea: se deshace desde donde esperaba, ejecutando sus
+   'finalmente'. Si es la que corre, se deshace en cuanto vuelva esto. */
+static void tarea_parar(TareaLince *t) {
+    if (t->estado == TAREA_TERMINADA || t->parar) return;
+    t->parar = 1;
+    if (t == _tarea_actual)
+        error_rt(ERROR_PARADA, linea_llamada(), "La tarea '%s' se ha parado.", t->f->nombre);
+    else if (t->estado == TAREA_ESPERANDO)
+        tarea_entrar(t);
+    /* Si no, ha llamado a la que corre ahora: se para en cuanto espere */
+}
+
+void interprete_parar_tareas(void) {
+    int    error_g = hay_error;
+    Valor *valor_g = valor_error;
+    hay_error   = 0;
+    valor_error = NULL;
+    for (int i = 0; i < _ntareas; i++) {        /* las que empiecen al pararse, también */
+        tarea_parar(_tareas[i]->tarea);
+        if (hay_error) {                         /* un error al pararse ya no va a ningún sitio */
+            valor_destruir(valor_error);
+            valor_error = NULL;
+            hay_error   = 0;
+        }
+    }
+    for (int i = 0; i < _ntareas; i++) valor_destruir(_tareas[i]);
+    free(_tareas);
+    _tareas  = NULL;
+    _ntareas = _cap_tareas = 0;
+    hay_error   = error_g;
+    valor_error = valor_g;
+}
+
+/* esperar() fuera de las tareas: las hace avanzar hasta que se cumpla, a
+   60 vueltas por segundo con el reloj real */
+static Valor *esperar_fuera(int espera, double segundos, Valor *otra, int linea) {
+    if (_reloj_tareas)
+        return error_rt("Error", linea,
+            "En un juego, esperar() solo puede ir dentro de una tarea: el bucle del juego no "
+            "se puede parar. Las tareas avanzan solas en cada juego.presentar().");
+    if (_avanzando)
+        return error_rt("Error", linea, "esperar() no puede ir aquí: las tareas están avanzando.");
+    double meta = corrutina_reloj() + segundos;
+    while (1) {
+        double vuelta = corrutina_reloj();
+        interprete_avanzar_tareas();
+        if (hay_error) return valor_nulo();
+        if (espera == ESPERA_FOTOGRAMA) break;
+        if (espera == ESPERA_TAREA ? otra->tarea->estado == TAREA_TERMINADA
+                                   : corrutina_reloj() >= meta) break;
+        double dormir = 1.0 / 60 - (corrutina_reloj() - vuelta);
+        if (espera == ESPERA_SEGUNDOS && meta - corrutina_reloj() < dormir) dormir = meta - corrutina_reloj();
+        corrutina_dormir(dormir);
+    }
+    return otra ? valor_copiar(otra->tarea->resultado) : valor_nulo();
+}
+
+/* esperar() · esperar(segundos) · esperar(tarea) */
+static Valor *fn_esperar(Valor **a, int n) {
+    int linea = linea_llamada();
+    int espera = ESPERA_FOTOGRAMA;
+    double segundos = 0;
+    Valor *otra = NULL;
+    if (n > 1)
+        return error_rt("ErrorArgumento", linea,
+            "esperar() recibe como mucho una cosa: los segundos, o la tarea a la que esperar.");
+    if (n == 1) {
+        if (a[0]->tipo == VAL_NUMERO) {
+            segundos = a[0]->numero;
+            if (!(segundos >= 0) || isinf(segundos))
+                return error_rt("Error", linea, "esperar(): los segundos no pueden ser negativos.");
+            if (segundos > 0) espera = ESPERA_SEGUNDOS;
+        } else if (a[0]->tipo == VAL_TAREA) {
+            otra = a[0];
+            espera = ESPERA_TAREA;
+        } else {
+            return error_rt("ErrorTipo", linea,
+                "esperar() espera los segundos (un número) o una tarea; sin nada, espera al siguiente fotograma.");
+        }
+    }
+    TareaLince *t = _tarea_actual;
+    if (t && t->es_generador)
+        return error_rt("Error", linea,
+            "esperar() no puede ir dentro de un generador: el generador da sus valores a quien lo "
+            "recorre, y es ese quien puede esperar.");
+    if (otra && otra->tarea == t)
+        return error_rt("Error", linea, "Una tarea no puede esperarse a sí misma.");
+    if (!t) return esperar_fuera(espera, segundos, otra, linea);
+    if (t->parar)
+        return error_rt(ERROR_PARADA, linea, "La tarea '%s' se ha parado.", t->f->nombre);
+    if (otra && otra->tarea->estado == TAREA_TERMINADA)
+        return valor_copiar(otra->tarea->resultado);
+
+    t->espera    = espera;
+    t->fotograma = _tareas_fotograma;
+    t->hasta     = tareas_ahora() + segundos;
+    t->otra      = otra ? valor_retener(otra) : NULL;
+    t->estado    = TAREA_ESPERANDO;
+    corrutina_salir(t->co);               /* ... y aquí se sigue más tarde */
+
+    Valor *r = valor_nulo();
+    if (t->otra) {
+        valor_destruir(r);
+        r = valor_copiar(t->otra->tarea->resultado);
+        valor_destruir(t->otra);
+        t->otra = NULL;
+    }
+    if (t->parar) {
+        valor_destruir(r);
+        return error_rt(ERROR_PARADA, linea, "La tarea '%s' se ha parado.", t->f->nombre);
+    }
+    return r;
+}
+
+/* ── Generadores ──
+   El cuerpo de un generador corre como una tarea que no está en la lista de
+   las que avanzan: 'para cada' lo hace seguir hasta que produce un valor, y
+   al salir del bucle lo para (con sus 'finalmente') si no había acabado. */
+
+/* El siguiente valor, o NULL si ha acabado o ha fallado (con hay_error) */
+static Valor *generador_siguiente(TareaLince *g) {
+    if (g->estado == TAREA_TERMINADA) return NULL;
+    tarea_entrar(g);
+    if (hay_error || g->estado == TAREA_TERMINADA) return NULL;
+    Valor *v = g->producido;
+    g->producido = NULL;
+    return v;
+}
+
+/* Lo deshace si se ha quedado a medias, sin tocar lo que estuviera pendiente
+   en quien lo recorría (un error, un 'devolver', un 'romper') */
+static void generador_cerrar(TareaLince *g) {
+    if (g->estado != TAREA_ESPERANDO) return;
+    int    error_g = hay_error,   ret_g = hay_retorno, salto_g = hay_salto;
+    Valor *verr_g  = valor_error, *vret_g = valor_retorno;
+    hay_error = 0; valor_error = NULL; hay_retorno = 0; valor_retorno = NULL; hay_salto = SALTO_NINGUNO;
+    g->parar = 1;
+    tarea_entrar(g);
+    if (hay_error && (error_g || ret_g)) {       /* ya había algo pendiente: gana eso */
+        valor_destruir(valor_error);
+        valor_error = NULL;
+        hay_error   = 0;
+    }
+    if (!hay_error) { hay_error = error_g; valor_error = verr_g; }
+    else valor_destruir(verr_g);
+    hay_retorno = ret_g; valor_retorno = vret_g; hay_salto = salto_g;
+}
+
+static void generador_liberar(TareaLince *g) {
+    generador_cerrar(g);
+    tarea_liberar(g);
+}
+
+/* producir valor: lo da a quien recorre el generador y espera a que pida otro */
+static Valor *exec_producir(Nodo *n, Entorno *e) {
+    TareaLince *g = _tarea_actual;
+    if (!g || !g->es_generador)
+        return error_rt("Error", n->linea, "'producir' solo puede usarse dentro de un generador.");
+    Valor *v = ejecutar(n->producir, e);
+    if (hay_error) { valor_destruir(v); return valor_nulo(); }
+    if (g->parar) { valor_destruir(v); return error_rt(ERROR_PARADA, n->linea, "El generador se ha parado."); }
+    g->producido = v;
+    g->estado    = TAREA_ESPERANDO;
+    corrutina_salir(g->co);
+    if (g->parar) return error_rt(ERROR_PARADA, n->linea, "El generador se ha parado.");
+    return valor_nulo();
+}
+
+/* tarea.terminada() · tarea.parar() */
+static Valor *metodo_tarea(Valor *obj, const char *met, Nodo *n, Entorno *e) {
+    (void)e;
+    TareaLince *t = obj->tarea;
+    Valor *r;
+    if (n->metodo.num_argumentos != 0)
+        r = error_rt("ErrorArgumento", n->linea, "%s() no recibe nada.", met);
+    else if (strcmp(met, "terminada") == 0)
+        r = valor_booleano(t->estado == TAREA_TERMINADA);
+    else if (strcmp(met, "parar") == 0) {
+        tarea_parar(t);
+        r = valor_nulo();
+    } else
+        r = error_rt("Error", n->linea,
+            "Una tarea no tiene el método '%s'. Tiene terminada() y parar(); para esperar a que acabe, esperar(tarea).", met);
+    valor_destruir(obj);
     return r;
 }
 
@@ -1437,7 +1870,7 @@ static int orden_comparar(CtxOrden *ctx, Valor *a, Valor *b) {
         /* ver la nota de NODO_LLAMADA: el valor del cuerpo lo posee quien
            llama. Aquí importa más que en otros sitios, porque esto se llama
            O(n log n) veces por cada ordenar(). */
-        valor_destruir(ejecutar(f->cuerpo, fn_e));
+        valor_destruir(ejecutar_cuerpo(f, fn_e));
         if (hay_retorno) {
             r = valor_retorno; valor_retorno = NULL; hay_retorno = 0;
         }
@@ -1693,7 +2126,7 @@ static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
     ClaseLince *cls_ant  = clase_actual;
     esto_actual  = obj;
     clase_actual = cls;
-    valor_destruir(ejecutar(f->cuerpo, fn_e));
+    valor_destruir(ejecutar_cuerpo(f, fn_e));
     Valor *retorno = tomar_retorno();
     esto_actual  = esto_anterior;
     clase_actual = cls_ant;
@@ -1817,7 +2250,7 @@ static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, 
         ClaseLince *cls_ant    = clase_actual;
         esto_actual  = vobj;
         clase_actual = cls;
-        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+        valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
         esto_actual  = esto_anterior;
         clase_actual = cls_ant;
         if (hay_retorno) valor_destruir(valor_retorno);
@@ -2105,16 +2538,38 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
         return valor_nulo();
     }
 
-    /* ── Lista o Generador ── */
-    if (col->tipo == VAL_LISTA || col->tipo == VAL_GENERADOR) {
-        int cant = (col->tipo == VAL_LISTA)
-            ? col->lista.cantidad
-            : col->generador.cantidad;
+    /* ── Generador: sus valores de uno en uno ── */
+    if (col->tipo == VAL_GENERADOR) {
+        TareaLince *g = col->generador.productor;
+        double i = col->generador.desde, hasta = col->generador.hasta, paso = col->generador.paso;
+        while (!hay_retorno && !hay_error) {
+            Valor *elem;
+            if (g) {
+                elem = generador_siguiente(g);
+                if (!elem) break;
+            } else {                                   /* rango() */
+                if (paso > 0 ? i >= hasta : i <= hasta) break;
+                elem = valor_numero(i);
+                i += paso;
+            }
+            validar_tipo(elem, n->para_cada.tipo,
+                         "variable del bucle", n->para_cada.variable, n->linea);
+            Entorno *iter = entorno_crear(e);
+            entorno_definir_i(iter, NI(n, n->para_cada.variable), elem, 0);
+            valor_destruir(ejecutar(n->para_cada.cuerpo, iter));
+            entorno_destruir(iter);
+            if (hay_salto && fin_de_vuelta()) break;
+        }
+        if (g) generador_cerrar(g);
+        valor_destruir(col);
+        return valor_nulo();
+    }
+
+    /* ── Lista ── */
+    if (col->tipo == VAL_LISTA) {
+        int cant = col->lista.cantidad;
         for (int i = 0; i < cant && !hay_retorno && !hay_error; i++) {
-            Valor *elem = valor_copiar(
-                col->tipo == VAL_LISTA
-                    ? col->lista.elementos[i]
-                    : col->generador.elementos[i]);
+            Valor *elem = valor_copiar(col->lista.elementos[i]);
             validar_tipo(elem, n->para_cada.tipo,
                          "variable del bucle", n->para_cada.variable, n->linea);
             Entorno *iter = entorno_crear(e);
@@ -2239,20 +2694,17 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
             entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
         }
 
-        /* Crear la lista acumuladora */
-        Valor *gen = valor_generador_crear();
-        Valor *gen_anterior = generador_actual;
-        generador_actual    = gen;
-
-        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
-
-        generador_actual = gen_anterior;
-        /* Un 'devolver' dentro de un generador no le llega a nadie,
-           pero el valor está creado: hay que soltarlo. */
-        if (hay_retorno) valor_destruir(valor_retorno);
-        hay_retorno      = 0;
-        valor_retorno    = NULL;
-        hay_producir     = 0;
+        /* El cuerpo no empieza hasta que se recorre */
+        Valor *gen = valor_nulo();
+        if (!hay_error) {
+            TareaLince *g = tarea_nueva(f, fn_e, n->linea);
+            if (g) {
+                g->es_generador = 1;
+                valor_destruir(gen);
+                gen = valor_generador_crear();
+                gen->generador.productor = g;
+            }
+        }
         entorno_destruir(fn_e);
         valor_destruir(vfun);
         profundidad--;
@@ -2324,7 +2776,7 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
        llama — NODO_BLOQUE ya libera así todos los anteriores. Sin
        este destruir se fugaban 40 bytes por llamada, que en un bucle
        de juego son 40 por función y por frame. */
-    valor_destruir(ejecutar(f->cuerpo, fn_e));
+    valor_destruir(ejecutar_cuerpo(f, fn_e));
     entorno_destruir(fn_e);
 
     Valor *retorno = tomar_retorno();
@@ -2675,7 +3127,7 @@ static Valor *llamar_biblioteca(Valor *vf, Valor **args, int nargs, int linea) {
         entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
     }
     for (int i = 0; i < nargs; i++) if (args[i]) valor_destruir(args[i]);
-    if (!hay_error) valor_destruir(ejecutar(f->cuerpo, fn_e));
+    if (!hay_error) valor_destruir(ejecutar_cuerpo(f, fn_e));
     _en_biblioteca--;
     Valor *r = tomar_retorno();
     if (!hay_error) validar_tipo(r, f->tipo_retorno, "retorno de función", f->nombre, linea);
@@ -2865,7 +3317,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         ClaseLince *cls_ant    = clase_actual;
         esto_actual  = obj;
         clase_actual = cls;
-        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+        valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
         Valor *retorno = tomar_retorno();
         esto_actual  = esto_anterior;
         clase_actual = cls_ant;
@@ -2876,6 +3328,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
     }
 
     if (obj->tipo == VAL_BYTES) return metodo_bytes(obj, met, n, e);
+    if (obj->tipo == VAL_TAREA) return metodo_tarea(obj, met, n, e);
 
     /* ── Métodos de LISTA ── */
     if (obj->tipo == VAL_LISTA) {
@@ -3206,7 +3659,7 @@ static Valor *exec_padre(Nodo *n, Entorno *e) {
 
     ClaseLince *cls_ant = clase_actual;
     clase_actual = cls_padre;
-    valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+    valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
     clase_actual  = cls_ant;
     if (hay_retorno) valor_destruir(valor_retorno);
     hay_retorno   = 0;
@@ -3223,8 +3676,9 @@ static Valor *exec_intentar(Nodo *n, Entorno *e) {
 
     /* La recarga en caliente usa un error para deshacer el programa que corre:
        ese no lo captura nadie. */
-    if (hay_error && !(valor_error && valor_error->tipo == VAL_ERROR &&
-                       strcmp(valor_error->error->tipo, ERROR_RECARGA) == 0)) {
+    if (hay_error && !es_tarea_parada() &&
+        !(valor_error && valor_error->tipo == VAL_ERROR &&
+          strcmp(valor_error->error->tipo, ERROR_RECARGA) == 0)) {
         Valor *err = valor_error;
         hay_error   = 0;
         valor_error = NULL;
@@ -3413,6 +3867,7 @@ static FuncionLince *metodo_desde_nodo(Nodo *mn, ClaseLince *c, Entorno *ce) {
     f->tipo_retorno     = mn->funcion.tipo_retorno;
     f->cuerpo           = mn->funcion.cuerpo;
     f->entorno_closure  = ce;
+    marcar_tarea(f, mn);
     f->vis              = mn->funcion.vis;
     f->estatico         = mn->funcion.estatico;
     f->abstracto        = mn->funcion.abstracto;
@@ -3865,6 +4320,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             f->tipo_retorno     = n->funcion.tipo_retorno;
             f->cuerpo           = n->funcion.cuerpo;
             f->entorno_closure  = e;
+            marcar_tarea(f, n);
             e->refs++;  /* el closure retiene el entorno */
             if (redefinido(e, n->funcion.nombre, "esta función", 0, n->linea))
                 return valor_nulo();
@@ -3946,25 +4402,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_nulo();
         }
 
-        case NODO_PRODUCIR: {
-            /* Solo válido dentro de un generador en ejecución */
-            if (!generador_actual) {
-                valor_error = valor_error_nuevo("Error",
-                    "'producir' solo puede usarse dentro de un generador.", n->linea);
-                hay_error = 1;
-                return valor_nulo();
-            }
-            if (generador_actual->generador.cantidad >= MAX_GENERADOR) {
-                valor_error = valor_error_nuevo("Error",
-                    "El generador ha superado el límite de 10000 valores.", n->linea);
-                hay_error = 1;
-                return valor_nulo();
-            }
-            Valor *v = ejecutar(n->producir, e);
-            generador_agregar(generador_actual, v);
-            hay_producir = 1;
-            return valor_nulo();
-        }
+        case NODO_PRODUCIR:
+            return exec_producir(n, e);
 
         case NODO_INTERFAZ: {
             /* Registra la interfaz en el entorno como un valor especial */
@@ -4170,7 +4609,7 @@ static Valor *fn_mapear(Valor **a, int n) {
                 entorno_definir(fn_e, f->parametros[0].nombre, elem, 0);
             else
                 valor_destruir(elem);   /* la lambda no declara parámetro */
-            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+            valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
             Valor *r = tomar_retorno();
             entorno_destruir(fn_e);
             lista_agregar(resultado, r);
@@ -4207,7 +4646,7 @@ static Valor *fn_filtrar(Valor **a, int n) {
             if (f->num_parametros >= 1)
                 entorno_definir(fn_e, f->parametros[0].nombre,
                     valor_copiar(elem), 0);
-            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+            valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
             Valor *r = tomar_retorno();
             ok = es_verdadero(r);
             valor_destruir(r);
@@ -4250,7 +4689,7 @@ static Valor *fn_reducir(Valor **a, int n) {
             if (f->num_parametros >= 2)
                 entorno_definir(fn_e, f->parametros[1].nombre,
                     valor_copiar(elem), 0);
-            valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+            valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
             nuevo_acc = tomar_retorno();
             entorno_destruir(fn_e);
         }
@@ -4262,6 +4701,11 @@ static Valor *fn_reducir(Valor **a, int n) {
 /* rango() — genera una secuencia de números */
 static Valor *fn_rango(Valor **a, int n) {
     double inicio = 0, fin = 0, paso = 1;
+    int bien = n >= 1 && n <= 3;
+    for (int i = 0; bien && i < n; i++) bien = a[i]->tipo == VAL_NUMERO && isfinite(a[i]->numero);
+    if (!bien)
+        return error_rt("ErrorArgumento", linea_llamada(),
+            "rango() espera de 1 a 3 números: rango(fin), rango(desde, fin) o rango(desde, fin, paso).");
     if (n == 1) {
         fin = a[0]->numero;
     } else if (n == 2) {
@@ -4277,13 +4721,11 @@ static Valor *fn_rango(Valor **a, int n) {
         hay_error = 1;
         return valor_nulo();
     }
+    /* Los números se calculan según se recorren: rango(1000000) no ocupa nada */
     Valor *gen = valor_generador_crear();
-    int count = 0;
-    for (double i = inicio;
-         (paso > 0 ? i < fin : i > fin) && count < MAX_GENERADOR;
-         i += paso, count++) {
-        generador_agregar(gen, valor_numero(i));
-    }
+    gen->generador.desde = inicio;
+    gen->generador.hasta = fin;
+    gen->generador.paso  = paso;
     return gen;
 }
 
@@ -4404,6 +4846,7 @@ Interprete *interprete_crear(void) {
     registrar_fn_nativa(interp->global, "filtrar",     fn_filtrar,      2);
     registrar_fn_nativa(interp->global, "reducir",     fn_reducir,      3);
     registrar_fn_nativa(interp->global, "rango",       fn_rango,       -1);
+    registrar_fn_nativa(interp->global, "esperar",     fn_esperar,     -1);
 
     /* Entrada/salida */
     registrar_fn_nativa(interp->global, "leer",       fn_leer,       -1);
@@ -4428,6 +4871,7 @@ void interprete_ejecutar(Interprete *interp, Nodo *programa) {
 
 int interprete_ejecutar_recargable(Interprete *interp, Nodo *programa, char *mensaje, size_t max) {
     valor_destruir(ejecutar(programa, interp->global));   /* ver la nota de NODO_LLAMADA */
+    interprete_parar_tareas();
     if (!hay_error || !valor_error) { hay_error = 0; return 0; }
     ErrorLince *err = valor_error->error;
     int r = 1;
@@ -4596,7 +5040,7 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {
 
     Valor *r = valor_nulo();
     if (!hay_error) {
-        valor_destruir(ejecutar(f->cuerpo, fn_e));   /* ver la nota de NODO_LLAMADA */
+        valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
         valor_destruir(r);
         r = tomar_retorno();
         if (!hay_error)

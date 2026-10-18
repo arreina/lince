@@ -21,6 +21,7 @@ Lince es un lenguaje de programación **para videojuegos, en español**, impleme
 | `funcion` | función o lambda |
 | `generador` | función generadora |
 | `producir` | emitir valor desde generador |
+| `tarea` | función que corre aparte y puede esperar (solo cuenta delante de un nombre y `(`; no es palabra reservada) |
 | `devolver` | return |
 | `si` / `sino si` / `sino` | if / else if / else |
 | `para` | for clásico |
@@ -207,10 +208,14 @@ a_logico(1)                # valor → lógico
 
 argumentos()               # lista de args de línea de comandos
 
-rango(5)                   # [0, 1, 2, 3, 4]
-rango(1, 6)                # [1, 2, 3, 4, 5]
-rango(0, 10, 2)            # [0, 2, 4, 6, 8]
-rango(10, 0, -1)           # [10, 9, ..., 1]
+rango(5)                   # 0, 1, 2, 3, 4 (para 'para cada')
+rango(1, 6)                # 1, 2, 3, 4, 5
+rango(0, 10, 2)            # 0, 2, 4, 6, 8
+rango(10, 0, -1)           # 10, 9, ..., 1
+
+esperar()                  # en una tarea: hasta el fotograma siguiente
+esperar(0.5)               # hasta que pase medio segundo
+esperar(otra_tarea)        # hasta que acabe; da lo que devolvió
 
 mapear(lista, funcion)     # aplica función a cada elemento
 filtrar(lista, funcion)    # filtra según condición
@@ -680,12 +685,85 @@ rango(0, 10, 2)   # 0, 2, 4, 6, 8
 rango(10, 0, -1)  # 10, 9, ..., 1
 ```
 
+Los números se calculan según se recorren: `rango(1000000)` no ocupa memoria.
+
 ### Reglas
 
 - `generador` declara una función generadora en vez de `funcion`
-- `producir` emite un valor y continúa
-- Los generadores se usan con `para cada`
-- Límite de 10.000 valores por generador
+- `producir` da un valor a quien recorre el generador, y el generador se queda parado
+  ahí hasta que le pida el siguiente: los valores salen de uno en uno, según se usan
+- Los generadores se usan con `para cada`, y cada uno se recorre una vez
+- No tienen límite de valores: uno puede no acabar nunca (`mientras verdadero { producir n }`).
+  Si el bucle sale antes (`romper`, `devolver` o un error), el generador se para y se
+  ejecutan sus `finalmente`
+- Dentro de un generador no se puede `esperar()`: quien espera es quien lo recorre
+
+---
+
+## Tareas
+
+Una tarea es código que puede pararse a esperar sin parar el resto del programa: las
+cosas que pasan a lo largo del tiempo se escriben en orden, como se piensan, en vez de
+con variables que recuerden por qué paso se va.
+
+```lince
+tarea ataque_jefe() {
+    jefe.animar("cargar")
+    esperar(0.8)                 # solo se para esta tarea: el juego sigue
+    para (i = 0; i < 3; i++) {
+        disparar(jefe.x, jefe.y)
+        esperar(0.2)
+    }
+    mientras no jefe.en_suelo { esperar() }
+}
+
+ataque_jefe()                    # empieza ya, y sigue sola en cada fotograma
+```
+
+- `tarea nombre(parámetros) { ... }` se declara como una función; el tipo de retorno
+  (`: tipo`) es opcional. Llamarla la **empieza**: corre hasta su primer `esperar` y la
+  llamada devuelve la tarea
+- `esperar()` la deja aparcada en esa línea hasta el fotograma siguiente;
+  `esperar(segundos)`, hasta que pase ese tiempo; `esperar(otra_tarea)`, hasta que la otra
+  acabe, y da lo que devolvió con `devolver`. Después sigue justo donde estaba, con sus
+  variables
+- Se puede esperar en cualquier función a la que llame la tarea, y así repartir una
+  tarea larga en trozos:
+
+  ```lince
+  funcion caminar_hasta(ref Enemigo e, val numero x): nulo {
+      mientras e.x < x {
+          e.x += 60 * juego.dt()
+          esperar()
+      }
+  }
+  tarea patrulla(ref Enemigo e) {
+      mientras verdadero {
+          caminar_hasta(e, 300)
+          esperar(1)
+          caminar_hasta(e, 500)
+      }
+  }
+  ```
+- Puede haber muchas a la vez (una por enemigo, una para el diálogo...): cada una va a su
+  ritmo, en el orden en que empezaron
+- Un método también puede ser una tarea, con `mi`: `tarea patrullar() { ... }` dentro de la
+  clase, y `enemigo.patrullar()` la empieza (`crear` no puede serlo)
+- `t.terminada()` dice si ha acabado; `t.parar()` la para: se deshace desde donde esperaba,
+  ejecutando sus `finalmente` (un `capturar` no lo captura). `t es tarea` comprueba el tipo
+- Un error dentro de una tarea, antes de su primer `esperar`, le llega a quien la llamó;
+  después, a quien la hace avanzar (en un juego, `juego.presentar()`), con la línea de la
+  tarea
+- **En un juego** avanzan solas una vez por fotograma, al llamar a `juego.presentar()`
+  y antes de mostrarlo, así que lo que dibujen sale en ese fotograma. `esperar(segundos)`
+  cuenta el tiempo del juego: se para con `congelar()` y va más despacio con
+  `velocidad()`. Fuera de una tarea no se puede `esperar` (el bucle del juego no se puede
+  parar)
+- **Sin juego**, `esperar` fuera de una tarea es lo que las hace avanzar, a 60 vueltas por
+  segundo y con el reloj de verdad: `esperar(t)` espera a que acabe `t`
+- Las que quedan al acabar el programa, o al recargarlo, se paran (con sus `finalmente`)
+- Por dentro, cada tarea tiene su propia pila: pasar de una a otra cuesta alrededor de un
+  microsegundo, y mil tareas esperando ocupan unos 16 MB
 
 ---
 
@@ -883,7 +961,7 @@ mientras juego.abierto() {
 |---|---|
 | `abrir(título, ancho, alto[, {"escala": n}])` / `cerrar()` / `salir()` | abre la ventana / la destruye / pide terminar el bucle (`abierto()` pasa a falso, como al pulsar la X). Con `escala`, la ventana es `n` veces mayor y cada píxel del juego se ve como un cuadrado de n × n: `abrir("Pelea", 320, 180, {"escala": 3})` para un juego de píxeles grandes, como los de consola portátil; todo se sigue midiendo en 320 × 180 |
 | `abierto()` · `titulo(t)` · `ancho()` · `alto()` | estado y tamaño |
-| `presentar()` | muestra lo dibujado, espera al siguiente fotograma y actualiza la entrada y `dt()` |
+| `presentar()` | hace avanzar las [tareas](#tareas), muestra lo dibujado, espera al siguiente fotograma y actualiza la entrada y `dt()` |
 | `dt()` · `fps()` · `tiempo()` | segundos del último fotograma · fotogramas por segundo · segundos desde que se abrió. Son tiempo de juego: se paran con `congelar()` y van más despacio con `velocidad()` (ver **Peleas**) |
 | `pantalla_completa([sí/no])` | sin argumento alterna; el juego se escala sin deformarse y el ratón sigue en coordenadas del juego |
 
@@ -1647,6 +1725,7 @@ lince/
 │   ├── lexer.c/h       # análisis léxico
 │   ├── parser.c/h      # análisis sintáctico (AST)
 │   ├── interprete.c/h  # ejecución del AST
+│   ├── corrutina.c/h   # una pila para cada tarea (ucontext / fibras de Windows)
 │   ├── modulos.c/h     # módulos estándar
 │   ├── empaquetado.c/h # lince compilar: ejecutables autónomos
 │   ├── repartir.c/h    # lince repartir: carpeta y .zip con el juego y SDL2

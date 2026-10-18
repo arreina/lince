@@ -96,7 +96,7 @@
     },
     "palabras_clave_declaracion": {
       "name": "keyword.declaration.lince",
-      "match": "\\b(sea|fijo|funcion|generador|clase|extiende|implementa|interfaz|enumeracion|mi|padre|importar|val|ref|abstracta|abstracto|estatico|privado|protegido|publico|sobrescribe|obtener|fijar|es|como|cualquiera)\\b"
+      "match": "\\b(sea|fijo|funcion|generador|clase|extiende|implementa|interfaz|enumeracion|mi|padre|importar|val|ref|abstracta|abstracto|estatico|privado|protegido|publico|sobrescribe|obtener|fijar|es|como|cualquiera|tarea)\\b"
     },
     "palabras_clave_tipos": {
       "name": "storage.type.lince",
@@ -138,11 +138,11 @@
       "patterns": [
         {
           "name": "entity.name.function.lince",
-          "match": "(?<=funcion\\s|generador\\s)([a-z_][a-zA-Z0-9_]*)"
+          "match": "(?<=funcion\\s|generador\\s|tarea\\s)([a-z_][a-zA-Z0-9_]*)"
         },
         {
           "name": "support.function.builtin.lince",
-          "match": "\\b(a_logico|a_numero|a_texto|argumentos|escribir|filtrar|leer|mapear|rango|reducir)\\b"
+          "match": "\\b(a_logico|a_numero|a_texto|argumentos|escribir|esperar|filtrar|leer|mapear|rango|reducir)\\b"
         },
         {
           "name": "entity.name.function.call.lince",

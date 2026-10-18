@@ -1,0 +1,17 @@
+# @seccion: Generadores
+# @titulo: Uno que no acaba nunca
+# @nota: Cada valor se calcula cuando `para cada` lo pide, así que un generador puede no acabar: se sale con `romper` o `devolver`, y entonces se para (con su `finalmente`). Un generador se recorre una vez.
+generador naturales(): numero {
+    sea n = 1
+    mientras verdadero {
+        producir n
+        n++
+    }
+}
+
+para cada numero n en naturales() {
+    si n * n > 50 {
+        escribir("el primero con el cuadrado mayor que 50 es " + n)
+        romper
+    }
+}

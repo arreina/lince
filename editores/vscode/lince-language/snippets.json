@@ -65,6 +65,17 @@
     ],
     "description": "Función generadora"
   },
+  "Tarea": {
+    "prefix": "tarea",
+    "body": [
+      "tarea ${1:nombre}() {",
+      "\t$2",
+      "\tesperar(${3:0.5})",
+      "\t$0",
+      "}"
+    ],
+    "description": "Código que se para a esperar sin parar el juego"
+  },
   "Si": {
     "prefix": "si",
     "body": [

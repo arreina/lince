@@ -19,3 +19,29 @@ hasta luego
 3
 6
 9
+produce 0
+usa 0
+produce 1
+usa 1
+produce 2
+usa 2
+naturales: cerrado
+produce 0
+produce 1
+produce 2
+naturales: cerrado
+2
+0
+4
+8
+12
+roto da 1
+capturado: Operación '/' no soportada entre esos tipos.
+produce 0
+produce 1
+naturales: cerrado
+capturado: en el cuerpo
+25000
+20000
+1.5
+rango() espera de 1 a 3 números: rango(fin), rango(desde, fin) o rango(desde, fin, paso).

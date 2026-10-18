@@ -230,6 +230,7 @@ struct Nodo {
             int         abstracto;
             int         sobrescribe;
             int         prop;         /* 1 = obtener, 2 = fijar */
+            int         es_tarea;     /* 'tarea' en vez de 'funcion' */
         } funcion;
 
         /* NODO_LLAMADA */
@@ -392,6 +393,7 @@ typedef struct {
     int    cantidad;
     int    pos;
     int    bucles;   /* bucles abiertos en la función actual (para 'romper') */
+    int    tarea;    /* la función que viene es una tarea: el tipo de retorno es opcional */
 } Parser;
 
 /* ─────────────────────────────────────────

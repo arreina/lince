@@ -145,15 +145,16 @@
 <div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a></div>
 <div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a><a href="#texto-1" class="sub">Texto con valores dentro</a></div>
 <div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
-<div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a></div>
+<div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a><a href="#generadores-1" class="sub">Uno que no acaba nunca</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
 <div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-5" class="sub">El módulo `tiempo`</a><a href="#modulos-y-librerias-6" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-7" class="sub">Fechas con `tiempo`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `juego`</a></div>
+<div class="grupo"><a href="#tareas" class="sec">Tareas</a><a href="#tareas-0" class="sub">Esperar sin parar el juego</a></div>
 </nav>
 
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>45 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>47 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -589,7 +590,20 @@ verdadero</pre></div><span class="fuente">690_es_y_defecto.lince</span></article
 2
 4
 6
-8</pre></div><span class="fuente">710_generadores.lince</span></article></section>
+8</pre></div><span class="fuente">710_generadores.lince</span></article><article class="ej" id="generadores-1"><h3>Uno que no acaba nunca</h3><p class="nota">Cada valor se calcula cuando `para cada` lo pide, así que un generador puede no acabar: se sale con `romper` o `devolver`, y entonces se para (con su `finalmente`). Un generador se recorre una vez.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">generador</span> naturales(): <span class="t">numero</span> {
+    <span class="k">sea</span> n = <span class="n">1</span>
+    <span class="k">mientras</span> <span class="k">verdadero</span> {
+        <span class="k">producir</span> n
+        n++
+    }
+}
+
+<span class="k">para</span> <span class="k">cada</span> <span class="t">numero</span> n <span class="k">en</span> naturales() {
+    <span class="k">si</span> n * n &gt; <span class="n">50</span> {
+        <span class="k">escribir</span>(<span class="s">&quot;el primero con el cuadrado mayor que 50 es &quot;</span> + n)
+        <span class="k">romper</span>
+    }
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>el primero con el cuadrado mayor que 50 es 8</pre></div><span class="fuente">715_generador_sin_fin.lince</span></article></section>
 <section id="errores"><h2>Errores</h2><article class="ej" id="errores-0"><h3>Intentar, capturar, finalmente</h3><p class="nota">`capturar (error e)` atrapa cualquier tipo; con un tipo concreto, sólo ese.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">intentar</span> {
     <span class="k">sea</span> <span class="t">lista</span> nums = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>]
     <span class="k">escribir</span>(nums[<span class="n">99</span>])
@@ -683,7 +697,7 @@ falso
 desde el sistema</pre></div><span class="fuente">950_archivos_y_sistema.lince</span></article><article class="ej" id="modulos-y-librerias-5"><h3>El módulo `tiempo`</h3><p class="nota">`tiempo` da la hora y permite esperar (en milisegundos). En un juego se usa poco: el tiempo de cada fotograma lo da `juego.dt()`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tiempo&quot;</span>
 
 <span class="k">sea</span> inicio = tiempo.ahora()
-tiempo.esperar(<span class="n">20</span>)
+tiempo.<span class="k">esperar</span>(<span class="n">20</span>)
 <span class="k">escribir</span>(tiempo.ahora() - inicio &gt;= <span class="n">0</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero</pre></div><span class="fuente">960_tiempo.lince</span></article><article class="ej" id="modulos-y-librerias-6"><h3>El módulo `pruebas`</h3><p class="nota">Pruebas unitarias para tus programas: `afirmar` comprueba una condición, `igual` compara valores (también listas y diccionarios), `lanza` comprueba que una función da error y `resumen` imprime el total y termina con código 1 si algo falló, ideal para la integración continua.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;pruebas&quot;</span>
 
 <span class="k">funcion</span> doble(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">numero</span> {
@@ -726,6 +740,40 @@ nulo</pre></div><span class="fuente">985_fechas.lince</span></article><article c
 <span class="k">escribir</span>((ancho_pantalla - juego.ancho_texto(<span class="s">&quot;GAME OVER&quot;</span>, <span class="n">4</span>)) / <span class="n">2</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero
 falso
 294</pre></div><span class="fuente">990_juego.lince</span></article></section>
+<section id="tareas"><h2>Tareas</h2><article class="ej" id="tareas-0"><h3>Esperar sin parar el juego</h3><p class="nota">Una `tarea` se escribe como una función y empieza a correr al llamarla. `esperar()` la deja aparcada en esa línea hasta el fotograma siguiente; `esperar(segundos)`, hasta que pase ese tiempo, y `esperar(otra)`, hasta que otra tarea acabe (y da lo que devolvió). Mientras, todo lo demás sigue. En un juego avanzan solas en cada `juego.presentar()`; aquí, sin juego, avanzan mientras el programa espera.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">tarea</span> parpadear(<span class="k">val</span> <span class="t">texto</span> quien, <span class="k">val</span> <span class="t">numero</span> veces) {
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt; veces; i++) {
+        <span class="k">escribir</span>(quien + <span class="s">&quot;: brilla&quot;</span>)
+        <span class="k">esperar</span>()
+    }
+    <span class="k">escribir</span>(quien + <span class="s">&quot;: desaparece&quot;</span>)
+}
+
+<span class="k">tarea</span> jefe(): <span class="t">texto</span> {
+    <span class="k">escribir</span>(<span class="s">&quot;jefe: carga el golpe&quot;</span>)
+    <span class="k">esperar</span>(<span class="n">0.2</span>)
+    <span class="k">escribir</span>(<span class="s">&quot;jefe: ¡golpe!&quot;</span>)
+    <span class="k">devolver</span> <span class="s">&quot;fin del ataque&quot;</span>
+}
+
+parpadear(<span class="s">&quot;moneda&quot;</span>, <span class="n">2</span>)
+parpadear(<span class="s">&quot;estrella&quot;</span>, <span class="n">3</span>)
+<span class="k">escribir</span>(<span class="k">esperar</span>(jefe()))
+
+<span class="k">sea</span> t = parpadear(<span class="s">&quot;vela&quot;</span>, <span class="n">100</span>)
+<span class="k">esperar</span>()
+t.parar()                  <span class="c"># se puede parar a medias</span>
+<span class="k">escribir</span>(t.terminada())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>moneda: brilla
+estrella: brilla
+jefe: carga el golpe
+moneda: brilla
+estrella: brilla
+moneda: desaparece
+estrella: brilla
+estrella: desaparece
+jefe: ¡golpe!
+fin del ataque
+vela: brilla
+verdadero</pre></div><span class="fuente">720_tareas.lince</span></article></section>
 </main>
 </div>
 

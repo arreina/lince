@@ -129,7 +129,8 @@ sea lista tests = [
     "test_asignacion_compuesta",
     "test_texto_con_valores",
     "test_desestructurar",
-    "test_biblioteca"
+    "test_biblioteca",
+    "test_tareas"
 ]
 
 # ── Cabecera ───────────────────────────────────────────────────

@@ -1,0 +1,35 @@
+# Tareas en un juego: avanzan solas en cada presentar(), con el tiempo del juego
+importar "juego"
+juego.abrir("Tareas", 40, 30)
+sea cuadros = 0
+sea x = 0
+tarea mover() {
+    esperar(0.5)                      # 30 fotogramas a 60 por segundo
+    escribir("tarea: medio segundo en el fotograma {cuadros}")
+    para (i = 0; i < 3; i++) {
+        x += 10
+        esperar()
+    }
+    escribir("tarea: x = {x} en el fotograma {cuadros}")
+}
+tarea marca() {
+    intentar {
+        mientras verdadero {
+            juego.rectangulo(0, 0, 10, 10, [255, 0, 0])   # lo que dibuja sale en este fotograma
+            esperar()
+        }
+    } capturar (error e) {
+        escribir("no debería: {e.mensaje}")
+    } finalmente {
+        escribir("tarea: marca parada")
+    }
+}
+mover()
+marca()
+intentar { esperar(1) } capturar (error e) { escribir("fuera de una tarea: {e.mensaje.contiene("solo puede ir dentro de una tarea")}") }
+mientras juego.abierto() {
+    cuadros++
+    juego.limpiar([0, 0, 0])
+    juego.presentar()
+}
+escribir("fin: {cuadros}")

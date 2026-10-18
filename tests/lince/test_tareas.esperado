@@ -1,0 +1,36 @@
+a 1
+b 1
+empezadas: <tarea contar>
+-- fotograma 0
+-- fotograma 1
+a 2
+b 2
+-- fotograma 2
+a 3
+b acaba
+-- fotograma 3
+a acaba
+a terminada: verdadero
+jefe: carga
+jefe: resultado 40
+infinita: finalmente
+parada: verdadero
+sola: antes
+sola terminada: verdadero
+brillo al empezar: 1
+brillo al acabar: 3
+verdadero
+verdadero
+falso
+lenta: hecho
+capturado: Operación '/' no soportada entre esos tipos. (línea 95)
+capturado: al empezar
+esperar() espera los segundos (un número) o una tarea; sin nada, espera al siguiente fotograma.
+esperar(): los segundos no pueden ser negativos.
+Una tarea no tiene el método 'correr'. Tiene terminada() y parar(); para esperar a que acabe, esperar(tarea).
+Error de tipo en retorno de tarea 'con_tipo': se esperaba 'numero' pero se recibió 'texto'.
+fregar
+verdadero
+verdadero
+fin del programa
+eterna: finalmente al acabar

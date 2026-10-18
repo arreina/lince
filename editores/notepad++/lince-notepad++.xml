@@ -14,7 +14,7 @@
 
       <!-- Declaraciones -->
       <Keywords name="Keywords2">
-        sea fijo funcion generador clase extiende implementa interfaz enumeracion mi padre importar val ref abstracta abstracto estatico privado protegido publico sobrescribe obtener fijar es como cualquiera
+        sea fijo funcion generador clase extiende implementa interfaz enumeracion mi padre importar val ref abstracta abstracto estatico privado protegido publico sobrescribe obtener fijar es como cualquiera tarea
       </Keywords>
 
       <!-- Tipos de dato -->
@@ -34,7 +34,7 @@
 
       <!-- Módulos estándar -->
       <Keywords name="Keywords6">
-        a_logico a_numero a_texto argumentos escribir filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json pruebas juego bytes bits
+        a_logico a_numero a_texto argumentos escribir esperar filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json pruebas juego bytes bits
       </Keywords>
 
       <!-- Operadores -->

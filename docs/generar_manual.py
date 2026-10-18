@@ -87,7 +87,7 @@ def ejecutar(ruta):
 
 
 # ── Resaltado ────────────────────────────────────────────────────
-CLAVES = r"""sea|fijo|funcion|generador|producir|devolver|si|sino|para|cada|
+CLAVES = r"""sea|fijo|funcion|generador|producir|tarea|esperar|devolver|si|sino|para|cada|
 mientras|hacer|romper|continuar|elegir|caso|otro|clase|extiende|implementa|interfaz|
 enumeracion|mi|padre|verdadero|falso|nulo|escribir|leer|val|ref|intentar|
 capturar|finalmente|lanzar|importar|como|en|y|o|no""".replace("\n", "")

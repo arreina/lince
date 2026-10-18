@@ -170,6 +170,24 @@ para cada numero n en pares(10) {
 }
 ```
 
+### Tareas
+
+Código que se para a esperar sin parar el juego: lo que pasa a lo largo del tiempo
+se escribe en orden.
+
+```lince
+tarea ataque_jefe() {
+    jefe.animar("cargar")
+    esperar(0.8)              # solo se para esta tarea; el juego sigue
+    para (i = 0; i < 3; i++) {
+        disparar(jefe.x, jefe.y)
+        esperar(0.2)
+    }
+}
+
+ataque_jefe()                 # empieza ya y sigue sola en cada juego.presentar()
+```
+
 ### Enumeraciones
 
 ```lince
@@ -231,7 +249,7 @@ make test-todo                         # todo: minijuegos, módulo juego, editor
 ```
 
 ```
-✅ 31/31 tests del intérprete pasaron
+✅ 38/38 tests del intérprete pasaron
 ✅ 15/15 tests del compilador pasaron
 ```
 
@@ -254,6 +272,7 @@ lince/
 │   ├── lexer.c/h           # análisis léxico
 │   ├── parser.c/h          # análisis sintáctico
 │   ├── interprete.c/h      # evaluación
+│   ├── corrutina.c/h       # una pila para cada tarea
 │   ├── empaquetado.c/h     # lince compilar: crea ejecutables autónomos
 │   ├── repartir.c/h        # lince repartir: carpeta y .zip para compartir un juego
 │   ├── recarga.c/h         # recarga en caliente

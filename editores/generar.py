@@ -133,7 +133,7 @@ def gramatica():
                        "match": "\\b([A-Z][a-zA-Z0-9_]*)\\b"},
             "funciones": {"patterns": [
                 {"name": "entity.name.function.lince",
-                 "match": "(?<=funcion\\s|generador\\s)([a-z_][a-zA-Z0-9_]*)"},
+                 "match": "(?<=funcion\\s|generador\\s|tarea\\s)([a-z_][a-zA-Z0-9_]*)"},
                 {"name": "support.function.builtin.lince", "match": "\\b(" + alt(ints) + ")\\b"},
                 {"name": "entity.name.function.call.lince",
                  "match": "\\b([a-z_][a-zA-Z0-9_]*)(?=\\s*\\()"}]},
@@ -167,6 +167,8 @@ SNIPPETS = [
     ("Generador", "generador", "Función generadora",
      ["generador ${1:contar}(val numero ${2:n}): numero {", "\tpara (${3:i} = 0; ${3:i} < ${2:n}; ${3:i}++) {",
       "\t\tproducir ${3:i}", "\t}", "}"]),
+    ("Tarea", "tarea", "Código que se para a esperar sin parar el juego",
+     ["tarea ${1:nombre}() {", "\t$2", "\tesperar(${3:0.5})", "\t$0", "}"]),
     ("Si", "si", "Condicional", ["si ${1:condicion} {", "\t$0", "}"]),
     ("Si / sino", "sino", "Condicional con alternativa",
      ["si ${1:condicion} {", "\t$2", "} sino {", "\t$0", "}"]),

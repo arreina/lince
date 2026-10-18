@@ -902,6 +902,8 @@ static TipoDato parsear_tipo(Parser *p, char **tipo_clase_out) {
 /* Desde el '(' de la lista de parámetros en adelante. 'sin_cuerpo_ok' admite
    una firma sin '{' (método abstracto): cuerpo NULL. */
 static Nodo *funcion_desde_parametros(Parser *p, Token *nombre, int sin_cuerpo_ok) {
+    int tarea = p->tarea;       /* solo para esta: no para las que lleve dentro */
+    p->tarea = 0;
     consumir(p, TOK_PAREN_IZQ, "'('");
 
     Parametro *params    = calloc(64, sizeof(Parametro));
@@ -952,10 +954,14 @@ static Nodo *funcion_desde_parametros(Parser *p, Token *nombre, int sin_cuerpo_o
     }
     consumir(p, TOK_PAREN_DER, "')'");
 
-    /* tipo de retorno: ): tipo */
-    consumir(p, TOK_DOS_PUNTOS, "':' seguido del tipo de retorno");
+    /* tipo de retorno: ): tipo. Una tarea puede no llevarlo: es lo que da
+       esperar(tarea) cuando acaba, y casi nunca hace falta. */
     char *tipo_ret_clase = NULL;
-    TipoDato tipo_retorno = parsear_tipo(p, &tipo_ret_clase);
+    TipoDato tipo_retorno = TIPO_CUALQUIERA;
+    if (!tarea || coincide(p, TOK_DOS_PUNTOS)) {
+        consumir(p, TOK_DOS_PUNTOS, "':' seguido del tipo de retorno");
+        tipo_retorno = parsear_tipo(p, &tipo_ret_clase);
+    }
 
     Nodo *cuerpo = (sin_cuerpo_ok && !coincide(p, TOK_LLAVE_IZQ)) ? NULL : cuerpo_funcion(p);
 
@@ -966,18 +972,34 @@ static Nodo *funcion_desde_parametros(Parser *p, Token *nombre, int sin_cuerpo_o
     n->funcion.tipo_retorno       = tipo_retorno;
     n->funcion.tipo_retorno_clase = tipo_ret_clase;
     n->funcion.cuerpo             = cuerpo;
+    n->funcion.es_tarea           = tarea;
     return n;
+}
+
+static int es_palabra(Parser *p, const char *w) {
+    return coincide(p, TOK_IDENTIFICADOR) && actual(p)->valor &&
+           strcmp(actual(p)->valor, w) == 0;
+}
+
+/* 'tarea nombre(' — 'tarea' no es palabra reservada: solo cuenta así */
+static int viene_tarea(Parser *p) {
+    return es_palabra(p, "tarea") && ver_siguiente(p)->tipo == TOK_IDENTIFICADOR &&
+           p->pos + 2 < p->cantidad && p->tokens[p->pos + 2].tipo == TOK_PAREN_IZQ;
+}
+
+/* tarea nombre(parámetros)[: tipo] { ... } — una función que, al llamarla,
+   empieza a correr aparte y puede pararse con esperar() */
+static Nodo *sent_tarea(Parser *p) {
+    consumir_cualquiera(p);
+    Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de la tarea");
+    p->tarea = 1;
+    return funcion_desde_parametros(p, nombre, 0);
 }
 
 static Nodo *sent_funcion(Parser *p) {
     consumir(p, TOK_FUNCION, "'funcion'");
     Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de función");
     return funcion_desde_parametros(p, nombre, 0);
-}
-
-static int es_palabra(Parser *p, const char *w) {
-    return coincide(p, TOK_IDENTIFICADOR) && actual(p)->valor &&
-           strcmp(actual(p)->valor, w) == 0;
 }
 
 static Nodo *sent_clase(Parser *p) {
@@ -1033,10 +1055,18 @@ static Nodo *sent_clase(Parser *p) {
         }
 
         if (coincide(p, TOK_FUNCION) ||
-            ((es_palabra(p, "obtener") || es_palabra(p, "fijar")) &&
+            ((es_palabra(p, "obtener") || es_palabra(p, "fijar") || es_palabra(p, "tarea")) &&
              ver_siguiente(p)->tipo == TOK_IDENTIFICADOR)) {
             int prop = 0;
-            if (!coincide(p, TOK_FUNCION)) {
+            if (es_palabra(p, "tarea")) {
+                consumir_cualquiera(p);
+                if (abstracto || estatico)
+                    error_sintaxis(p, "Una tarea no puede ser 'abstracto' ni 'estatico'.");
+                if (es_palabra(p, "crear"))
+                    error_sintaxis(p, "'crear' no puede ser una tarea: el objeto tiene que estar hecho al acabar crear(). "
+                                      "Empieza la tarea desde crear(), llamándola.");
+                p->tarea = 1;
+            } else if (!coincide(p, TOK_FUNCION)) {
                 prop = es_palabra(p, "obtener") ? 1 : 2;
                 consumir_cualquiera(p);
             } else {
@@ -1398,6 +1428,7 @@ static Nodo *sentencia_interna(Parser *p) {
     if (coincide(p, TOK_HACER))    return sent_hacer(p);
     if (coincide(p, TOK_PARA))     return sent_para(p);
     if (coincide(p, TOK_FUNCION))  return sent_funcion(p);
+    if (viene_tarea(p))            return sent_tarea(p);
     if (coincide(p, TOK_DEVOLVER)) return sent_devolver(p);
     if (coincide(p, TOK_CLASE))    return sent_clase(p);
     if (es_palabra(p, "abstracta") && ver_siguiente(p)->tipo == TOK_CLASE) return sent_clase(p);
@@ -1548,6 +1579,7 @@ Parser *parser_crear(Token *tokens, int cantidad) {
     p->cantidad = cantidad;
     p->pos      = 0;
     p->bucles   = 0;
+    p->tarea    = 0;
     return p;
 }
 

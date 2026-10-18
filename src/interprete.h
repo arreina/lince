@@ -23,6 +23,7 @@ typedef enum {
     VAL_ERROR,
     VAL_GENERADOR,
     VAL_BYTES,      /* datos binarios: cada elemento es un número de 0 a 255 */
+    VAL_TAREA,      /* lo que devuelve llamar a una tarea (ver TareaLince en interprete.c) */
 } TipoValor;
 
 typedef struct Valor Valor;
@@ -43,6 +44,8 @@ typedef struct {
     int                 prop;       /* 1 = obtener, 2 = fijar */
     struct ClaseLince  *duena;      /* clase que lo declara */
     int                 de_biblioteca;  /* escrita en Lince dentro de un módulo estándar */
+    int                 es_tarea;       /* 'tarea': llamarla la empieza y da la tarea */
+    TipoDato            tipo_tarea;     /* el tipo de lo que devuelve la tarea al acabar */
 } FuncionLince;
 
 enum { VIS_PUBLICO = 0, VIS_PRIVADO = 1, VIS_PROTEGIDO = 2 };
@@ -131,11 +134,13 @@ struct Valor {
             int            cantidad;
             int            capacidad;
         } bytes;
-        /* VAL_GENERADOR — lista de valores producidos */
+        struct TareaLince *tarea;       /* VAL_TAREA */
+        /* VAL_GENERADOR — da sus valores de uno en uno, según se recorre: los
+           de un 'generador' los va produciendo su cuerpo, que corre aparte
+           (como una tarea), y los de rango() se calculan */
         struct {
-            struct Valor **elementos;
-            int            cantidad;
-            int            capacidad;
+            struct TareaLince *productor;   /* NULL en rango() */
+            double             desde, hasta, paso;
         } generador;
     };
 };
@@ -241,6 +246,14 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs);
    'entorno') y añade al módulo cada función cuyo nombre no empiece por '_'.
    'codigo' tiene que vivir siempre (el árbol se guarda la primera vez). */
 void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const char *codigo);
+
+/* Tareas (tarea ... { esperar(1) }). Quien tiene un bucle de fotogramas
+   (juego.presentar) da su reloj y las avanza una vez por fotograma; sin
+   reloj, esperar() fuera de una tarea es quien las avanza, con el reloj real.
+   Al acabar el programa se paran las que queden. */
+void interprete_reloj_tareas(double (*reloj)(void));
+void interprete_avanzar_tareas(void);
+void interprete_parar_tareas(void);
 
 /* Ruta del fichero que se va a ejecutar. Sirve para resolver los
    'importar "./x"' junto al fichero que los escribe, no junto al directorio

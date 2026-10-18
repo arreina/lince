@@ -34,6 +34,10 @@
       "contents": "generador ${1:contar}(val numero ${2:n}): numero {\n\tpara (${3:i} = 0; ${3:i} < ${2:n}; ${3:i}++) {\n\t\tproducir ${3:i}\n\t}\n}"
     },
     {
+      "trigger": "tarea\tCódigo que se para a esperar sin parar el juego",
+      "contents": "tarea ${1:nombre}() {\n\t$2\n\tesperar(${3:0.5})\n\t$0\n}"
+    },
+    {
       "trigger": "si\tCondicional",
       "contents": "si ${1:condicion} {\n\t$0\n}"
     },
@@ -172,6 +176,7 @@
     "es",
     "como",
     "cualquiera",
+    "tarea",
     "en",
     "matematica",
     "archivos",
@@ -195,6 +200,7 @@
     "a_numero",
     "a_texto",
     "argumentos",
+    "esperar",
     "filtrar",
     "leer",
     "mapear",

@@ -478,6 +478,7 @@ static void jg_cerrar_todo(void) {
     _jgs.render = _jgs.ventana = NULL;
     if (_jgs.abierta) _jg.Quit();
     _jgs.abierta = 0;
+    interprete_reloj_tareas(NULL);
 }
 
 /* Variable de entorno en UTF-8 (en Windows getenv usa la página de códigos local) */
@@ -537,6 +538,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         return jg_error("ErrorJuego", msg);
     }
     _jgs.abierta = 1;
+    interprete_reloj_tareas(jg_reloj);             /* esperar(segundos) cuenta el tiempo del juego */
     _jgs.ventana = _jg.CrearVentana(a[0]->texto, 0x2FFF0000, 0x2FFF0000, (int)(w * z), (int)(h * z), 0);
     if (_jgs.ventana) {
         _jgs.render = _jg.CreateRenderer(_jgs.ventana, -1, 2 | 4);       /* acelerado + vsync */
@@ -918,6 +920,12 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     (void)a; (void)n;
     JG_ABIERTA();
     int recargar = recarga_activa() && jg_vigilar();
+    /* Las tareas siguen una vez por fotograma, antes de mostrarlo: así lo que
+       dibujen sale en este fotograma (y debajo del fundido de las escenas) */
+    if (!recargar) {
+        interprete_avanzar_tareas();
+        if (hay_error) return valor_nulo();
+    }
     jg_escenas();
     if (recarga_error()) jg_aviso_error(recarga_error(), 0);
     if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))

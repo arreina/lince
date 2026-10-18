@@ -70,7 +70,7 @@ static PalabraClave PALABRAS_CLAVE[] = {
    servidor de lenguaje sepan resaltarlas y sugerirlas. */
 static const char *const PALABRAS_CONTEXTUALES[] = {
     "abstracta", "abstracto", "estatico", "privado", "protegido", "publico",
-    "sobrescribe", "obtener", "fijar", "es", "como", "cualquiera", NULL,
+    "sobrescribe", "obtener", "fijar", "es", "como", "cualquiera", "tarea", NULL,
 };
 
 const char *lexer_palabra_clave(int i) {

@@ -434,4 +434,25 @@ if d == b"\x89PNG\r\n\x1a\n": print("  ✅ guardar_imagen: es un PNG")
 else: print("  ❌ guardar_imagen: no es un PNG"); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida5b.txt; exit 1; }
+# ── Tareas: avanzan en presentar() y se paran al acabar o al pulsar F5 ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=60 LINCE_JUEGO_CAPTURA=tareas.bmp timeout 20 "$LINCE" "$DIR/prueba14.lince" > salida18.txt 2>&1
+[ $? -eq 0 ] && ok "las tareas terminan bien" || mal "la prueba de tareas falló"
+for l in "tarea: medio segundo en el fotograma 31" "tarea: x = 30 en el fotograma 34" "fuera de una tarea: verdadero" \
+         "fin: 60" "tarea: marca parada"; do
+    grep -qxF "$l" salida18.txt && ok "$l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+d = open("tareas.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+def px(x, y):
+    fila = (abs(h) - 1 - y) if h > 0 else y
+    b, g, r, a = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 4]
+    return (r, g, b)
+if px(5, 5) == (255, 0, 0) and px(20, 20) == (0, 0, 0): print("  ✅ lo que dibuja una tarea se ve")
+else: print("  ❌ lo que dibuja una tarea no se ve:", px(5, 5), px(20, 20)); sys.exit(1)
+PY
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=8 LINCE_JUEGO_PULSAR=f5 timeout 20 "$LINCE" "$DIR/prueba14.lince" > salida19.txt 2>&1
+[ "$(grep -cxF "tarea: marca parada" salida19.txt)" -ge 2 ] && ok "F5 para las tareas y vuelven a empezar" || mal "F5 no para las tareas"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida5b.txt; exit 1; }

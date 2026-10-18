@@ -60,3 +60,65 @@ generador multiplos(val numero base, val numero hasta): numero {
 para cada numero n en multiplos(3, 10) {
     escribir(n)
 }
+
+# Los valores salen de uno en uno, según se piden: puede no acabar nunca
+generador naturales(): numero {
+    sea i = 0
+    intentar {
+        mientras verdadero {
+            escribir("produce {i}")
+            producir i
+            i++
+        }
+    } capturar (error e) {
+        escribir("no debería: {e.mensaje}")
+    } finalmente {
+        escribir("naturales: cerrado")
+    }
+}
+para cada numero n en naturales() {
+    escribir("usa {n}")
+    si n == 2 { romper }
+}
+funcion primero_mayor(val numero x): numero {
+    para cada numero n en naturales() {
+        si n > x { devolver n }
+    }
+    devolver -1
+}
+escribir(primero_mayor(1))
+
+# Uno dentro de otro
+generador dobles(val numero hasta): numero {
+    para cada numero p en multiplos(2, hasta) { producir p * 2 }
+}
+para cada numero d en dobles(7) { escribir(d) }
+
+# Un error dentro del generador, o en el cuerpo del bucle
+generador roto(): numero {
+    producir 1
+    producir 1 / "x"
+}
+intentar {
+    para cada numero v en roto() { escribir("roto da {v}") }
+} capturar (error e) {
+    escribir("capturado: {e.mensaje}")
+}
+intentar {
+    para cada numero v en naturales() { si v == 1 { lanzar Error("en el cuerpo") } }
+} capturar (error e) {
+    escribir("capturado: {e.mensaje}")
+}
+
+# Sin límite de valores
+sea cuantos = 0
+para cada numero v en rango(25000) { cuantos++ }
+escribir(cuantos)
+generador muchos(): numero { para (i = 0; i < 20000; i++) { producir i } }
+cuantos = 0
+para cada numero v en muchos() { cuantos++ }
+escribir(cuantos)
+sea suma = 0
+para cada numero v en rango(0, 1, 0.25) { suma += v }
+escribir(suma)
+intentar { rango("a") } capturar (error e) { escribir(e.mensaje) }
