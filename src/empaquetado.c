@@ -16,6 +16,7 @@
 #include <dirent.h>
 #endif
 #include "empaquetado.h"
+#include "tiled.h"
 #include "lexer.h"
 #include "parser.h"
 #include "interprete.h"
@@ -207,6 +208,17 @@ static int anadir_extra(const char *ruta) {
     return 1;
 }
 
+/* Un archivo que necesita un mapa de Tiled (un tileset, una imagen) */
+static void anadir_de_mapa(const char *ruta) {
+    struct stat st;
+    if (ya_esta(sin_punto(ruta))) return;
+    if (stat(ruta, &st) != 0) {
+        fprintf(stderr, "⚠  El mapa necesita '%s', que no existe aquí: no va dentro.\n", ruta);
+        return;
+    }
+    if (anadir_extra(ruta)) printf("   + %s\n", sin_punto(ruta));
+}
+
 /* Valida la sintaxis (el parser termina el proceso si hay un error) y recorre
    los 'importar' de 'codigo', añadiendo cada archivo que encuentra. 'actual' es
    el fichero desde el que se resuelven los './x'. */
@@ -219,7 +231,8 @@ static void recoger(const char *codigo, const char *actual) {
     /* Imágenes, sonidos y fuentes nombrados en el código: van dentro sin --incluir.
        Sólo estos tipos: un .txt o un .json puede ser un archivo que el juego
        escribe (récords), y empaquetado taparía la versión del disco. */
-    static const char *const MEDIOS[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".wav", ".ogg", ".ttf", ".otf", NULL };
+    static const char *const MEDIOS[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".wav", ".ogg", ".ttf", ".otf",
+                                          ".tmx", ".tmj", NULL };
     for (int i = 0; i < cnt; i++) {
         if (tok[i].tipo != TOK_TEXTO || !tok[i].valor) continue;
         const char *v = tok[i].valor, *ext = strrchr(v, '.');
@@ -237,6 +250,8 @@ static void recoger(const char *codigo, const char *actual) {
             continue;
         }
         if (anadir_extra(v)) printf("   + %s\n", sin_punto(v));
+        /* un mapa de Tiled: también sus tilesets y sus imágenes */
+        if ((ext[1] | 32) == 't' && (ext[2] | 32) == 'm') tiled_archivos(v, anadir_de_mapa);
     }
     for (int i = 0; i + 1 < cnt; i++) {
         if (tok[i].tipo != TOK_IMPORTAR || tok[i + 1].tipo != TOK_TEXTO) continue;

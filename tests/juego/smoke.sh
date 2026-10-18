@@ -504,4 +504,35 @@ done
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=12 LINCE_JUEGO_CLIC=160,150 \
     timeout 30 "$LINCE" "$DIR/prueba19.lince" > salida25.txt 2>&1
 grep -qxF "menu: Salir" salida25.txt && ok "menús: se elige con un clic (o el dedo)" || mal "menús: el clic no elige"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida5b.txt; exit 1; }
+# ── Mapas de Tiled (.tmx con tileset .tsx, y .tmj con capa en base64 y zlib) ──
+(cd "$DIR" && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=3 LINCE_JUEGO_CAPTURA="$T/tiled.bmp" \
+    timeout 30 "$LINCE" prueba20.lince) > salida26.txt 2>&1
+for ruta in tiled/nivel.tmx tiled/nivel.tmj; do
+    for l in "$ruta: 10x6, casilla 8, capas [\"Fondo\", \"Suelo\"]" "objeto: inicio jugador 8,16 8x8 rectangulo {}"; do
+        grep -qxF "$l" salida26.txt && ok "tiled: $l" || mal "falta la línea: $l"
+    done
+done
+for l in "propiedades: tema & fondo 900" 'objeto: moneda moneda 40,16 8x8 tile {"valor": 5}' "casillas: # = . verdadero" \
+         "cae a y=34 en_suelo=verdadero" "error: dibujar_tiled(): el mapa no tiene la capa 'NoExiste' (mira mapa[\"capas\"])" \
+         "error: mapa_tiled(): no se encuentra 'tiled/no_esta.tmx'"; do
+    [ "$(grep -cxF "$l" salida26.txt)" -ge 1 ] && ok "tiled: $l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+d = open("tiled.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]
+w, h = struct.unpack_from("<ii", d, 18)
+def px(x, y):
+    fila = (abs(h) - 1 - y) if h > 0 else y
+    b, g, r, a = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 4]
+    return (r, g, b)
+casos = [((1, 4), (40, 80, 230), "tile volteado"), ((6, 4), (220, 40, 40), "tile volteado (la otra mitad)"),
+         ((20, 20), (250, 250, 250), "fondo"), ((44, 28), (40, 80, 230), "plataforma"),
+         ((12, 36), (240, 220, 40), "tile animado"), ((40, 44), (220, 40, 40), "suelo")]
+mal = 0
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ tiled, píxel:", nombre)
+    else: print("  ❌ tiled, píxel:", nombre, "→", px(x, y)); mal += 1
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida5b.txt; exit 1; }

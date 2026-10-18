@@ -12,9 +12,18 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Versión 0.9
 
-- [ ] **Mapas de Tiled:** `juego.mapa_tiled("nivel.tmj")` carga los niveles hechos con Tiled (capas de tiles, objetos como enemigos o salidas, y colisiones) y se dibujan y se usan con lo que ya hay.
+- [x] **Mapas de Tiled:** `juego.mapa_tiled` (.tmx y .tmj, tilesets .tsx y .tsj) y `juego.dibujar_tiled`. Quedan fuera los mapas isométricos y hexagonales, los infinitos, los tilesets de imágenes sueltas y las capas comprimidas con zstd.
 - [ ] **Física sencilla, en Lince:** cuerpos con gravedad, rebotes, empujes y choques entre ellos y con el mapa (cajas que caen, pelotas, plataformas que se mueven), encima de las colisiones que ya hay.
 - [ ] **Controles a gusto:** el jugador cambia las teclas y botones de cada acción desde un menú del juego, y se guarda (con los menús y las partidas guardadas de la 0.8).
+
+## Camino a la 1.0
+
+La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10, 0.11... Para llegar a ella:
+
+- [ ] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
+- [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad, y un juego subido a Google Play.
+- [ ] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta.
+- [ ] **El manual lo cubre todo**, también el módulo `juego` (ahora solo está en la especificación).
 
 ## Lenguaje
 

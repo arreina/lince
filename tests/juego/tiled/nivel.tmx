@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.11.0" orientation="orthogonal" renderorder="right-down" width="10" height="6" tilewidth="8" tileheight="8" infinite="0" nextlayerid="4" nextobjectid="3">
+ <properties>
+  <property name="musica" value="tema &amp; fondo"/>
+  <property name="gravedad" type="int" value="900"/>
+ </properties>
+ <tileset firstgid="1" source="tiles.tsx"/>
+ <layer id="1" name="Fondo" width="10" height="6">
+  <data encoding="csv">
+2147483656,5,5,5,5,5,5,5,5,5,
+5,5,5,5,5,5,5,5,5,5,
+5,5,5,5,5,5,5,5,5,5,
+5,5,5,5,5,5,5,5,5,5,
+5,5,5,5,5,5,5,5,5,5,
+5,5,5,5,5,5,5,5,5,5
+</data>
+ </layer>
+ <layer id="2" name="Suelo" width="10" height="6">
+  <data encoding="csv">
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,3,3,3,0,0,
+0,4,0,0,0,0,0,0,0,0,
+1,1,1,1,1,1,1,1,1,1
+</data>
+ </layer>
+ <objectgroup id="3" name="Cosas">
+  <object id="1" name="inicio" type="jugador" x="8" y="16" width="8" height="8"/>
+  <object id="2" name="moneda" type="moneda" gid="4" x="40" y="24" width="8" height="8">
+   <properties>
+    <property name="valor" type="int" value="5"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

@@ -1634,6 +1634,7 @@ static void cargar_pruebas(Entorno *entorno) {
 #include "empaquetado.h"
 #include "recarga.h"
 #include "biblioteca_juego.h"
+#include "tiled.h"
 #include "juego.h"
 
 static void cargar_matematica(Entorno *entorno) {

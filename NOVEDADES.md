@@ -3,6 +3,15 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 0.9.0 (en preparación)
+
+### Mapas de Tiled
+
+- `juego.mapa_tiled("nivel.tmx")` lee los mapas hechos con [Tiled](https://www.mapeditor.org): `.tmx` y `.tmj`, con sus tilesets (`.tsx`, `.tsj`), capas en CSV o base64 (con zlib o gzip), objetos y propiedades. Da un mapa de Lince normal, así que `mover_en_mapa`, `camino` y las demás funciones sirven igual.
+- `juego.dibujar_tiled(mapa[, capas])` lo dibuja con los tiles animados, volteados y girados, la opacidad, el desplazamiento y el paralaje de cada capa.
+- Lo sólido y las plataformas se marcan en Tiled: una capa «Colisiones» o la propiedad `solido` en una capa o en un tile.
+- `lince compilar` y `lince repartir` meten dentro el mapa, sus tilesets y sus imágenes.
+
 ## 0.8.0
 
 Publicar en Google Play, partidas guardadas, y menús y diálogos.

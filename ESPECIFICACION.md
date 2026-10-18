@@ -1445,6 +1445,38 @@ interruptor): es un diccionario normal. `09_mazmorra` hace su hoja con `sprite()
 Ejemplos: `08_plataformas` (con gravedad y plataformas) y `09_mazmorra` (vista cenital con tiles,
 fantasmas que te persiguen).
 
+**Mapas de Tiled.** Los niveles también se pueden dibujar con [Tiled](https://www.mapeditor.org), el
+editor de mapas gratuito más usado, y cargarlos tal cual:
+
+```lince
+fijo NIVEL = juego.mapa_tiled("niveles/uno.tmx")
+para cada diccionario cosa en NIVEL["objetos"] {          # los objetos que pusiste en Tiled
+    si cosa["tipo"] == "jugador" {
+        yo["x"] = cosa["x"]
+        yo["y"] = cosa["y"]
+    }
+}
+# en cada fotograma:
+juego.mover_en_mapa(NIVEL, yo)                            # choca con lo que es sólido
+juego.dibujar_tiled(NIVEL, ["Fondo", "Suelo"])            # lo de detrás del personaje
+juego.dibujar(personaje, yo["x"], yo["y"])
+juego.dibujar_tiled(NIVEL, "Delante")                     # lo de delante
+```
+
+| Función | Qué hace |
+|---|---|
+| `mapa_tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa()`, así que `mover_en_mapa`, `casilla`, `solido`, `buscar_en_mapa` y `camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`) y `"propiedades"` (las del mapa). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa()`) |
+| `dibujar_tiled(mapa[, capas])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan |
+
+Qué es sólido se dice en Tiled de tres maneras: una capa que se llama **Colisiones** (o Sólidos o
+Paredes), una capa o un tile del tileset con la propiedad `solido` (lógica, verdadera), o la
+opción `"solidos"`. Con la propiedad o la opción `plataforma`, se atraviesan desde abajo y se
+pisan desde arriba. Una capa de colisiones se puede dejar oculta en Tiled: sirve para chocar y
+no se dibuja. Lince entiende los mapas ortogonales (rejilla normal) con casillas cuadradas y
+tilesets de una sola imagen (también con margen, separación y un color transparente). Los mapas
+y lo que usan (tilesets e imágenes) van dentro del juego al hacer `lince compilar` o `lince
+repartir`, como las imágenes.
+
 **Partículas.** Chispas, polvo, explosiones: `particulas(x, y[, opciones])` lanza un puñado y
 `dibujar_particulas()` las mueve y las dibuja (llámala en cada fotograma, después de lo que deban
 tapar; respeta la cámara y devuelve cuántas quedan). `borrar_particulas()` las quita todas.

@@ -1,0 +1,201 @@
+{
+ "width": 10,
+ "height": 6,
+ "tilewidth": 8,
+ "tileheight": 8,
+ "orientation": "orthogonal",
+ "infinite": false,
+ "type": "map",
+ "properties": [
+  {
+   "name": "musica",
+   "type": "string",
+   "value": "tema & fondo"
+  },
+  {
+   "name": "gravedad",
+   "type": "int",
+   "value": 900
+  }
+ ],
+ "tilesets": [
+  {
+   "firstgid": 1,
+   "name": "tiles",
+   "image": "tiles.png",
+   "imagewidth": 32,
+   "imageheight": 16,
+   "tilewidth": 8,
+   "tileheight": 8,
+   "tilecount": 8,
+   "columns": 4,
+   "margin": 0,
+   "spacing": 0,
+   "tiles": [
+    {
+     "id": 0,
+     "properties": [
+      {
+       "name": "solido",
+       "type": "bool",
+       "value": true
+      }
+     ]
+    },
+    {
+     "id": 2,
+     "properties": [
+      {
+       "name": "plataforma",
+       "type": "bool",
+       "value": true
+      }
+     ]
+    },
+    {
+     "id": 3,
+     "animation": [
+      {
+       "tileid": 3,
+       "duration": 100
+      },
+      {
+       "tileid": 1,
+       "duration": 100
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "layers": [
+  {
+   "id": 1,
+   "name": "Fondo",
+   "type": "tilelayer",
+   "width": 10,
+   "height": 6,
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "encoding": "base64",
+   "compression": "zlib",
+   "data": "eJzjYGBoYGVgYBgpGAAJRwGw"
+  },
+  {
+   "id": 2,
+   "name": "Suelo",
+   "type": "tilelayer",
+   "width": 10,
+   "height": 6,
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "data": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    3,
+    3,
+    3,
+    0,
+    0,
+    0,
+    4,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Cosas",
+   "type": "objectgroup",
+   "visible": true,
+   "opacity": 1,
+   "x": 0,
+   "y": 0,
+   "objects": [
+    {
+     "id": 1,
+     "name": "inicio",
+     "type": "jugador",
+     "x": 8,
+     "y": 16,
+     "width": 8,
+     "height": 8,
+     "rotation": 0,
+     "visible": true
+    },
+    {
+     "id": 2,
+     "name": "moneda",
+     "type": "moneda",
+     "gid": 4,
+     "x": 40,
+     "y": 24,
+     "width": 8,
+     "height": 8,
+     "rotation": 0,
+     "visible": true,
+     "properties": [
+      {
+       "name": "valor",
+       "type": "int",
+       "value": 5
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
