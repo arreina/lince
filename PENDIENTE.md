@@ -28,8 +28,9 @@ Nada pendiente ahora mismo.
 
 - [ ] **Android**: hecho lo básico (`android/construir.sh`, táctil, mando en la pantalla, botones,
   «atrás», archivos en su carpeta, tareas en arm64). Falta:
-  - **Probarlo en un móvil de verdad** (lo hace el autor). Hecho en el emulador (x86_64);
-    las tareas en arm64, con `qemu-aarch64`.
+  - **Probarlo con un mando Bluetooth** en el móvil (lo hace el autor): que se lea y
+    que el mando de la pantalla se esconda al conectarlo. Ya probado en un móvil de
+    verdad sin mando, en el emulador y las tareas en arm64 con `qemu-aarch64`.
   - **`lince repartir --android`** sin que quien hace el juego tenga que instalar el SDK.
     Por ejemplo, un `.apk` de Lince hecho una vez en la CI al que solo se le añade el
     juego y se firma.
