@@ -4933,13 +4933,17 @@ static void soltar_args(Valor **args, int desde, int nargs) {
     for (int i = desde; i < nargs; i++) valor_destruir(args[i]);
 }
 
+/* El árbol de cada biblioteca se hace una vez y se guarda: las funciones que
+   define lo usan mientras viva el programa. También su ámbito de la última
+   vez, para sus variables al recargar en caliente y para llamar a sus
+   funciones desde C (interprete_llamar_biblioteca). */
+static struct { const char *codigo; Nodo *ast; Entorno *ambito; } _bibliotecas[8];
+static int _nbibliotecas = 0;
+
 void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const char *codigo) {
-    /* El árbol se hace una vez por biblioteca y se guarda: las funciones que
-       define lo usan mientras viva el programa */
-    static struct { const char *codigo; Nodo *ast; } hechas[8];
-    static int nhechas = 0;
-    Nodo *ast = NULL;
-    for (int i = 0; i < nhechas; i++) if (hechas[i].codigo == codigo) ast = hechas[i].ast;
+    int k = -1;
+    for (int i = 0; i < _nbibliotecas; i++) if (_bibliotecas[i].codigo == codigo) k = i;
+    Nodo *ast = k >= 0 ? _bibliotecas[k].ast : NULL;
     if (!ast) {
         Lexer  *lx  = lexer_crear(codigo);
         int     cnt = 0;
@@ -4948,7 +4952,12 @@ void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const ch
         ast = parser_parsear(pa);
         parser_destruir(pa);
         lexer_destruir(lx);
-        if (nhechas < 8) { hechas[nhechas].codigo = codigo; hechas[nhechas++].ast = ast; }
+        if (_nbibliotecas < 8) {
+            k = _nbibliotecas++;
+            _bibliotecas[k].codigo = codigo;
+            _bibliotecas[k].ast    = ast;
+            _bibliotecas[k].ambito = NULL;
+        }
     }
     if (hay_error) return;
     Valor *mod = entorno_obtener(entorno, nombre_modulo, 0);
@@ -4959,9 +4968,17 @@ void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const ch
     while (raiz->padre) raiz = raiz->padre;
     Entorno *bib = entorno_crear(raiz);
     entorno_definir(bib, nombre_modulo, valor_retener(mod), 0);
+    /* Al recargar en caliente, sus 'sea' conservan el valor de la vez
+       anterior, como los del programa (la escena en la que se estaba...) */
+    Entorno *cons_de = _conservar_de, *cons_en = _conservar_en;
+    Entorno *antes = k >= 0 ? _bibliotecas[k].ambito : NULL;
+    _conservar_de = cons_de && antes ? antes : NULL;
+    _conservar_en = bib;
     _en_biblioteca++;
     valor_destruir(ejecutar(ast, bib));
     _en_biblioteca--;
+    _conservar_de = cons_de;
+    _conservar_en = cons_en;
     for (int i = 0; i < bib->cantidad && !hay_error; i++) {
         Valor *v = bib->vars[i].valor;
         if (v->tipo != VAL_FUNCION || !v->funcion) continue;
@@ -4972,8 +4989,27 @@ void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const ch
         if (k >= 0) { valor_destruir(mod->diccionario.valores[k]); mod->diccionario.valores[k] = valor_retener(v); }
         else valor_diccionario_agregar(mod, nombre, valor_retener(v));
     }
-    entorno_destruir(bib);      /* sigue vivo: lo retienen sus funciones */
+    if (k >= 0) {
+        entorno_destruir(antes);
+        _bibliotecas[k].ambito = bib;       /* se queda con su referencia */
+    } else {
+        entorno_destruir(bib);              /* sigue vivo: lo retienen sus funciones */
+    }
     valor_destruir(mod);
+}
+
+Valor *interprete_llamar_biblioteca(const char *codigo, const char *nombre, Valor **args, int nargs) {
+    Entorno *bib = NULL;
+    for (int i = 0; i < _nbibliotecas; i++) if (_bibliotecas[i].codigo == codigo) bib = _bibliotecas[i].ambito;
+    const char *id = bib ? intern_buscar(nombre) : NULL;
+    Valor *vf = NULL;
+    for (int i = 0; id && i < bib->cantidad; i++)
+        if (bib->vars[i].nombre == id) vf = bib->vars[i].valor;
+    if (!vf || vf->tipo != VAL_FUNCION) {
+        for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
+        return error_rt("Error", linea_llamada(), "La biblioteca no tiene la función '%s'.", nombre);
+    }
+    return llamar_biblioteca(vf, args, nargs, linea_llamada());
 }
 
 Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {

@@ -1394,9 +1394,19 @@ static Nodo *sent_intentar(Parser *p) {
    '=' o '+='..., su último eslabón es lo que se asigna; si no, es una
    expresión usada como sentencia. */
 static Nodo *asignar_a_cadena(Parser *p, Nodo *base) {
-    if (!coincide(p, TOK_IGUAL) && !op_compuesto(actual(p)->tipo)) return base;
-    const char *op = op_compuesto(consumir_cualquiera(p)->tipo);
-    Nodo *valor = expresion(p);
+    int paso = coincide(p, TOK_MAS_MAS) || coincide(p, TOK_MENOS_MENOS);
+    if (!coincide(p, TOK_IGUAL) && !op_compuesto(actual(p)->tipo) && !paso) return base;
+    const char *op;
+    Nodo *valor;
+    if (paso) {                     /* mi.x++ y lista[i]-- son mi.x += 1 y lista[i] -= 1 */
+        op = coincide(p, TOK_MAS_MAS) ? "+" : "-";
+        consumir_cualquiera(p);
+        valor = nodo_nuevo(NODO_NUMERO, p);
+        valor->numero = 1;
+    } else {
+        op = op_compuesto(consumir_cualquiera(p)->tipo);
+        valor = expresion(p);
+    }
     if (base->tipo == NODO_INDICE) {
         Nodo *n = nodo_nuevo(NODO_ASIGNACION_INDICE, p);
         n->asignacion_indice.objeto = base->acceso_indice.objeto;
@@ -1415,7 +1425,9 @@ static Nodo *asignar_a_cadena(Parser *p, Nodo *base) {
         free(base);
         return n;
     }
-    error_sintaxis(p, "A esto no se le puede asignar un valor: solo a una variable, a un elemento (lista[i]) o a un campo (objeto.campo).");
+    error_sintaxis(p, paso
+        ? "Solo se puede sumar o restar uno ('++', '--') a una variable, a un elemento (lista[i]) o a un campo (objeto.campo)."
+        : "A esto no se le puede asignar un valor: solo a una variable, a un elemento (lista[i]) o a un campo (objeto.campo).");
     return NULL;
 }
 

@@ -99,3 +99,23 @@ intentar { sea ll = [1]
 intentar { no_existe += 1 } capturar (error e) { escribir(e.mensaje) }
 fijo K = 1
 intentar { K += 1 } capturar (error e) { escribir(e.mensaje) }
+
+# ++ y -- también en campos y elementos
+clase Contador {
+    sea n = 1
+    funcion subir(): nulo { mi.n++ }
+}
+sea cnt = Contador()
+cnt.subir()
+cnt.n++
+cnt.n--
+cnt.n++
+escribir(cnt.n)
+sea nums = [5, 6]
+nums[0]++
+nums[-1]--
+escribir(nums)
+sea dic = {"v": 1, "m": [[1]]}
+dic["v"]++
+dic["m"][0][0]++
+escribir(dic)

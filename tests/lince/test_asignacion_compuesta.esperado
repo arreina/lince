@@ -26,3 +26,6 @@ División por cero.
 Índice 3 fuera de rango. La lista tiene 1 elementos.
 La variable 'no_existe' no está definida.
 'K' es una constante definida con 'fijo' y no puede cambiar. Si necesitas que cambie, usa 'sea' en lugar de 'fijo'.
+3
+[6, 5]
+{"v": 2, "m": [[2]]}

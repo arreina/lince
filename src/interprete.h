@@ -246,6 +246,10 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs);
    'entorno') y añade al módulo cada función cuyo nombre no empiece por '_'.
    'codigo' tiene que vivir siempre (el árbol se guarda la primera vez). */
 void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const char *codigo);
+/* Llama a la función 'nombre' de esa biblioteca (también a las que empiezan
+   por '_', que no están en el módulo) como si se llamara desde la línea que
+   corre ahora. Se queda con la propiedad de args[]. */
+Valor *interprete_llamar_biblioteca(const char *codigo, const char *nombre, Valor **args, int nargs);
 
 /* Tareas (tarea ... { esperar(1) }). Quien tiene un bucle de fotogramas
    (juego.presentar) da su reloj y las avanza una vez por fotograma; sin

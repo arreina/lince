@@ -10,6 +10,7 @@ sea bicho = Bicho()
 sea inicio = cuenta
 juego.abrir("Recarga 2", 120, 80)
 escribir("v2 conserva: " + a_texto(cuenta > 5) + " " + bicho.saludo())
+escribir("v2 escena: " + juego.escena())   # lo de juego.lince también se conserva
 mientras juego.abierto() {
     cuenta = cuenta + 1
     si cuenta == inicio + 3 { funcion_que_no_existe() }

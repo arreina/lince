@@ -125,7 +125,7 @@ funcion f(): texto {
 |----------|-------------|
 | `+` | suma / concatenación de texto |
 | `-` `*` `/` `%` | resta, multiplicación, división, módulo |
-| `++` `--` | incremento / decremento |
+| `++` `--` | incremento / decremento, como sentencia: `i++`, `mi.vidas--`, `puntos[j]++` |
 | `+=` `-=` `*=` `/=` `%=` | operar y guardar: `x += 5` es `x = x + 5` |
 | `==` `!=` `<` `>` `<=` `>=` | comparación |
 | `y` `o` `no` | lógicos |
@@ -936,7 +936,7 @@ la pone).
 Casi todo `juego` está en C, porque habla con la pantalla, el teclado, el mando y el altavoz o
 trabaja píxel a píxel. Lo que no lo necesita está escrito en Lince, en
 [`src/lince/juego.lince`](src/lince/juego.lince), y va dentro del ejecutable: `combo`,
-`mantenida`, `pulsaciones`, `curva`, `suavizar` y `acercar`. Para quien lo usa no hay
+`mantenida`, `pulsaciones`, `curva`, `suavizar`, `acercar` y las escenas. Para quien lo usa no hay
 diferencia; quien quiera una versión distinta puede leerla y copiarla. Un error dentro de una de
 esas funciones se cuenta en la línea del programa que la llamó.
 
@@ -963,6 +963,7 @@ mientras juego.abierto() {
 | `abierto()` · `titulo(t)` · `ancho()` · `alto()` | estado y tamaño |
 | `presentar()` | hace avanzar las [tareas](#tareas), muestra lo dibujado, espera al siguiente fotograma y actualiza la entrada y `dt()` |
 | `dt()` · `fps()` · `tiempo()` | segundos del último fotograma · fotogramas por segundo · segundos desde que se abrió. Son tiempo de juego: se paran con `congelar()` y van más despacio con `velocidad()` (ver **Peleas**) |
+| `tiempo_real()` | segundos desde que se abrió, sin pararse con `congelar()` ni cambiar con `velocidad()`: para lo que tiene que seguir moviéndose durante un parón (un menú, el fundido de las escenas) |
 | `pantalla_completa([sí/no])` | sin argumento alterna; el juego se escala sin deformarse y el ratón sigue en coordenadas del juego |
 
 **Dibujo**
@@ -970,6 +971,7 @@ mientras juego.abierto() {
 | Función | Qué hace |
 |---|---|
 | `limpiar([color])` | rellena toda la ventana |
+| `cubrir(color)` | pinta toda la ventana encima de lo dibujado, sin moverse con la cámara ni con el temblor: con alfa la oscurece o la tiñe (`juego.cubrir([0, 0, 0, 160])` en una pausa) |
 | `rectangulo(x, y, ancho, alto[, color])` · `contorno(...)` | rectángulo relleno / solo borde |
 | `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
 | `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |

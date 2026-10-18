@@ -121,7 +121,7 @@ for i in $(seq 1 300); do grep -q funcion_que_no_existe errores4.txt 2>/dev/null
 sleep 0.5
 cp rec/v3.lince rec/juego.lince
 wait
-for l in "v2 conserva: verdadero hola v2" "v3 tras el error: verdadero 160" "código 0"; do
+for l in "v2 conserva: verdadero hola v2" "v2 escena: cueva" "v3 tras el error: verdadero 160" "código 0"; do
     grep -qxF "$l" salida4.txt && ok "recarga: $l" || mal "falta la línea: $l"
 done
 grep -q "capturado" salida4.txt && mal "intentar capturó la recarga" || ok "recarga: intentar no la captura"
@@ -438,7 +438,7 @@ PY
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=60 LINCE_JUEGO_CAPTURA=tareas.bmp timeout 20 "$LINCE" "$DIR/prueba14.lince" > salida18.txt 2>&1
 [ $? -eq 0 ] && ok "las tareas terminan bien" || mal "la prueba de tareas falló"
 for l in "tarea: medio segundo en el fotograma 31" "tarea: x = 30 en el fotograma 34" "fuera de una tarea: verdadero" \
-         "fin: 60" "tarea: marca parada"; do
+         "fin: 60" "tarea: marca parada" "tiempo real: 1" "cubrir sin color: cubrir() espera un color, por ejemplo [0, 0, 0, 128]"; do
     grep -qxF "$l" salida18.txt && ok "$l" || mal "falta la línea: $l"
 done
 python3 - <<'PY' || fallos=$((fallos+1))
@@ -450,8 +450,10 @@ def px(x, y):
     fila = (abs(h) - 1 - y) if h > 0 else y
     b, g, r, a = d[off + (fila * w + x) * 4: off + (fila * w + x) * 4 + 4]
     return (r, g, b)
-if px(5, 5) == (255, 0, 0) and px(20, 20) == (0, 0, 0): print("  ✅ lo que dibuja una tarea se ve")
-else: print("  ❌ lo que dibuja una tarea no se ve:", px(5, 5), px(20, 20)); sys.exit(1)
+if px(5, 5) == (255, 0, 0): print("  ✅ lo que dibuja una tarea se ve")
+else: print("  ❌ lo que dibuja una tarea no se ve:", px(5, 5)); sys.exit(1)
+if px(2, 25) == (0, 0, 128) and px(38, 2) == (0, 0, 128): print("  ✅ cubrir() tapa toda la ventana")
+else: print("  ❌ cubrir():", px(2, 25), px(38, 2)); sys.exit(1)
 PY
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=8 LINCE_JUEGO_PULSAR=f5 timeout 20 "$LINCE" "$DIR/prueba14.lince" > salida19.txt 2>&1
 [ "$(grep -cxF "tarea: marca parada" salida19.txt)" -ge 2 ] && ok "F5 para las tareas y vuelven a empezar" || mal "F5 no para las tareas"

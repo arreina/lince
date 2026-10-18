@@ -1,6 +1,7 @@
 # Tareas en un juego: avanzan solas en cada presentar(), con el tiempo del juego
 importar "juego"
 juego.abrir("Tareas", 40, 30)
+juego.camara(15, 15)                     # cubrir() no se mueve con la cámara
 sea cuadros = 0
 sea x = 0
 tarea mover() {
@@ -15,7 +16,7 @@ tarea mover() {
 tarea marca() {
     intentar {
         mientras verdadero {
-            juego.rectangulo(0, 0, 10, 10, [255, 0, 0])   # lo que dibuja sale en este fotograma
+            juego.rectangulo(15, 15, 10, 10, [255, 0, 0])  # lo que dibuja sale en este fotograma (con la cámara: en 0, 0)
             esperar()
         }
     } capturar (error e) {
@@ -30,6 +31,9 @@ intentar { esperar(1) } capturar (error e) { escribir("fuera de una tarea: {e.me
 mientras juego.abierto() {
     cuadros++
     juego.limpiar([0, 0, 0])
+    juego.cubrir([0, 0, 255, 128])        # encima de lo dibujado, y de toda la ventana
     juego.presentar()
 }
 escribir("fin: {cuadros}")
+escribir("tiempo real: {juego.tiempo_real()}")
+intentar { juego.cubrir() } capturar (error e) { escribir("cubrir sin color: {e.mensaje}") }

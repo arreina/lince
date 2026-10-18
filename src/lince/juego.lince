@@ -8,7 +8,8 @@
 # una versión propia.
 #
 # Lo que usa de C: juego.historial(segundos[, acciones]), juego.gastar(ids),
-# juego.estado_accion(nombre), juego.tiempo() y juego.dt().
+# juego.estado_accion(nombre), juego.tiempo(), juego.tiempo_real(), juego.dt()
+# y juego.cubrir(color). presentar() llama a _presentar() en cada fotograma.
 
 importar "matematica"
 
@@ -172,4 +173,73 @@ funcion suavizar(val cualquiera desde, val cualquiera hasta, val numero segundos
 funcion acercar(val cualquiera actual, val cualquiera objetivo, val numero rapidez): cualquiera {
     si rapidez < 0 { lanzar Error("acercar(): la rapidez no es negativa") }
     devolver _interpolar(actual, objetivo, 1 - matematica.potencia(matematica.E, -rapidez * juego.dt()), "acercar")
+}
+
+# ── Escenas ──
+# Un nombre para cada parte del juego ("portada", "partida", "fin"...). El
+# cambio se hace en el siguiente presentar(), así un fotograma no mezcla dos
+# escenas; con fundido, la pantalla se oscurece, cambia y se aclara. El
+# fundido va con el reloj de verdad: no se para con congelar().
+
+sea _escena = ""
+sea _siguiente = nulo        # la que viene, o nulo
+sea _nueva = falso           # ¿es el primer fotograma de la escena?
+sea _desde = 0               # juego.tiempo() al empezar la escena
+sea _fundido = 0             # segundos que dura el fundido
+sea _fase = 0                # 0: sin fundido; 1: oscurece; 2: aclara
+sea _desde_fase = 0          # juego.tiempo_real() al empezar la fase
+
+funcion _poner_escena(val texto nombre): nulo {
+    _escena = nombre
+    _nueva = verdadero
+    _desde = juego.tiempo()
+}
+
+# cambiar_escena(nombre[, fundido]): fundido en segundos (0 = de golpe)
+funcion cambiar_escena(val cualquiera nombre, val cualquiera fundido = 0): nulo {
+    si no juego.abierto() { lanzar Error("la ventana no está abierta: llama a juego.abrir() primero") }
+    si no (nombre es texto) { lanzar ErrorTipo("cambiar_escena() espera (nombre[, segundos de fundido])") }
+    si no (fundido es numero) { lanzar ErrorTipo("cambiar_escena(): el argumento 2 debe ser un número") }
+    si _escena == "" y fundido <= 0 {        # la primera escena empieza ya
+        _poner_escena(nombre)
+        devolver nulo
+    }
+    _siguiente = nombre
+    _fundido = si fundido > 0 { fundido } sino { 0 }
+    si fundido > 0 y _fase != 1 {
+        _fase = 1
+        _desde_fase = juego.tiempo_real()
+    }
+}
+
+funcion escena(): texto { devolver _escena }
+funcion escena_nueva(): logico { devolver _nueva }
+funcion tiempo_escena(): numero { devolver juego.tiempo() - _desde }
+
+# En cada presentar(), después de las tareas: hace el cambio pendiente y
+# dibuja el fundido encima de todo
+funcion _presentar(): nulo {
+    _nueva = falso
+    si _siguiente != nulo y _fase != 1 {
+        _poner_escena(_siguiente)
+        _siguiente = nulo
+    }
+    si _fase == 0 { devolver nulo }
+    sea ahora = juego.tiempo_real()
+    sea mitad = _fundido / 2
+    sea p = si mitad > 0 { (ahora - _desde_fase) / mitad } sino { 1 }
+    si _fase == 1 y p >= 1 {                 # a oscuras: cambia y empieza a aclarar
+        si _siguiente != nulo {
+            _poner_escena(_siguiente)
+            _siguiente = nulo
+        }
+        _fase = 2
+        _desde_fase = ahora
+        p = 0
+    } sino si _fase == 2 y p >= 1 {
+        _fase = 0
+        devolver nulo
+    }
+    sea alfa = si _fase == 1 { p } sino { 1 - p }
+    juego.cubrir([0, 0, 0, matematica.limitar(alfa, 0, 1) * 255])
 }

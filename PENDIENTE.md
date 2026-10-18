@@ -12,7 +12,6 @@ repensarlo cada vez. Las ideas para el editor visual van en
     - que tengan valores propios;
     - recorrerlas con `para cada`;
     - que `elegir` avise de un caso que falta: añadir `Estado.Agarrado` y que Lince diga dónde se ha olvidado.
-- [ ] **`mi.x++` y `lista[i]++`** dan «Sentencia no reconocida». `i++` solo vale con una variable; hoy hay que escribir `mi.x += 1`.
 - [ ] **Guardar un generador en una variable.**
   - `sea g = contar(5)` deja `g` en `nulo`, porque copiar un generador da `nulo`.
   - Solo se puede recorrer directamente: `para cada x en contar(5)`.
@@ -24,7 +23,6 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 La lógica de juego reutilizable va escrita en Lince, en `src/lince/juego.lince`, encima de primitivas pequeñas en C: es lo que aporta Lince.
 
-- [ ] **Escenas en Lince.** Ahora que hay tareas, el fundido podría ser una tarea que dibuja cada fotograma, en vez de código C dentro de `presentar()`.
 - [ ] **Animador en Lince.** Está atado a las hojas y a la recarga en caliente de C; habría que separar qué parte es lógica y cuál es dibujo.
 
 ## Rendimiento
@@ -39,7 +37,14 @@ La lógica de juego reutilizable va escrita en Lince, en `src/lince/juego.lince`
 
 ## Plataformas
 
-- [ ] **Android** (en estudio): que un juego de Lince se pueda instalar en un móvil.
+- [ ] **Android** (aplazado): que un juego de Lince se pueda instalar en un móvil. Lo que haría falta:
+  - **Táctil:** `juego.toques()` y botones en pantalla para las acciones. También se podría probar en el ordenador con el ratón.
+  - **Archivos:** leer las imágenes y los sonidos desde dentro del `.apk`, a través de SDL.
+  - **Pila de las tareas:** cambiarla a mano para ARM y x86, porque Android no trae `swapcontext`.
+  - **Ciclo de vida:** pausar el juego al salir de la app y seguir al volver.
+  - **Pantallas:** distintos tamaños y orientación.
+  - **El `.apk`:** un «Lince para Android» hecho una vez en la CI, y `lince repartir --android` que mete el juego dentro y lo firma.
+  - **Pruebas:** el autor, en un móvil de verdad.
 
 ## Decisiones ya tomadas
 
@@ -54,4 +59,5 @@ La lógica de juego reutilizable va escrita en Lince, en `src/lince/juego.lince`
 - **Palabras reservadas que no pueden ser nombres:** entre otras, `y`, `o`, `no`, `lista`, `mi`, `caso`, `otro`, `romper` y `continuar`.
   - Por eso no vale `sea [x, y] = ...`.
   - `en`, `cualquiera`, `tarea`, `es`, `como`, `obtener`, `fijar`, etc. solo cuentan en su sitio.
-- **Escenas y animador se quedan en C de momento** (ver arriba).
+- **Ya están en Lince** los combos, `mantenida`, `pulsaciones`, las curvas, `suavizar`, `acercar` y las escenas. `presentar()` llama en cada fotograma a `_presentar()` de la biblioteca, y las variables de la biblioteca se conservan al recargar en caliente.
+- **El animador se queda en C de momento** (ver arriba).

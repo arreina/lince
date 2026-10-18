@@ -229,10 +229,6 @@ static struct {
         int activa, canales;
         float vol;
     } flujo;
-    /* escenas: la actual, la que viene (se cambia en presentar()) y el fundido */
-    char escena[64], siguiente[64];
-    int hay_siguiente, escena_nueva, fase;   /* fase 1: oscurece; 2: aclara */
-    double t_escena, t_fundido, fundido;
     double t_vigilar;                    /* última comprobación de archivos cambiados */
     /* el reloj del juego: avanza con dt, que se para con congelar() y va más
        lento o más rápido con velocidad() (las escenas van con el reloj de verdad) */
@@ -271,7 +267,6 @@ static int jg_vigilar(void);
 static double jg_reloj(void);
 static double jg_reloj_real(void);
 static void jg_historial(void);
-static void jg_escenas(void);
 static void jg_aviso_error(const char *msg, int pantalla);
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
@@ -921,12 +916,13 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     JG_ABIERTA();
     int recargar = recarga_activa() && jg_vigilar();
     /* Las tareas siguen una vez por fotograma, antes de mostrarlo: así lo que
-       dibujen sale en este fotograma (y debajo del fundido de las escenas) */
+       dibujen sale en este fotograma. Luego lo de juego.lince que va en cada
+       fotograma (las escenas y su fundido, que queda encima de todo). */
     if (!recargar) {
         interprete_avanzar_tareas();
+        if (!hay_error) valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_presentar", NULL, 0));
         if (hay_error) return valor_nulo();
     }
-    jg_escenas();
     if (recarga_error()) jg_aviso_error(recarga_error(), 0);
     if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))
         jg_guardar_bmp(getenv("LINCE_JUEGO_CAPTURA"));      /* prueba: guarda el último fotograma */
@@ -4790,62 +4786,26 @@ static Valor *fn_jg_borrar_particulas(Valor **a, int n) {
     return valor_nulo();
 }
 
-/* ── Escenas ──
-   Un nombre para cada parte del juego ("menu", "partida", "fin"...). El cambio
-   se hace en el siguiente presentar(), así un fotograma no mezcla dos escenas;
-   con fundido, la pantalla se oscurece, cambia y se aclara. */
-static void jg_poner_escena(const char *nombre) {
-    snprintf(_jgs.escena, sizeof _jgs.escena, "%s", nombre);
-    _jgs.escena_nueva = 1;
-    _jgs.t_escena = jg_reloj();
-}
+/* ── Escenas ── están escritas en Lince (src/lince/juego.lince). Lo que
+   usan de aquí también sirve para un juego: cubrir() para oscurecer la pantalla
+   (una pausa, un fundido) y tiempo_real(). */
 
-/* cambiar_escena(nombre[, fundido]): fundido en segundos (0 = de golpe) */
-static Valor *fn_jg_cambiar_escena(Valor **a, int n) {
+/* cubrir(color): toda la ventana de ese color (con alfa, encima de lo dibujado),
+   sin cámara ni temblor */
+static Valor *fn_jg_cubrir(Valor **a, int n) {
     JG_ABIERTA();
-    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "cambiar_escena() espera (nombre[, segundos de fundido])");
-    double f = 0;
-    if (n > 1 && !jg_num(a, n, 1, &f, "cambiar_escena")) return valor_nulo();
-    if (!_jgs.escena[0] && f <= 0) {                       /* la primera escena empieza ya */
-        jg_poner_escena(a[0]->texto);
-        return valor_nulo();
-    }
-    snprintf(_jgs.siguiente, sizeof _jgs.siguiente, "%s", a[0]->texto);
-    _jgs.hay_siguiente = 1;
-    _jgs.fundido = f > 0 ? f : 0;
-    if (f > 0 && _jgs.fase != 1) { _jgs.fase = 1; _jgs.t_fundido = jg_reloj_real(); }
+    unsigned char c[4] = {0, 0, 0, 255};
+    if (n < 1) return jg_error("ErrorArgumento", "cubrir() espera un color, por ejemplo [0, 0, 0, 128]");
+    if (!jg_color(a, n, 0, c)) return valor_nulo();
+    jg_pintar(c);
+    JgRect r = {0, 0, _jgs.ancho, _jgs.alto};
+    _jg.FillRect(_jgs.render, &r);
     return valor_nulo();
 }
 
-static Valor *fn_jg_escena(Valor **a, int n)        { (void)a; (void)n; return valor_texto(_jgs.escena); }
-static Valor *fn_jg_escena_nueva(Valor **a, int n)  { (void)a; (void)n; return valor_booleano(_jgs.escena_nueva); }
-static Valor *fn_jg_tiempo_escena(Valor **a, int n) { (void)a; (void)n; return valor_numero(jg_reloj() - _jgs.t_escena); }
-
-/* En presentar(): hace el cambio pendiente y dibuja el fundido */
-static void jg_escenas(void) {
-    _jgs.escena_nueva = 0;
-    double ahora = jg_reloj_real();           /* el fundido no se para con congelar() */
-    if (_jgs.hay_siguiente && _jgs.fase != 1) {
-        _jgs.hay_siguiente = 0;
-        jg_poner_escena(_jgs.siguiente);
-    }
-    if (!_jgs.fase) return;
-    double mitad = _jgs.fundido / 2, p = mitad > 0 ? (ahora - _jgs.t_fundido) / mitad : 1;
-    if (_jgs.fase == 1 && p >= 1) {                        /* a oscuras: cambia y empieza a aclarar */
-        if (_jgs.hay_siguiente) { _jgs.hay_siguiente = 0; jg_poner_escena(_jgs.siguiente); }
-        _jgs.fase = 2;
-        _jgs.t_fundido = ahora;
-        p = 0;
-    } else if (_jgs.fase == 2 && p >= 1) {
-        _jgs.fase = 0;
-        return;
-    }
-    double alfa = _jgs.fase == 1 ? p : 1 - p;
-    unsigned char negro[4] = {0, 0, 0, (unsigned char)(alfa < 0 ? 0 : alfa > 1 ? 255 : alfa * 255)};
-    jg_pintar(negro);
-    JgRect r = {0, 0, _jgs.ancho, _jgs.alto};
-    _jg.FillRect(_jgs.render, &r);
-}
+/* tiempo_real(): segundos desde que se abrió la ventana, sin parar con
+   congelar() ni ir más despacio con velocidad() */
+static Valor *fn_jg_tiempo_real(Valor **a, int n) { (void)a; (void)n; return valor_numero(jg_reloj_real()); }
 
 /* ── Efectos de sonido generados ──
    Un sintetizador pequeño al estilo de los juegos de 8 bits: una onda cuya
@@ -5581,10 +5541,8 @@ static void cargar_juego(Entorno *entorno) {
         {"particulas",      fn_jg_particulas,      -1},
         {"dibujar_particulas", fn_jg_dibujar_particulas, 0},
         {"borrar_particulas", fn_jg_borrar_particulas, 0},
-        {"cambiar_escena",  fn_jg_cambiar_escena,  -1},
-        {"escena",          fn_jg_escena,           0},
-        {"escena_nueva",    fn_jg_escena_nueva,     0},
-        {"tiempo_escena",   fn_jg_tiempo_escena,    0},
+        {"cubrir",          fn_jg_cubrir,          -1},
+        {"tiempo_real",     fn_jg_tiempo_real,      0},
         {"mapa",            fn_jg_mapa,            -1},
         {"efecto",          fn_jg_efecto,          -1},
         {"crear_efecto",    fn_jg_crear_efecto,    -1},
@@ -5604,6 +5562,6 @@ static void cargar_juego(Entorno *entorno) {
     registrar_modulo_diccionario(entorno, "juego",
         fns, (int)(sizeof(fns) / sizeof(fns[0])), NULL, NULL, 0);
     /* Y lo que está escrito en Lince: combo, pulsaciones, mantenida, curva,
-       suavizar y acercar */
+       suavizar, acercar y las escenas */
     interprete_biblioteca(entorno, "juego", BIBLIOTECA_JUEGO);
 }

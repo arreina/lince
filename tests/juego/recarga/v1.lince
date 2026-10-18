@@ -8,6 +8,7 @@ clase Bicho {
 }
 sea bicho = Bicho()
 juego.abrir("Recarga 1", 120, 80)
+juego.cambiar_escena("cueva")
 mientras juego.abierto() {
     cuenta = cuenta + 1
     si cuenta == 3 { archivos.escribir("juego.lince", archivos.leer("v_rota.lince")) }
