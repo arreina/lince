@@ -468,7 +468,7 @@ done
 grep -qF 'un botón en la pantalla es "pantalla:x,y,ancho,alto"' salida20.txt && ok "táctil: error de un botón mal escrito" || mal "falta el error de pantalla:"
 # ── Mando en la pantalla táctil (el clic de prueba encima del botón A) ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 LINCE_JUEGO_CLIC=388,214 timeout 20 "$LINCE" "$DIR/prueba16.lince" > salida21.txt 2>&1
-for l in "saltos: 5, con boton(): 5" "palanca: 0" "eje limitado: 1"; do
+for l in 'acciones: {"saltar": ["espacio", "mando:a"]}' "saltos: 5, con boton(): 5" "palanca: 0" "eje limitado: 1"; do
     grep -qxF "$l" salida21.txt && ok "mando táctil: $l" || mal "falta la línea: $l"
 done
 grep -qF 'no conozco '"'"'boton'"'" salida21.txt && grep -qF '"botones" es una lista' salida21.txt && ok "mando táctil: errores de opciones" || mal "faltan los errores de mando_tactil"

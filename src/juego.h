@@ -158,7 +158,7 @@ typedef struct { char tipo; int codigo, mando, signo; float x, y, w, h; } JgEntr
 typedef struct { long long id; float x, y; } JgToque;
 /* desde: cuándo se empezó a pulsar (-1: no está pulsada); soltada: cuándo se
    soltó la última vez, tras 'duro' segundos pulsada (para mantenida()) */
-typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; int n; double desde, soltada, duro; } JgAccion;
+typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; char *textos[JG_ENTRADAS]; int n; double desde, soltada, duro; } JgAccion;
 
 /* Mapa de casillas: un carácter ASCII por casilla, fila a fila */
 typedef struct {
@@ -553,6 +553,10 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     if (_jgs.abierta) return jg_error("Error", "la ventana ya está abierta");
     if (!jg_cargar())
         return jg_error("ErrorJuego", "no se encuentra SDL2: instálala (por ejemplo 'sudo apt install libsdl2-2.0-0')");
+#ifdef __ANDROID__
+    /* en el móvil, el acelerómetro no es un mando (sí los de Bluetooth o cable) */
+    if (_jg.SetHint) _jg.SetHint("SDL_ACCELEROMETER_AS_JOYSTICK", "0");
+#endif
     /* vídeo, y si se puede audio y mandos (0x10 audio, 0x200 joystick, 0x2000 mando) */
     if (_jg.Init(0x20 | 0x10 | 0x200 | 0x2000) != 0 && _jg.Init(0x20 | 0x10) != 0 && _jg.Init(0x20) != 0) {
         char msg[400];
@@ -4398,8 +4402,10 @@ static Valor *fn_jg_definir_accion(Valor **a, int n) {
         if (!jg_entrada(v->texto, &nueva.e[nueva.n], msg, sizeof msg)) {
             char m2[400];
             snprintf(m2, sizeof m2, "definir_accion(\"%s\"): %s", a[0]->texto, msg);
+            for (int k = 0; k < nueva.n; k++) free(nueva.textos[k]);
             return jg_error("Error", m2);
         }
+        nueva.textos[nueva.n] = strdup(v->texto);
         nueva.n++;
     }
     JgAccion *acc = jg_buscar_accion(a[0]->texto);
@@ -4411,7 +4417,23 @@ static Valor *fn_jg_definir_accion(Valor **a, int n) {
     }
     nueva.nombre = acc->nombre;
     nueva.desde = acc->desde; nueva.soltada = acc->soltada; nueva.duro = acc->duro;   /* se puede redefinir sin perder la carga */
+    for (int k = 0; k < acc->n; k++) free(acc->textos[k]);
     *acc = nueva;
+    return valor_nulo();
+}
+
+/* acciones() -> {nombre: [entradas]}: las acciones definidas, con sus entradas
+   tal como se escribieron (para enseñar los controles, o para el mando de la
+   pantalla táctil, que pone los botones que se usan) */
+static Valor *fn_jg_acciones(Valor **a, int n) {
+    (void)a; (void)n;
+    Valor *d = valor_diccionario_crear();
+    for (int i = 0; i < _jgs.nacciones; i++) {
+        Valor *l = valor_lista_crear();
+        for (int k = 0; k < _jgs.acciones[i].n; k++) lista_agregar(l, valor_texto(_jgs.acciones[i].textos[k]));
+        valor_diccionario_agregar(d, _jgs.acciones[i].nombre, l);
+    }
+    return d;
     return valor_nulo();
 }
 
@@ -5495,6 +5517,7 @@ static void cargar_juego(Entorno *entorno) {
         {"capturar_raton",  fn_jg_capturar_raton,   1},
         {"movimiento_raton", fn_jg_movimiento_raton, 0},
         {"toques",          fn_jg_toques,           0},
+        {"acciones",        fn_jg_acciones,         0},
         {"mando_virtual",   fn_jg_mando_virtual,    2},
         {"posicion_camara", fn_jg_posicion_camara,  0},
         {"tactil",          fn_jg_tactil,           0},

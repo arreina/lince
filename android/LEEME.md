@@ -47,11 +47,14 @@ errores) se ve con `adb logcat -s lince`.
 
 - **Pantalla**: el juego ocupa toda la pantalla, escalado sin deformarse (con
   bandas si hace falta). Si es más ancho que alto, el móvil se pone de lado.
-- **Mando en la pantalla**: `juego.mando_tactil()` pone una palanca (aparece
-  donde se apoya el pulgar izquierdo) y los botones A, B (y X, Y si se piden)
-  como en los juegos de móvil. Funciona como un mando de verdad: un juego hecho
-  con acciones `"mando:..."` se juega igual con el teclado, con un mando y con
-  el dedo.
+- **Mando en la pantalla**: si el juego usa acciones con `"mando:..."`, sale solo
+  un mando como el de los juegos de móvil: una palanca que aparece donde se
+  apoya el pulgar izquierdo y, a la derecha, los botones que usan las acciones
+  (A, B, X, Y, e inicio arriba). Un juego hecho para teclado y mando se juega
+  en el móvil sin cambiar nada. Se ajusta o se quita con `juego.mando_tactil()`.
+- **Mandos Bluetooth**: funcionan como en el ordenador (los lee SDL2), también
+  si se conectan con el juego en marcha. Mientras haya uno conectado, el mando
+  de la pantalla se esconde.
 - **Táctil**: `juego.toques()` da los dedos que hay en la pantalla (un toque
   rápido cuenta al menos un fotograma), y una acción puede tener botones propios
   en la pantalla: `"pantalla:x,y,ancho,alto"`. El primer dedo también mueve el

@@ -2,9 +2,10 @@
 #
 # Para probar Lince en un móvil Android (android/construir.sh), y también en
 # el ordenador. Se juega con un mando en la pantalla, como los juegos de móvil:
-# la palanca aparece donde se pone el pulgar izquierdo y el botón A salta (en
-# el ordenador, con el ratón, que cuenta como un dedo; o con las flechas y el
-# espacio, o con un mando). Cada dedo en la pantalla se ve como un círculo con
+# la palanca aparece donde se pone el pulgar izquierdo, A salta y B corre (en
+# el ordenador, con el ratón, que cuenta como un dedo; o con las flechas,
+# espacio y Mayús, o con un mando). El mando de la pantalla sale solo, con los
+# botones que usan las acciones. Cada dedo en la pantalla se ve como un círculo con
 # su número. Una estrella parpadea con una tarea, y el juego cuenta en un
 # archivo cuántas veces se ha abierto. El botón «atrás» del móvil (o Esc) sale.
 #
@@ -23,7 +24,8 @@ juego.abrir("Lince en el móvil", ANCHO, ALTO, {"escala": 2})
 juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
 juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
 juego.definir_accion("saltar", ["espacio", "arriba", "mando:a"])
-juego.mando_tactil({"botones": ["a", "b"], "siempre": verdadero})
+juego.definir_accion("correr", ["mayus", "mando:b"])
+juego.mando_tactil({"siempre": verdadero})        # en el móvil sale solo; así también en el ordenador
 juego.definir_accion("salir", ["escape"])
 
 fijo LINCE = juego.sprite([
@@ -67,7 +69,8 @@ mientras juego.abierto() {
     si juego.accion_pulsada("salir") { juego.salir() }
     sea dt = juego.dt()
     sea direccion = juego.direccion("izquierda", "derecha")
-    px = matematica.limitar(px + direccion * 160 * dt, 20, ANCHO - 20)
+    sea rapidez = si juego.accion("correr") { 300 } sino { 160 }
+    px = matematica.limitar(px + direccion * rapidez * dt, 20, ANCHO - 20)
     si direccion < 0 { mira_izquierda = verdadero }
     si direccion > 0 { mira_izquierda = falso }
     si juego.accion_pulsada("saltar") y py >= SUELO {
@@ -93,6 +96,6 @@ mientras juego.abierto() {
         juego.texto(a_texto(t["id"] % 100), t["x"] - 4, t["y"] - 4, 1, [255, 255, 255])
     }
     juego.texto("DEDOS: {dedos.longitud()} - PALANCA: {matematica.redondear(juego.eje("izq_x") * 10) / 10}" +
-                "{si juego.boton("b") { " - B" } sino { "" }}", 12, 56, 1, [220, 220, 230])
+                "{si juego.accion("correr") { " - CORRE" } sino { "" }}", 12, 56, 1, [220, 220, 230])
     juego.presentar()
 }

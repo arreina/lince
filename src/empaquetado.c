@@ -70,6 +70,9 @@ static int repartir_carga(const unsigned char *carga, uint64_t largo) {
     size_t pos = 0;
     if (largo < 4) return 0;
     int n = (int)leer_u32(carga); pos = 4;
+    for (int i = 0; i < _num_entradas; i++) { free(_entradas[i].clave); free(_entradas[i].contenido); }
+    free(_entradas);
+    _num_entradas = 0;
     _entradas = calloc((size_t)n + 1, sizeof(Entrada));
     for (int i = 0; i < n; i++) {
         if (pos + 4 > largo) break;
