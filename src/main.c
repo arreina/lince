@@ -109,6 +109,7 @@ static int ejecutar_recargable(const char *archivo) {
         Parser     *parser   = parser_crear(tokens, cantidad);
         Nodo       *programa = parser_parsear(parser);
         Interprete *interp   = interprete_crear();
+        lsp_conocer_importados(parser, codigo, archivo);
         parser_avisos(parser, avisar);
 
         /* Para resolver los 'importar "./x"' junto a este fichero */
@@ -170,6 +171,8 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         char   *codigo = leer_archivo(argv[2]);
+        /* El editor puede pasar la ruta de verdad si comprueba una copia */
+        lsp_fijar_ruta(argc > 3 ? argv[3] : argv[2]);
         lsp_analizar(codigo);            /* termina el proceso si hay un error */
         printf("✅ Sintaxis correcta: %s\n", argv[2]);
         return 0;

@@ -118,4 +118,9 @@ escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n}\n"))
 escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n caso E.C \{ }\n}\n"))
 escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n otro \{ }\n}\n"))
 escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n caso E.B \{ }\n caso E.C \{ }\n}\n"))
+# También con las enumeraciones de un archivo importado
+fijo TMP_IMP = "test_enumeraciones_tmp_imp.lince"
+archivos.escribir(TMP_IMP, "# estados\nenumeracion Fase \{\n    Uno = [1, 2]\n    Dos, Tres\n}\n")
+escribir(avisos("importar \"./test_enumeraciones_tmp_imp\"\nsea f = Fase.Uno\nelegir f \{\n caso Fase.Dos \{ }\n}\n"))
+archivos.eliminar(TMP_IMP)
 archivos.eliminar(TMP)

@@ -6,6 +6,9 @@
 #ifndef LINCE_LSP_H
 #define LINCE_LSP_H
 
+#include <stddef.h>
+#include "parser.h"
+
 /* Atiende peticiones hasta 'exit' o fin de la entrada. Devuelve el código de salida. */
 int lsp_servir(void);
 
@@ -14,6 +17,12 @@ int lsp_servir(void);
    el parser termina el proceso al primer error. */
 /* Léxico + sintaxis de un texto; si hay un error, termina el proceso con él. */
 void lsp_analizar(const char *texto);
+/* El archivo de lo que se analiza, para seguir sus 'importar "./x"' */
+void lsp_fijar_ruta(const char *ruta);
+/* Apunta en 'p' las enumeraciones de los archivos que importa 'texto' (que
+   está en 'ruta'), para el aviso de un 'elegir' incompleto */
+void lsp_conocer_importados(Parser *p, const char *texto, const char *ruta);
+
 int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max);
 
 #endif

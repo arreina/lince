@@ -164,6 +164,19 @@ funcion aplicar(val numero x, val funcion f): numero { devolver f(x) }
 escribir(aplicar(5, doble))  # 10
 ```
 
+Se puede llamar a cualquier cosa que dé una función, no solo a un nombre: una lista de
+ataques, un diccionario de acciones, lo que devuelve otra función o un campo de un objeto.
+
+```lince
+golpes[i](fuerza)
+acciones["saltar"]()
+sumador(2)(3)
+enemigo.al_morir()          # una función guardada en el campo (si la clase no tiene ese método)
+```
+
+El `(` va en la misma línea que lo que se llama: uno al principio de la línea siguiente
+empieza otra expresión.
+
 ### Asignación compuesta
 
 `+=`, `-=`, `*=`, `/=` y `%=` operan y guardan en un solo paso, en
@@ -688,7 +701,8 @@ para cada Direccion dir en Direccion {
 - Como clave de un diccionario cuenta su texto: `veces[Estado.Quieto] = 1` es la clave
   `"Estado.Quieto"`
 - **Aviso de `elegir`**: si un `elegir` sin `otro` tiene todos sus casos de la misma
-  enumeración (declarada en el mismo archivo) pero le faltan valores, Lince avisa al empezar,
+  enumeración (del mismo archivo o de uno importado con `importar "./..."`) pero le faltan
+  valores, Lince avisa al empezar,
   con `lince comprobar` y en el editor. Lo normal es que se haya añadido un valor y se haya
   olvidado ahí:
 

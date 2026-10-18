@@ -20,6 +20,45 @@
 #include "lsp.h"
 #include "lexer.h"
 #include "parser.h"
+#include "interprete.h"
+
+static const char *_ruta_analizada = NULL;   /* ver lsp_fijar_ruta */
+
+/* ── Las enumeraciones de los archivos importados ('importar "./x"'), para
+   el aviso de un 'elegir' incompleto. Se siguen también sus importaciones. */
+typedef struct { Parser *p; char vistos[16][1024]; int nvistos; int nivel; char desde[1024]; } Importados;
+
+static void seguir_import(const char *nombre, void *ctx) {
+    Importados *im = ctx;
+    if (strncmp(nombre, "./", 2) != 0 && strncmp(nombre, "../", 3) != 0) return;
+    char ruta[1024];
+    if (im->nivel >= 8 || im->nvistos >= 16 || !interprete_resolver_import(im->desde, nombre, ruta, sizeof ruta)) return;
+    for (int i = 0; i < im->nvistos; i++) if (strcmp(im->vistos[i], ruta) == 0) return;
+    snprintf(im->vistos[im->nvistos++], sizeof im->vistos[0], "%s", ruta);
+    char *texto = interprete_leer_fuente(ruta);
+    if (!texto) return;
+    char desde[1024];
+    memcpy(desde, im->desde, sizeof desde);
+    snprintf(im->desde, sizeof im->desde, "%s", ruta);
+    im->nivel++;
+    parser_conocer_enumeraciones(im->p, texto, seguir_import, im);
+    im->nivel--;
+    memcpy(im->desde, desde, sizeof desde);
+    free(texto);
+}
+
+void lsp_conocer_importados(Parser *p, const char *texto, const char *ruta) {
+    if (!ruta || !ruta[0]) return;
+    Importados *im = calloc(1, sizeof(Importados));
+    im->p = p;
+    snprintf(im->desde, sizeof im->desde, "%s", ruta);
+    /* Del archivo principal interesan sus 'importar' (sus enumeraciones las
+       vuelve a apuntar, pero ya estaban: se usa la primera) */
+    parser_conocer_enumeraciones(p, texto, seguir_import, im);
+    free(im);
+}
+
+void lsp_fijar_ruta(const char *ruta) { _ruta_analizada = ruta; }
 
 static void avisar_stderr(int linea, const char *mensaje) {
     fprintf(stderr, "⚠️  Aviso en línea %d: %s\n", linea, mensaje);
@@ -31,6 +70,7 @@ void lsp_analizar(const char *texto) {
     Token  *t = lexer_tokenizar(l, &n);
     Parser *p = parser_crear(t, n);
     parser_parsear(p);         /* termina el proceso si hay un error */
+    lsp_conocer_importados(p, texto, _ruta_analizada);
     parser_avisos(p, avisar_stderr);
     fflush(stderr);
 }
@@ -73,7 +113,8 @@ static int analizar_aparte(const char *texto, char *buf, size_t max) {
     HANDLE nulo = CreateFileA("NUL", GENERIC_WRITE, FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, NULL);
 
     char cmd[3 * MAX_PATH];
-    snprintf(cmd, sizeof cmd, "\"%s\" comprobar \"%s\"", exe, tmp);
+    if (_ruta_analizada) snprintf(cmd, sizeof cmd, "\"%s\" comprobar \"%s\" \"%s\"", exe, tmp, _ruta_analizada);
+    else snprintf(cmd, sizeof cmd, "\"%s\" comprobar \"%s\"", exe, tmp);
     STARTUPINFOA si;
     PROCESS_INFORMATION pi;
     memset(&si, 0, sizeof si);
@@ -709,7 +750,11 @@ static void publicar_diagnosticos(const char *uri, const char *texto) {
     buf_json(&b, uri);
     buf_str(&b, ",\"diagnostics\":[");
     buf[0] = '\0';
+    char *ruta = uri_a_ruta(uri);
+    lsp_fijar_ruta(ruta);
     int error = analizar_aparte(texto, buf, sizeof buf);
+    lsp_fijar_ruta(NULL);
+    free(ruta);
     quitar_retornos(buf);
     if (error) {
         leer_error(buf, &linea, msg, sizeof msg);

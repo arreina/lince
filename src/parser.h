@@ -239,6 +239,7 @@ struct Nodo {
             char  *nombre;
             Nodo **argumentos;
             int    num_argumentos;
+            Nodo  *funcion;     /* lista[0](1), (f)(1)...: lo que se llama, si no es un nombre */
         } llamada;
 
         /* NODO_DEVOLVER */
@@ -399,6 +400,8 @@ typedef struct {
     int    tarea;    /* la función que viene es una tarea: el tipo de retorno es opcional */
     Nodo **enums, **elegires;   /* para parser_avisos */
     int    nenums, nelegires;
+    Nodo **enums_fuera;         /* las de otros archivos (son suyas) */
+    int    nenums_fuera;
 } Parser;
 
 /* ─────────────────────────────────────────
@@ -410,6 +413,10 @@ Nodo   *parser_parsear(Parser *p);
 /* Avisos de lo ya leído que no es un error pero casi seguro es un descuido
    (un 'elegir' al que le faltan valores de una enumeración) */
 void    parser_avisos(Parser *p, void (*avisar)(int linea, const char *mensaje));
+/* Apunta las enumeraciones del texto de otro archivo (uno importado), para
+   esos avisos, y llama a 'importa' con cada 'importar "..."' que lleve */
+void    parser_conocer_enumeraciones(Parser *p, const char *texto,
+                                     void (*importa)(const char *nombre, void *ctx), void *ctx);
 void    nodo_destruir(Nodo *n);
 void    nodo_imprimir(Nodo *n, int nivel);
 

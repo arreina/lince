@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "parser.h"
 
 /* ─────────────────────────────────────────
@@ -183,6 +184,31 @@ static Nodo *postfijo(Parser *p, Nodo *base) {
             n->metodo.num_argumentos = nargs;
             free(base->acceso.campo);
             free(base);
+            base = n;
+            continue;
+        }
+
+        /* Llamar a lo que ha salido: lista[0](1), (f)(1), f(1)(2). Solo en la
+           misma línea: un '(' al principio de la siguiente es otra cosa */
+        if (coincide(p, TOK_PAREN_IZQ) && p->pos > 0 &&
+            p->tokens[p->pos - 1].linea == actual(p)->linea) {
+            consumir(p, TOK_PAREN_IZQ, "'('");
+            int cap = 8;
+            Nodo **args = malloc(sizeof(Nodo*) * cap);
+            int    nargs = 0;
+            if (!coincide(p, TOK_PAREN_DER)) {
+                do {
+                    if (nargs > 0) consumir(p, TOK_COMA, "','");
+                    if (nargs == cap) args = realloc(args, sizeof(Nodo*) * (cap *= 2));
+                    args[nargs++] = expresion(p);
+                } while (coincide(p, TOK_COMA));
+            }
+            consumir(p, TOK_PAREN_DER, "')'");
+            Nodo *n = nodo_nuevo(NODO_LLAMADA, p);
+            n->llamada.nombre         = strdup("(sin nombre)");
+            n->llamada.argumentos     = args;
+            n->llamada.num_argumentos = nargs;
+            n->llamada.funcion        = base;
             base = n;
             continue;
         }
@@ -465,7 +491,9 @@ static Nodo *primario(Parser *p) {
         char *nombre = strdup(t->valor);
         consumir_cualquiera(p);
 
-        if (coincide(p, TOK_PAREN_IZQ)) {
+        /* f(...) con el '(' en la misma línea: uno al principio de la
+           siguiente empieza otra cosa */
+        if (coincide(p, TOK_PAREN_IZQ) && actual(p)->linea == t->linea) {
             consumir(p, TOK_PAREN_IZQ, "'('");
             Nodo **args = malloc(sizeof(Nodo*) * 64);
             int num_args = 0;
@@ -1584,8 +1612,9 @@ static Nodo *sentencia_interna(Parser *p) {
         }
     }
 
-    /* Fallback: cualquier expresión puede ser sentencia (llamadas a métodos, etc.) */
-    if (coincide(p, TOK_IDENTIFICADOR)) {
+    /* Fallback: cualquier expresión puede ser sentencia (llamadas a métodos,
+       (tarea() { ... })(), etc.) */
+    if (coincide(p, TOK_IDENTIFICADOR) || coincide(p, TOK_PAREN_IZQ)) {
         Nodo *expr = expresion(p);
         return expr;
     }
@@ -1612,12 +1641,126 @@ Parser *parser_crear(Token *tokens, int cantidad) {
     p->pos      = 0;
     p->bucles   = 0;
     p->tarea    = 0;
-    p->enums    = p->elegires = NULL;
-    p->nenums   = p->nelegires = 0;
+    p->enums    = p->elegires = p->enums_fuera = NULL;
+    p->nenums   = p->nelegires = p->nenums_fuera = 0;
     return p;
 }
 
+/* ── Enumeraciones de otros archivos ──
+   Para el aviso de 'elegir': las enumeraciones de un archivo importado se
+   leen de su texto con este escáner sencillo (el lexer termina el proceso si
+   ese archivo tiene un error, y aquí no se puede). */
+static int ch_ident(unsigned char c) { return isalnum(c) || c == '_' || c >= 0x80; }
+
+static const char *saltar_blancos(const char *s) {
+    for (;;) {
+        while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
+        if (*s != '#') return s;
+        while (*s && *s != '\n') s++;
+    }
+}
+
+static const char *saltar_texto(const char *s) {       /* s en la comilla de apertura */
+    for (s++; *s && *s != '"'; s++) if (*s == '\\' && s[1]) s++;
+    return *s ? s + 1 : s;
+}
+
+/* Un trozo de expresión: lo que va entre corchetes, llaves o paréntesis, un
+   texto, o una palabra o número (con '.' y '-' dentro) */
+static const char *saltar_termino(const char *s) {
+    s = saltar_blancos(s);
+    if (*s == '"') return saltar_texto(s);
+    if (*s == '[' || *s == '{' || *s == '(') {
+        int prof = 0;
+        while (*s) {
+            if (*s == '"') { s = saltar_texto(s); continue; }
+            if (*s == '[' || *s == '{' || *s == '(') prof++;
+            else if (*s == ']' || *s == '}' || *s == ')') { if (--prof == 0) return s + 1; }
+            s++;
+        }
+        return s;
+    }
+    if (*s == '-') s++;
+    while (ch_ident((unsigned char)*s) || *s == '.') s++;
+    return s;
+}
+
+void parser_conocer_enumeraciones(Parser *p, const char *texto,
+                                  void (*importa)(const char *nombre, void *ctx), void *ctx) {
+    const char *s = texto;
+    while (*s) {
+        if (*s == '#') { while (*s && *s != '\n') s++; continue; }
+        if (*s == '"') { s = saltar_texto(s); continue; }
+        if (!ch_ident((unsigned char)*s)) { s++; continue; }
+        const char *w = s;
+        while (ch_ident((unsigned char)*s)) s++;
+        size_t lw = (size_t)(s - w);
+        if (lw == 8 && strncmp(w, "importar", 8) == 0 && importa) {
+            const char *q = saltar_blancos(s);
+            if (*q == '"') {
+                const char *fin = saltar_texto(q);
+                size_t l = (size_t)(fin - q) - 2;
+                char *nombre = malloc(l + 1);
+                memcpy(nombre, q + 1, l);
+                nombre[l] = '\0';
+                importa(nombre, ctx);
+                free(nombre);
+                s = fin;
+            }
+            continue;
+        }
+        if (lw != 11 || strncmp(w, "enumeracion", 11) != 0 || (w > texto && ch_ident((unsigned char)w[-1]))) continue;
+        const char *q = saltar_blancos(s), *nom = q;
+        while (ch_ident((unsigned char)*q)) q++;
+        size_t ln = (size_t)(q - nom);
+        q = saltar_blancos(q);
+        if (!ln || *q != '{') continue;
+        q++;
+        int cap = 16, num = 0;
+        char **valores = malloc(sizeof(char*) * cap);
+        for (;;) {
+            q = saltar_blancos(q);
+            if (*q == ',') { q++; continue; }
+            if (!ch_ident((unsigned char)*q)) break;            /* '}' o algo raro: se acaba */
+            const char *v = q;
+            while (ch_ident((unsigned char)*q)) q++;
+            if (num == cap) valores = realloc(valores, sizeof(char*) * (cap *= 2));
+            valores[num] = malloc((size_t)(q - v) + 1);
+            memcpy(valores[num], v, (size_t)(q - v));
+            valores[num][q - v] = '\0';
+            num++;
+            const char *r = saltar_blancos(q);
+            if (*r == '=') {                                  /* = valor: se salta */
+                q = saltar_termino(r + 1);
+                for (;;) {
+                    const char *o = q;
+                    while (*o == ' ' || *o == '\t') o++;
+                    if (!strchr("+-*/%", *o) || !*o) break;
+                    q = saltar_termino(o + 1);
+                }
+            }
+        }
+        Nodo *n = nodo_nuevo(NODO_ENUMERACION, NULL);
+        n->enumeracion.nombre = malloc(ln + 1);
+        memcpy(n->enumeracion.nombre, nom, ln);
+        n->enumeracion.nombre[ln] = '\0';
+        n->enumeracion.valores = valores;
+        n->enumeracion.num_valores = num;
+        apuntar(&p->enums, &p->nenums, n);
+        apuntar(&p->enums_fuera, &p->nenums_fuera, n);
+        s = q;
+    }
+}
+
 void parser_destruir(Parser *p) {
+    for (int i = 0; i < p->nenums_fuera; i++) {
+        Nodo *n = p->enums_fuera[i];
+        for (int k = 0; k < n->enumeracion.num_valores; k++) free(n->enumeracion.valores[k]);
+        free(n->enumeracion.valores);
+        free(n->enumeracion.nombre);
+        free(n);
+    }
+    free(p->enums_fuera);
     free(p->enums);
     free(p->elegires);
     free(p);
@@ -1772,6 +1915,7 @@ void nodo_destruir(Nodo *n) {
             break;
         case NODO_LLAMADA:
             free(n->llamada.nombre);
+            nodo_destruir(n->llamada.funcion);
             for (int i = 0; i < n->llamada.num_argumentos; i++)
                 nodo_destruir(n->llamada.argumentos[i]);
             free(n->llamada.argumentos);

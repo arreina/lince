@@ -52,3 +52,28 @@ funcion aplicar(val numero x, val funcion f): numero {
     devolver f(x)
 }
 escribir(aplicar(4, funcion(val numero n): numero { devolver n * n }))
+
+# Se puede llamar a cualquier cosa que dé una función, no solo a un nombre
+sea doble = funcion(val numero x): numero { devolver x * 2 }
+escribir((doble)(4))
+sea golpes = [funcion(val numero d): numero { devolver d + 1 }, doble]
+escribir(golpes[0](10))
+escribir(golpes[1](10))
+sea por_nombre = {"puño": doble}
+escribir(por_nombre["puño"](3))
+funcion sumador(val numero a): funcion {
+    devolver funcion(val numero b): numero { devolver a + b }
+}
+escribir(sumador(2)(3))
+clase Arma { sea al_golpear = nulo }
+sea arma = Arma()
+arma.al_golpear = doble
+escribir(arma.al_golpear(21))
+golpes[0](1)
+sea uno = 1
+intentar { golpes.agregar(uno)
+    golpes[2](1) } capturar (error e) { escribir(e.mensaje) }
+# Un '(' al principio de la línea siguiente no llama a lo de antes
+sea a = doble
+(uno)
+escribir(a(5))

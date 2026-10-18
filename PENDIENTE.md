@@ -6,8 +6,8 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Lenguaje
 
-- [ ] **Llamar a algo que no es un nombre**: `(f)(1)`, `lista[0](1)` o `(tarea() { ... })()` dan error de sintaxis; hay que guardarlo antes en una variable.
-- [ ] **El aviso de `elegir` incompleto** solo mira las enumeraciones del mismo archivo; podría mirar también las de los archivos importados.
+- [ ] **El aviso de `elegir` con un alias:** no se da cuando la enumeración viene de `importar "./x" como x` (los casos son `x.Estado.Quieto`).
+- [ ] **Comparar funciones con `==`:** hoy siempre da `falso`.
 - [ ] **Guardar un generador en una variable.**
   - `sea g = contar(5)` deja `g` en `nulo`, porque copiar un generador da `nulo`.
   - Solo se puede recorrer directamente: `para cada x en contar(5)`.

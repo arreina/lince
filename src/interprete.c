@@ -2689,48 +2689,16 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
         "'para cada' solo funciona con listas, diccionarios o texto.");
 }
 
-static Valor *exec_llamada(Nodo *n, Entorno *e) {
-    if (profundidad >= 0 && profundidad + 1 < PILA_MAX) { _pila_nombre[profundidad + 1] = n->llamada.nombre; _pila_linea[profundidad + 1] = n->linea; }
-    if (++profundidad > MAX_PROFUNDIDAD) {
-        profundidad = 0;
-        char msg[128];
-        snprintf(msg, sizeof(msg),
-            "Demasiadas llamadas anidadas — ¿hay una recursión infinita en '%s'?",
-            n->llamada.nombre);
-        valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
-        hay_error   = 1;
-        return valor_nulo();
-    }
-    Valor *vfun = obtener_var(n, e, NI(n, n->llamada.nombre), n->llamada.nombre);
-
-    /* Si el nombre no existe, entorno_obtener ya ha puesto el error:
-       se propaga tal cual en vez de añadir un "no es una función"
-       encima, que sería la consecuencia y no la causa. */
-    if (hay_error) {
-        valor_destruir(vfun);
-        profundidad--;
-        return valor_nulo();
-    }
-    if (vfun->tipo != VAL_FUNCION) {
-        /* Error capturable, no exit(1): matar el proceso por esto
-           impedía que un intentar/capturar se recuperase, y el pilar
-           del lenguaje es que los errores se cuenten, no que aborten. */
-        char msg[256];
-        snprintf(msg, sizeof(msg),
-            "'%s' no es una función, así que no se puede llamar.",
-            n->llamada.nombre);
-        valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
-        hay_error   = 1;
-        valor_destruir(vfun);
-        profundidad--;
-        return valor_nulo();
-    }
+/* Llama a la función 'vfun' (se queda con ella) con los argumentos sin
+   calcular 'argn', desde el nodo 'n' (para la línea). La profundidad ya está
+   contada: se descuenta al volver. */
+static Valor *llamar_valor(Nodo *n, Valor *vfun, Nodo **argn, int nargs_nodos, Entorno *e) {
     FuncionLince *f = vfun->funcion;
 
     /* ¿Es un generador? */
     if (vfun->es_modulo == 99) {
         /* Ejecutar el cuerpo acumulando valores producidos */
-        int args_dados   = n->llamada.num_argumentos;
+        int args_dados   = nargs_nodos;
         int params_total = f->num_parametros;
         int params_req   = 0;
         for (int i = 0; i < params_total; i++)
@@ -2748,7 +2716,7 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
         Entorno *fn_e = entorno_crear(f->entorno_closure);
         for (int i = 0; i < params_total; i++) {
             Valor *arg = (i < args_dados)
-                ? ejecutar(n->llamada.argumentos[i], e)
+                ? ejecutar(argn[i], e)
                 : ejecutar(f->parametros[i].valor_defecto, e);
             entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
         }
@@ -2774,11 +2742,11 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
     if (f->entorno_closure == NULL) {
         typedef Valor *(*FnNativa)(Valor**, int);
         FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
-        int nargs = n->llamada.num_argumentos;
+        int nargs = nargs_nodos;
         Valor *args_pila[8];
         Valor **args = nargs < 8 ? args_pila : malloc(sizeof(Valor*) * (nargs + 1));
         for (int i = 0; i < nargs; i++)
-            args[i] = ejecutar(n->llamada.argumentos[i], e);
+            args[i] = ejecutar(argn[i], e);
         Valor *resultado = fn(args, nargs);
         for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
         if (args != args_pila) free(args);
@@ -2788,7 +2756,7 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
     }
 
     /* Contar parámetros requeridos (sin valor por defecto) */
-    int args_dados   = n->llamada.num_argumentos;
+    int args_dados   = nargs_nodos;
     int params_total = f->num_parametros;
     int params_req   = 0;
     for (int i = 0; i < params_total; i++)
@@ -2810,9 +2778,9 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
 
         if (i < args_dados) {
             if (param->por_ref) {
-                arg = ejecutar(n->llamada.argumentos[i], e);
+                arg = ejecutar(argn[i], e);
             } else {
-                Valor *tmp = ejecutar(n->llamada.argumentos[i], e);
+                Valor *tmp = ejecutar(argn[i], e);
                 if (tmp->tipo == VAL_NUMERO || tmp->tipo == VAL_TEXTO ||
                     tmp->tipo == VAL_BOOLEANO || tmp->tipo == VAL_NULO) {
                     arg = valor_copiar(tmp);
@@ -2846,6 +2814,51 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
     valor_destruir(vfun);
     profundidad--;
     return retorno;
+}
+
+static Valor *exec_llamada(Nodo *n, Entorno *e) {
+    if (profundidad >= 0 && profundidad + 1 < PILA_MAX) { _pila_nombre[profundidad + 1] = n->llamada.nombre; _pila_linea[profundidad + 1] = n->linea; }
+    if (++profundidad > MAX_PROFUNDIDAD) {
+        profundidad = 0;
+        char msg[128];
+        snprintf(msg, sizeof(msg),
+            "Demasiadas llamadas anidadas — ¿hay una recursión infinita en '%s'?",
+            n->llamada.nombre);
+        valor_error = valor_error_nuevo("ErrorRecursion", msg, n->linea);
+        hay_error   = 1;
+        return valor_nulo();
+    }
+    Valor *vfun = n->llamada.funcion ? ejecutar(n->llamada.funcion, e)
+                                     : obtener_var(n, e, NI(n, n->llamada.nombre), n->llamada.nombre);
+
+    /* Si el nombre no existe, entorno_obtener ya ha puesto el error:
+       se propaga tal cual en vez de añadir un "no es una función"
+       encima, que sería la consecuencia y no la causa. */
+    if (hay_error) {
+        valor_destruir(vfun);
+        profundidad--;
+        return valor_nulo();
+    }
+    if (vfun->tipo != VAL_FUNCION) {
+        /* Error capturable, no exit(1): matar el proceso por esto
+           impedía que un intentar/capturar se recuperase, y el pilar
+           del lenguaje es que los errores se cuenten, no que aborten. */
+        char msg[256];
+        if (n->llamada.funcion) {
+            char *t = valor_a_texto(vfun);
+            snprintf(msg, sizeof(msg), "Lo que se quiere llamar no es una función, así que no se puede llamar: es %.80s.", t);
+            free(t);
+        } else
+        snprintf(msg, sizeof(msg),
+            "'%s' no es una función, así que no se puede llamar.",
+            n->llamada.nombre);
+        valor_error = valor_error_nuevo("ErrorTipo", msg, n->linea);
+        hay_error   = 1;
+        valor_destruir(vfun);
+        profundidad--;
+        return valor_nulo();
+    }
+    return llamar_valor(n, vfun, n->llamada.argumentos, n->llamada.num_argumentos, e);
 }
 
 /* Posición i (negativa: desde el final) dentro de unos bytes, o -1 si se sale */
@@ -3327,6 +3340,22 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         FuncionLince *f          = (FuncionLince *)n->cache_cd;
 
         if (!f) {
+            /* obj.campo(...) con una función guardada en el campo */
+            for (int i = 0; i < obj->objeto->num_campos; i++) {
+                Valor *vc = obj->objeto->campos_valores[i];
+                if (strcmp(obj->objeto->campos_nombres[i], met_nombre) != 0 || vc->tipo != VAL_FUNCION) continue;
+                CampoClase *cd = buscar_campo(cls, met_nombre, 0);
+                if (cd && cd->vis != VIS_PUBLICO && !acceso_permitido(cd->vis, cd->duena, e)) break;
+                Valor *vf = valor_retener(vc);
+                valor_destruir(obj);
+                if (profundidad >= 0 && profundidad + 1 < PILA_MAX) { _pila_nombre[profundidad + 1] = met_nombre; _pila_linea[profundidad + 1] = n->linea; }
+                if (++profundidad > MAX_PROFUNDIDAD) {
+                    profundidad = 0;
+                    valor_destruir(vf);
+                    return error_rt("ErrorRecursion", n->linea, "Demasiadas llamadas anidadas en '%s'.", met_nombre);
+                }
+                return llamar_valor(n, vf, n->metodo.argumentos, n->metodo.num_argumentos, e);
+            }
             Valor *err = error_rt("Error", n->linea,
                 "La clase '%s' no tiene el método '%s'.", cls->nombre, met_nombre);
             valor_destruir(obj);
