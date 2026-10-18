@@ -143,7 +143,7 @@ jobs:
           SDL_RUTA: ${{ runner.temp }}/SDL2
         run: |
           export JAVA_HOME="$JAVA_HOME_17_X64"
-          android/construir.sh --plantilla -o lince-android.apk
+          bash android/construir.sh --plantilla -o lince-android.apk
 
       # Lo que hace quien tiene Lince, sin el SDK: el .apk de un juego
       - name: lince repartir --android
