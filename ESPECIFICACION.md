@@ -1483,6 +1483,34 @@ vectores (listas `[x, y]`), `longitud(x, y)`, `normalizar(x, y)`, `vector(angulo
 contrario de `angulo`), `rotar(x, y, grados)` y `acercar(actual, objetivo, paso)` (avanza sin
 pasarse: frenar, perseguir, cámaras suaves).
 
+**Menús y diálogos.** Se manejan igual con teclado (flechas o WASD, entrar o espacio, escape), con
+mando (cruceta o palanca, A, B) y con el ratón o el dedo (señalar y tocar), y se dibujan sin
+moverse con la cámara. Están escritos en Lince.
+
+```lince
+# en cada fotograma de la portada:
+sea eleccion = juego.menu(["Jugar", "Opciones", "Salir"])
+si eleccion == "Jugar" { juego.cambiar_escena("partida", 0.6) }
+
+# al hablar con alguien:
+juego.dialogo([
+    {"nombre": "Lince", "texto": "Llevo días viendo luces raras entre los árboles."},
+    {"nombre": "Lince", "texto": "¿Me acompañas?", "respuestas": ["Sí", "No"]}
+])
+# y en la partida:
+si no juego.dialogo_abierto() { ...mover al personaje... }
+si juego.respuesta() == "Sí" { ... }
+```
+
+| Función | Qué hace |
+|---|---|
+| `menu(opciones[, ajustes])` | dibuja las opciones (textos) una debajo de otra y devuelve la elegida en el fotograma en que se elige; si no, `nulo`. Se llama en cada fotograma mientras se vea, y vuelve a la primera opción si deja de verse un rato. Ajustes: `x`, `y` (el centro de la primera opción; por defecto, el menú centrado en la pantalla), `escala` (3), `fuente`, `color`, `color_elegido`, `separacion`, `atras` (lo que devuelve con escape o B, como `"Continuar"` en una pausa), `sonido_mover` y `sonido_elegir` |
+| `dialogo(paginas[, ajustes])` | abre una caja de diálogo abajo de la pantalla con el texto saliendo letra a letra. `paginas` es una página o una lista; una página es un texto o un diccionario con `texto`, `nombre` (quién habla, en una pestaña encima), `retrato` (una imagen a la izquierda) y `respuestas` (textos para elegir). Aceptar (entrar, espacio, A o tocar) termina de escribir la página o pasa a la siguiente; una página que no cabe se parte sola. Ajustes: `escala` (2), `fuente`, `color`, `fondo`, `borde`, `velocidad` (letras por segundo, 40), `lineas` (3), `arriba` (verdadero: la caja arriba) y `sonido` (suena con las letras) |
+| `dialogo_abierto()` · `respuesta()` · `cerrar_dialogo()` | si hay un diálogo abierto (también en el fotograma en que se cierra, para que la tecla que lo cierra no lo vuelva a abrir) · la última respuesta elegida, o `nulo` · lo cierra |
+
+El juego sigue viendo las teclas mientras hay un menú o un diálogo: lo normal es no mover al
+personaje mientras `dialogo_abierto()`, como en el ejemplo. `examples/12_aventura.lince` lo usa todo.
+
 **Partidas guardadas.** Récords, opciones y avances que siguen ahí al volver a abrir el juego:
 
 ```lince

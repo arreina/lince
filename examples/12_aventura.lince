@@ -1,0 +1,94 @@
+# 🐆 Lince — Aventura
+#
+# Habla con la lince del claro: acércate y pulsa espacio (o A en el mando, o
+# toca la pantalla). Flechas o WASD (o el stick) para moverte; Esc (o B, o
+# inicio) abre la pausa.
+#
+# Muestra: un menú de portada y otro de pausa (juego.menu), una caja de
+# diálogo con el texto saliendo letra a letra, quién habla y respuestas para
+# elegir (juego.dialogo, juego.dialogo_abierto, juego.respuesta), y escenas
+# (juego.cambiar_escena). Todo se maneja igual con teclado, mando, ratón o dedo.
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 640
+fijo ALTO = 480
+fijo VELOCIDAD = 180
+
+juego.abrir("Aventura", ANCHO, ALTO)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("arriba", ["arriba", "w", "mando:arriba", "mando:izq_y-"])
+juego.definir_accion("abajo", ["abajo", "s", "mando:abajo", "mando:izq_y+"])
+juego.definir_accion("hablar", ["espacio", "entrar", "mando:a", "raton:izquierdo"])
+juego.definir_accion("pausa", ["escape", "mando:b", "mando:inicio"])
+
+sea x = 120
+sea y_tu = 300
+sea lince_x = 460
+sea lince_y = 240
+sea amigos = falso          # ¿ha dicho que sí?
+sea pausa = falso
+
+si no juego.recargado() { juego.cambiar_escena("portada") }
+
+funcion cerca(): logico {
+    devolver matematica.distancia(x, y_tu, lince_x, lince_y) < 80
+}
+
+funcion hablar(): nulo {
+    si amigos {
+        juego.dialogo({"nombre": "Lince", "texto": "¡Qué bien que hayas vuelto! El bosque es más bonito con compañía."})
+        devolver nulo
+    }
+    juego.dialogo([
+        {"nombre": "Lince", "texto": "¡Hola! No suele venir nadie por este claro. Llevo días viendo luces raras entre los árboles, de noche."},
+        {"nombre": "Lince", "texto": "¿Me acompañas a ver qué son?", "respuestas": ["Claro que sí", "Mejor otro día"]}
+    ])
+}
+
+funcion dibujar_mundo(): nulo {
+    juego.limpiar([46, 92, 58])
+    para (i = 0; i < 14; i++) {                       # árboles
+        sea ax = (i * 137) % ANCHO
+        sea ay = 40 + (i * 89) % 120
+        juego.circulo(ax, ay, 26, [30, 70, 40])
+    }
+    juego.circulo(lince_x, lince_y, 18, [214, 150, 70])         # la lince
+    juego.rectangulo(lince_x - 12, lince_y - 26, 6, 10, [214, 150, 70])
+    juego.rectangulo(lince_x + 6, lince_y - 26, 6, 10, [214, 150, 70])
+    juego.circulo(x, y_tu, 14, [235, 235, 245])                   # tú
+    si cerca() y no juego.dialogo_abierto() {
+        juego.texto("ESPACIO: HABLAR", lince_x, lince_y + 30, {"escala": 2, "alinear": "centro"})
+    }
+    si amigos { juego.texto("TIENES UNA AMIGA", 10, 10, 2) }
+}
+
+mientras juego.abierto() {
+    si juego.escena() == "portada" {
+        juego.limpiar([16, 24, 30])
+        juego.texto("AVENTURA EN EL CLARO", ANCHO / 2, 110, {"escala": 4, "alinear": "centro", "color": [255, 200, 90]})
+        sea eleccion = juego.menu(["Jugar", "Salir"], {"y": 260})
+        si eleccion == "Jugar" { juego.cambiar_escena("bosque", 0.6) }
+        si eleccion == "Salir" { juego.salir() }
+    } sino {
+        dibujar_mundo()
+        si pausa {
+            juego.cubrir([0, 0, 0, 150])
+            sea eleccion = juego.menu(["Continuar", "Volver a la portada", "Salir"], {"atras": "Continuar"})
+            si eleccion == "Continuar" { pausa = falso }
+            si eleccion == "Volver a la portada" {
+                pausa = falso
+                juego.cambiar_escena("portada", 0.6)
+            }
+            si eleccion == "Salir" { juego.salir() }
+        } sino si no juego.dialogo_abierto() {
+            x = matematica.limitar(x + juego.direccion("izquierda", "derecha") * VELOCIDAD * juego.dt(), 14, ANCHO - 14)
+            y_tu = matematica.limitar(y_tu + juego.direccion("arriba", "abajo") * VELOCIDAD * juego.dt(), 14, ALTO - 14)
+            si juego.accion_pulsada("pausa") { pausa = verdadero }
+            si cerca() y juego.accion_pulsada("hablar") { hablar() }
+        }
+        si juego.respuesta() == "Claro que sí" { amigos = verdadero }
+    }
+    juego.presentar()
+}

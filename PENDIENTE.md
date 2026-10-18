@@ -8,7 +8,13 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 - [x] **Google Play:** `lince repartir --aab` hace el `.aab` firmado que pide Google Play, en C como el `.apk`. Probado con bundletool y en un emulador con Android 16; falta subir uno de verdad a Play Console (lo hace el autor, cuando tenga cuenta).
 - [x] **Partidas guardadas:** `juego.guardar`, `juego.cargar` (con valores por defecto), `juego.olvidar` y `juego.carpeta_guardado`, en la carpeta de datos del usuario de cada sistema.
-- [ ] **Menús y diálogos, en Lince:** menús que se manejan con teclado, mando o dedo (portada, pausa, opciones) y cajas de diálogo con el texto saliendo letra a letra.
+- [x] **Menús y diálogos, en Lince:** `juego.menu` y `juego.dialogo` (con quién habla, retrato y respuestas), con teclado, mando, ratón o dedo; `examples/12_aventura.lince`.
+
+## Versión 0.9
+
+- [ ] **Mapas de Tiled:** `juego.mapa_tiled("nivel.tmj")` carga los niveles hechos con Tiled (capas de tiles, objetos como enemigos o salidas, y colisiones) y se dibujan y se usan con lo que ya hay.
+- [ ] **Física sencilla, en Lince:** cuerpos con gravedad, rebotes, empujes y choques entre ellos y con el mapa (cajas que caen, pelotas, plataformas que se mueven), encima de las colisiones que ya hay.
+- [ ] **Controles a gusto:** el jugador cambia las teclas y botones de cada acción desde un menú del juego, y se guarda (con los menús y las partidas guardadas de la 0.8).
 
 Para más adelante: **juegos en el navegador** (`lince repartir --web`, con una plantilla en WebAssembly, como la de Android).
 

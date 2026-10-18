@@ -217,9 +217,10 @@ funcion escena(): texto { devolver _escena }
 funcion escena_nueva(): logico { devolver _nueva }
 funcion tiempo_escena(): numero { devolver juego.tiempo() - _desde }
 
-# En cada presentar(), después de las tareas: el fundido de las escenas y,
-# encima de todo, el mando de la pantalla táctil
+# En cada presentar(), después de las tareas: la caja de diálogo, el fundido
+# de las escenas y, encima de todo, el mando de la pantalla táctil
 funcion _presentar(): nulo {
+    _dibujar_dialogo()
     _fundido_escenas()
     _dibujar_mando()
 }
@@ -691,6 +692,8 @@ funcion _mt_dentro(val diccionario t, val lista sitio, val numero radio): logico
 # palanca sigue al dedo que la empezó (uno nuevo en la mitad izquierda que no
 # toque un botón); cada botón está pulsado si hay otro dedo encima.
 funcion _entrada(): nulo {
+    _ui_leer()
+    _dl_entrada()
     _mt = _mt_config()
     si _mt == nulo {
         si _mt_puesto {                     # se suelta lo que hubiera pulsado
@@ -784,6 +787,374 @@ funcion _dibujar_mando(): nulo {
         sea escala = matematica.maximo(1, matematica.redondear(radio / 9))
         juego.texto(letra, sitio[0], sitio[1] - 3.5 * escala,
                     {"escala": escala, "alinear": "centro", "color": [255, 255, 255, matematica.minimo(255, alfa * 1.8)]})
+    }
+    juego.camara(camara[0], camara[1])
+}
+
+# ── Menús y diálogos ──
+# Se manejan igual con teclado (flechas o WASD, entrar o espacio, escape), con
+# mando (cruceta o palanca, A, B) y con el ratón o el dedo (señalar y tocar).
+# Se dibujan sin moverse con la cámara.
+
+sea _ui_eje = 0             # la palanca, arriba (-1), abajo (1) o en medio: para moverse a saltos
+sea _ui_paso = 0            # -1 / 1 si en este fotograma se pide subir / bajar
+sea _menus = {}             # por menú (sus opciones): cuál está elegida y cuándo se vio
+
+# Lo que se pide en este fotograma (en _entrada, con la entrada recién leída)
+funcion _ui_leer(): nulo {
+    sea eje = juego.eje("izq_y")
+    sea ahora = si eje < -0.5 { -1 } sino si eje > 0.5 { 1 } sino { 0 }
+    _ui_paso = 0
+    si juego.tecla_pulsada("arriba") o juego.tecla_pulsada("w") o juego.boton_pulsado("arriba") { _ui_paso = -1 }
+    si juego.tecla_pulsada("abajo") o juego.tecla_pulsada("s") o juego.boton_pulsado("abajo") { _ui_paso = 1 }
+    si ahora != 0 y ahora != _ui_eje { _ui_paso = ahora }
+    _ui_eje = ahora
+}
+
+funcion _ui_aceptar(): logico {
+    devolver juego.tecla_pulsada("entrar") o juego.tecla_pulsada("espacio") o juego.boton_pulsado("a")
+}
+
+funcion _ui_atras(): logico {
+    devolver juego.tecla_pulsada("escape") o juego.boton_pulsado("b") o juego.boton_pulsado("atras")
+}
+
+# ajustes[c], o 'defecto' si no está
+funcion _de(val diccionario ajustes, val texto c, val cualquiera defecto): cualquiera {
+    si ajustes.contiene(c) { devolver ajustes[c] }
+    devolver defecto
+}
+
+funcion _ui_sonar(val cualquiera ajustes, val texto cual): nulo {
+    si ajustes.contiene(cual) y ajustes[cual] != nulo { juego.reproducir(ajustes[cual]) }
+}
+
+# Las opciones de letra para texto() y ancho_texto()
+funcion _ui_letra(val diccionario ajustes, val numero escala): diccionario {
+    sea r = {"escala": escala}
+    si ajustes.contiene("fuente") { r["fuente"] = ajustes["fuente"] }
+    devolver r
+}
+
+fijo _MENU_AJUSTES = ["x", "y", "escala", "fuente", "color", "color_elegido", "separacion", "atras",
+                      "sonido_mover", "sonido_elegir"]
+
+funcion _ui_ajustes(val cualquiera ajustes, val lista validos, val texto fn): diccionario {
+    si ajustes == nulo { devolver {} }
+    si no (ajustes es diccionario) { lanzar ErrorTipo("{fn}() espera un diccionario de ajustes") }
+    para cada texto c en ajustes {
+        si no validos.contiene(c) {
+            lanzar Error("{fn}(): no conozco '{c}' (hay " + texto.unir(validos, ", ") + ")")
+        }
+    }
+    devolver ajustes
+}
+
+# menu(opciones[, ajustes]): dibuja un menú con esas opciones (textos), una
+# debajo de otra, y devuelve la elegida en el fotograma en que se elige (si
+# no, nulo). Se llama en cada fotograma mientras se vea:
+#   sea eleccion = juego.menu(["Jugar", "Opciones", "Salir"])
+#   si eleccion == "Jugar" { juego.cambiar_escena("partida", 0.6) }
+# Ajustes: x, y (el centro de la primera opción; por defecto, el centro de la
+# pantalla), escala (3), fuente, color, color_elegido, separacion, atras (lo
+# que devuelve con escape o B: "Continuar" en una pausa), sonido_mover y
+# sonido_elegir. Vuelve a la primera opción si deja de verse un rato.
+funcion menu(val cualquiera opciones, val cualquiera ajustes = nulo): cualquiera {
+    si no (opciones es lista) o opciones.longitud() == 0 {
+        lanzar ErrorTipo("menu() espera una lista de opciones, como [\"Jugar\", \"Salir\"]")
+    }
+    para cada cualquiera op en opciones {
+        si no (op es texto) { lanzar ErrorTipo("menu(): cada opción es un texto") }
+    }
+    sea aj = _ui_ajustes(ajustes, _MENU_AJUSTES, "menu")
+    sea escala = _de(aj, "escala", 3)
+    sea letra = _ui_letra(aj, escala)
+    sea alto = juego.medir_texto("Ay", letra)[1]
+    sea paso = alto + _de(aj, "separacion", alto * 0.6)
+    sea cx = _de(aj, "x", juego.ancho() / 2)
+    sea cy = _de(aj, "y", juego.alto() / 2 - paso * (opciones.longitud() - 1) / 2)
+    sea clave = texto.unir(opciones, "|")
+    sea ahora = juego.tiempo_real()
+    si no _menus.contiene(clave) o ahora - _menus[clave]["visto"] > 0.25 {
+        _menus[clave] = {"elegida": 0, "visto": ahora}
+    }
+    sea m = _menus[clave]
+    m["visto"] = ahora
+    sea antes = m["elegida"]
+    sea total = opciones.longitud()
+    m["elegida"] = (m["elegida"] + _ui_paso + total) % total
+    # el ratón o el dedo: señalar elige, tocar acepta
+    sea r = juego.raton()
+    sea mov = juego.movimiento_raton()
+    sea tocada = -1
+    para (i = 0; i < total; i++) {
+        sea ancho = juego.ancho_texto(opciones[i], letra)
+        sea arriba = cy + i * paso - paso * 0.2
+        si r[0] >= cx - ancho / 2 - alto y r[0] <= cx + ancho / 2 + alto y r[1] >= arriba y r[1] < arriba + paso {
+            si mov[0] != 0 o mov[1] != 0 o juego.clic(1) { m["elegida"] = i }
+            si juego.clic(1) { tocada = i }
+        }
+    }
+    si m["elegida"] != antes { _ui_sonar(aj, "sonido_mover") }
+    # dibujar
+    sea camara = juego.posicion_camara()
+    juego.camara()
+    para (i = 0; i < total; i++) {
+        sea elegida = i == m["elegida"]
+        sea y_op = cy + i * paso
+        si elegida {
+            sea ancho = juego.ancho_texto(opciones[i], letra)
+            juego.rectangulo(cx - ancho / 2 - alto * 0.6, y_op - alto * 0.3, ancho + alto * 1.2, alto * 1.6, [255, 255, 255, 40])
+        }
+        sea color = si elegida { _de(aj, "color_elegido", [255, 220, 80]) } sino { _de(aj, "color", [210, 210, 220]) }
+        sea t = {"alinear": "centro", "color": color}
+        para cada texto c en letra { t[c] = letra[c] }
+        juego.texto(opciones[i], cx, y_op, t)
+    }
+    juego.camara(camara[0], camara[1])
+    # elegir
+    si tocada >= 0 o _ui_aceptar() {
+        _ui_sonar(aj, "sonido_elegir")
+        _menus.eliminar(clave)
+        devolver opciones[m["elegida"]]
+    }
+    si aj.contiene("atras") y _ui_atras() {
+        _menus.eliminar(clave)
+        devolver aj["atras"]
+    }
+    devolver nulo
+}
+
+# dialogo(paginas[, ajustes]): una caja de diálogo abajo de la pantalla, con el
+# texto saliendo letra a letra, como en las aventuras y los RPG. 'paginas' es
+# una página o una lista; cada página, un texto o un diccionario con "texto",
+# "nombre" (quién habla), "retrato" (una imagen) y "respuestas" (una lista de
+# textos para elegir; la elegida la da respuesta()). Aceptar (entrar, espacio,
+# A o tocar) termina de escribir la página o pasa a la siguiente. Mientras
+# dialogo_abierto() sea verdadero, el juego no debería mover al personaje:
+#   si no juego.dialogo_abierto() { ...mover... }
+# Ajustes: escala (2), fuente, color, fondo, borde, velocidad (letras por
+# segundo, 40), lineas (3), arriba (verdadero: arriba de la pantalla) y sonido
+# (suena con las letras). Una página que no cabe en las líneas se parte sola.
+sea _dl = nulo               # el diálogo abierto, o nulo
+sea _dl_cerrando = falso     # se cerró con la entrada de este fotograma
+sea _dl_respuesta = nulo
+
+fijo _DIALOGO_AJUSTES = ["escala", "fuente", "color", "fondo", "borde", "velocidad", "lineas", "arriba", "sonido"]
+fijo _PAGINA_CAMPOS = ["texto", "nombre", "retrato", "respuestas"]
+
+# Un texto partido en líneas que no pasen de 'ancho'
+funcion _partir_lineas(val texto t, val numero ancho, val diccionario letra): lista {
+    sea lineas = []
+    para cada texto parrafo en texto.dividir(t, "\n") {
+        sea linea = ""
+        para cada texto palabra en texto.dividir(parrafo, " ") {
+            sea con = si linea == "" { palabra } sino { linea + " " + palabra }
+            si linea != "" y juego.ancho_texto(con, letra) > ancho {
+                lineas.agregar(linea)
+                linea = palabra
+            } sino {
+                linea = con
+            }
+        }
+        lineas.agregar(linea)
+    }
+    devolver lineas
+}
+
+# Las medidas de la caja
+funcion _dl_medidas(val diccionario aj, val logico con_retrato, val numero filas = 0): diccionario {
+    sea letra = _ui_letra(aj, _de(aj, "escala", 2))
+    sea alto_letra = juego.medir_texto("Ay", letra)[1]
+    sea margen = matematica.maximo(8, juego.ancho() / 50)
+    sea relleno = alto_letra * 0.8
+    sea paso = alto_letra * 1.4
+    sea lineas = _de(aj, "lineas", 3)
+    sea alto_caja = relleno * 2 + paso * matematica.maximo(lineas, filas) - (paso - alto_letra)
+    sea retrato = si con_retrato { alto_caja - relleno } sino { 0 }
+    devolver {"letra": letra, "alto_letra": alto_letra, "margen": margen, "relleno": relleno, "paso": paso,
+              "lineas": lineas, "alto": alto_caja, "retrato": retrato,
+              "ancho_texto": juego.ancho() - margen * 2 - relleno * 2 - (si con_retrato { retrato + relleno } sino { 0 })}
+}
+
+funcion dialogo(val cualquiera paginas, val cualquiera ajustes = nulo): nulo {
+    sea aj = _ui_ajustes(ajustes, _DIALOGO_AJUSTES, "dialogo")
+    si paginas es texto o paginas es diccionario { paginas = [paginas] }
+    si no (paginas es lista) o paginas.longitud() == 0 {
+        lanzar ErrorTipo("dialogo() espera un texto, una página (\{\"nombre\": ..., \"texto\": ...}) o una lista de páginas")
+    }
+    # cada página, en trozos que caben en la caja
+    sea trozos = []
+    para cada cualquiera p en paginas {
+        si p es texto { p = {"texto": p} }
+        si no (p es diccionario) o no p.contiene("texto") o no (p["texto"] es texto) {
+            lanzar ErrorTipo("dialogo(): cada página es un texto o un diccionario con \"texto\"")
+        }
+        para cada texto c en p {
+            si no _PAGINA_CAMPOS.contiene(c) {
+                lanzar Error("dialogo(): una página no tiene '{c}' (tiene \"texto\", \"nombre\", \"retrato\" y \"respuestas\")")
+            }
+        }
+        sea respuestas = _de(p, "respuestas", [])
+        si no (respuestas es lista) { lanzar ErrorTipo("dialogo(): \"respuestas\" es una lista de textos") }
+        sea md = _dl_medidas(aj, p.contiene("retrato"))
+        sea todas = _partir_lineas(p["texto"], md["ancho_texto"], md["letra"])
+        # las respuestas van en la última parte (la caja crece para que quepan)
+        sea caben = md["lineas"]
+        sea i = 0
+        mientras i < todas.longitud() o i == 0 {
+            sea quedan = todas.longitud() - i
+            sea ultimo = quedan <= caben
+            sea cuantas = si ultimo { quedan } sino { caben }
+            sea trozo = {"lineas": [], "nombre": _de(p, "nombre", nulo), "retrato": _de(p, "retrato", nulo),
+                         "respuestas": si ultimo { respuestas } sino { [] }}
+            para (k = 0; k < cuantas; k++) { trozo["lineas"].agregar(todas[i + k]) }
+            trozos.agregar(trozo)
+            i = i + matematica.maximo(cuantas, 1)
+        }
+    }
+    _dl = {"trozos": trozos, "ajustes": aj, "pagina": 0, "letras": 0, "elegida": 0, "desde": juego.tiempo_real()}
+    _dl_respuesta = nulo
+}
+
+funcion dialogo_abierto(): logico { devolver _dl != nulo o _dl_cerrando }
+funcion respuesta(): cualquiera { devolver _dl_respuesta }
+funcion cerrar_dialogo(): nulo { _dl = nulo }
+
+funcion _dl_total(val diccionario trozo): numero {
+    sea n = 0
+    para cada texto l en trozo["lineas"] { n = n + l.longitud() }
+    devolver n
+}
+
+funcion _dl_siguiente(): nulo {
+    _dl["pagina"] = _dl["pagina"] + 1
+    _dl["letras"] = 0
+    _dl["elegida"] = 0
+    si _dl["pagina"] >= _dl["trozos"].longitud() {
+        _dl = nulo
+        _dl_cerrando = verdadero
+    }
+}
+
+# Dónde va la caja y cada respuesta
+funcion _dl_caja(): diccionario {
+    sea trozo = _dl["trozos"][_dl["pagina"]]
+    sea md = _dl_medidas(_dl["ajustes"], trozo["retrato"] != nulo, trozo["lineas"].longitud() + trozo["respuestas"].longitud())
+    sea arriba = si _de(_dl["ajustes"], "arriba", falso) { md["margen"] + md["alto_letra"] * 1.5 } sino { juego.alto() - md["margen"] - md["alto"] }
+    md["x"] = md["margen"]
+    md["y"] = arriba
+    md["ancho"] = juego.ancho() - md["margen"] * 2
+    md["texto_x"] = md["x"] + md["relleno"] + (si trozo["retrato"] != nulo { md["retrato"] + md["relleno"] } sino { 0 })
+    devolver md
+}
+
+# En _entrada: avanza las letras y atiende a aceptar
+funcion _dl_entrada(): nulo {
+    _dl_cerrando = falso
+    si _dl == nulo { devolver nulo }
+    sea ahora = juego.tiempo_real()
+    sea trozo = _dl["trozos"][_dl["pagina"]]
+    sea total = _dl_total(trozo)
+    sea antes = matematica.piso(_dl["letras"])
+    _dl["letras"] = matematica.minimo(total, _dl["letras"] + _de(_dl["ajustes"], "velocidad", 40) * (ahora - _dl["desde"]))
+    _dl["desde"] = ahora
+    si _dl["ajustes"].contiene("sonido") y matematica.piso(_dl["letras"]) != antes y antes % 2 == 0 {
+        juego.reproducir(_dl["ajustes"]["sonido"])
+    }
+    sea acabada = _dl["letras"] >= total
+    sea respuestas = trozo["respuestas"]
+    si no acabada {
+        si _ui_aceptar() o _ui_atras() o juego.clic(1) { _dl["letras"] = total }
+        devolver nulo
+    }
+    si respuestas.longitud() == 0 {
+        si _ui_aceptar() o _ui_atras() o juego.clic(1) { _dl_siguiente() }
+        devolver nulo
+    }
+    # elegir una respuesta
+    sea n = respuestas.longitud()
+    _dl["elegida"] = (_dl["elegida"] + _ui_paso + n) % n
+    sea md = _dl_caja()
+    sea r = juego.raton()
+    sea mov = juego.movimiento_raton()
+    sea tocada = falso
+    para (i = 0; i < n; i++) {
+        sea arriba = md["y"] + md["relleno"] + (trozo["lineas"].longitud() + i) * md["paso"] - md["paso"] * 0.2
+        si r[0] >= md["x"] y r[0] <= md["x"] + md["ancho"] y r[1] >= arriba y r[1] < arriba + md["paso"] {
+            si mov[0] != 0 o mov[1] != 0 o juego.clic(1) { _dl["elegida"] = i }
+            si juego.clic(1) { tocada = verdadero }
+        }
+    }
+    si tocada o _ui_aceptar() {
+        _dl_respuesta = respuestas[_dl["elegida"]]
+        _dl_siguiente()
+    }
+}
+
+# En _presentar: la caja, encima de lo del juego
+funcion _dibujar_dialogo(): nulo {
+    si _dl == nulo { devolver nulo }
+    sea aj = _dl["ajustes"]
+    sea trozo = _dl["trozos"][_dl["pagina"]]
+    sea md = _dl_caja()
+    sea camara = juego.posicion_camara()
+    juego.camara()
+    sea borde = _de(aj, "borde", [255, 255, 255])
+    juego.rectangulo(md["x"], md["y"], md["ancho"], md["alto"], _de(aj, "fondo", [16, 18, 36, 235]))
+    juego.contorno(md["x"], md["y"], md["ancho"], md["alto"], borde)
+    sea color = _de(aj, "color", [240, 240, 240])
+    sea letra = {"color": color}
+    para cada texto c en md["letra"] { letra[c] = md["letra"][c] }
+    si trozo["nombre"] != nulo {          # quién habla, en una pestaña encima
+        sea ancho_nombre = juego.ancho_texto(trozo["nombre"], md["letra"]) + md["relleno"] * 2
+        sea alto_nombre = md["alto_letra"] * 1.5
+        juego.rectangulo(md["x"], md["y"] - alto_nombre, ancho_nombre, alto_nombre, _de(aj, "fondo", [16, 18, 36, 235]))
+        juego.contorno(md["x"], md["y"] - alto_nombre, ancho_nombre, alto_nombre + 1, borde)
+        sea letra_nombre = {"color": [255, 220, 80]}
+        para cada texto c en md["letra"] { letra_nombre[c] = md["letra"][c] }
+        juego.texto(trozo["nombre"], md["x"] + md["relleno"], md["y"] - alto_nombre + md["alto_letra"] * 0.25, letra_nombre)
+    }
+    si trozo["retrato"] != nulo {
+        juego.dibujar(trozo["retrato"], md["x"] + md["relleno"], md["y"] + md["relleno"] / 2,
+                      {"ancho": md["retrato"], "alto": md["retrato"]})
+    }
+    # las letras que ya han salido
+    sea quedan = matematica.piso(_dl["letras"])
+    sea fila = md["y"] + md["relleno"]
+    para cada texto linea en trozo["lineas"] {
+        si quedan <= 0 { romper }
+        sea parte = linea
+        si linea.longitud() > quedan {
+            parte = ""
+            sea k = 0
+            para cada texto ch en linea {
+                si k >= quedan { romper }
+                parte = parte + ch
+                k = k + 1
+            }
+        }
+        juego.texto(parte, md["texto_x"], fila, letra)
+        quedan = quedan - linea.longitud()
+        fila = fila + md["paso"]
+    }
+    si _dl["letras"] >= _dl_total(trozo) {
+        sea respuestas = trozo["respuestas"]
+        si respuestas.longitud() > 0 {
+            para (i = 0; i < respuestas.longitud(); i++) {
+                sea elegida = i == _dl["elegida"]
+                sea lr = {"color": si elegida { [255, 220, 80] } sino { color }}
+                para cada texto c en md["letra"] { lr[c] = md["letra"][c] }
+                juego.texto((si elegida { "> " } sino { "  " }) + respuestas[i], md["texto_x"], fila + i * md["paso"], lr)
+            }
+        } sino si (juego.tiempo_real() * 2) % 2 < 1 {     # el triangulito de «sigue»
+            sea t = md["alto_letra"] * 0.5
+            sea ax = md["x"] + md["ancho"] - md["relleno"] - t * 2
+            sea ay = md["y"] + md["alto"] - md["relleno"] - t
+            para (k = 0; k < t; k++) {
+                juego.rectangulo(ax + k, ay + k, (t - k) * 2 - k, 1, borde)
+            }
+        }
     }
     juego.camara(camara[0], camara[1])
 }

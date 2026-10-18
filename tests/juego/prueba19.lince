@@ -1,0 +1,33 @@
+# Menús y diálogos manejados con teclas (LINCE_JUEGO_GUION) sin pantalla
+importar "juego"
+juego.abrir("Menús", 320, 240)
+sea fase = "menu"
+mientras juego.abierto() {
+    juego.limpiar([20, 30, 40])
+    juego.rectangulo(40, 120, 30, 30, [200, 120, 60])
+    si fase == "menu" {
+        sea eleccion = juego.menu(["Jugar", "Opciones", "Salir"], {"escala": 2})
+        si eleccion != nulo {
+            escribir("menu: {eleccion}")
+            fase = "dialogo"
+            juego.dialogo(["Hola, soy el lince. Este texto es largo para ver que se parte en varias líneas y en varias páginas sin salirse de la caja.",
+                           {"nombre": "Lince", "texto": "¿Vienes de aventura?", "respuestas": ["Sí", "No", "Luego"]}],
+                          {"velocidad": 2000})
+        }
+    } sino si fase == "dialogo" {
+        si no juego.dialogo_abierto() {
+            escribir("respuesta: {juego.respuesta()}")
+            fase = "pausa"
+        }
+    } sino si fase == "pausa" {
+        sea p = juego.menu(["Continuar", "Salir"], {"atras": "Continuar"})
+        si p != nulo {
+            escribir("pausa: {p}")
+            fase = "fin"
+        }
+    }
+    juego.presentar()
+}
+intentar { juego.menu([]) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.menu(["a"], {"colr": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.dialogo([{"txt": "x"}]) } capturar (error e) { escribir("error: {e.mensaje}") }

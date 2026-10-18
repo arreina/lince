@@ -36,5 +36,6 @@ done <<'LISTA'
 09_mazmorra.lince|LINCE_JUEGO_PULSAR|derecha,abajo
 10_paseo.lince|LINCE_JUEGO_PULSAR|derecha,mayus
 11_movil.lince|LINCE_JUEGO_CLIC|430,230
+12_aventura.lince|LINCE_JUEGO_PULSAR|espacio,derecha
 LISTA
 [ "$fallos" -eq 0 ] && echo "✅ Minijuegos: todos se ejecutan" || exit 1

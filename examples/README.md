@@ -18,7 +18,7 @@ Y se reparten como un único ejecutable:
 | Juego | Cómo se juega | Qué enseña |
 |-------|---------------|------------|
 | `01_pong.lince` | W / S y flechas; 1 o 2 jugadores | el bucle `mientras juego.abierto()`, `dt()`, teclado, colisiones, texto y sonido |
-| `02_serpiente.lince` | flechas o WASD | listas de listas, tiempo acumulado con `dt`, funciones con variables globales, **escribir tu nombre** para el récord (`juego.editar`) |
+| `02_serpiente.lince` | flechas o WASD | listas de listas, tiempo acumulado con `dt`, funciones con variables globales, **escribir tu nombre** para el récord (`juego.editar`), que **se guarda** para la próxima vez (`juego.guardar` y `juego.cargar`) |
 | `03_rompeladrillos.lince` | flechas o A / D, espacio lanza | lista de diccionarios, rebotes y colisiones con rectángulos, estados de juego |
 | `04_pajaro.lince` | espacio salta | gravedad, obstáculos que se crean y descartan, **guardar el récord** con `archivos` y `json` |
 | `05_esquiva.lince` | flechas o A / D | **clases, herencia y polimorfismo** (`Objeto` → `Meteorito` y `Estrella`), `es` |
@@ -29,7 +29,9 @@ Y se reparten como un único ejecutable:
 | `10_paseo.lince` | flechas o A / D, Mayús corre, o **mando** | **animaciones generadas** a partir de un solo dibujo (`juego.animar`: andar, correr y respirar), la hoja generada en pantalla, **animación tradicional** con una hoja de sprites que se divide sola (`juego.hoja`, los pájaros), pasos con sonido y un paisaje que se repite con varias capas de profundidad |
 | `11_movil.lince` | botones en la pantalla (o el ratón), flechas y espacio | para probar Lince **en un móvil Android** (`android/construir.sh`): `juego.toques()` con un círculo por dedo, **botones táctiles** con `"pantalla:..."` en las acciones, inclinar el móvil para moverse (`"inclinacion:x-"`), vibrar al saltar, una tarea que hace parpadear una estrella y un archivo que cuenta cuántas veces se ha abierto |
 
-Todos terminan con **Esc**.
+| `12_aventura.lince` | flechas o WASD, espacio para hablar, Esc para la pausa | un **menú** de portada y otro de pausa (`juego.menu`) y **diálogos** con el texto saliendo letra a letra, quién habla y respuestas para elegir (`juego.dialogo`, `juego.respuesta`); todo con teclado, mando, ratón o dedo |
+
+Todos terminan con **Esc** (en la aventura, Esc abre la pausa, que tiene «Salir»).
 
 ## Prueba la recarga en caliente
 

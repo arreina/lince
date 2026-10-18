@@ -17,6 +17,13 @@ apartado que le toca de este archivo.
 - La serpiente (`examples/02_serpiente.lince`) guarda el récord.
 - `json` se ha rehecho: textos de cualquier largo, `\u00f1` y emojis, decimales que se leen iguales, claves con comillas, `json.texto(valor, verdadero)` en varias líneas y un error si el texto no es JSON válido.
 
+### Menús y diálogos
+
+- `juego.menu(["Jugar", "Salir"])` dibuja un menú y devuelve la opción elegida. Se maneja con teclado, mando, ratón o dedo, y tiene `atras` para las pausas.
+- `juego.dialogo(paginas)` abre una caja de diálogo con el texto saliendo letra a letra, quién habla, un retrato y respuestas para elegir (`juego.respuesta()`). Las páginas largas se parten solas.
+- Están escritos en Lince, en la biblioteca del módulo `juego`.
+- Ejemplo nuevo: `examples/12_aventura.lince`.
+
 ## 0.7.0
 
 La primera versión publicada. Lince pasa a ser un lenguaje para hacer videojuegos.

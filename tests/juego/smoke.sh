@@ -492,4 +492,16 @@ for l in "nada: nulo" "por defecto: 0.8" "nivel: 3, Ñandú, 95.5, verdadero" "o
 done
 [ -f casa/.local/share/lince/prueba18/opciones.json ] || [ -f casa/Lince/prueba18/opciones.json ] \
     && ok "partidas: en la carpeta de datos del usuario" || mal "partidas: no está opciones.json en la carpeta de datos"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida5b.txt; exit 1; }
+# ── Menús y diálogos, con teclas y con el ratón ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100 \
+    LINCE_JUEGO_GUION=5:abajo:1,10:entrar:1,20:espacio:1,30:espacio:1,40:abajo:1,45:abajo:1,50:entrar:1,60:escape:1 \
+    timeout 30 "$LINCE" "$DIR/prueba19.lince" > salida24.txt 2>&1
+for l in "menu: Opciones" "respuesta: Luego" "pausa: Continuar" 'error: menu() espera una lista de opciones, como ["Jugar", "Salir"]' \
+         "error: menu(): no conozco 'colr' (hay x, y, escala, fuente, color, color_elegido, separacion, atras, sonido_mover, sonido_elegir)" \
+         'error: dialogo(): cada página es un texto o un diccionario con "texto"'; do
+    grep -qxF "$l" salida24.txt && ok "menús y diálogos: $l" || mal "falta la línea: $l"
+done
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=12 LINCE_JUEGO_CLIC=160,150 \
+    timeout 30 "$LINCE" "$DIR/prueba19.lince" > salida25.txt 2>&1
+grep -qxF "menu: Salir" salida25.txt && ok "menús: se elige con un clic (o el dedo)" || mal "menús: el clic no elige"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida5b.txt; exit 1; }
