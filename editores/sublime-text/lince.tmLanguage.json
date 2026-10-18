@@ -96,7 +96,7 @@
     },
     "palabras_clave_declaracion": {
       "name": "keyword.declaration.lince",
-      "match": "\\b(sea|fijo|funcion|generador|clase|extiende|implementa|interfaz|enumeracion|mi|padre|importar|val|ref|abstracta|abstracto|estatico|privado|protegido|publico|sobrescribe|obtener|fijar|es|como)\\b"
+      "match": "\\b(sea|fijo|funcion|generador|clase|extiende|implementa|interfaz|enumeracion|mi|padre|importar|val|ref|abstracta|abstracto|estatico|privado|protegido|publico|sobrescribe|obtener|fijar|es|como|cualquiera)\\b"
     },
     "palabras_clave_tipos": {
       "name": "storage.type.lince",

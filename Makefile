@@ -22,7 +22,7 @@ RM = rm -f
 # ── Compilar ──────────────────────────────
 all: $(BIN)
 
-$(BIN): $(SRC) src/juego.h src/ogg.h src/imagen.h src/letra.h
+$(BIN): $(SRC) src/juego.h src/ogg.h src/imagen.h src/letra.h src/biblioteca_juego.h
 	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
 	@echo "✅ Lince compilado — usa: ./$(BIN) archivo.lince"
 
@@ -90,7 +90,7 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-ejemplos test-lsp test-editores editores-check test-depurador test-juego test-asan
+test-todo: test test-compilador test-ejemplos test-lsp test-editores editores-check bibliotecas-check test-depurador test-juego test-asan
 
 test-juego: $(BIN)
 	@bash tests/juego/smoke.sh ./$(BIN)
@@ -118,6 +118,15 @@ editores:
 
 editores-check:
 	@python3 editores/generar.py --comprobar
+
+# ── Bibliotecas escritas en Lince ─────────
+# src/lince/*.lince van dentro del ejecutable (src/biblioteca_*.h, generados
+# y en el repositorio para compilar sin Python).
+bibliotecas:
+	@python3 src/lince/incrustar.py
+
+bibliotecas-check:
+	@python3 src/lince/incrustar.py --comprobar
 
 test-depurador: $(BIN)
 	@bash tests/depurador/smoke.sh ./$(BIN)
@@ -157,5 +166,5 @@ endif
 
 .PHONY: all windows debug ejemplo test test-compilador test-ejemplos \
         test-asan test-depurador test-lsp test-editores editores editores-check bench vsix \
-        test-juego test-todo clean install uninstall docs docs-check
+        test-juego test-todo clean install uninstall docs docs-check bibliotecas bibliotecas-check
 

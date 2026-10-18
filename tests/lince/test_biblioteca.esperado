@@ -1,0 +1,13 @@
+número, texto, lista de 2, otra cosa
+[1, "dos"]
+6
+0.25
+0.875
+[10, 20]
+línea 25: curva(): la curva es "lineal", "suave", "entrar", "salir", "rebote", "elastico" o "atras"
+línea 29: acercar(): la rapidez no es negativa
+línea 30: ErrorTipo: curva(): Error de tipo en parámetro 't': se esperaba 'numero' pero se recibió 'texto'.
+línea 31: suavizar() espera de 4 a 5 argumentos y recibió 2.
+línea 32: suavizar(): los dos valores son números, o listas de números del mismo largo (como [x, y] o un color)
+línea 34: combo(): la ventana no está abierta: llama a juego.abrir() primero
+El módulo no tiene la función '_curva'.

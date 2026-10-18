@@ -244,7 +244,8 @@ static struct {
     int cam_quieta;
     unsigned tem_semilla;
     /* las últimas acciones pulsadas, para combo() */
-    struct { int accion; double t; int usada; } hist[JG_HISTORIAL];
+    struct { int accion; double t; int usada; double id; } hist[JG_HISTORIAL];
+    double hist_id;     /* número de la última pulsación apuntada */
     int nhist;
     /* LINCE_JUEGO_GUION: teclas mantenidas desde un fotograma durante otros tantos */
     struct { long desde, cuantos; int tecla; } guion[JG_GUION];
@@ -4485,75 +4486,76 @@ static void jg_historial(void) {
         if (_jgs.nhist == JG_HISTORIAL) memmove(_jgs.hist, _jgs.hist + 1, sizeof _jgs.hist[0] * --_jgs.nhist);
         _jgs.hist[_jgs.nhist].accion = i;
         _jgs.hist[_jgs.nhist].t = t;
+        _jgs.hist[_jgs.nhist].id = ++_jgs.hist_id;
         _jgs.hist[_jgs.nhist++].usada = 0;
     }
 }
 
-/* combo(acciones[, segundos]): ¿se han pulsado esas acciones en ese orden en
-   los últimos 'segundos' (0,5 si no se dice)? Puede haber otras pulsaciones en
-   medio. Cuando da verdadero, esas pulsaciones se gastan: no valen para otro
-   combo (así que se pregunta antes por los combos largos). Con una sola
-   acción sirve para no perder una pulsación hecha un poco antes de tiempo:
-   combo(["golpe"], 0.2) en vez de accion_pulsada("golpe"). */
-static Valor *fn_jg_combo(Valor **a, int n) {
+/* Lo que necesitan combo(), pulsaciones() y mantenida(), que están escritas en
+   Lince (src/lince/juego.lince): las pulsaciones se apuntan aquí, en
+   presentar(), con el reloj real (no se paran con congelar ni se frenan con
+   velocidad), y estas tres funciones las enseñan.
+
+   historial(segundos[, acciones]): las pulsaciones de los últimos 'segundos'
+   (solo las de esas acciones, si se dicen: nulo si alguna no está definida),
+   de la más antigua a la última, como {"accion", "hace" (segundos), "id", "gastada"} */
+static Valor *fn_jg_historial(Valor **a, int n) {
     JG_ABIERTA();
-    if (n < 1 || a[0]->tipo != VAL_LISTA || a[0]->lista.cantidad < 1 || a[0]->lista.cantidad > JG_HISTORIAL)
-        return jg_error("ErrorTipo", "combo() espera (lista de acciones[, segundos]), por ejemplo ([\"abajo\", \"adelante\", \"golpe\"], 0.5)");
-    double s = 0.5;
-    if (n > 1 && !jg_num(a, n, 1, &s, "combo")) return valor_nulo();
-    if (s < 0 || s > 10) return jg_error("Error", "combo(): los segundos van de 0 a 10");
-    int m = a[0]->lista.cantidad, idx[JG_HISTORIAL], usadas[JG_HISTORIAL];
-    for (int i = 0; i < m; i++) {
-        Valor *v = a[0]->lista.elementos[i];
-        Valor *arg[1] = {v};
-        JgAccion *acc = jg_accion_arg(arg, 1, 0, "combo");
-        if (!acc) return valor_nulo();
-        idx[i] = (int)(acc - _jgs.acciones);
+    double s;
+    if (!jg_num(a, n, 0, &s, "historial")) return valor_nulo();
+    int quiero[JG_ACCIONES], filtrar = n > 1 && a[1]->tipo == VAL_LISTA;
+    if (filtrar) {
+        memset(quiero, 0, sizeof quiero);
+        for (int k = 0; k < a[1]->lista.cantidad; k++) {
+            Valor *v = a[1]->lista.elementos[k];
+            JgAccion *acc = v->tipo == VAL_TEXTO ? jg_buscar_accion(v->texto) : NULL;
+            if (!acc) return valor_nulo();
+            quiero[acc - _jgs.acciones] = 1;
+        }
     }
-    double limite = jg_reloj_real() - s - 1e-9;
-    int j = _jgs.nhist - 1;
-    for (int i = m - 1; i >= 0; i--) {
-        while (j >= 0 && _jgs.hist[j].t >= limite && (_jgs.hist[j].usada || _jgs.hist[j].accion != idx[i])) j--;
-        if (j < 0 || _jgs.hist[j].t < limite) return valor_booleano(0);
-        usadas[i] = j--;
+    double ahora = jg_reloj_real(), limite = ahora - s - 1e-9;
+    int i = _jgs.nhist;
+    while (i > 0 && _jgs.hist[i - 1].t >= limite) i--;
+    Valor *l = valor_lista_crear();
+    for (; i < _jgs.nhist; i++) {
+        if (filtrar && !quiero[_jgs.hist[i].accion]) continue;
+        Valor *d = valor_diccionario_crear();
+        valor_diccionario_agregar(d, "accion", valor_texto(_jgs.acciones[_jgs.hist[i].accion].nombre));
+        valor_diccionario_agregar(d, "hace", valor_numero(ahora - _jgs.hist[i].t));
+        valor_diccionario_agregar(d, "id", valor_numero(_jgs.hist[i].id));
+        valor_diccionario_agregar(d, "gastada", valor_booleano(_jgs.hist[i].usada));
+        lista_agregar(l, d);
     }
-    for (int i = 0; i < m; i++) _jgs.hist[usadas[i]].usada = 1;
-    return valor_booleano(1);
+    return l;
 }
 
-/* pulsaciones(accion[, segundos]): cuántas veces se ha pulsado en los últimos
-   'segundos' (0,5 si no se dice), también las que ya ha gastado combo(). Para
-   los golpes de machacar un botón (pulsar puño muy deprisa) y para soltarse
-   de un agarre. */
-static Valor *fn_jg_pulsaciones(Valor **a, int n) {
+/* gastar(ids): esas pulsaciones ya no cuentan como sin gastar en historial() */
+static Valor *fn_jg_gastar(Valor **a, int n) {
     JG_ABIERTA();
-    JgAccion *acc = jg_accion_arg(a, n, 0, "pulsaciones");
-    if (!acc) return valor_nulo();
-    double s = 0.5;
-    if (n > 1 && !jg_num(a, n, 1, &s, "pulsaciones")) return valor_nulo();
-    if (s < 0 || s > 10) return jg_error("Error", "pulsaciones(): los segundos van de 0 a 10");
-    int k = (int)(acc - _jgs.acciones), cuenta = 0;
-    double limite = jg_reloj_real() - s - 1e-9;
-    for (int i = _jgs.nhist - 1; i >= 0 && _jgs.hist[i].t >= limite; i--)
-        if (_jgs.hist[i].accion == k) cuenta++;
-    return valor_numero(cuenta);
+    if (n < 1 || a[0]->tipo != VAL_LISTA) return jg_error("ErrorTipo", "gastar() espera una lista de ids (de historial())");
+    for (int k = 0; k < a[0]->lista.cantidad; k++) {
+        Valor *v = a[0]->lista.elementos[k];
+        if (v->tipo != VAL_NUMERO) continue;
+        for (int i = 0; i < _jgs.nhist; i++) if (_jgs.hist[i].id == v->numero) _jgs.hist[i].usada = 1;
+    }
+    return valor_nulo();
 }
 
-/* mantenida(accion[, margen]): cuántos segundos lleva pulsada (0 si no lo
-   está). Con 'margen', si se soltó hace menos de esos segundos dice cuánto
-   estuvo pulsada: para los golpes cargados (mantener atrás un segundo y
-   luego adelante y golpe: al pulsar adelante, atrás ya se ha soltado). */
-static Valor *fn_jg_mantenida(Valor **a, int n) {
+/* estado_accion(nombre): {"pulsada", "mantenida" (segundos que lleva), "soltada_hace"
+   (segundos, o -1 si no se ha soltado nunca), "duro" (lo que duró la última vez)};
+   nulo si la acción no está definida */
+static Valor *fn_jg_estado_accion(Valor **a, int n) {
     JG_ABIERTA();
-    JgAccion *acc = jg_accion_arg(a, n, 0, "mantenida");
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "estado_accion() espera el nombre de una acción");
+    JgAccion *acc = jg_buscar_accion(a[0]->texto);
     if (!acc) return valor_nulo();
-    double margen = 0;
-    if (n > 1 && !jg_num(a, n, 1, &margen, "mantenida")) return valor_nulo();
-    if (margen < 0 || margen > 10) return jg_error("Error", "mantenida(): el margen va de 0 a 10 segundos");
     double t = jg_reloj_real();
-    if (acc->desde >= 0) return valor_numero(t - acc->desde);
-    if (margen > 0 && acc->soltada >= 0 && t - acc->soltada <= margen + 1e-9) return valor_numero(acc->duro);
-    return valor_numero(0);
+    Valor *d = valor_diccionario_crear();
+    valor_diccionario_agregar(d, "pulsada", valor_booleano(acc->desde >= 0));
+    valor_diccionario_agregar(d, "mantenida", valor_numero(acc->desde >= 0 ? t - acc->desde : 0));
+    valor_diccionario_agregar(d, "soltada_hace", valor_numero(acc->soltada >= 0 ? t - acc->soltada : -1));
+    valor_diccionario_agregar(d, "duro", valor_numero(acc->duro));
+    return d;
 }
 
 /* direccion(negativa, positiva): de -1 a 1, gradual con el stick y entera con teclas.
@@ -4647,102 +4649,7 @@ static Valor *fn_jg_cuadro(Valor **a, int n) {
 }
 
 /* ── Movimiento suave ──
-   Una curva dice cómo se reparte un cambio en el tiempo: t va de 0 (empieza)
-   a 1 (acaba) y la curva da cuánto del camino se ha hecho. "lineal" va igual
-   todo el rato; las demás arrancan o paran poco a poco, se pasan un poco y
-   vuelven ("atras"), rebotan al llegar ("rebote") o vibran como un muelle
-   ("elastico"). */
-static const char *const JG_CURVAS[] = { "lineal", "suave", "entrar", "salir", "rebote", "elastico", "atras", NULL };
-
-static double jg_curva(int c, double t) {
-    t = t < 0 ? 0 : t > 1 ? 1 : t;
-    switch (c) {
-        case 0: return t;
-        case 1: return t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2;
-        case 2: return t * t * t;
-        case 3: return 1 - pow(1 - t, 3);
-        case 4: {
-            const double n1 = 7.5625, d1 = 2.75;
-            if (t < 1 / d1) return n1 * t * t;
-            if (t < 2 / d1) { t -= 1.5 / d1; return n1 * t * t + 0.75; }
-            if (t < 2.5 / d1) { t -= 2.25 / d1; return n1 * t * t + 0.9375; }
-            t -= 2.625 / d1;
-            return n1 * t * t + 0.984375;
-        }
-        case 5:
-            if (t == 0 || t == 1) return t;
-            return pow(2, -10 * t) * sin((t * 10 - 0.75) * (2 * M_PI / 3)) + 1;
-        default: {
-            const double c1 = 1.70158, c3 = c1 + 1;
-            return 1 + c3 * pow(t - 1, 3) + c1 * pow(t - 1, 2);
-        }
-    }
-}
-
-/* El número de la curva a[i] ("suave" si no se dice); -1 con el error puesto */
-static int jg_curva_arg(Valor **a, int n, int i, const char *fn) {
-    if (i >= n || a[i]->tipo == VAL_NULO) return 1;
-    if (a[i]->tipo == VAL_TEXTO)
-        for (int c = 0; JG_CURVAS[c]; c++) if (!strcmp(a[i]->texto, JG_CURVAS[c])) return c;
-    char msg[300];
-    snprintf(msg, sizeof msg, "%s(): la curva es \"lineal\", \"suave\", \"entrar\", \"salir\", \"rebote\", \"elastico\" o \"atras\"", fn);
-    jg_error("Error", msg);
-    return -1;
-}
-
-/* desde + (hasta - desde) * f, con números o con listas de números (posiciones, colores) */
-static Valor *jg_interpolar(Valor *desde, Valor *hasta, double f, const char *fn) {
-    if (desde->tipo == VAL_NUMERO && hasta->tipo == VAL_NUMERO) return valor_numero(desde->numero + (hasta->numero - desde->numero) * f);
-    int ok = desde->tipo == VAL_LISTA && hasta->tipo == VAL_LISTA && desde->lista.cantidad == hasta->lista.cantidad;
-    for (int i = 0; ok && i < desde->lista.cantidad; i++)
-        ok = desde->lista.elementos[i]->tipo == VAL_NUMERO && hasta->lista.elementos[i]->tipo == VAL_NUMERO;
-    if (!ok) {
-        char msg[200];
-        snprintf(msg, sizeof msg, "%s(): los dos valores son números, o listas de números del mismo largo (como [x, y] o un color)", fn);
-        return jg_error("ErrorTipo", msg);
-    }
-    Valor *r = valor_lista_crear();
-    for (int i = 0; i < desde->lista.cantidad; i++) {
-        double a = desde->lista.elementos[i]->numero, b = hasta->lista.elementos[i]->numero;
-        lista_agregar(r, valor_numero(a + (b - a) * f));
-    }
-    return r;
-}
-
-/* curva(nombre, t): cuánto del camino se ha hecho en el momento t (de 0 a 1) */
-static Valor *fn_jg_curva(Valor **a, int n) {
-    double t;
-    if (n < 2 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "curva() espera (nombre de la curva, t de 0 a 1)");
-    int c = jg_curva_arg(a, n, 0, "curva");
-    if (c < 0 || !jg_num(a, n, 1, &t, "curva")) return valor_nulo();
-    return valor_numero(jg_curva(c, t));
-}
-
-/* suavizar(desde, hasta, segundos, inicio[, curva]): el valor que toca ahora
-   en un cambio de 'desde' a 'hasta' que empezó en 'inicio' (un juego.tiempo())
-   y dura 'segundos'; antes de empezar, 'desde', y al acabar, 'hasta' */
-static Valor *fn_jg_suavizar(Valor **a, int n) {
-    double seg, inicio;
-    if (n < 4) return jg_error("ErrorTipo", "suavizar() espera (desde, hasta, segundos, inicio[, curva])");
-    if (!jg_num(a, n, 2, &seg, "suavizar") || !jg_num(a, n, 3, &inicio, "suavizar")) return valor_nulo();
-    int c = jg_curva_arg(a, n, 4, "suavizar");
-    if (c < 0) return valor_nulo();
-    double t = seg > 0 ? (jg_reloj() - inicio) / seg : 1;
-    return jg_interpolar(a[0], a[1], jg_curva(c, t), "suavizar");
-}
-
-/* acercar(actual, objetivo, rapidez): un paso de 'actual' hacia 'objetivo' en
-   este fotograma, más largo cuanto más lejos (frena al llegar). Con rapidez 10
-   recorre en una décima de segundo unos dos tercios de lo que le falta, vaya
-   el juego a los fotogramas que vaya. Para una cámara que sigue al jugador,
-   una barra de vida que baja... */
-static Valor *fn_jg_acercar(Valor **a, int n) {
-    double r;
-    if (n < 3) return jg_error("ErrorTipo", "acercar() espera (actual, objetivo, rapidez)");
-    if (!jg_num(a, n, 2, &r, "acercar")) return valor_nulo();
-    if (r < 0) return jg_error("Error", "acercar(): la rapidez no es negativa");
-    return jg_interpolar(a[0], a[1], 1 - exp(-r * _jgs.dt), "acercar");
-}
+   curva(), suavizar() y acercar() están escritas en Lince: src/lince/juego.lince */
 
 /* ── Partículas ──
    particulas(x, y[, opciones]) lanza un puñado desde (x, y); dibujar_particulas()
@@ -5619,9 +5526,6 @@ static void cargar_juego(Entorno *entorno) {
         {"captura",         fn_jg_captura,          1},
         {"pitido",          fn_jg_pitido,          -1},
         {"colision",        fn_jg_colision,        -1},
-        {"curva",           fn_jg_curva,           -1},
-        {"suavizar",        fn_jg_suavizar,        -1},
-        {"acercar",         fn_jg_acercar,         -1},
         {"caja",            fn_jg_caja,            -1},
         {"imagen",          fn_jg_imagen,           1},
         {"dibujar",         fn_jg_dibujar,         -1},
@@ -5660,9 +5564,6 @@ static void cargar_juego(Entorno *entorno) {
         {"accion",          fn_jg_accion,           1},
         {"accion_pulsada",  fn_jg_accion_pulsada,   1},
         {"accion_soltada",  fn_jg_accion_soltada,   1},
-        {"combo",           fn_jg_combo,           -1},
-        {"mantenida",       fn_jg_mantenida,       -1},
-        {"pulsaciones",     fn_jg_pulsaciones,     -1},
         {"direccion",       fn_jg_direccion,        2},
         {"recargado",       fn_jg_recargado,        0},
         {"colision_circulos", fn_jg_colision_circulos, 6},
@@ -5688,7 +5589,13 @@ static void cargar_juego(Entorno *entorno) {
         {"mover_en_mapa",   fn_jg_mover_en_mapa,   -1},
         {"dibujar_mapa",    fn_jg_dibujar_mapa,     2},
         {"camino",          fn_jg_camino,          -1},
+        {"historial",       fn_jg_historial,       -1},
+        {"gastar",          fn_jg_gastar,           1},
+        {"estado_accion",   fn_jg_estado_accion,    1},
     };
     registrar_modulo_diccionario(entorno, "juego",
         fns, (int)(sizeof(fns) / sizeof(fns[0])), NULL, NULL, 0);
+    /* Y lo que está escrito en Lince: combo, pulsaciones, mantenida, curva,
+       suavizar y acercar */
+    interprete_biblioteca(entorno, "juego", BIBLIOTECA_JUEGO);
 }

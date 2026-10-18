@@ -1,0 +1,36 @@
+# TEST: el tipo 'cualquiera' y las funciones de 'juego' escritas en Lince
+importar "juego"
+
+# 'cualquiera' acepta lo que sea; con 'es' se mira qué es
+funcion describir(val cualquiera v): texto {
+    si v es numero { devolver "número" }
+    si v es texto { devolver "texto" }
+    si v es lista { devolver "lista de {v.longitud()}" }
+    devolver "otra cosa"
+}
+escribir(describir(3) + ", " + describir("a") + ", " + describir([1, 2]) + ", " + describir(nulo))
+funcion lo_mismo(val cualquiera v): cualquiera { devolver v }
+escribir(lo_mismo([1, "dos"]))
+# 'cualquiera' no es palabra reservada: fuera de un tipo es un nombre normal
+sea cualquiera = 5
+escribir(cualquiera + 1)
+
+# Las funciones de la biblioteca son funciones del módulo como las de C
+escribir(juego.curva("lineal", 0.25))
+escribir(juego.curva("salir", 0.5))
+escribir(juego.suavizar([0, 0], [10, 20], 1, -5))
+
+# Un error dentro se cuenta en la línea de quien llama, con el nombre delante
+intentar {
+    juego.curva("rara", 0.5)
+} capturar (error e) {
+    escribir("línea {e.linea}: {e.mensaje}")
+}
+intentar { juego.acercar(1, 2, -1) } capturar (error e) { escribir("línea {e.linea}: {e.mensaje}") }
+intentar { juego.curva("lineal", "x") } capturar (error e) { escribir("línea {e.linea}: {e.tipo}: {e.mensaje}") }
+intentar { juego.suavizar(1, 2) } capturar (error e) { escribir("línea {e.linea}: {e.mensaje}") }
+intentar { juego.suavizar(1, [2], 1, 0) } capturar (error e) { escribir("línea {e.linea}: {e.mensaje}") }
+# Sin ventana, las de las pulsaciones avisan
+intentar { juego.combo(["a"]) } capturar (error e) { escribir("línea {e.linea}: {e.mensaje}") }
+# Las de ayuda (con '_' delante) no se ven desde fuera
+intentar { juego._curva("lineal", 1) } capturar (error e) { escribir(e.mensaje) }

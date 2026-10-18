@@ -69,6 +69,9 @@ static int    profundidad    = 0;
 static const char *_pila_nombre[PILA_MAX];
 static int         _pila_linea[PILA_MAX];
 static void (*_hook_sentencia)(Nodo *s, Entorno *e) = NULL;
+/* > 0 mientras corre código de una biblioteca estándar escrita en Lince: el
+   depurador no se para dentro (sus líneas no son del programa) */
+static int _en_biblioteca = 0;
 
 void interprete_fijar_hook(void (*hook)(Nodo *sentencia, Entorno *e)) { _hook_sentencia = hook; }
 int  interprete_profundidad(void) { return profundidad; }
@@ -2640,6 +2643,61 @@ desconocido:
     return r;
 }
 
+/* Una función de biblioteca (juego.combo...) llamada desde el programa: como
+   una función Lince normal (con sus valores por defecto), pero un error dentro
+   se cuenta en la línea de quien llama y con el nombre de la función delante,
+   que es lo que entiende quien la usa: sus líneas no están en su programa. */
+static Valor *llamar_biblioteca(Valor *vf, Valor **args, int nargs, int linea) {
+    FuncionLince *f = vf->funcion;
+    int req = 0;
+    for (int i = 0; i < f->num_parametros; i++)
+        if (!f->parametros[i].valor_defecto) req++;
+    if (nargs < req || nargs > f->num_parametros) {
+        for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
+        if (req == f->num_parametros)
+            return error_rt("ErrorArgumento", linea, "%s() espera %d argumento%s y recibió %d.",
+                            f->nombre, req, req == 1 ? "" : "s", nargs);
+        return error_rt("ErrorArgumento", linea, "%s() espera de %d a %d argumentos y recibió %d.",
+                        f->nombre, req, f->num_parametros, nargs);
+    }
+    if (++profundidad > MAX_PROFUNDIDAD) {
+        profundidad = 0;
+        for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
+        return error_rt("ErrorRecursion", linea, "Demasiadas llamadas anidadas en '%s'.", f->nombre);
+    }
+    vf->refs++;
+    Entorno *fn_e = entorno_crear(f->entorno_closure);
+    _en_biblioteca++;
+    for (int i = 0; i < f->num_parametros && !hay_error; i++) {
+        Valor *arg = i < nargs ? args[i] : ejecutar(f->parametros[i].valor_defecto, fn_e);
+        if (i < nargs) args[i] = NULL;
+        validar_tipo(arg, f->parametros[i].tipo, "parámetro", f->parametros[i].nombre, linea);
+        entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
+    }
+    for (int i = 0; i < nargs; i++) if (args[i]) valor_destruir(args[i]);
+    if (!hay_error) valor_destruir(ejecutar(f->cuerpo, fn_e));
+    _en_biblioteca--;
+    Valor *r = tomar_retorno();
+    if (!hay_error) validar_tipo(r, f->tipo_retorno, "retorno de función", f->nombre, linea);
+    entorno_destruir(fn_e);
+    profundidad--;
+    valor_destruir(vf);
+    if (hay_error && valor_error && valor_error->tipo == VAL_ERROR &&
+        strcmp(valor_error->error->tipo, ERROR_RECARGA) != 0) {
+        ErrorLince *er = valor_error->error;
+        er->linea = linea;
+        size_t ln = strlen(f->nombre);
+        if (strncmp(er->mensaje, f->nombre, ln) != 0 || er->mensaje[ln] != '(') {
+            char *m = malloc(ln + strlen(er->mensaje) + 8);
+            sprintf(m, "%s(): %s", f->nombre, er->mensaje);
+            free(er->mensaje);
+            er->mensaje = m;
+        }
+    }
+    if (hay_error) { valor_destruir(r); return valor_nulo(); }
+    return r;
+}
+
 /* 'src' con cada 'pat' (no vacío) cambiado por 'rep', en memoria nueva */
 static char *texto_reemplazar(const char *src, const char *pat, const char *rep) {
     size_t lp = strlen(pat), lr = strlen(rep), veces = 0;
@@ -2694,7 +2752,9 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                     args[j] = ejecutar(n->metodo.argumentos[j], e);
 
                 Valor *resultado;
-                if (f->entorno_closure == NULL) {
+                if (f->de_biblioteca) {
+                    resultado = llamar_biblioteca(vf, args, nargs, n->linea);
+                } else if (f->entorno_closure == NULL) {
                     /* Nativa: 'cuerpo' guarda el puntero a la función C */
                     typedef Valor *(*FnNativa)(Valor**, int);
                     FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
@@ -3750,7 +3810,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             Valor *ultimo = valor_nulo();
             for (int i = 0; i < n->bloque.cantidad && !hay_retorno && !hay_error && !hay_salto; i++) {
                 valor_destruir(ultimo);
-                if (_hook_sentencia) _hook_sentencia(n->bloque.sentencias[i], e);
+                if (_hook_sentencia && !_en_biblioteca) _hook_sentencia(n->bloque.sentencias[i], e);
                 ultimo = ejecutar(n->bloque.sentencias[i], e);
             }
             return ultimo;
@@ -4427,6 +4487,49 @@ char *valor_a_texto_repl(Valor *v) {
    el delta de cada frame. */
 static void soltar_args(Valor **args, int desde, int nargs) {
     for (int i = desde; i < nargs; i++) valor_destruir(args[i]);
+}
+
+void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const char *codigo) {
+    /* El árbol se hace una vez por biblioteca y se guarda: las funciones que
+       define lo usan mientras viva el programa */
+    static struct { const char *codigo; Nodo *ast; } hechas[8];
+    static int nhechas = 0;
+    Nodo *ast = NULL;
+    for (int i = 0; i < nhechas; i++) if (hechas[i].codigo == codigo) ast = hechas[i].ast;
+    if (!ast) {
+        Lexer  *lx  = lexer_crear(codigo);
+        int     cnt = 0;
+        Token  *tok = lexer_tokenizar(lx, &cnt);
+        Parser *pa  = parser_crear(tok, cnt);
+        ast = parser_parsear(pa);
+        parser_destruir(pa);
+        lexer_destruir(lx);
+        if (nhechas < 8) { hechas[nhechas].codigo = codigo; hechas[nhechas++].ast = ast; }
+    }
+    if (hay_error) return;
+    Valor *mod = entorno_obtener(entorno, nombre_modulo, 0);
+    if (hay_error || mod->tipo != VAL_DICCIONARIO) { valor_destruir(mod); return; }
+
+    /* Su ámbito cuelga del de más fuera (donde están escribir, a_texto...) */
+    Entorno *raiz = entorno;
+    while (raiz->padre) raiz = raiz->padre;
+    Entorno *bib = entorno_crear(raiz);
+    entorno_definir(bib, nombre_modulo, valor_retener(mod), 0);
+    _en_biblioteca++;
+    valor_destruir(ejecutar(ast, bib));
+    _en_biblioteca--;
+    for (int i = 0; i < bib->cantidad && !hay_error; i++) {
+        Valor *v = bib->vars[i].valor;
+        if (v->tipo != VAL_FUNCION || !v->funcion) continue;
+        v->funcion->de_biblioteca = 1;
+        const char *nombre = bib->vars[i].nombre;
+        if (nombre[0] == '_') continue;
+        int k = valor_diccionario_buscar(mod, nombre);
+        if (k >= 0) { valor_destruir(mod->diccionario.valores[k]); mod->diccionario.valores[k] = valor_retener(v); }
+        else valor_diccionario_agregar(mod, nombre, valor_retener(v));
+    }
+    entorno_destruir(bib);      /* sigue vivo: lo retienen sus funciones */
+    valor_destruir(mod);
 }
 
 Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {

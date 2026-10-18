@@ -889,6 +889,9 @@ static TipoDato parsear_tipo(Parser *p, char **tipo_clase_out) {
     if (coincide(p, TOK_FUNCION))                                { consumir_cualquiera(p); return TIPO_FUNCION; }
     if (coincide(p, TOK_IDENTIFICADOR)) {
         Token *t = consumir_cualquiera(p);
+        /* 'cualquiera': acepta un valor de cualquier tipo (no es palabra
+           reservada, solo significa eso donde va un tipo) */
+        if (strcmp(t->valor, "cualquiera") == 0) return TIPO_CUALQUIERA;
         if (tipo_clase_out) *tipo_clase_out = strdup(t->valor);
         return TIPO_CLASE;
     }

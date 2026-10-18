@@ -184,7 +184,8 @@ da `ErrorRango`.
 ### Reglas
 
 - Todo parámetro indica `val` o `ref`
-- Todo parámetro tiene tipo declarado
+- Todo parámetro tiene tipo declarado; `cualquiera` acepta un valor de cualquier tipo
+  (`val cualquiera v`, y también como tipo de retorno), y con `es` se mira cuál es
 - Toda función declara su tipo de retorno
 - `val` — copia; `ref` — referencia (los cambios afectan al original)
 - Parámetros con valor por defecto van al final
@@ -852,7 +853,16 @@ Ventana 2D con dibujo, imágenes, teclado, ratón, mando y sonido, para hacer
 videojuegos. Usa SDL2, que se carga al abrir la ventana (no hace falta para compilar
 Lince). Las imágenes y el OGG los lee el propio Lince. En Debian/Ubuntu:
 `sudo apt install libsdl2-2.0-0`; en Windows, `SDL2.dll` junto al juego (`lince repartir`
-la pone). El bucle lo escribes tú:
+la pone).
+
+Casi todo `juego` está en C, porque habla con la pantalla, el teclado, el mando y el altavoz o
+trabaja píxel a píxel. Lo que no lo necesita está escrito en Lince, en
+[`src/lince/juego.lince`](src/lince/juego.lince), y va dentro del ejecutable: `combo`,
+`mantenida`, `pulsaciones`, `curva`, `suavizar` y `acercar`. Para quien lo usa no hay
+diferencia; quien quiera una versión distinta puede leerla y copiarla. Un error dentro de una de
+esas funciones se cuenta en la línea del programa que la llamó.
+
+El bucle lo escribes tú:
 
 ```lince
 importar "juego"
@@ -1177,6 +1187,15 @@ si g != nulo {
 `combo()` mira las acciones de `definir_accion()`. «Adelante» depende de hacia dónde mire el
 personaje: `combo(["abajo", "derecha", "golpe"])` si mira a la derecha. Los combos no pierden
 pulsaciones durante `congelar()`: se miden en tiempo de verdad.
+
+`combo`, `mantenida` y `pulsaciones` están escritas en Lince, encima de tres funciones de C que
+también se pueden usar para hacer otras parecidas:
+
+| Función | Qué hace |
+|---|---|
+| `historial(segundos[, acciones])` | las pulsaciones de los últimos `segundos` (solo las de esas acciones, si se dicen), de la más antigua a la última. Cada una es `{"accion", "hace", "id", "gastada"}`: `hace` son los segundos que han pasado, en tiempo de verdad. Da `nulo` si alguna de las acciones no está definida |
+| `gastar(ids)` | marca esas pulsaciones (por su `id`) como gastadas, como hace `combo()` |
+| `estado_accion(acción)` | `{"pulsada", "mantenida", "soltada_hace", "duro"}`: si está pulsada, cuántos segundos lleva, hace cuánto se soltó (-1 si nunca) y cuánto duró pulsada la última vez. `nulo` si no está definida |
 
 La inteligencia de los enemigos se escribe en Lince, normalmente como una máquina de estados: un
 `"estado"` en el diccionario de cada uno (acercarse, atacar, esperar, recibir, por los aires, en el

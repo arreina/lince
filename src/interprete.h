@@ -42,6 +42,7 @@ typedef struct {
     int                 abstracto;
     int                 prop;       /* 1 = obtener, 2 = fijar */
     struct ClaseLince  *duena;      /* clase que lo declara */
+    int                 de_biblioteca;  /* escrita en Lince dentro de un módulo estándar */
 } FuncionLince;
 
 enum { VIS_PUBLICO = 0, VIS_PRIVADO = 1, VIS_PROTEGIDO = 2 };
@@ -234,6 +235,12 @@ void        valor_destruir(Valor *v);
 /* Llama a una función Lince desde un módulo nativo. Se queda con la
    propiedad de args[]. */
 Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs);
+
+/* La parte de un módulo estándar escrita en Lince: ejecuta 'codigo' en un
+   ámbito propio (donde 'nombre_modulo' es el propio módulo, ya definido en
+   'entorno') y añade al módulo cada función cuyo nombre no empiece por '_'.
+   'codigo' tiene que vivir siempre (el árbol se guarda la primera vez). */
+void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const char *codigo);
 
 /* Ruta del fichero que se va a ejecutar. Sirve para resolver los
    'importar "./x"' junto al fichero que los escribe, no junto al directorio

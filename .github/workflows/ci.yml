@@ -46,6 +46,10 @@ jobs:
       - name: Los editores están al día
         run: make editores-check
 
+      # src/lince/*.lince va dentro del ejecutable como src/biblioteca_*.h
+      - name: Las bibliotecas en Lince están al día
+        run: make bibliotecas-check
+
       # El manual publica la salida real de cada ejemplo, así que si alguien
       # toca uno sin regenerar —o el lenguaje cambia de comportamiento— la
       # página quedaría mintiendo. Esto lo detecta.
