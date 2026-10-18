@@ -1776,10 +1776,16 @@ void parser_avisos(Parser *p, void (*avisar)(int linea, const char *mensaje)) {
         const char *nombre = NULL;
         int todos = 1;
         for (int c = 0; c < el->elegir.num_casos && todos; c++) {
+            /* Estado.Quieto, o alias.Estado.Quieto si se importó 'como' */
             Nodo *v = el->elegir.valores[c];
-            todos = v->tipo == NODO_ACCESO && v->acceso.objeto->tipo == NODO_IDENTIFICADOR &&
-                    (!nombre || strcmp(nombre, v->acceso.objeto->identificador) == 0);
-            if (todos) nombre = v->acceso.objeto->identificador;
+            const char *este = NULL;
+            if (v->tipo == NODO_ACCESO && v->acceso.objeto->tipo == NODO_IDENTIFICADOR)
+                este = v->acceso.objeto->identificador;
+            else if (v->tipo == NODO_ACCESO && v->acceso.objeto->tipo == NODO_ACCESO &&
+                     v->acceso.objeto->acceso.objeto->tipo == NODO_IDENTIFICADOR)
+                este = v->acceso.objeto->acceso.campo;
+            todos = este && (!nombre || strcmp(nombre, este) == 0);
+            if (todos) nombre = este;
         }
         Nodo *en = NULL;
         for (int k = 0; todos && k < p->nenums && !en; k++)

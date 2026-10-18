@@ -122,3 +122,35 @@ sea suma = 0
 para cada numero v en rango(0, 1, 0.25) { suma += v }
 escribir(suma)
 intentar { rango("a") } capturar (error e) { escribir(e.mensaje) }
+
+# Guardado en una variable, sigue por donde iba; se para al soltarlo
+generador contador(): numero {
+    sea i = 0
+    intentar {
+        mientras verdadero {
+            producir i
+            i++
+        }
+    } capturar (error e) {
+        escribir("no debería")
+    } finalmente {
+        escribir("contador: cerrado")
+    }
+}
+sea g = contador()
+escribir(g)
+para cada numero n en g { si n == 2 { romper } }
+para cada numero n en g {
+    escribir("sigue en {n}")
+    si n == 4 { romper }
+}
+g = nulo
+sea dos = rango(2)
+para cada numero x en dos { escribir("rango {x}") }
+para cada numero x en dos { escribir("otra vez {x}") }
+generador propio(): numero {
+    producir 1
+    para cada numero x en yo { producir x }
+}
+sea yo = propio()
+intentar { para cada numero x en yo { escribir(x) } } capturar (error e) { escribir(e.mensaje) }

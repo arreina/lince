@@ -177,6 +177,9 @@ enemigo.al_morir()          # una función guardada en el campo (si la clase no 
 El `(` va en la misma línea que lo que se llama: uno al principio de la línea siguiente
 empieza otra expresión.
 
+Dos funciones son iguales (`==`) si son la misma: la misma declaración, o la misma lambda
+guardada en dos sitios. Dos lambdas escritas igual son distintas.
+
 ### Asignación compuesta
 
 `+=`, `-=`, `*=`, `/=` y `%=` operan y guardan en un solo paso, en
@@ -701,7 +704,8 @@ para cada Direccion dir en Direccion {
 - Como clave de un diccionario cuenta su texto: `veces[Estado.Quieto] = 1` es la clave
   `"Estado.Quieto"`
 - **Aviso de `elegir`**: si un `elegir` sin `otro` tiene todos sus casos de la misma
-  enumeración (del mismo archivo o de uno importado con `importar "./..."`) pero le faltan
+  enumeración (del mismo archivo o de uno importado con `importar "./..."`, también con
+  `como`) pero le faltan
   valores, Lince avisa al empezar,
   con `lince comprobar` y en el editor. Lo normal es que se haya añadido un valor y se haya
   olvidado ahí:
@@ -744,10 +748,14 @@ Los números se calculan según se recorren: `rango(1000000)` no ocupa memoria.
 - `generador` declara una función generadora en vez de `funcion`
 - `producir` da un valor a quien recorre el generador, y el generador se queda parado
   ahí hasta que le pida el siguiente: los valores salen de uno en uno, según se usan
-- Los generadores se usan con `para cada`, y cada uno se recorre una vez
+- Los generadores se usan con `para cada`. Guardado en una variable (`sea g = contar(10)`),
+  un generador sigue por donde iba: si un bucle sale con `romper`, el siguiente `para cada`
+  sobre `g` continúa con el valor siguiente, y cuando acaba ya no da más. `rango()` se puede
+  recorrer las veces que se quiera
 - No tienen límite de valores: uno puede no acabar nunca (`mientras verdadero { producir n }`).
-  Si el bucle sale antes (`romper`, `devolver` o un error), el generador se para y se
-  ejecutan sus `finalmente`
+  Si el bucle sale antes (`romper`, `devolver` o un error) y el generador no está guardado en
+  ninguna variable, se para y se ejecutan sus `finalmente`; uno guardado se para cuando se
+  suelta (`g = nulo`)
 - Dentro de un generador no se puede `esperar()`: quien espera es quien lo recorre
 
 ---

@@ -44,3 +44,5 @@ Un valor de una enumeración tiene 'nombre', 'valor' e 'indice'; no tiene 'color
 ✅ Sintaxis correcta: test_enumeraciones_tmp.lince
 ⚠️  Aviso en línea 3: este 'elegir' no trata Fase.Uno ni Fase.Tres: añádelos, o pon 'otro { }' si no hace falta.
 ✅ Sintaxis correcta: test_enumeraciones_tmp.lince
+⚠️  Aviso en línea 3: este 'elegir' no trata Fase.Dos ni Fase.Tres: añádelos, o pon 'otro { }' si no hace falta.
+✅ Sintaxis correcta: test_enumeraciones_tmp.lince

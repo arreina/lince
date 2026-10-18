@@ -6,12 +6,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Lenguaje
 
-- [ ] **El aviso de `elegir` con un alias:** no se da cuando la enumeración viene de `importar "./x" como x` (los casos son `x.Estado.Quieto`).
-- [ ] **Comparar funciones con `==`:** hoy siempre da `falso`.
-- [ ] **Guardar un generador en una variable.**
-  - `sea g = contar(5)` deja `g` en `nulo`, porque copiar un generador da `nulo`.
-  - Solo se puede recorrer directamente: `para cada x en contar(5)`.
-  - Si se arregla, el generador se recorrerá una sola vez.
+Nada pendiente ahora mismo: lo que vaya saliendo se apunta aquí.
 
 ## Biblioteca de juego en Lince
 

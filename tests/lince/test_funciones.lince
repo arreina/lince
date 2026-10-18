@@ -77,3 +77,11 @@ intentar { golpes.agregar(uno)
 sea a = doble
 (uno)
 escribir(a(5))
+
+# Una función es igual a sí misma (aunque esté guardada en otro sitio)
+funcion nada(): nulo { }
+sea otra = nada
+escribir(otra == nada)
+escribir(nada != nada)
+escribir(funcion(): nulo { } == nada)
+escribir(golpes[1] == doble)

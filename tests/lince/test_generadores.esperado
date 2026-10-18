@@ -45,3 +45,13 @@ capturado: en el cuerpo
 20000
 1.5
 rango() espera de 1 a 3 números: rango(fin), rango(desde, fin) o rango(desde, fin, paso).
+<generador contador>
+sigue en 3
+sigue en 4
+contador: cerrado
+rango 0
+rango 1
+otra vez 0
+otra vez 1
+1
+Un generador no puede recorrerse a sí mismo mientras produce.

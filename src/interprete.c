@@ -576,6 +576,7 @@ static Valor *valor_copiar(Valor *v) {
         case VAL_BYTES:
         case VAL_TAREA:
         case VAL_ENUMERADO:
+        case VAL_GENERADOR:     /* guardado en una variable, sigue por donde iba */
             return valor_retener(v);
         default:              return valor_nulo();
     }
@@ -622,6 +623,12 @@ static char *valor_a_texto(Valor *v) {
             return strdup(buf);
         case VAL_ENUMERADO:
             return strdup(v->miembro->texto);
+        case VAL_GENERADOR:
+            if (v->generador.productor)
+                snprintf(buf, sizeof(buf), "<generador %s>", tarea_nombre(v->generador.productor));
+            else
+                snprintf(buf, sizeof(buf), "<rango de %g a %g>", v->generador.desde, v->generador.hasta);
+            return strdup(buf);
         case VAL_CLASE:
             snprintf(buf, sizeof(buf), "<clase %s>", v->clase->nombre);
             return strdup(buf);
@@ -1331,6 +1338,12 @@ static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
         if (ig >= 0) resultado = valor_booleano(op[0] == '=' ? ig : !ig);
     }
 
+    /* Funciones: iguales si son la misma (la misma declaración, o la misma
+       lambda guardada en dos sitios) */
+    if (!resultado && izq->tipo == VAL_FUNCION && der->tipo == VAL_FUNCION &&
+        (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0))
+        resultado = valor_booleano((izq->funcion == der->funcion) == (op[0] == '='));
+
     /* Tareas: iguales si son la misma */
     if (!resultado && izq->tipo == VAL_TAREA && der->tipo == VAL_TAREA &&
         (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0))
@@ -1800,6 +1813,10 @@ static Valor *fn_esperar(Valor **a, int n) {
 /* El siguiente valor, o NULL si ha acabado o ha fallado (con hay_error) */
 static Valor *generador_siguiente(TareaLince *g) {
     if (g->estado == TAREA_TERMINADA) return NULL;
+    if (g->estado == TAREA_CORRIENDO) {
+        error_rt("Error", linea_llamada(), "Un generador no puede recorrerse a sí mismo mientras produce.");
+        return NULL;
+    }
     tarea_entrar(g);
     if (hay_error || g->estado == TAREA_TERMINADA) return NULL;
     Valor *v = g->producido;
@@ -2604,7 +2621,8 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
             entorno_destruir(iter);
             if (hay_salto && fin_de_vuelta()) break;
         }
-        if (g) generador_cerrar(g);
+        /* Si solo lo tenía el bucle, al soltarlo se para (generador_liberar);
+           si está guardado en una variable, se queda donde iba */
         valor_destruir(col);
         return valor_nulo();
     }
