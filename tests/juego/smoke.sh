@@ -466,4 +466,11 @@ for l in "tactil: falso" "dedo en: 15,15" "pulsada: 5, nuevos: 5"; do
     grep -qxF "$l" salida20.txt && ok "táctil: $l" || mal "falta la línea: $l"
 done
 grep -qF 'un botón en la pantalla es "pantalla:x,y,ancho,alto"' salida20.txt && ok "táctil: error de un botón mal escrito" || mal "falta el error de pantalla:"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida5b.txt; exit 1; }
+# ── Mando en la pantalla táctil (el clic de prueba encima del botón A) ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 LINCE_JUEGO_CLIC=388,214 timeout 20 "$LINCE" "$DIR/prueba16.lince" > salida21.txt 2>&1
+for l in "saltos: 5, con boton(): 5" "palanca: 0" "eje limitado: 1"; do
+    grep -qxF "$l" salida21.txt && ok "mando táctil: $l" || mal "falta la línea: $l"
+done
+grep -qF 'no conozco '"'"'boton'"'" salida21.txt && grep -qF '"botones" es una lista' salida21.txt && ok "mando táctil: errores de opciones" || mal "faltan los errores de mando_tactil"
+grep -q "no debería" salida21.txt && mal "mando táctil: se pulsó B" || ok "mando táctil: B no se pulsa"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida5b.txt; exit 1; }

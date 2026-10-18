@@ -1041,6 +1041,7 @@ mientras juego.abierto() {
 | `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
 | `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
 | `texto(t, x, y, opciones)` · `ancho_texto(t, opciones)` · `medir_texto(t[, opciones])` | con otra fuente, alineado o partido en líneas (ver **Letras**, abajo). `medir_texto` da `[ancho, alto]` |
+| `posicion_camara()` | `[x, y]` de la cámara (sin el temblor) |
 | `camara(x, y)` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador, que tampoco tiembla con `temblor()` |
 | `captura(ruta)` | guarda la ventana como `.bmp` |
 
@@ -1089,6 +1090,8 @@ minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del j
 | `raton()` · `boton_raton(n)` · `clic(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · giro de la rueda |
 | `mandos()` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4) · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
 | `cursor(visible)` · `capturar_raton(si)` · `movimiento_raton()` | muestra u oculta la flecha · encierra y oculta el ratón para apuntar (devuelve si se pudo) · `[dx, dy]` movido desde el fotograma anterior |
+| `mando_tactil([opciones])` · `mando_tactil(falso)` | pone en la pantalla táctil un mando como el de los juegos de móvil: a la izquierda una palanca que aparece donde se apoya el pulgar, y a la derecha los botones. Funciona como un mando de verdad (se suma al mando 1), así que las acciones con `"mando:a"`, `"mando:izq_x-"` o `"mando:izquierda"` (la palanca también hace de cruceta), `boton()` y `eje()` sirven sin cambiar nada. Opciones: `botones` (`["a", "b"]`; con `"x"`, `"y"` en rombo, e `"inicio"` arriba), `palanca` (verdadero), `alfa` (120), `tamano` (1) y `siempre` (falso: solo se ve si hay pantalla táctil; verdadero, también en el ordenador, con el ratón). Se dibuja encima de todo, sin moverse con la cámara. Está escrito en Lince |
+| `mando_virtual(botones, ejes)` | para hacer un mando propio: deja pulsados esos botones (`["a"]`) y esos ejes (`{"izq_x": -0.5}`) en el mando 1 hasta que se cambien |
 | `toques()` · `tactil()` | los dedos que hay en la pantalla táctil: una lista de `{"id", "x", "y", "nuevo"}` en coordenadas del juego (`nuevo`: empezó a tocar en este fotograma; `id` sigue al mismo dedo mientras no se levante). Sin pantalla táctil, el botón izquierdo del ratón cuenta como un dedo, para probarlo en el ordenador · ¿hay pantalla táctil? (en un móvil, siempre) |
 | `editar(texto[, maximo])` · `texto_escrito()` | el texto con lo tecleado añadido y «borrar» aplicado (tildes y ñ incluidas) · lo tecleado en este fotograma |
 

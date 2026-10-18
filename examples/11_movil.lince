@@ -1,14 +1,16 @@
 # 🐆 Lince — En el móvil
 #
 # Para probar Lince en un móvil Android (android/construir.sh), y también en
-# el ordenador: los botones de la pantalla mueven y hacen saltar al lince
-# (con el ratón, que cuenta como un dedo, o con las flechas y el espacio).
-# Cada dedo en la pantalla se ve como un círculo con su número. Una estrella
-# parpadea con una tarea, y el juego cuenta en un archivo cuántas veces se ha
-# abierto. El botón «atrás» del móvil (o Esc) sale.
+# el ordenador. Se juega con un mando en la pantalla, como los juegos de móvil:
+# la palanca aparece donde se pone el pulgar izquierdo y el botón A salta (en
+# el ordenador, con el ratón, que cuenta como un dedo; o con las flechas y el
+# espacio, o con un mando). Cada dedo en la pantalla se ve como un círculo con
+# su número. Una estrella parpadea con una tarea, y el juego cuenta en un
+# archivo cuántas veces se ha abierto. El botón «atrás» del móvil (o Esc) sale.
 #
-# Muestra: juego.toques(), botones táctiles con "pantalla:" en las acciones,
-#          tareas, efectos de sonido y guardar datos.
+# Muestra: juego.mando_tactil() (las acciones con "mando:..." funcionan igual
+#          con el de la pantalla), juego.toques(), tareas, efectos de sonido
+#          y guardar datos.
 importar "juego"
 importar "archivos"
 importar "matematica"
@@ -16,12 +18,12 @@ importar "matematica"
 fijo ANCHO = 480
 fijo ALTO = 270
 fijo SUELO = 200
-fijo BOTONES = {"izquierda": [16, 206, 56, 56], "derecha": [80, 206, 56, 56], "saltar": [408, 206, 56, 56]}
 
 juego.abrir("Lince en el móvil", ANCHO, ALTO, {"escala": 2})
-juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-", "pantalla:16,206,56,56"])
-juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+", "pantalla:80,206,56,56"])
-juego.definir_accion("saltar", ["espacio", "arriba", "mando:a", "pantalla:408,206,56,56"])
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("saltar", ["espacio", "arriba", "mando:a"])
+juego.mando_tactil({"botones": ["a", "b"], "siempre": verdadero})
 juego.definir_accion("salir", ["escape"])
 
 fijo LINCE = juego.sprite([
@@ -61,14 +63,6 @@ tarea parpadear() {
 }
 parpadear()
 
-funcion boton(val texto nombre, val texto letra): nulo {
-    sea r = BOTONES[nombre]
-    sea color = si juego.accion(nombre) { [255, 200, 80, 220] } sino { [255, 255, 255, 70] }
-    juego.rectangulo(r[0], r[1], r[2], r[3], color)
-    juego.contorno(r[0], r[1], r[2], r[3], [255, 255, 255, 160])
-    juego.texto(letra, r[0] + r[2] / 2 - 6, r[1] + r[3] / 2 - 7, 2, [30, 30, 40])
-}
-
 mientras juego.abierto() {
     si juego.accion_pulsada("salir") { juego.salir() }
     sea dt = juego.dt()
@@ -98,10 +92,7 @@ mientras juego.abierto() {
         juego.circulo(t["x"], t["y"], 18, [120, 200, 255, 120])
         juego.texto(a_texto(t["id"] % 100), t["x"] - 4, t["y"] - 4, 1, [255, 255, 255])
     }
-    juego.texto("DEDOS: {dedos.longitud()}", 12, 56, 1, [220, 220, 230])
-
-    boton("izquierda", "<")
-    boton("derecha", ">")
-    boton("saltar", "^")
+    juego.texto("DEDOS: {dedos.longitud()} - PALANCA: {matematica.redondear(juego.eje("izq_x") * 10) / 10}" +
+                "{si juego.boton("b") { " - B" } sino { "" }}", 12, 56, 1, [220, 220, 230])
     juego.presentar()
 }

@@ -47,10 +47,15 @@ errores) se ve con `adb logcat -s lince`.
 
 - **Pantalla**: el juego ocupa toda la pantalla, escalado sin deformarse (con
   bandas si hace falta). Si es más ancho que alto, el móvil se pone de lado.
-- **Táctil**: `juego.toques()` da los dedos que hay en la pantalla, y una
-  acción puede tener botones en la pantalla: `"pantalla:x,y,ancho,alto"`. El
-  primer dedo también mueve el ratón (`juego.raton()`, `juego.clic()`).
-  `juego.tactil()` es verdadero.
+- **Mando en la pantalla**: `juego.mando_tactil()` pone una palanca (aparece
+  donde se apoya el pulgar izquierdo) y los botones A, B (y X, Y si se piden)
+  como en los juegos de móvil. Funciona como un mando de verdad: un juego hecho
+  con acciones `"mando:..."` se juega igual con el teclado, con un mando y con
+  el dedo.
+- **Táctil**: `juego.toques()` da los dedos que hay en la pantalla (un toque
+  rápido cuenta al menos un fotograma), y una acción puede tener botones propios
+  en la pantalla: `"pantalla:x,y,ancho,alto"`. El primer dedo también mueve el
+  ratón (`juego.raton()`, `juego.clic()`). `juego.tactil()` es verdadero.
 - **Atrás**: el botón «atrás» del móvil cierra el juego (`juego.abierto()` pasa
   a falso).
 - **Archivos**: lo que el juego escribe (récords, partidas) va a su carpeta

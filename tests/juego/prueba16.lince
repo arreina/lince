@@ -1,0 +1,24 @@
+# Mando en la pantalla táctil: con "siempre" funciona sin pantalla táctil, con
+# el clic de prueba (LINCE_JUEGO_CLIC) encima del botón A. Lo pulsado se suma
+# al mando 1: boton("a") y las acciones con "mando:a".
+importar "juego"
+juego.abrir("Mando táctil", 480, 270)
+juego.definir_accion("saltar", ["espacio", "mando:a"])
+juego.mando_tactil({"botones": ["a", "b"], "siempre": verdadero})
+sea saltos = 0
+sea con_boton = 0
+mientras juego.abierto() {
+    si juego.accion_pulsada("saltar") { saltos++ }
+    si juego.boton("a") { con_boton++ }
+    si juego.boton("b") { escribir("no debería: B") }
+    juego.limpiar([0, 0, 0])
+    juego.presentar()
+}
+escribir("saltos: {saltos}, con boton(): {con_boton}")
+escribir("palanca: {juego.eje("izq_x")}")
+juego.mando_tactil(falso)
+juego.mando_virtual([], {"izq_x": 2})       # un mando propio: se suma al mando 1
+juego.presentar()
+escribir("eje limitado: {juego.eje("izq_x")}")
+intentar { juego.mando_tactil({"botones": ["z"]}) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.mando_tactil({"boton": ["a"]}) } capturar (error e) { escribir("error: {e.mensaje}") }

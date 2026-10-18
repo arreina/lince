@@ -185,6 +185,8 @@ static struct {
     int rx, ry, rueda;
     JgToque toques[JG_TOQUES], toques_prev[JG_TOQUES];
     int ntoques, ntoques_prev;
+    JgToque rapidos[JG_TOQUES];          /* dedos que tocaron en este fotograma (x, y de 0 a 1): un */
+    int nrapidos;                        /* toque corto puede soltarse antes de mirar */
     double t_ultimo, dt, fps, t_fps;
     int cuadros;
     /* Modo de prueba (sin pantalla ni espera): LINCE_JUEGO_FOTOGRAMAS=N cierra tras N
@@ -213,6 +215,10 @@ static struct {
     void *mandos[JG_MANDOS];
     unsigned char botones[JG_MANDOS][JG_BOTONES], botones_prev[JG_MANDOS][JG_BOTONES];
     float ejes[JG_MANDOS][JG_EJES], ejes_prev[JG_MANDOS][JG_EJES];
+    /* un mando hecho de otra cosa (el de la pantalla táctil, de juego.lince):
+       se suma al mando 1 en cada presentar() */
+    unsigned char virt_botones[JG_BOTONES];
+    float virt_ejes[JG_EJES];
     int njoy;
     char escrito[JG_ESCRITO];            /* lo tecleado en el último fotograma */
     int nescrito;
@@ -268,6 +274,7 @@ static void jg_poner_textura(JgImagen *im, void *tex) { im->tex = tex; im->versi
 static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
 static void jg_leer_mandos(void);
+static void jg_mezclar_virtual(void);
 static void jg_recoger_voces(void);
 static void jg_parar_flujo(void);
 static int jg_audio(void);
@@ -955,6 +962,18 @@ static void jg_leer_toques(void) {
             else { t->x = fx * _jgs.ancho; t->y = fy * _jgs.alto; }
         }
     }
+    /* un toque que empezó y acabó entre dos fotogramas cuenta en este */
+    for (int r = 0; r < _jgs.nrapidos && _jgs.ntoques < JG_TOQUES; r++) {
+        int esta = 0;
+        for (int i = 0; i < _jgs.ntoques && !esta; i++) esta = _jgs.toques[i].id == _jgs.rapidos[r].id;
+        if (esta) continue;
+        JgToque *t = &_jgs.toques[_jgs.ntoques++];
+        t->id = _jgs.rapidos[r].id;
+        float fx = _jgs.rapidos[r].x, fy = _jgs.rapidos[r].y;
+        if (_jg.WindowToLogical) _jg.WindowToLogical(_jgs.render, (int)(fx * ww), (int)(fy * wh), &t->x, &t->y);
+        else { t->x = fx * _jgs.ancho; t->y = fy * _jgs.alto; }
+    }
+    _jgs.nrapidos = 0;
 #ifndef __ANDROID__
     if (_jgs.ntoques == 0 && (_jgs.raton & 1)) {
         _jgs.toques[0].id = -1;
@@ -1069,6 +1088,11 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         else if (tipo == 0x400) {                                   /* movimiento: xrel, yrel */
             _jgs.mov_x += *(int *)(ev + 28);
             _jgs.mov_y += *(int *)(ev + 32);
+        } else if (tipo == 0x700 && _jgs.nrapidos < JG_TOQUES) {    /* un dedo toca la pantalla */
+            JgToque *t = &_jgs.rapidos[_jgs.nrapidos++];
+            t->id = *(long long *)(ev + 16);
+            t->x = *(float *)(ev + 24);
+            t->y = *(float *)(ev + 28);
         } else if (tipo == 0x303) {                                 /* texto tecleado (UTF-8) */
             const char *t = (const char *)ev + 12;
             size_t l = strnlen(t, 32);
@@ -1122,6 +1146,11 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos)
             _jgs.teclas[_jgs.guion[i].tecla] = 1;
     jg_leer_toques();                    /* después de los clics de prueba: también cuentan como dedo */
+    /* lo de juego.lince que mira la entrada de este fotograma (el mando de la
+       pantalla táctil), y lo que deja en mando_virtual() se suma al mando 1 */
+    valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_entrada", NULL, 0));
+    if (hay_error) return valor_nulo();
+    jg_mezclar_virtual();
 #ifdef __ANDROID__
     /* el teclado de la pantalla, mientras el juego pida texto en cada fotograma */
     if (_jgs.texto_ahora && !_jgs.teclado_puesto && _jg.StartTextInput) { _jg.StartTextInput(); _jgs.teclado_puesto = 1; }
@@ -4099,6 +4128,51 @@ static void jg_leer_mandos(void) {
     }
 }
 
+/* Suma el mando virtual al mando 1: un botón cuenta si está pulsado en
+   cualquiera de los dos, y un eje vale lo que esté más inclinado */
+static void jg_mezclar_virtual(void) {
+    for (int b = 0; b < JG_BOTONES; b++) if (_jgs.virt_botones[b]) _jgs.botones[0][b] = 1;
+    for (int e = 0; e < JG_EJES; e++)
+        if (fabsf(_jgs.virt_ejes[e]) > fabsf(_jgs.ejes[0][e])) _jgs.ejes[0][e] = _jgs.virt_ejes[e];
+}
+
+/* mando_virtual(botones, ejes): el estado de un mando que no es de verdad
+   (uno dibujado en la pantalla): la lista de botones pulsados y los ejes
+   ({"izq_x": -0.5}). Se suma al mando 1 hasta que se cambie. */
+static Valor *fn_jg_mando_virtual(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_DICCIONARIO)
+        return jg_error("ErrorTipo", "mando_virtual() espera (lista de botones pulsados, {eje: valor})");
+    unsigned char botones[JG_BOTONES] = {0};
+    float ejes[JG_EJES] = {0};
+    for (int i = 0; i < a[0]->lista.cantidad; i++) {
+        Valor *v = a[0]->lista.elementos[i];
+        int b = -1;
+        for (int k = 0; v->tipo == VAL_TEXTO && k < JG_BOTONES; k++) if (strcmp(v->texto, JG_NOMBRES_BOTON[k]) == 0) b = k;
+        if (b < 0) return jg_error("Error", "mando_virtual(): botón desconocido (a, b, x, y, lb, rb, inicio, atras, guia, arriba, abajo, izquierda, derecha, stick_izq, stick_der)");
+        botones[b] = 1;
+    }
+    for (int i = 0; i < a[1]->diccionario.cantidad; i++) {
+        int e = -1;
+        for (int k = 0; k < JG_EJES; k++) if (strcmp(a[1]->diccionario.claves[i], JG_NOMBRES_EJE[k]) == 0) e = k;
+        Valor *v = a[1]->diccionario.valores[i];
+        if (e < 0 || v->tipo != VAL_NUMERO) return jg_error("Error", "mando_virtual(): los ejes son izq_x, izq_y, der_x, der_y, lt y rt, con un número");
+        float f = (float)v->numero, min = e >= 4 ? 0 : -1;
+        ejes[e] = f < min ? min : f > 1 ? 1 : f;
+    }
+    memcpy(_jgs.virt_botones, botones, sizeof botones);
+    memcpy(_jgs.virt_ejes, ejes, sizeof ejes);
+    return valor_nulo();
+}
+
+/* posicion_camara() -> [x, y]: dónde está puesta la cámara (sin el temblor) */
+static Valor *fn_jg_posicion_camara(Valor **a, int n) {
+    (void)a; (void)n;
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(_jgs.cu_x));
+    lista_agregar(l, valor_numero(_jgs.cu_y));
+    return l;
+}
+
 static int jg_mando_arg(Valor **a, int n, int i) {
     if (i < n && a[i]->tipo == VAL_NUMERO) {
         int m = (int)a[i]->numero - 1;
@@ -5421,6 +5495,8 @@ static void cargar_juego(Entorno *entorno) {
         {"capturar_raton",  fn_jg_capturar_raton,   1},
         {"movimiento_raton", fn_jg_movimiento_raton, 0},
         {"toques",          fn_jg_toques,           0},
+        {"mando_virtual",   fn_jg_mando_virtual,    2},
+        {"posicion_camara", fn_jg_posicion_camara,  0},
         {"tactil",          fn_jg_tactil,           0},
         {"definir_accion",  fn_jg_definir_accion,   2},
         {"accion",          fn_jg_accion,           1},

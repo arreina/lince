@@ -216,9 +216,15 @@ funcion escena(): texto { devolver _escena }
 funcion escena_nueva(): logico { devolver _nueva }
 funcion tiempo_escena(): numero { devolver juego.tiempo() - _desde }
 
-# En cada presentar(), después de las tareas: hace el cambio pendiente y
-# dibuja el fundido encima de todo
+# En cada presentar(), después de las tareas: el fundido de las escenas y,
+# encima de todo, el mando de la pantalla táctil
 funcion _presentar(): nulo {
+    _fundido_escenas()
+    _dibujar_mando()
+}
+
+# Hace el cambio de escena pendiente y dibuja el fundido
+funcion _fundido_escenas(): nulo {
     _nueva = falso
     si _siguiente != nulo y _fase != 1 {
         _poner_escena(_siguiente)
@@ -526,4 +532,208 @@ funcion pisada(val cualquiera pj): logico {
     pj["visto_de"] = actual
     pj["visto_desde"] = desde
     devolver hay
+}
+
+# ── Mando en la pantalla táctil ──
+# Como en los juegos de móvil de ahora: a la izquierda una palanca que aparece
+# donde se pone el pulgar, y a la derecha los botones A, B, X, Y. Funciona como
+# un mando de verdad (se suma al mando 1 con mando_virtual()), así que las
+# acciones con "mando:a" o "mando:izq_x-" no cambian:
+#   juego.mando_tactil()                           palanca, A y B
+#   juego.mando_tactil({"botones": ["a", "b", "x", "y"]})
+#   juego.mando_tactil(falso)                      lo quita
+# Solo se ve y funciona si hay pantalla táctil (o con "siempre": verdadero,
+# para probarlo en el ordenador con el ratón).
+
+sea _mt = nulo              # las opciones, o nulo si no está puesto
+sea _mt_palanca = nulo      # el dedo de la palanca: su id y dónde empezó
+sea _mt_eje = [0, 0]        # cuánto se inclina la palanca, de -1 a 1
+sea _mt_pulsados = []
+
+fijo _MT_BOTONES = ["a", "b", "x", "y", "inicio"]
+fijo _MT_COLORES = {"a": [80, 200, 110], "b": [230, 80, 80], "x": [80, 140, 240], "y": [240, 200, 60], "inicio": [180, 180, 190]}
+fijo _MT_MENSAJES = {
+    "botones": "\"botones\" es una lista con algunos de \"a\", \"b\", \"x\", \"y\" e \"inicio\"",
+    "palanca": "\"palanca\" es verdadero o falso",
+    "siempre": "\"siempre\" es verdadero o falso",
+    "alfa": "\"alfa\" va de 0 (invisible) a 255",
+    "tamano": "\"tamano\" es un número mayor que 0 (1 es el tamaño normal)"
+}
+
+funcion _mt_bien(val texto c, val cualquiera v): logico {
+    elegir c {
+        caso "botones" {
+            si no (v es lista) { devolver falso }
+            para cada cualquiera b en v {
+                si no (b es texto) o no _MT_BOTONES.contiene(b) { devolver falso }
+            }
+            devolver verdadero
+        }
+        caso "palanca" { devolver v es logico }
+        caso "siempre" { devolver v es logico }
+        caso "alfa" { devolver v es numero y v >= 0 y v <= 255 }
+        caso "tamano" { devolver v es numero y v > 0 }
+    }
+    devolver falso
+}
+
+# mando_tactil([opciones]) · mando_tactil(falso)
+funcion mando_tactil(val cualquiera opciones = nulo): nulo {
+    si opciones == falso {
+        _mt = nulo
+        _mt_palanca = nulo
+        _mt_eje = [0, 0]
+        _mt_pulsados = []
+        juego.mando_virtual([], {})
+        devolver nulo
+    }
+    si opciones == nulo { opciones = {} }
+    si no (opciones es diccionario) {
+        lanzar ErrorTipo("mando_tactil() espera un diccionario de opciones (o falso para quitarlo), por ejemplo \{\"botones\": [\"a\", \"b\"]}")
+    }
+    sea mt = {"botones": ["a", "b"], "palanca": verdadero, "siempre": falso, "alfa": 120, "tamano": 1}
+    para cada texto c en opciones {
+        si no mt.contiene(c) {
+            lanzar Error("mando_tactil(): no conozco '{c}' (hay \"botones\", \"palanca\", \"siempre\", \"alfa\" y \"tamano\")")
+        }
+        si no _mt_bien(c, opciones[c]) { lanzar Error("mando_tactil(): " + _MT_MENSAJES[c]) }
+        mt[c] = opciones[c]
+    }
+    _mt = mt
+}
+
+funcion _mt_activo(): logico {
+    devolver _mt != nulo y (_mt["siempre"] o juego.tactil())
+}
+
+# Las medidas, en coordenadas del juego: u es el lado corto de la pantalla
+funcion _mt_medidas(): diccionario {
+    sea ancho = juego.ancho()
+    sea alto = juego.alto()
+    sea u = matematica.minimo(ancho, alto) * _mt["tamano"]
+    sea radio = u * 0.16
+    devolver {"ancho": ancho, "alto": alto, "radio": radio, "boton": u * 0.085,
+              "casa": [u * 0.1 + radio, alto - u * 0.1 - radio], "centro": [ancho - u * 0.26, alto - u * 0.26]}
+}
+
+# Dónde va cada botón: en rombo como en un mando (A abajo, B a la derecha, X a
+# la izquierda, Y arriba); con dos o menos, A y B en diagonal; "inicio", arriba
+funcion _mt_sitio(val texto b, val diccionario m): lista {
+    sea c = m["centro"]
+    sea d = m["boton"] * 1.35
+    si b == "inicio" { devolver [m["ancho"] - m["boton"] * 1.6, m["boton"] * 1.4] }
+    sea cuantos = 0
+    para cada texto otro_boton en _mt["botones"] {
+        si otro_boton != "inicio" { cuantos++ }
+    }
+    si cuantos <= 2 {
+        si b == "a" o cuantos == 1 { devolver [c[0] - d * 0.7, c[1] + d * 0.45] }
+        devolver [c[0] + d * 0.7, c[1] - d * 0.45]
+    }
+    elegir b {
+        caso "a" { devolver [c[0], c[1] + d] }
+        caso "b" { devolver [c[0] + d, c[1]] }
+        caso "x" { devolver [c[0] - d, c[1]] }
+    }
+    devolver [c[0], c[1] - d]
+}
+
+funcion _mt_dentro(val diccionario t, val lista sitio, val numero radio): logico {
+    devolver matematica.distancia(t["x"], t["y"], sitio[0], sitio[1]) <= radio
+}
+
+# Después de leer los dedos, en cada presentar(): qué hace cada uno. La
+# palanca sigue al dedo que la empezó (uno nuevo en la mitad izquierda que no
+# toque un botón); cada botón está pulsado si hay otro dedo encima.
+funcion _entrada(): nulo {
+    si no _mt_activo() {
+        si _mt != nulo y _mt_pulsados.longitud() > 0 {
+            _mt_pulsados = []
+            juego.mando_virtual([], {})
+        }
+        devolver nulo
+    }
+    sea m = _mt_medidas()
+    sea toques = juego.toques()
+    sea dedo = nulo
+    si _mt_palanca != nulo {
+        para cada diccionario t en toques {
+            si t["id"] == _mt_palanca["id"] { dedo = t }
+        }
+        si dedo == nulo { _mt_palanca = nulo }
+    }
+    si _mt_palanca == nulo y _mt["palanca"] {
+        para cada diccionario t en toques {
+            si t["nuevo"] y t["x"] < m["ancho"] / 2 {
+                # la base, donde se pone el pulgar pero sin salirse de la pantalla
+                _mt_palanca = {"id": t["id"],
+                               "x": matematica.limitar(t["x"], m["radio"], m["ancho"] / 2 - m["radio"]),
+                               "y": matematica.limitar(t["y"], m["radio"], m["alto"] - m["radio"])}
+                dedo = t
+                romper
+            }
+        }
+    }
+    sea ejes = {}
+    _mt_eje = [0, 0]
+    si dedo != nulo {
+        sea dx = dedo["x"] - _mt_palanca["x"]
+        sea dy = dedo["y"] - _mt_palanca["y"]
+        sea largo = matematica.distancia(0, 0, dx, dy)
+        si largo > m["radio"] {
+            dx = dx * m["radio"] / largo
+            dy = dy * m["radio"] / largo
+            largo = m["radio"]
+        }
+        si largo > m["radio"] * 0.15 {             # zona muerta, como en un mando
+            _mt_eje = [dx / m["radio"], dy / m["radio"]]
+        }
+        ejes = {"izq_x": _mt_eje[0], "izq_y": _mt_eje[1]}
+    }
+    sea pulsados = []
+    para cada texto b en _mt["botones"] {
+        sea sitio = _mt_sitio(b, m)
+        para cada diccionario t en toques {
+            si (dedo == nulo o t["id"] != dedo["id"]) y _mt_dentro(t, sitio, m["boton"] * 1.3) {
+                pulsados.agregar(b)
+                romper
+            }
+        }
+    }
+    # la palanca también hace de cruceta
+    si _mt_eje[0] < -0.5 { pulsados.agregar("izquierda") }
+    si _mt_eje[0] > 0.5 { pulsados.agregar("derecha") }
+    si _mt_eje[1] < -0.5 { pulsados.agregar("arriba") }
+    si _mt_eje[1] > 0.5 { pulsados.agregar("abajo") }
+    _mt_pulsados = pulsados
+    juego.mando_virtual(pulsados, ejes)
+}
+
+# En cada presentar(), encima de todo y sin moverse con la cámara
+funcion _dibujar_mando(): nulo {
+    si no _mt_activo() { devolver nulo }
+    sea m = _mt_medidas()
+    sea alfa = _mt["alfa"]
+    sea camara = juego.posicion_camara()
+    juego.camara()
+    si _mt["palanca"] {
+        sea base = si _mt_palanca != nulo { [_mt_palanca["x"], _mt_palanca["y"]] } sino { m["casa"] }
+        juego.circulo(base[0], base[1], m["radio"], [255, 255, 255, alfa * 0.3])
+        sea fuerte = si _mt_palanca != nulo { 1.4 } sino { 1 }
+        juego.circulo(base[0] + _mt_eje[0] * m["radio"], base[1] + _mt_eje[1] * m["radio"], m["radio"] * 0.45,
+                      [255, 255, 255, matematica.minimo(255, alfa * fuerte)])
+    }
+    para cada texto b en _mt["botones"] {
+        sea sitio = _mt_sitio(b, m)
+        sea pulsado = _mt_pulsados.contiene(b)
+        sea c = _MT_COLORES[b]
+        sea radio = si b == "inicio" { m["boton"] * 0.6 } sino { m["boton"] }
+        juego.circulo(sitio[0], sitio[1], si pulsado { radio * 0.9 } sino { radio },
+                      [c[0], c[1], c[2], matematica.minimo(255, si pulsado { alfa * 1.8 } sino { alfa })])
+        sea letra = si b == "inicio" { "=" } sino { b.mayusculas() }
+        sea escala = matematica.maximo(1, matematica.redondear(radio / 9))
+        juego.texto(letra, sitio[0], sitio[1] - 3.5 * escala,
+                    {"escala": escala, "alinear": "centro", "color": [255, 255, 255, matematica.minimo(255, alfa * 1.8)]})
+    }
+    juego.camara(camara[0], camara[1])
 }
