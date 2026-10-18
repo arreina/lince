@@ -36,4 +36,11 @@ const unsigned char *llave_publica(const LlaveRsa *ll, size_t *n);
    directorio central (malloc), o NULL si el zip no es válido. */
 unsigned char *apk_firmar_v2(const unsigned char *zip, size_t n, const LlaveRsa *ll, size_t *n_salida);
 
+/* Firma JAR (la que pide Google Play al .aab) de los archivos 'nombres' con
+   su contenido sin comprimir: devuelve META-INF/MANIFEST.MF, META-INF/LINCE.SF
+   y META-INF/LINCE.RSA (malloc) */
+typedef struct { unsigned char *mf, *sf, *rsa; size_t nmf, nsf, nrsa; } JarFirma;
+void jar_firmar(const LlaveRsa *ll, const char *const *nombres, const unsigned char *const *datos,
+                const size_t *largos, int num, JarFirma *salida);
+
 #endif /* LINCE_FIRMAR_H */

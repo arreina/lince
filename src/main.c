@@ -50,6 +50,7 @@ static void mostrar_ayuda(void) {
     printf("  lince compilar <a.lince> --incluir <ruta> Incluye niveles u otros archivos (varias veces)\n");
     printf("  lince repartir <juego.lince>             Carpeta y .zip para compartir el juego (con SDL2)\n");
     printf("  lince repartir <juego.lince> --android   El .apk para instalarlo en un móvil Android\n");
+    printf("  lince repartir <juego.lince> --aab       El .aab para publicarlo en Google Play\n");
     printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");
@@ -263,7 +264,8 @@ int main(int argc, char *argv[]) {
     /* Repartir: carpeta y .zip con el juego y SDL2, listos para compartir */
     if (strcmp(cmd, "repartir") == 0) {
         const char *uso = "   Uso: lince repartir <juego.lince> [-o carpeta] [--incluir carpeta_o_archivo]...\n"
-                          "        lince repartir <juego.lince> --android [-o juego.apk] [--nombre \"Mi juego\"] [--id org.lince.mijuego]\n\n";
+                          "        lince repartir <juego.lince> --android [--aab] [-o juego.apk] [--nombre \"Mi juego\"]\n"
+                          "                       [--id org.lince.mijuego] [--version 1]\n\n";
         if (argc < 3) { fprintf(stderr, "\n❌ Falta el juego.\n%s", uso); return 1; }
         const char *ext = strrchr(argv[2], '.');
         if (!ext || strcmp(ext, ".lince") != 0) {
@@ -272,10 +274,20 @@ int main(int argc, char *argv[]) {
         }
         const char *carpeta = NULL, *nombre = NULL, *id = NULL;
         const char *extras[64];
-        int num_extras = 0, android = 0;
+        int num_extras = 0, android = 0, aab = 0, version = 1;
         for (int i = 3; i < argc; i++) {
             if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) carpeta = argv[++i];
             else if (strcmp(argv[i], "--android") == 0) android = 1;
+            else if (strcmp(argv[i], "--aab") == 0) android = aab = 1;
+            else if (strcmp(argv[i], "--version") == 0 && i + 1 < argc) {
+                char *fin;
+                long v = strtol(argv[++i], &fin, 10);
+                if (*fin || v < 1 || v > 2100000000) {
+                    fprintf(stderr, "\n❌ --version es un número entero, 1 o más (súbelo cada vez que publiques el juego).\n\n");
+                    return 1;
+                }
+                version = (int)v;
+            }
             else if (strcmp(argv[i], "--nombre") == 0 && i + 1 < argc) nombre = argv[++i];
             else if (strcmp(argv[i], "--id") == 0 && i + 1 < argc) id = argv[++i];
             else if (strcmp(argv[i], "--incluir") == 0 && i + 1 < argc) {
@@ -287,7 +299,7 @@ int main(int argc, char *argv[]) {
             }
         }
         if (android) {
-            /* un .apk para Android, sin Java ni el SDK (ver apk.c) */
+            /* un .apk para Android (o el .aab de Google Play), sin Java ni el SDK (ver apk.c) */
             char base[256], apk[512], id_auto[300];
             const char *b = strrchr(argv[2], '/');
 #ifdef _WIN32
@@ -296,7 +308,7 @@ int main(int argc, char *argv[]) {
 #endif
             snprintf(base, sizeof base, "%s", b ? b + 1 : argv[2]);
             base[strlen(base) - 6] = '\0';                      /* sin ".lince" */
-            if (!carpeta) { snprintf(apk, sizeof apk, "%s.apk", base); carpeta = apk; }
+            if (!carpeta) { snprintf(apk, sizeof apk, "%s.%s", base, aab ? "aab" : "apk"); carpeta = apk; }
             if (!id) {                         /* 01_pong → org.lince.pong: cada parte empieza por letra */
                 size_t k = 0;
                 char parte[200];
@@ -316,7 +328,8 @@ int main(int argc, char *argv[]) {
             if (!bien) { fprintf(stderr, "\n❌ El --id es como org.lince.mijuego (minúsculas, cada parte empieza por letra).\n\n"); return 1; }
             const char *nombre_auto = base;                /* 01_pong → pong */
             while ((*nombre_auto >= '0' && *nombre_auto <= '9') || *nombre_auto == '_') nombre_auto++;
-            return apk_crear(argv[2], carpeta, nombre ? nombre : (*nombre_auto ? nombre_auto : base), id, extras, num_extras);
+            return apk_crear(argv[2], carpeta, nombre ? nombre : (*nombre_auto ? nombre_auto : base), id, version, aab,
+                             extras, num_extras);
         }
         return repartir_crear(argv[2], carpeta, extras, num_extras);
     }

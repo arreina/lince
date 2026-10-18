@@ -6,9 +6,10 @@
 #ifndef LINCE_APK_H
 #define LINCE_APK_H
 
-/* 'nombre' es el de la app en el móvil e 'id' el del paquete (org.lince.mijuego).
-   0 si va bien. */
-int apk_crear(const char *juego, const char *salida, const char *nombre, const char *id,
+/* 'nombre' es el de la app en el móvil, 'id' el del paquete (org.lince.mijuego)
+   y 'version' el número de versión (versionCode). Con 'aab', el .aab para Google
+   Play en vez del .apk. 0 si va bien. */
+int apk_crear(const char *juego, const char *salida, const char *nombre, const char *id, int version, int aab,
               const char *const *extras, int num_extras);
 
 #endif /* LINCE_APK_H */

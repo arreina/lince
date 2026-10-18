@@ -97,6 +97,8 @@ lince repartir mi_juego.lince --android --nombre "Mi juego"
 
 Hace `mi_juego.apk`, para instalar el juego en un móvil Android, sin instalar nada más (Lince lo monta y lo firma él mismo a partir de la plantilla `lince-android.apk`, que viene con cada versión): a pantalla completa, con un mando en la pantalla como el de los juegos de móvil (`juego.mando_tactil()`: palanca y botones A/B que funcionan como un mando de verdad), `juego.toques()` y el botón «atrás» para salir. Ver [`android/LEEME.md`](android/LEEME.md).
 
+Para publicarlo en Google Play, `lince repartir mi_juego.lince --aab --version 1` hace el `.aab` que pide Google Play, también firmado por Lince.
+
 ## Uso
 
 ```bash

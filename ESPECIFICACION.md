@@ -1699,7 +1699,7 @@ y un `LEEME.txt`, y un `.zip` con esa carpeta. Quien lo reciba lo descomprime y 
 
 ### Android
 
-`lince repartir juego.lince --android [-o juego.apk] [--nombre "Mi juego"] [--id org.lince.mijuego]`
+`lince repartir juego.lince --android [-o juego.apk] [--nombre "Mi juego"] [--id org.lince.mijuego] [--version 1]`
 hace un `.apk` para instalar el juego en un móvil Android (64 bits, Android 7.0 o más nuevo) sin
 instalar nada más: parte de la plantilla `lince-android.apk` (junto al ejecutable, en `~/.lince/`
 o en `LINCE_ANDROID_PLANTILLA`), le mete el juego y lo firma con una llave que se crea la primera
@@ -1709,6 +1709,11 @@ firmadas con la misma). Ver [`android/LEEME.md`](android/LEEME.md); allí está 
 (de lado si es más ancho que alto), se controla con `toques()` y con botones `"pantalla:..."`
 en las acciones, el botón «atrás» lo cierra y lo que escribe va a su carpeta privada.
 `examples/11_movil.lince` sirve para probarlo.
+
+`lince repartir juego.lince --aab [--nombre ...] [--id ...] [--version N]` hace en su lugar el `.aab`
+que pide Google Play, firmado con la misma llave (que hace de llave de subida). Cada `.aab` que se
+sube lleva un `--version` más alto que el anterior. El juego apunta a Android 16 (API 36) y sus
+bibliotecas sirven con páginas de memoria de 16 KB, como pide Google Play.
 
 `lince compilar juego.lince --datos -o juego.paq` empaqueta solo el programa y sus archivos,
 sin el intérprete: es lo que va dentro del `.apk`.

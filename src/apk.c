@@ -25,6 +25,7 @@ char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen)
 
 #define PLANTILLA_PAQUETE "org.lince.plantilla"
 #define PLANTILLA_NOMBRE  "LINCE_NOMBRE"
+#define PLANTILLA_VERSION 1234321         /* versionCode y versionName de la plantilla */
 
 static uint16_t le16(const unsigned char *p) { return (uint16_t)(p[0] | p[1] << 8); }
 static uint32_t le32(const unsigned char *p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
@@ -187,6 +188,96 @@ static void arsc_cambiar_paquete(unsigned char *p, size_t n, const char *paquete
     }
 }
 
+/* La versión en el XML binario: el versionCode es un entero (Res_value de
+   tipo TYPE_INT_DEC) con el valor de la plantilla */
+static void axml_cambiar_version(unsigned char *x, size_t n, int version) {
+    for (size_t i = 0; i + 8 <= n; i += 4)
+        if (le16(x + i) == 8 && x[i + 2] == 0 && x[i + 3] == 0x10 && le32(x + i + 4) == PLANTILLA_VERSION)
+            pon32(x + i + 4, (uint32_t)version);
+}
+
+/* ── Protobuf (el manifiesto y los recursos del .aab) ──
+   Sin conocer el esquema: cada campo de bytes que sea uno de los textos de la
+   plantilla se cambia; si no, se mira si es un mensaje y se recorre por
+   dentro. Los enteros con la versión de la plantilla pasan a ser la nueva. */
+typedef struct { const char *const *de, *const *a; int n; int version; } Cambios;
+typedef struct { unsigned char *p; size_t n, cap; } Buf;
+static void mas(Buf *b, const void *p, size_t n) {
+    if (b->n + n > b->cap) { b->cap = (b->n + n) * 2 + 4096; b->p = realloc(b->p, b->cap); }
+    memcpy(b->p + b->n, p, n);
+    b->n += n;
+}
+
+static int pb_leer(const unsigned char *p, size_t n, size_t *i, uint64_t *v) {
+    *v = 0;
+    for (int d = 0; d < 64; d += 7) {
+        if (*i >= n) return 0;
+        unsigned char c = p[(*i)++];
+        *v |= (uint64_t)(c & 0x7F) << d;
+        if (!(c & 0x80)) return 1;
+    }
+    return 0;
+}
+
+static void pb_poner(Buf *b, uint64_t v) {
+    unsigned char c[10];
+    int k = 0;
+    do { c[k] = (unsigned char)(v & 0x7F); v >>= 7; if (v) c[k] |= 0x80; k++; } while (v);
+    mas(b, c, (size_t)k);
+}
+
+/* 1 si p es un mensaje (y lo deja en 'sal' con los cambios), 0 si no */
+static int pb_cambiar(const unsigned char *p, size_t n, const Cambios *c, Buf *sal, int hondo) {
+    size_t i = 0;
+    if (hondo > 40) return 0;
+    while (i < n) {
+        uint64_t clave, v;
+        if (!pb_leer(p, n, &i, &clave) || clave >> 3 == 0) return 0;
+        switch (clave & 7) {
+        case 0:
+            if (!pb_leer(p, n, &i, &v)) return 0;
+            pb_poner(sal, clave);
+            pb_poner(sal, v == PLANTILLA_VERSION ? (uint64_t)c->version : v);
+            break;
+        case 1: case 5: {
+            size_t largo = (clave & 7) == 1 ? 8 : 4;
+            if (i + largo > n) return 0;
+            pb_poner(sal, clave);
+            mas(sal, p + i, largo);
+            i += largo;
+            break;
+        }
+        case 2: {
+            if (!pb_leer(p, n, &i, &v) || v > n - i) return 0;
+            const unsigned char *d = p + i;
+            size_t largo = (size_t)v;
+            i += largo;
+            pb_poner(sal, clave);
+            int hecho = 0;
+            for (int k = 0; k < c->n && !hecho; k++)
+                if (strlen(c->de[k]) == largo && memcmp(d, c->de[k], largo) == 0) {
+                    pb_poner(sal, strlen(c->a[k]));
+                    mas(sal, c->a[k], strlen(c->a[k]));
+                    hecho = 1;
+                }
+            if (hecho) break;
+            Buf dentro = {0};
+            if (largo > 0 && pb_cambiar(d, largo, c, &dentro, hondo + 1)) {
+                pb_poner(sal, dentro.n);
+                mas(sal, dentro.p, dentro.n);
+            } else {
+                pb_poner(sal, largo);
+                mas(sal, d, largo);
+            }
+            free(dentro.p);
+            break;
+        }
+        default: return 0;
+        }
+    }
+    return 1;
+}
+
 /* ── Zip ── */
 typedef struct {
     char nombre[512];
@@ -245,13 +336,6 @@ static void guardar_sin_comprimir(Entrada *e, unsigned char *p, size_t n) {
     e->metodo = 0;
     e->comprimido = e->original = (uint32_t)n;
     e->crc = crc32_de(p, n);
-}
-
-typedef struct { unsigned char *p; size_t n, cap; } Buf;
-static void mas(Buf *b, const void *p, size_t n) {
-    if (b->n + n > b->cap) { b->cap = (b->n + n) * 2 + 4096; b->p = realloc(b->p, b->cap); }
-    memcpy(b->p + b->n, p, n);
-    b->n += n;
 }
 
 /* El zip, con los datos sin comprimir alineados a 4 bytes (lo que hace
@@ -323,9 +407,67 @@ static int buscar_plantilla(char *ruta, size_t max) {
     return stat(ruta, &st) == 0;
 }
 
-int apk_crear(const char *juego, const char *salida, const char *nombre, const char *id,
+static int escribir_archivo(const char *ruta, const unsigned char *p, size_t n) {
+    FILE *f = fopen(ruta, "wb");
+    if (!f) return 0;
+    int bien = fwrite(p, 1, n, f) == n;
+    return fclose(f) == 0 && bien;
+}
+
+static void liberar_entradas(Entrada *e, int num) {
+    for (int i = 0; i < num; i++) free(e[i].propio);
+    free(e);
+}
+
+/* El .aab: los archivos del .apk en base/ (dex/, lib/, res/, assets/), lo
+   de aab/ de la plantilla en su sitio y la firma JAR delante */
+static unsigned char *hacer_aab(Entrada *e, int num, const LlaveRsa *ll, size_t *n_salida) {
+    Entrada *b = calloc((size_t)num + 3, sizeof(Entrada));
+    int k = 3;                                     /* los tres de META-INF van primero */
+    for (int i = 0; i < num; i++) {
+        const char *x = e[i].nombre;
+        char nombre[600];
+        if (strncmp(x, "aab/", 4) == 0) snprintf(nombre, sizeof nombre, "%s", x + 4);
+        else if (strcmp(x, "classes.dex") == 0) snprintf(nombre, sizeof nombre, "base/dex/%s", x);
+        else if (strncmp(x, "lib/", 4) == 0 || strncmp(x, "res/", 4) == 0 || strncmp(x, "assets/", 7) == 0)
+            snprintf(nombre, sizeof nombre, "base/%s", x);
+        else continue;                             /* el manifiesto y resources.arsc del .apk */
+        b[k] = e[i];
+        b[k].propio = NULL;
+        snprintf(b[k].nombre, sizeof b[k].nombre, "%s", nombre);
+        k++;
+    }
+    /* la firma: el resumen de lo que hay dentro de cada archivo */
+    int num_f = k - 3;
+    const char **nombres = malloc(sizeof(char *) * (size_t)num_f);
+    const unsigned char **datos = malloc(sizeof(char *) * (size_t)num_f);
+    unsigned char **propios = calloc((size_t)num_f, sizeof(char *));
+    size_t *largos = malloc(sizeof(size_t) * (size_t)num_f);
+    for (int i = 0; i < num_f; i++) {
+        Entrada *x = &b[3 + i];
+        nombres[i] = x->nombre;
+        if (x->metodo == 0) { datos[i] = x->datos; largos[i] = x->original; }
+        else { propios[i] = descomprimir(x, &largos[i]); datos[i] = propios[i]; }
+    }
+    JarFirma jf;
+    jar_firmar(ll, nombres, datos, largos, num_f, &jf);
+    for (int i = 0; i < num_f; i++) free(propios[i]);
+    free(nombres); free(datos); free(propios); free(largos);
+    snprintf(b[0].nombre, sizeof b[0].nombre, "META-INF/MANIFEST.MF");
+    guardar_sin_comprimir(&b[0], jf.mf, jf.nmf);
+    snprintf(b[1].nombre, sizeof b[1].nombre, "META-INF/LINCE.SF");
+    guardar_sin_comprimir(&b[1], jf.sf, jf.nsf);
+    snprintf(b[2].nombre, sizeof b[2].nombre, "META-INF/LINCE.RSA");
+    guardar_sin_comprimir(&b[2], jf.rsa, jf.nrsa);
+    unsigned char *zip = escribir_zip(b, k, n_salida);
+    for (int i = 0; i < 3; i++) free(b[i].propio);
+    free(b);
+    return zip;
+}
+
+int apk_crear(const char *juego, const char *salida, const char *nombre, const char *id, int version, int aab,
               const char *const *extras, int num_extras) {
-    char plantilla[1200], ruta_llave[1200], error[400], paq[1200];
+    char plantilla[1200], ruta_llave[1200], error[400], paq[1200], texto_version[16];
     if (!buscar_plantilla(plantilla, sizeof plantilla)) {
         fprintf(stderr, "\n❌ No encuentro la plantilla de Android (lince-android.apk).\n"
                         "   Ponla junto al ejecutable de Lince o en %s/.lince/, o di dónde está con\n"
@@ -350,64 +492,86 @@ int apk_crear(const char *juego, const char *salida, const char *nombre, const c
         free(pl); free(datos_paq);
         return 1;
     }
-    /* lo que va en el .apk: todo menos la firma vieja, con el manifiesto y
-       los recursos cambiados, y el juego */
+    /* todo menos la firma vieja, con el manifiesto y los recursos cambiados
+       (los del .apk y, si se hace el .aab, los suyos), y el juego */
     Entrada *nuevas = calloc((size_t)num + 1, sizeof(Entrada));
-    int k = 0, hay_manifiesto = 0;
-    const char *de[2] = {PLANTILLA_PAQUETE, PLANTILLA_NOMBRE}, *a[2] = {id, nombre};
-    for (int i = 0; i < num; i++) {
-        if (strncmp(e[i].nombre, "META-INF/", 9) == 0 || strcmp(e[i].nombre, "assets/juego.paq") == 0) continue;
+    int k = 0, hay_manifiesto = 0, malo = 0;
+    snprintf(texto_version, sizeof texto_version, "%d", version);
+    char texto_plantilla[16];
+    snprintf(texto_plantilla, sizeof texto_plantilla, "%d", PLANTILLA_VERSION);
+    const char *de[3] = {PLANTILLA_PAQUETE, PLANTILLA_NOMBRE, texto_plantilla}, *a[3] = {id, nombre, texto_version};
+    Cambios cambios = {de, a, 3, version};
+    for (int i = 0; i < num && !malo; i++) {
+        const char *x = e[i].nombre;
+        if (strncmp(x, "META-INF/", 9) == 0 || strcmp(x, "assets/juego.paq") == 0) continue;
+        int del_aab = strncmp(x, "aab/", 4) == 0;
+        if (del_aab != aab && (del_aab || strcmp(x, "AndroidManifest.xml") == 0 || strcmp(x, "resources.arsc") == 0))
+            continue;                              /* lo de un .apk no va en el .aab, ni al revés */
         nuevas[k] = e[i];
-        if (strcmp(e[i].nombre, "AndroidManifest.xml") == 0) {
+        if (strcmp(x, "AndroidManifest.xml") == 0) {
             size_t n, n2;
             unsigned char *xml = descomprimir(&e[i], &n);
-            unsigned char *cambiado = xml ? axml_cambiar(xml, n, de, a, 2, &n2) : NULL;
+            unsigned char *cambiado = xml ? axml_cambiar(xml, n, de, a, 3, &n2) : NULL;
             free(xml);
-            if (!cambiado) break;
+            if (!cambiado) { malo = 1; break; }
+            axml_cambiar_version(cambiado, n2, version);
             guardar_sin_comprimir(&nuevas[k], cambiado, n2);
             hay_manifiesto = 1;
-        } else if (strcmp(e[i].nombre, "resources.arsc") == 0) {
+        } else if (strcmp(x, "resources.arsc") == 0) {
             size_t n;
             unsigned char *r = descomprimir(&e[i], &n);
             if (r) { arsc_cambiar_paquete(r, n, id); guardar_sin_comprimir(&nuevas[k], r, n); }
+        } else if (strcmp(x, "aab/base/manifest/AndroidManifest.xml") == 0 || strcmp(x, "aab/base/resources.pb") == 0) {
+            size_t n;
+            unsigned char *pb = descomprimir(&e[i], &n);
+            Buf cambiado = {0};
+            if (!pb || !pb_cambiar(pb, n, &cambios, &cambiado, 0)) { free(pb); free(cambiado.p); malo = 1; break; }
+            free(pb);
+            guardar_sin_comprimir(&nuevas[k], cambiado.p, cambiado.n);
+            if (strstr(x, "AndroidManifest")) hay_manifiesto = 1;
         }
         k++;
     }
-    if (!hay_manifiesto) {
-        fprintf(stderr, "\n❌ No se pudo cambiar el manifiesto de la plantilla '%s'.\n\n", plantilla);
-        for (int i = 0; i < k; i++) free(nuevas[i].propio);
-        free(nuevas); free(e); free(pl); free(datos_paq);
+    if (!hay_manifiesto || malo) {
+        fprintf(stderr, aab ? "\n❌ La plantilla '%s' no sirve para hacer el .aab (es de una versión de\n"
+                              "   Lince anterior a la 0.8: descarga la nueva).\n\n"
+                            : "\n❌ No se pudo cambiar el manifiesto de la plantilla '%s'.\n\n", plantilla);
+        liberar_entradas(nuevas, k);
+        free(e); free(pl); free(datos_paq);
         return 1;
     }
     snprintf(nuevas[k].nombre, sizeof nuevas[k].nombre, "assets/juego.paq");
     guardar_sin_comprimir(&nuevas[k], datos_paq, n_paq);
     k++;
 
-    size_t n_zip, n_apk;
-    unsigned char *zip = escribir_zip(nuevas, k, &n_zip);
-    for (int i = 0; i < k; i++) free(nuevas[i].propio);
-    free(nuevas); free(e); free(pl);
-
-    /* la firma */
+    /* la llave */
     snprintf(ruta_llave, sizeof ruta_llave, "%s/.lince", carpeta_usuario());
     mkdir(ruta_llave, 0700);
     snprintf(ruta_llave, sizeof ruta_llave, "%s/.lince/android-llave.txt", carpeta_usuario());
     LlaveRsa *ll = llave_cargar_o_crear(ruta_llave, error, sizeof error);
-    if (!ll) { fprintf(stderr, "\n❌ %s\n\n", error); free(zip); return 1; }
-    unsigned char *apk = apk_firmar_v2(zip, n_zip, ll, &n_apk);
+    if (!ll) { fprintf(stderr, "\n❌ %s\n\n", error); liberar_entradas(nuevas, k); free(e); free(pl); return 1; }
+
+    size_t n_fin = 0;
+    unsigned char *fin;
+    if (aab) fin = hacer_aab(nuevas, k, ll, &n_fin);
+    else {
+        size_t n_zip;
+        unsigned char *zip = escribir_zip(nuevas, k, &n_zip);
+        fin = apk_firmar_v2(zip, n_zip, ll, &n_fin);
+        free(zip);
+    }
     llave_liberar(ll);
-    free(zip);
-    if (!apk) { fprintf(stderr, "\n❌ No se pudo firmar el .apk.\n\n"); return 1; }
-    FILE *f = fopen(salida, "wb");
-    if (!f || fwrite(apk, 1, n_apk, f) != n_apk) {
-        if (f) fclose(f);
-        free(apk);
+    liberar_entradas(nuevas, k);
+    free(e); free(pl);
+    if (!fin) { fprintf(stderr, "\n❌ No se pudo firmar el .apk.\n\n"); return 1; }
+    if (!escribir_archivo(salida, fin, n_fin)) {
+        free(fin);
         fprintf(stderr, "\n❌ No se pudo escribir '%s'.\n\n", salida);
         return 1;
     }
-    fclose(f);
-    free(apk);
-    printf("✅ %s (%.1f MB) — %s, %s\n", salida, n_apk / 1048576.0, nombre, id);
+    free(fin);
+    printf("✅ %s (%.1f MB) — %s, %s, versión %d\n", salida, n_fin / 1048576.0, nombre, id, version);
     printf("   Firmado con tu llave: %s (guárdala para poder actualizar el juego)\n", ruta_llave);
+    if (aab) printf("   Para Google Play: súbelo en Play Console. Cada vez que subas uno, con --version más alto.\n");
     return 0;
 }

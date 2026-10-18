@@ -20,6 +20,40 @@ La primera vez se crea una llave en `~/.lince/android-llave.txt` y con ella se
 firman todos tus juegos. **Guárdala**: para instalar una versión nueva de un
 juego encima de la anterior, tiene que estar firmada con la misma llave.
 
+`--version N` pone el número de versión (1 si no se dice). Para que un móvil
+acepte una versión nueva encima de la anterior, el número tiene que ser mayor.
+
+## Publicarlo en Google Play
+
+Google Play no quiere un `.apk` sino un `.aab` (Android App Bundle), con el que
+Google hace después el `.apk` justo para cada móvil:
+
+```bash
+lince repartir mi_juego.lince --aab --nombre "Mi juego" --id org.tunombre.mijuego --version 1
+```
+
+Hace `mi_juego.aab`, firmado con tu llave (la firma JAR, la que pide Google
+Play), que se sube en [Play Console](https://play.google.com/console). Hay que
+tener cuenta de desarrollador (25 $, una sola vez), y Google pide probar la app
+con un grupo de personas antes de publicarla. Para tener en cuenta:
+
+- **El `--id` no se puede cambiar** después de publicar: elige uno tuyo
+  (`org.tunombre.mijuego`), no `org.lince...`.
+- **Cada `.aab` que subas, con `--version` más alto** que el anterior.
+- **Tu llave es la «llave de subida»**: Google firma el juego que llega a los
+  móviles con la suya (la firma de apps de Google Play). Si pierdes tu llave,
+  Google te deja cambiarla; si la pierdes sin haber publicado nada, no pasa nada.
+- El juego apunta a Android 16 (API 36) y sus bibliotecas sirven en móviles con
+  páginas de memoria de 16 KB: lo que Google Play pide hoy.
+
+En el `.aab` van las mismas piezas que en el `.apk`, colocadas como pide
+Google, y el manifiesto y los recursos en su formato (protobuf). Esas dos
+piezas vienen hechas en la plantilla, en `aab/` (las hace bundletool en
+`android/construir.sh --plantilla`), y Lince solo cambia en ellas el nombre,
+el paquete y la versión. Para probar un `.aab` en un móvil conectado por USB:
+`java -jar bundletool.jar build-apks --bundle=mi_juego.aab --output=mi_juego.apks --connected-device`
+y `java -jar bundletool.jar install-apks --apks=mi_juego.apks`.
+
 ## Hacer el .apk con el SDK
 
 `android/construir.sh` hace lo mismo con las herramientas de Android (y es lo
@@ -50,10 +84,11 @@ En `~/lince-android`, o donde diga `LINCE_ANDROID`:
 | Carpeta | Qué es |
 |---|---|
 | `jdk/` | Java 17 (por ejemplo Temurin) |
-| `sdk/` | el SDK de Android con `platforms;android-34`, `build-tools;34.0.0` y `ndk;26.3.11579264` |
+| `sdk/` | el SDK de Android con `platforms;android-36`, `build-tools;34.0.0` y `ndk;26.3.11579264` |
 | `SDL2/` | las fuentes de SDL2 (2.30.9), tal cual (o `SDL_RUTA`) |
+| `descargas/bundletool.jar` | bundletool (o `BUNDLETOOL`), para la plantilla: si no está, `construir.sh --plantilla` lo descarga |
 
-`sdkmanager --sdk_root=... "platforms;android-34" "build-tools;34.0.0" "ndk;26.3.11579264"`
+`sdkmanager --sdk_root=... "platforms;android-36" "build-tools;34.0.0" "ndk;26.3.11579264"`
 las instala (hay que aceptar la licencia del SDK). La primera vez se compilan
 Lince y SDL2 para el móvil y la parte en Java; luego se reutilizan (en
 `obra/`). El `.apk` se firma con una llave de pruebas que se crea ahí mismo

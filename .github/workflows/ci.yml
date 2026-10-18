@@ -158,6 +158,10 @@ jobs:
           curl -sSL -o sdl2.tar.gz https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz
           mkdir -p "$RUNNER_TEMP/SDL2" && tar -xzf sdl2.tar.gz -C "$RUNNER_TEMP/SDL2" --strip-components=1
 
+      # Google Play pide apuntar a Android 16 (API 36)
+      - name: Android 16 en el SDK
+        run: yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" > /dev/null
+
       # Con el Java 17, el SDK y el NDK que trae la máquina de GitHub
       - name: Plantilla de Android (lince-android.apk)
         env:
@@ -167,12 +171,15 @@ jobs:
           export JAVA_HOME="$JAVA_HOME_17_X64"
           bash android/construir.sh --plantilla -o lince-android.apk
 
-      # Lo que hace quien tiene Lince, sin el SDK: el .apk de un juego
-      - name: lince repartir --android
+      # Lo que hace quien tiene Lince, sin el SDK: el .apk y el .aab de un juego,
+      # comprobados con apksigner, jarsigner y bundletool
+      - name: lince repartir --android y --aab
+        env:
+          LINCE_ANDROID_PLANTILLA: lince-android.apk
+          BUNDLETOOL: ${{ runner.temp }}/lince-android/descargas/bundletool.jar
         run: |
-          LINCE_ANDROID_PLANTILLA=lince-android.apk ./lince repartir examples/08_plataformas.lince --android -o plataformas.apk
-          BT="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)"
-          "$BT/apksigner" verify -v plataformas.apk
+          export JAVA_HOME="$JAVA_HOME_17_X64" PATH="$JAVA_HOME_17_X64/bin:$PATH"
+          bash tests/android/repartir.sh ./lince
 
       - uses: actions/upload-artifact@v4
         with:

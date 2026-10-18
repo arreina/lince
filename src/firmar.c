@@ -625,3 +625,110 @@ unsigned char *apk_firmar_v2(const unsigned char *zip, size_t n, const LlaveRsa 
     free(firmante.p); free(firmantes.p); free(valor.p); free(bloque.p);
     return salida;
 }
+
+/* ─────────────────── Firma JAR (la del .aab) ───────────────────
+   META-INF/MANIFEST.MF con el resumen de cada archivo, LINCE.SF con el de cada
+   apartado del manifiesto, y LINCE.RSA: la firma del .SF en PKCS #7.
+   https://docs.oracle.com/javase/8/docs/technotes/guides/jar/jar.html#Signed_JAR_File */
+static void base64(Buf *b, const unsigned char *p, size_t n) {
+    static const char A[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    for (size_t i = 0; i < n; i += 3) {
+        uint32_t v = (uint32_t)p[i] << 16 | (i + 1 < n ? (uint32_t)p[i + 1] << 8 : 0) | (i + 2 < n ? p[i + 2] : 0);
+        char c[4] = {A[v >> 18 & 63], A[v >> 12 & 63], i + 1 < n ? A[v >> 6 & 63] : '=', i + 2 < n ? A[v & 63] : '='};
+        buf_mas(b, c, 4);
+    }
+}
+
+/* Una línea "clave: valor" del manifiesto, partida a 72 bytes como pide el formato */
+static void linea_mf(Buf *b, const char *clave, const char *valor, size_t nvalor) {
+    Buf l = {0};
+    buf_mas(&l, clave, strlen(clave));
+    buf_mas(&l, ": ", 2);
+    buf_mas(&l, valor, nvalor);
+    for (size_t i = 0; i < l.n; ) {
+        size_t cabe = i == 0 ? 72 : 71;
+        size_t trozo = l.n - i < cabe ? l.n - i : cabe;
+        if (i > 0) buf_byte(b, ' ');
+        buf_mas(b, l.p + i, trozo);
+        buf_mas(b, "\r\n", 2);
+        i += trozo;
+    }
+    free(l.p);
+}
+
+static void linea_resumen(Buf *b, const char *clave, const void *p, size_t n) {
+    unsigned char r[32];
+    Buf b64 = {0};
+    sha256(p, n, r);
+    base64(&b64, r, 32);
+    linea_mf(b, clave, (const char *)b64.p, b64.n);
+    free(b64.p);
+}
+
+void jar_firmar(const LlaveRsa *ll, const char *const *nombres, const unsigned char *const *datos,
+                const size_t *largos, int num, JarFirma *salida) {
+    static const char PRINCIPAL[] = "Manifest-Version: 1.0\r\nCreated-By: Lince\r\n\r\n";
+    static const char FIRMA[]     = "Signature-Version: 1.0\r\nCreated-By: Lince\r\n";
+    Buf mf = {0}, sf = {0}, apartados = {0};
+    buf_mas(&mf, PRINCIPAL, strlen(PRINCIPAL));
+    for (int i = 0; i < num; i++) {
+        size_t inicio = mf.n;
+        linea_mf(&mf, "Name", nombres[i], strlen(nombres[i]));
+        linea_resumen(&mf, "SHA-256-Digest", datos[i], largos[i]);
+        buf_mas(&mf, "\r\n", 2);
+        /* en el .SF, el resumen de este apartado del manifiesto */
+        linea_mf(&apartados, "Name", nombres[i], strlen(nombres[i]));
+        linea_resumen(&apartados, "SHA-256-Digest", mf.p + inicio, mf.n - inicio);
+        buf_mas(&apartados, "\r\n", 2);
+    }
+    buf_mas(&sf, FIRMA, strlen(FIRMA));
+    linea_resumen(&sf, "SHA-256-Digest-Manifest", mf.p, mf.n);
+    linea_resumen(&sf, "SHA-256-Digest-Manifest-Main-Attributes", mf.p, strlen(PRINCIPAL));
+    buf_mas(&sf, "\r\n", 2);
+    buf_mas(&sf, apartados.p, apartados.n);
+    free(apartados.p);
+
+    /* PKCS #7 SignedData, sin el contenido (el .SF va aparte) */
+    static const unsigned char OID_SIGNED_DATA[] = {0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02};
+    static const unsigned char OID_DATA[]        = {0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x01};
+    static const unsigned char OID_SHA256[]      = {0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00};
+    static const unsigned char UNO[] = {1};
+    unsigned char firma[256], nb[256], serie[32];
+    llave_firmar(ll, sf.p, sf.n, firma);
+    bn_a_bytes(&ll->n, nb, 256);                  /* el número de serie del certificado */
+    sha256(nb, 256, serie);
+    serie[0] &= 0x7F;
+
+    Buf alg = {0}, algs = {0}, contenido = {0}, certs = {0}, emisor = {0}, firmante = {0}, firmantes = {0};
+    Buf alg_rsa = {0}, sd = {0}, sd_seq = {0}, explicito = {0}, ci = {0}, rsa = {0};
+    der(&alg, 0x30, OID_SHA256, sizeof OID_SHA256);
+    der(&algs, 0x31, alg.p, alg.n);
+    der(&contenido, 0x30, OID_DATA, sizeof OID_DATA);
+    der(&certs, 0xA0, ll->cert, ll->ncert);
+    der_nombre(&emisor);
+    der_entero(&emisor, serie, 8);
+    der_entero(&firmante, UNO, 1);
+    der_buf(&firmante, 0x30, &emisor);
+    buf_mas(&firmante, alg.p, alg.n);
+    der(&alg_rsa, 0x30, OID_RSA, sizeof OID_RSA);
+    buf_mas(&firmante, alg_rsa.p, alg_rsa.n);
+    der(&firmante, 0x04, firma, 256);
+    Buf firmante_seq = {0};
+    der_buf(&firmante_seq, 0x30, &firmante);
+    der_buf(&firmantes, 0x31, &firmante_seq);
+    der_entero(&sd, UNO, 1);
+    buf_mas(&sd, algs.p, algs.n);
+    buf_mas(&sd, contenido.p, contenido.n);
+    buf_mas(&sd, certs.p, certs.n);
+    buf_mas(&sd, firmantes.p, firmantes.n);
+    der_buf(&sd_seq, 0x30, &sd);
+    der_buf(&explicito, 0xA0, &sd_seq);
+    buf_mas(&ci, OID_SIGNED_DATA, sizeof OID_SIGNED_DATA);
+    buf_mas(&ci, explicito.p, explicito.n);
+    der_buf(&rsa, 0x30, &ci);
+    free(alg.p); free(algs.p); free(contenido.p); free(certs.p); free(firmantes.p); free(alg_rsa.p); free(explicito.p);
+
+    salida->mf = mf.p;   salida->nmf = mf.n;
+    salida->sf = sf.p;   salida->nsf = sf.n;
+    salida->rsa = rsa.p; salida->nrsa = rsa.n;
+}

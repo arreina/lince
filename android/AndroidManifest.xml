@@ -6,10 +6,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="@ID@"
     android:versionCode="@VERSION@"
-    android:versionName="@VERSION@.0"
+    android:versionName="@VERSION@"
     android:installLocation="auto">
 
-    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
+    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="36" />
     <uses-feature android:glEsVersion="0x00020000" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />

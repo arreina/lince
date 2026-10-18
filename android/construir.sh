@@ -7,6 +7,9 @@
 #
 # La plantilla es un .apk de Lince sin juego: con ella, 'lince repartir
 # --android juego.lince' hace el .apk sin nada de lo de abajo (ver src/apk.c).
+# Lleva también, en aab/, lo que el .aab de Google Play tiene distinto del .apk
+# (el manifiesto y los recursos en protobuf, y la configuración del bundle),
+# hecho con bundletool: así 'lince repartir --android --aab' hace el .aab.
 #
 # Necesita, fuera del repositorio (por defecto en ~/lince-android, o donde diga
 # LINCE_ANDROID): jdk/ (Java 17), sdk/ (con platforms, build-tools y ndk) y
@@ -42,6 +45,7 @@ while [ $# -gt 0 ]; do
 done
 if [ "$PLANTILLA" = 1 ]; then          # lo que apk.c sabe cambiar
     JUEGO="plantilla"; ID="org.lince.plantilla"; NOMBRE="LINCE_NOMBRE"; SALIDA="${SALIDA:-lince-android.apk}"
+    VERSION=1234321                     # la versión que pone 'lince repartir --version'
 fi
 [ -n "$JUEGO" ] || { echo "Uso: android/construir.sh juego.lince [-o juego.apk] [--nombre \"Mi juego\"] [--id org.lince.mijuego]"; exit 1; }
 BASE="$(basename "$JUEGO" .lince)"
@@ -95,6 +99,24 @@ cp "$OBRA/dex/classes.dex" "$T/"
 mkdir -p "$T/lib"
 cp -r "$OBRA/lib/"* "$T/lib/"
 (cd "$T" && zip -q -r base.apk classes.dex lib)
+
+# 5. Para el .aab: el mismo módulo en protobuf y bundletool, que lo convierte en
+#    un .aab. De ese .aab, a aab/ de la plantilla va lo que no está ya en el .apk
+if [ "$PLANTILLA" = 1 ]; then
+    BUNDLETOOL="${BUNDLETOOL:-$A/descargas/bundletool.jar}"
+    if [ ! -f "$BUNDLETOOL" ]; then
+        mkdir -p "$(dirname "$BUNDLETOOL")"
+        curl -sSL -o "$BUNDLETOOL" https://github.com/google/bundletool/releases/download/1.18.1/bundletool-all-1.18.1.jar
+    fi
+    "$BT/aapt2" link --proto-format -o "$T/proto.apk" -I "$PLAT/android.jar" --manifest "$T/AndroidManifest.xml" \
+        -A "$T/assets" "$T/res.zip"
+    mkdir -p "$T/modulo/manifest" "$T/modulo/dex" "$T/aab"
+    (cd "$T/modulo" && unzip -q ../proto.apk && mv AndroidManifest.xml manifest/ && cp ../classes.dex dex/ && cp -r ../lib . \
+        && zip -q -r ../modulo.zip .)
+    java -jar "$BUNDLETOOL" build-bundle --modules="$T/modulo.zip" --output="$T/plantilla.aab"
+    (cd "$T/aab" && unzip -q ../plantilla.aab -x 'base/dex/*' 'base/lib/*' 'base/res/*' 'base/assets/*' 2> /dev/null)
+    (cd "$T" && zip -q -r base.apk aab)
+fi
 "$BT/zipalign" -f -p 4 "$T/base.apk" "$T/alineado.apk"
 LLAVE="$A/lince-pruebas.keystore"           # una llave de pruebas, solo de esta máquina
 [ -f "$LLAVE" ] || keytool -genkeypair -keystore "$LLAVE" -alias lince -keyalg RSA -keysize 2048 \

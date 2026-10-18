@@ -4,6 +4,14 @@ Lo que queda por hacer en Lince y lo que ya se ha decidido, para no tener que
 repensarlo cada vez. Las ideas para el editor visual van en
 [IDEAS_EDITOR.md](IDEAS_EDITOR.md), no aquí.
 
+## Versión 0.8
+
+- [x] **Google Play:** `lince repartir --aab` hace el `.aab` firmado que pide Google Play, en C como el `.apk`. Probado con bundletool y en un emulador con Android 16; falta subir uno de verdad a Play Console (lo hace el autor, cuando tenga cuenta).
+- [ ] **Partidas guardadas:** `juego.guardar("partida", datos)` y `juego.cargar("partida")` guardan récords, opciones y avances en la carpeta del usuario de cada sistema (también en Android), sin pensar en rutas.
+- [ ] **Menús y diálogos, en Lince:** menús que se manejan con teclado, mando o dedo (portada, pausa, opciones) y cajas de diálogo con el texto saliendo letra a letra.
+
+Para más adelante: **juegos en el navegador** (`lince repartir --web`, con una plantilla en WebAssembly, como la de Android).
+
 ## Lenguaje
 
 Nada pendiente ahora mismo: lo que vaya saliendo se apunta aquí.
@@ -31,8 +39,6 @@ Nada pendiente ahora mismo.
   - **Probarlo con un mando Bluetooth** en el móvil (lo hace el autor): que se lea y
     que el mando de la pantalla se esconda al conectarlo. Ya probado en un móvil de
     verdad sin mando, en el emulador y las tareas en arm64 con `qemu-aarch64`.
-  - **Publicar en Google Play**: pide un `.aab` (no un `.apk`) firmado; hoy solo se hace el
-    `.apk` (con la llave de cada uno, que ya vale para instalarlo y actualizarlo).
 
 ## Decisiones ya tomadas
 
