@@ -85,8 +85,6 @@ lince repartir mi_juego.lince
 
 Crea la carpeta `mi_juego-linux` (o `mi_juego-windows`) y un `.zip` con ella: el juego con sus imágenes y sonidos dentro, SDL2 y un `LEEME.txt`. Quien lo reciba lo descomprime y juega, sin instalar Lince. Las imágenes y sonidos que nombra el código van dentro solos; los niveles u otros archivos, con `--incluir`.
 
-En Mac debería funcionar con `make` y SDL2 de Homebrew, pero no está probado.
-
 ## Uso
 
 ```bash

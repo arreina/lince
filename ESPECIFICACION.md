@@ -1615,7 +1615,6 @@ y un `LEEME.txt`, y un `.zip` con esa carpeta. Quien lo reciba lo descomprime y 
 - **Windows**: lleva `SDL2.dll` y las DLL de las que dependa (si las hay en su carpeta).
 - **Linux**: lleva `libSDL2-2.0.so.0`. El juego usa la SDL2 del sistema si está
   instalada y, si no, la de su carpeta.
-- **macOS**: sin probar; SDL2 no se incluye (`brew install sdl2`).
 - El ejecutable es para el sistema en el que se crea: para Windows, se reparte desde
   Windows (o con el `lince.exe` de `make windows` bajo Wine).
 
@@ -1701,7 +1700,6 @@ make test                              # tests del intérprete
 | Linux | ✅ Probado en la CI | `make` (para jugar: `libsdl2-2.0-0`) |
 | Windows (MSYS2 UCRT64) | ✅ Probado en la CI | `make` (para jugar: `SDL2.dll` junto al ejecutable) |
 | Windows desde Linux | ✅ | `make windows` (compilación cruzada con MinGW) |
-| Mac | ⚠️ Debería funcionar, sin probar | `make` |
 
 ---
 
