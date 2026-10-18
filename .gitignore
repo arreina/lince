@@ -20,3 +20,7 @@ agenda.json
 /build/
 pajaro_record.json
 lince.exe
+
+# Android: la plantilla y los .apk que se generan
+*.apk
+*.idsig

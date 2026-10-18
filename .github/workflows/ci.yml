@@ -1,8 +1,10 @@
 # 🐆 Lince — integración continua
 #
-# Tres trabajos: uno comprueba que el lenguaje se comporta como debe, otro
+# Cuatro trabajos: uno comprueba que el lenguaje se comporta como debe, otro
 # repite las mismas suites con AddressSanitizer para cazar errores de
-# memoria, y el tercero lo compila y lo prueba en Windows (MSYS2/UCRT64).
+# memoria, el tercero lo compila y lo prueba en Windows (MSYS2/UCRT64) y el
+# cuarto hace la plantilla de Android (lince-android.apk) y prueba
+# 'lince repartir --android' con ella.
 
 name: CI
 
@@ -116,3 +118,47 @@ jobs:
         run: |
           bash tests/juego/smoke.sh ./lince.exe
           bash tests/juego/ejemplos.sh ./lince.exe
+
+  android:
+    name: Android
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # para adjuntar la plantilla a una versión
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compilar Lince
+        run: make
+
+      # SDL2 no va en el repositorio: se descargan sus fuentes
+      - name: Fuentes de SDL2
+        run: |
+          curl -sSL -o sdl2.tar.gz https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz
+          mkdir -p "$RUNNER_TEMP/SDL2" && tar -xzf sdl2.tar.gz -C "$RUNNER_TEMP/SDL2" --strip-components=1
+
+      # Con el Java 17, el SDK y el NDK que trae la máquina de GitHub
+      - name: Plantilla de Android (lince-android.apk)
+        env:
+          LINCE_ANDROID: ${{ runner.temp }}/lince-android
+          SDL_RUTA: ${{ runner.temp }}/SDL2
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          android/construir.sh --plantilla -o lince-android.apk
+
+      # Lo que hace quien tiene Lince, sin el SDK: el .apk de un juego
+      - name: lince repartir --android
+        run: |
+          LINCE_ANDROID_PLANTILLA=lince-android.apk ./lince repartir examples/08_plataformas.lince --android -o plataformas.apk
+          BT="$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify -v plataformas.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lince-android
+          path: lince-android.apk
+
+      - name: Adjuntar la plantilla a la versión
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" lince-android.apk --clobber

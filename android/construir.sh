@@ -3,6 +3,10 @@
 #
 #   android/construir.sh juego.lince [-o juego.apk] [--nombre "Mi juego"]
 #                        [--id org.lince.mijuego] [--version 1] [--incluir carpeta]...
+#   android/construir.sh --plantilla [-o lince-android.apk]
+#
+# La plantilla es un .apk de Lince sin juego: con ella, 'lince repartir
+# --android juego.lince' hace el .apk sin nada de lo de abajo (ver src/apk.c).
 #
 # Necesita, fuera del repositorio (por defecto en ~/lince-android, o donde diga
 # LINCE_ANDROID): jdk/ (Java 17), sdk/ (con platforms, build-tools y ndk) y
@@ -10,17 +14,21 @@
 set -e
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
 A="${LINCE_ANDROID:-$HOME/lince-android}"
-export JAVA_HOME="$A/jdk" PATH="$A/jdk/bin:$PATH"
+mkdir -p "$A"
+# Java y el SDK: los de $A si están; si no, los del sistema (como en la CI)
+if [ -d "$A/jdk" ]; then export JAVA_HOME="$A/jdk"; fi
+[ -n "$JAVA_HOME" ] && export PATH="$JAVA_HOME/bin:$PATH"
 SDK="$A/sdk"
+[ -d "$SDK" ] || SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$SDK}}"
 NDK="$(ls -d "$SDK"/ndk/* 2>/dev/null | sort -V | tail -1)"
 BT="$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1)"
 PLAT="$(ls -d "$SDK"/platforms/android-* 2>/dev/null | sort -V | tail -1)"
 SDL="${SDL_RUTA:-$A/SDL2}"
-for falta in "$JAVA_HOME/bin/javac" "$NDK/ndk-build" "$BT/aapt2" "$PLAT/android.jar" "$SDL/Android.mk"; do
+for falta in "$(command -v javac || echo javac)" "$NDK/ndk-build" "$BT/aapt2" "$PLAT/android.jar" "$SDL/Android.mk"; do
     [ -e "$falta" ] || { echo "❌ Falta $falta (ver android/LEEME.md)"; exit 1; }
 done
 
-JUEGO="" ; SALIDA="" ; NOMBRE="" ; ID="" ; VERSION=1 ; EXTRAS=()
+JUEGO="" ; SALIDA="" ; NOMBRE="" ; ID="" ; VERSION=1 ; EXTRAS=() ; PLANTILLA=0
 while [ $# -gt 0 ]; do
     case "$1" in
         -o) SALIDA="$2"; shift 2 ;;
@@ -28,9 +36,13 @@ while [ $# -gt 0 ]; do
         --id) ID="$2"; shift 2 ;;
         --version) VERSION="$2"; shift 2 ;;
         --incluir) EXTRAS+=(--incluir "$2"); shift 2 ;;
+        --plantilla) PLANTILLA=1; shift ;;
         *) JUEGO="$1"; shift ;;
     esac
 done
+if [ "$PLANTILLA" = 1 ]; then          # lo que apk.c sabe cambiar
+    JUEGO="plantilla"; ID="org.lince.plantilla"; NOMBRE="LINCE_NOMBRE"; SALIDA="${SALIDA:-lince-android.apk}"
+fi
 [ -n "$JUEGO" ] || { echo "Uso: android/construir.sh juego.lince [-o juego.apk] [--nombre \"Mi juego\"] [--id org.lince.mijuego]"; exit 1; }
 BASE="$(basename "$JUEGO" .lince)"
 SALIDA="${SALIDA:-$BASE.apk}"
@@ -65,7 +77,11 @@ fi
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/assets" "$T/res/drawable"
-"$LINCE" compilar "$JUEGO" --datos -o "$T/assets/juego.paq" "${EXTRAS[@]}" > "$T/compilar.log" || { cat "$T/compilar.log"; exit 1; }
+if [ "$PLANTILLA" = 1 ]; then
+    : > "$T/assets/.vacio"              # sin juego: lo pone 'lince repartir --android'
+else
+    "$LINCE" compilar "$JUEGO" --datos -o "$T/assets/juego.paq" "${EXTRAS[@]}" > "$T/compilar.log" || { cat "$T/compilar.log"; exit 1; }
+fi
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy "$LINCE" "$RAIZ/android/icono.lince" "$T/res/drawable/icono.png" > /dev/null
 NOMBRE_XML="$(printf '%s' "$NOMBRE" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/"/\&quot;/g')"
 sed -e "s|@ID@|$ID|g" -e "s|@VERSION@|$VERSION|g" -e "s|@NOMBRE@|$NOMBRE_XML|g" \

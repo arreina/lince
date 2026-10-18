@@ -1,10 +1,33 @@
 # 🐆 Lince en Android
 
 Un juego de Lince se convierte en un `.apk` que se instala en un móvil Android
-(de 64 bits: arm64, o x86_64 en el emulador):
+(de 64 bits, Android 7.0 o más nuevo):
+
+```bash
+lince repartir mi_juego.lince --android                         # mi_juego.apk
+lince repartir mi_juego.lince --android -o juego.apk --nombre "Mi juego" --id org.lince.mijuego
+```
+
+No hace falta instalar nada más: Lince parte de una **plantilla**
+(`lince-android.apk`, un `.apk` de Lince sin juego), le mete el juego, le pone
+el nombre del paquete y de la app y lo firma él mismo (`src/apk.c` y
+`src/firmar.c`: SHA-256, RSA y el esquema de firma v2 de Android escritos en
+C). La plantilla se busca junto al ejecutable de Lince, en `~/.lince/` o donde
+diga `LINCE_ANDROID_PLANTILLA`; viene con cada versión de Lince (la hace la CI)
+o se hace con `android/construir.sh --plantilla`.
+
+La primera vez se crea una llave en `~/.lince/android-llave.txt` y con ella se
+firman todos tus juegos. **Guárdala**: para instalar una versión nueva de un
+juego encima de la anterior, tiene que estar firmada con la misma llave.
+
+## Hacer el .apk con el SDK
+
+`android/construir.sh` hace lo mismo con las herramientas de Android (y es lo
+que hace la plantilla):
 
 ```bash
 android/construir.sh examples/11_movil.lince -o movil.apk --nombre "Lince en el móvil"
+android/construir.sh --plantilla -o lince-android.apk
 ```
 
 El `.apk` lleva:

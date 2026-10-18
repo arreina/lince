@@ -88,10 +88,10 @@ Crea la carpeta `mi_juego-linux` (o `mi_juego-windows`) y un `.zip` con ella: el
 ### En un móvil Android
 
 ```bash
-android/construir.sh mi_juego.lince -o mi_juego.apk --nombre "Mi juego"
+lince repartir mi_juego.lince --android --nombre "Mi juego"
 ```
 
-Hace un `.apk` para instalar el juego en un móvil Android de 64 bits: a pantalla completa, con un mando en la pantalla como el de los juegos de móvil (`juego.mando_tactil()`: palanca y botones A/B que funcionan como un mando de verdad), `juego.toques()` y el botón «atrás» para salir. Necesita Java, el SDK y el NDK de Android y las fuentes de SDL2; ver [`android/LEEME.md`](android/LEEME.md).
+Hace `mi_juego.apk`, para instalar el juego en un móvil Android, sin instalar nada más (Lince lo monta y lo firma él mismo a partir de la plantilla `lince-android.apk`, que viene con cada versión): a pantalla completa, con un mando en la pantalla como el de los juegos de móvil (`juego.mando_tactil()`: palanca y botones A/B que funcionan como un mando de verdad), `juego.toques()` y el botón «atrás» para salir. Ver [`android/LEEME.md`](android/LEEME.md).
 
 ## Uso
 

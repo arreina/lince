@@ -26,15 +26,15 @@ Nada pendiente ahora mismo.
 
 ## Plataformas
 
-- [ ] **Android**: hecho lo básico (`android/construir.sh`, táctil, mando en la pantalla, botones,
+- [ ] **Android**: hecho lo básico (`lince repartir --android`, `android/construir.sh`, táctil, mando en la pantalla, botones,
   «atrás», archivos en su carpeta, tareas en arm64). Falta:
   - **Probarlo con un mando Bluetooth** en el móvil (lo hace el autor): que se lea y
     que el mando de la pantalla se esconda al conectarlo. Ya probado en un móvil de
     verdad sin mando, en el emulador y las tareas en arm64 con `qemu-aarch64`.
-  - **`lince repartir --android`** sin que quien hace el juego tenga que instalar el SDK.
-    Por ejemplo, un `.apk` de Lince hecho una vez en la CI al que solo se le añade el
-    juego y se firma.
-  - **Firmar para publicar** en una tienda: hoy se firma con una llave de pruebas.
+  - **Publicar en Google Play**: pide un `.aab` (no un `.apk`) firmado; hoy solo se hace el
+    `.apk` (con la llave de cada uno, que ya vale para instalarlo y actualizarlo).
+  - **La plantilla en la versión**: la CI la hace y la adjunta a cada versión nueva; la
+    siguiente versión de Lince es la primera que la llevará.
 
 ## Decisiones ya tomadas
 

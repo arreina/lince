@@ -17,6 +17,7 @@
 #include "modulos.h"
 #include "recarga.h"
 #include "repartir.h"
+#include "apk.h"
 #include "nuevo.h"
 
 static char *leer_archivo(const char *ruta) {
@@ -47,6 +48,7 @@ static void mostrar_ayuda(void) {
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
     printf("  lince compilar <a.lince> --incluir <ruta> Incluye niveles u otros archivos (varias veces)\n");
     printf("  lince repartir <juego.lince>             Carpeta y .zip para compartir el juego (con SDL2)\n");
+    printf("  lince repartir <juego.lince> --android   El .apk para instalarlo en un móvil Android\n");
     printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");
@@ -253,18 +255,22 @@ int main(int argc, char *argv[]) {
 
     /* Repartir: carpeta y .zip con el juego y SDL2, listos para compartir */
     if (strcmp(cmd, "repartir") == 0) {
-        const char *uso = "   Uso: lince repartir <juego.lince> [-o carpeta] [--incluir carpeta_o_archivo]...\n\n";
+        const char *uso = "   Uso: lince repartir <juego.lince> [-o carpeta] [--incluir carpeta_o_archivo]...\n"
+                          "        lince repartir <juego.lince> --android [-o juego.apk] [--nombre \"Mi juego\"] [--id org.lince.mijuego]\n\n";
         if (argc < 3) { fprintf(stderr, "\n❌ Falta el juego.\n%s", uso); return 1; }
         const char *ext = strrchr(argv[2], '.');
         if (!ext || strcmp(ext, ".lince") != 0) {
             fprintf(stderr, "\n❌ El archivo '%s' no tiene la extensión '.lince'.\n\n", argv[2]);
             return 1;
         }
-        const char *carpeta = NULL;
+        const char *carpeta = NULL, *nombre = NULL, *id = NULL;
         const char *extras[64];
-        int num_extras = 0;
+        int num_extras = 0, android = 0;
         for (int i = 3; i < argc; i++) {
             if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) carpeta = argv[++i];
+            else if (strcmp(argv[i], "--android") == 0) android = 1;
+            else if (strcmp(argv[i], "--nombre") == 0 && i + 1 < argc) nombre = argv[++i];
+            else if (strcmp(argv[i], "--id") == 0 && i + 1 < argc) id = argv[++i];
             else if (strcmp(argv[i], "--incluir") == 0 && i + 1 < argc) {
                 if (num_extras < 64) extras[num_extras++] = argv[++i];
                 else i++;
@@ -272,6 +278,38 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "\n❌ Opción desconocida: %s\n%s", argv[i], uso);
                 return 1;
             }
+        }
+        if (android) {
+            /* un .apk para Android, sin Java ni el SDK (ver apk.c) */
+            char base[256], apk[512], id_auto[300];
+            const char *b = strrchr(argv[2], '/');
+#ifdef _WIN32
+            const char *b2 = strrchr(argv[2], '\\');
+            if (!b || (b2 && b2 > b)) b = b2;
+#endif
+            snprintf(base, sizeof base, "%s", b ? b + 1 : argv[2]);
+            base[strlen(base) - 6] = '\0';                      /* sin ".lince" */
+            if (!carpeta) { snprintf(apk, sizeof apk, "%s.apk", base); carpeta = apk; }
+            if (!id) {                         /* 01_pong → org.lince.pong: cada parte empieza por letra */
+                size_t k = 0;
+                char parte[200];
+                for (const char *c = base; *c && k < sizeof parte - 1; c++)
+                    if ((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || (*c >= 'A' && *c <= 'Z'))
+                        parte[k++] = (char)(*c >= 'A' && *c <= 'Z' ? *c + 32 : *c);
+                parte[k] = '\0';
+                const char *p = parte;
+                while (*p >= '0' && *p <= '9') p++;
+                snprintf(id_auto, sizeof id_auto, "org.lince.%s", *p ? p : "juego");
+                id = id_auto;
+            }
+            int bien = id[0] >= 'a' && id[0] <= 'z' && strchr(id, '.') != NULL;
+            for (const char *c = id; *c && bien; c++)
+                bien = (*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9') || *c == '_' ||
+                       (*c == '.' && c[1] >= 'a' && c[1] <= 'z');
+            if (!bien) { fprintf(stderr, "\n❌ El --id es como org.lince.mijuego (minúsculas, cada parte empieza por letra).\n\n"); return 1; }
+            const char *nombre_auto = base;                /* 01_pong → pong */
+            while ((*nombre_auto >= '0' && *nombre_auto <= '9') || *nombre_auto == '_') nombre_auto++;
+            return apk_crear(argv[2], carpeta, nombre ? nombre : (*nombre_auto ? nombre_auto : base), id, extras, num_extras);
         }
         return repartir_crear(argv[2], carpeta, extras, num_extras);
     }

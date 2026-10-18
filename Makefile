@@ -3,7 +3,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -Wno-maybe-uninitialized -Wno-format-truncation -Wno-stringop-truncation
 LDFLAGS = -lm
-SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c src/ogg.c src/recarga.c src/imagen.c src/repartir.c src/nuevo.c src/letra.c src/corrutina.c src/android.c
+SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c src/ogg.c src/recarga.c src/imagen.c src/repartir.c src/nuevo.c src/letra.c src/corrutina.c src/android.c src/firmar.c src/apk.c
 
 # ── Detección de plataforma ───────────────
 UNAME := $(shell uname 2>/dev/null || echo Windows)
@@ -32,6 +32,10 @@ MINGW ?= x86_64-w64-mingw32-gcc
 windows: $(SRC) src/juego.h
 	$(MINGW) $(CFLAGS) -o lince.exe $(SRC) -lm
 	@echo "✅ lince.exe compilado para Windows"
+
+# ── Android: 'lince repartir --android' con la plantilla (se salta si no la hay) ──
+test-android: $(BIN)
+	@bash tests/android/repartir.sh ./$(BIN)
 
 # ── Modo debug ────────────────────────────
 debug: $(SRC)
@@ -90,7 +94,7 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-ejemplos test-lsp test-editores editores-check bibliotecas-check test-depurador test-juego test-asan
+test-todo: test test-compilador test-ejemplos test-lsp test-editores editores-check bibliotecas-check test-depurador test-juego test-android test-asan
 
 test-juego: $(BIN)
 	@bash tests/juego/smoke.sh ./$(BIN)
@@ -166,5 +170,5 @@ endif
 
 .PHONY: all windows debug ejemplo test test-compilador test-ejemplos \
         test-asan test-depurador test-lsp test-editores editores editores-check bench vsix \
-        test-juego test-todo clean install uninstall docs docs-check bibliotecas bibliotecas-check
+        test-juego test-android test-todo clean install uninstall docs docs-check bibliotecas bibliotecas-check
 

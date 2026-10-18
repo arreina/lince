@@ -1699,9 +1699,13 @@ y un `LEEME.txt`, y un `.zip` con esa carpeta. Quien lo reciba lo descomprime y 
 
 ### Android
 
-`android/construir.sh juego.lince` hace un `.apk` para instalar el juego en un móvil Android
-de 64 bits; ver [`android/LEEME.md`](android/LEEME.md). Hacen falta Java, el SDK y el NDK de
-Android y las fuentes de SDL2, fuera del repositorio. En el móvil el juego ocupa la pantalla
+`lince repartir juego.lince --android [-o juego.apk] [--nombre "Mi juego"] [--id org.lince.mijuego]`
+hace un `.apk` para instalar el juego en un móvil Android (64 bits, Android 7.0 o más nuevo) sin
+instalar nada más: parte de la plantilla `lince-android.apk` (junto al ejecutable, en `~/.lince/`
+o en `LINCE_ANDROID_PLANTILLA`), le mete el juego y lo firma con una llave que se crea la primera
+vez en `~/.lince/android-llave.txt` (guárdala: las actualizaciones de un juego tienen que ir
+firmadas con la misma). Ver [`android/LEEME.md`](android/LEEME.md); allí está también
+`android/construir.sh`, que hace el `.apk` o la plantilla con Java, el SDK y el NDK de Android. En el móvil el juego ocupa la pantalla
 (de lado si es más ancho que alto), se controla con `toques()` y con botones `"pantalla:..."`
 en las acciones, el botón «atrás» lo cierra y lo que escribe va a su carpeta privada.
 `examples/11_movil.lince` sirve para probarlo.
