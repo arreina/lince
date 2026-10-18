@@ -6,8 +6,9 @@
 # el ordenador, con el ratón, que cuenta como un dedo; o con las flechas,
 # espacio y Mayús, o con un mando). El mando de la pantalla sale solo, con los
 # botones que usan las acciones. Cada dedo en la pantalla se ve como un círculo con
-# su número. Una estrella parpadea con una tarea, y el juego cuenta en un
-# archivo cuántas veces se ha abierto. El botón «atrás» del móvil (o Esc) sale.
+# su número. Inclinar el móvil también mueve al lince, y al saltar vibra. Una
+# estrella parpadea con una tarea, y el juego cuenta en un archivo cuántas
+# veces se ha abierto. El botón «atrás» del móvil (o Esc) sale.
 #
 # Muestra: juego.mando_tactil() (las acciones con "mando:..." funcionan igual
 #          con el de la pantalla), juego.toques(), tareas, efectos de sonido
@@ -21,8 +22,8 @@ fijo ALTO = 270
 fijo SUELO = 200
 
 juego.abrir("Lince en el móvil", ANCHO, ALTO, {"escala": 2})
-juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
-juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-", "inclinacion:x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+", "inclinacion:x+"])
 juego.definir_accion("saltar", ["espacio", "arriba", "mando:a"])
 juego.definir_accion("correr", ["mayus", "mando:b"])
 juego.mando_tactil({"siempre": verdadero})        # en el móvil sale solo; así también en el ordenador
@@ -77,6 +78,7 @@ mientras juego.abierto() {
         vy = -330
         saltos++
         juego.efecto("salto", {"volumen": 0.4})
+        juego.vibrar(0.05)                           # un toque en la mano (y en el mando)
     }
     vy += 900 * dt
     py = matematica.minimo(py + vy * dt, SUELO)
@@ -95,6 +97,8 @@ mientras juego.abierto() {
         juego.circulo(t["x"], t["y"], 18, [120, 200, 255, 120])
         juego.texto(a_texto(t["id"] % 100), t["x"] - 4, t["y"] - 4, 1, [255, 255, 255])
     }
+    sea incl = juego.inclinacion()
+    juego.texto("INCLINACIÓN: {matematica.redondear(incl[0] * 10) / 10}, {matematica.redondear(incl[1] * 10) / 10}", 12, 68, 1, [220, 220, 230])
     juego.texto("DEDOS: {dedos.longitud()} - PALANCA: {matematica.redondear(juego.eje("izq_x") * 10) / 10}" +
                 "{si juego.accion("correr") { " - CORRE" } sino { "" }}", 12, 56, 1, [220, 220, 230])
     juego.presentar()

@@ -35,7 +35,6 @@ Nada pendiente ahora mismo.
     Por ejemplo, un `.apk` de Lince hecho una vez en la CI al que solo se le añade el
     juego y se firma.
   - **Firmar para publicar** en una tienda: hoy se firma con una llave de pruebas.
-  - **Vibrar** (`juego.vibrar()`) y el teclado de la pantalla para `editar()`.
 
 ## Decisiones ya tomadas
 

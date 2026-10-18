@@ -103,6 +103,17 @@ static struct {
     void *(*GetTouchFinger)(long long, int);       /* SDL_Finger: id (64 bits), x, y (0 a 1) */
     void (*GetWindowSize)(void *, int *, int *);
     int  (*SetHint)(const char *, const char *);
+    int  (*Rumble)(void *, unsigned short, unsigned short, unsigned);     /* SDL ≥ 2.0.9 */
+    int  (*NumHaptics)(void);
+    const char *(*HapticName)(int);
+    void *(*HapticOpen)(int);
+    int  (*HapticRumbleInit)(void *);
+    int  (*HapticRumblePlay)(void *, float, unsigned);
+    int  (*NumSensors)(void);
+    int  (*SensorDeviceType)(int);
+    void *(*SensorOpen)(int);
+    int  (*SensorData)(void *, float *, int);
+    int  (*DisplayOrientation)(int);
 } _jg;
 
 /* Formato de audio de Lince: 16 bits con signo, estéreo, 44100 Hz */
@@ -153,6 +164,7 @@ typedef struct {
 /* Una entrada de una acción: tecla, botón del mando, botón del ratón o eje del mando
    hacia un lado. mando = -1: cualquiera. */
 typedef struct { char tipo; int codigo, mando, signo; float x, y, w, h; } JgEntrada;   /* x..h: "pantalla:" */
+/* "inclinacion:x+": tipo 'i', codigo 0 (x) o 1 (y), signo; cuenta del todo con media inclinación */
 /* Un dedo en la pantalla, en coordenadas del juego */
 #define JG_TOQUES 10
 typedef struct { long long id; float x, y; } JgToque;
@@ -219,6 +231,10 @@ static struct {
        se suma al mando 1 en cada presentar() */
     unsigned char virt_botones[JG_BOTONES];
     float virt_ejes[JG_EJES];
+    /* la vibración del propio aparato y el acelerómetro (se abren la primera vez) */
+    void *vibrador, *acelerometro;
+    int vibrador_buscado, acelerometro_buscado;
+    float incl[2], incl_prev[2];         /* inclinacion(): hacia dónde rodaría una bola, de -1 a 1 */
     int njoy;
     char escrito[JG_ESCRITO];            /* lo tecleado en el último fotograma */
     int nescrito;
@@ -275,6 +291,7 @@ static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
 static void jg_leer_mandos(void);
 static void jg_mezclar_virtual(void);
+static void jg_leer_inclinacion(void);
 static void jg_recoger_voces(void);
 static void jg_parar_flujo(void);
 static int jg_audio(void);
@@ -386,6 +403,17 @@ static int jg_cargar(void) {
     *(void **)(&_jg.GetTouchFinger) = JG_SIMBOLO(h, "SDL_GetTouchFinger");
     *(void **)(&_jg.GetWindowSize) = JG_SIMBOLO(h, "SDL_GetWindowSize");
     *(void **)(&_jg.SetHint) = JG_SIMBOLO(h, "SDL_SetHint");
+    *(void **)(&_jg.Rumble) = JG_SIMBOLO(h, "SDL_GameControllerRumble");
+    *(void **)(&_jg.NumHaptics) = JG_SIMBOLO(h, "SDL_NumHaptics");
+    *(void **)(&_jg.HapticName) = JG_SIMBOLO(h, "SDL_HapticName");
+    *(void **)(&_jg.HapticOpen) = JG_SIMBOLO(h, "SDL_HapticOpen");
+    *(void **)(&_jg.HapticRumbleInit) = JG_SIMBOLO(h, "SDL_HapticRumbleInit");
+    *(void **)(&_jg.HapticRumblePlay) = JG_SIMBOLO(h, "SDL_HapticRumblePlay");
+    *(void **)(&_jg.NumSensors) = JG_SIMBOLO(h, "SDL_NumSensors");
+    *(void **)(&_jg.SensorDeviceType) = JG_SIMBOLO(h, "SDL_SensorGetDeviceType");
+    *(void **)(&_jg.SensorOpen) = JG_SIMBOLO(h, "SDL_SensorOpen");
+    *(void **)(&_jg.SensorData) = JG_SIMBOLO(h, "SDL_SensorGetData");
+    *(void **)(&_jg.DisplayOrientation) = JG_SIMBOLO(h, "SDL_GetDisplayOrientation");
     return 1;
 }
 
@@ -500,6 +528,8 @@ static void jg_cerrar_todo(void) {
     _jgs.render = _jgs.ventana = NULL;
     if (_jgs.abierta) _jg.Quit();
     _jgs.abierta = 0;
+    _jgs.vibrador = _jgs.acelerometro = NULL;         /* SDL_Quit los ha cerrado */
+    _jgs.vibrador_buscado = _jgs.acelerometro_buscado = 0;
     interprete_reloj_tareas(NULL);
 }
 
@@ -558,7 +588,9 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     if (_jg.SetHint) _jg.SetHint("SDL_ACCELEROMETER_AS_JOYSTICK", "0");
 #endif
     /* vídeo, y si se puede audio y mandos (0x10 audio, 0x200 joystick, 0x2000 mando) */
-    if (_jg.Init(0x20 | 0x10 | 0x200 | 0x2000) != 0 && _jg.Init(0x20 | 0x10) != 0 && _jg.Init(0x20) != 0) {
+    /* (y 0x1000 vibración, 0x8000 sensores: el acelerómetro del móvil) */
+    if (_jg.Init(0x20 | 0x10 | 0x200 | 0x2000 | 0x1000 | 0x8000) != 0 && _jg.Init(0x20 | 0x10 | 0x200 | 0x2000) != 0 &&
+        _jg.Init(0x20 | 0x10) != 0 && _jg.Init(0x20) != 0) {
         char msg[400];
         snprintf(msg, sizeof(msg), "no se pudo iniciar SDL2: %s", _jg.GetError());
         return jg_error("ErrorJuego", msg);
@@ -988,6 +1020,76 @@ static void jg_leer_toques(void) {
 #endif
 }
 
+/* ── Acelerómetro ──
+   Hacia dónde rodaría una bola sobre la pantalla, de -1 a 1 en cada eje (x a
+   la derecha, y hacia abajo, como las coordenadas del juego): la gravedad
+   proyectada en la pantalla. Android da la aceleración en los ejes del aparato
+   en vertical (x a la derecha, y hacia arriba), y la gravedad es lo contrario;
+   se gira según cómo esté puesta la pantalla. */
+static void jg_leer_inclinacion(void) {
+    memcpy(_jgs.incl_prev, _jgs.incl, sizeof _jgs.incl);
+    if (!_jgs.acelerometro_buscado) {
+        _jgs.acelerometro_buscado = 1;
+        int n = _jg.NumSensors && _jg.SensorDeviceType && _jg.SensorOpen && _jg.SensorData ? _jg.NumSensors() : 0;
+        for (int i = 0; i < n && !_jgs.acelerometro; i++)
+            if (_jg.SensorDeviceType(i) == 1) _jgs.acelerometro = _jg.SensorOpen(i);      /* SDL_SENSOR_ACCEL */
+    }
+    float a[3] = {0, 0, 0};
+    if (!_jgs.acelerometro || _jg.SensorData(_jgs.acelerometro, a, 3) != 0) { _jgs.incl[0] = _jgs.incl[1] = 0; return; }
+    int o = _jg.DisplayOrientation ? _jg.DisplayOrientation(0) : 3;
+    float x, y;
+    switch (o) {
+        case 1:  x =  a[1]; y =  a[0]; break;          /* de lado, con la derecha arriba */
+        case 2:  x = -a[1]; y = -a[0]; break;          /* de lado, con la izquierda arriba */
+        case 4:  x =  a[0]; y = -a[1]; break;          /* en vertical, boca abajo */
+        default: x = -a[0]; y =  a[1]; break;          /* en vertical */
+    }
+    x /= 9.80665f; y /= 9.80665f;
+    _jgs.incl[0] = x < -1 ? -1 : x > 1 ? 1 : x;
+    _jgs.incl[1] = y < -1 ? -1 : y > 1 ? 1 : y;
+}
+
+/* inclinacion() -> [x, y] */
+static Valor *fn_jg_inclinacion(Valor **a, int n) {
+    (void)a; (void)n;
+    Valor *l = valor_lista_crear();
+    lista_agregar(l, valor_numero(_jgs.incl[0]));
+    lista_agregar(l, valor_numero(_jgs.incl[1]));
+    return l;
+}
+
+/* vibrar(segundos[, fuerza]): hace vibrar el móvil y los mandos conectados
+   (fuerza de 0 a 1). Donde no se puede vibrar, no hace nada. */
+static Valor *fn_jg_vibrar(Valor **a, int n) {
+    JG_ABIERTA();
+    double s, f = 1;
+    if (!jg_num(a, n, 0, &s, "vibrar")) return valor_nulo();
+    if (n > 1 && !jg_num(a, n, 1, &f, "vibrar")) return valor_nulo();
+    if (s < 0 || s > 10) return jg_error("Error", "vibrar(): los segundos van de 0 a 10");
+    if (f < 0 || f > 1) return jg_error("Error", "vibrar(): la fuerza va de 0 a 1");
+    unsigned ms = (unsigned)(s * 1000 + 0.5);
+    unsigned short fuerza = (unsigned short)(f * 65535);
+    for (int i = 0; i < JG_MANDOS && _jg.Rumble; i++)
+        if (_jgs.mandos[i]) _jg.Rumble(_jgs.mandos[i], fuerza, fuerza, ms);
+#ifdef __ANDROID__
+    /* SDL presenta el vibrador del móvil como un dispositivo háptico más */
+    if (!_jgs.vibrador_buscado && _jg.NumHaptics && _jg.HapticOpen && _jg.HapticRumbleInit && _jg.HapticRumblePlay) {
+        _jgs.vibrador_buscado = 1;
+        int nh = _jg.NumHaptics(), elegido = nh > 0 ? 0 : -1;
+        for (int i = 0; i < nh; i++) {
+            const char *nombre = _jg.HapticName ? _jg.HapticName(i) : NULL;
+            if (nombre && strstr(nombre, "VIBRATOR")) elegido = i;
+        }
+        if (elegido >= 0) {
+            _jgs.vibrador = _jg.HapticOpen(elegido);
+            if (_jgs.vibrador && _jg.HapticRumbleInit(_jgs.vibrador) != 0) _jgs.vibrador = NULL;
+        }
+    }
+    if (_jgs.vibrador && ms > 0) _jg.HapticRumblePlay(_jgs.vibrador, (float)f, ms);
+#endif
+    return valor_nulo();
+}
+
 /* toques() -> [{"id", "x", "y", "nuevo"}, ...]: los dedos que hay en la
    pantalla; "nuevo" si ha empezado a tocar en este fotograma */
 static Valor *fn_jg_toques(Valor **a, int n) {
@@ -1150,6 +1252,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos)
             _jgs.teclas[_jgs.guion[i].tecla] = 1;
     jg_leer_toques();                    /* después de los clics de prueba: también cuentan como dedo */
+    jg_leer_inclinacion();
     /* lo de juego.lince que mira la entrada de este fotograma (el mando de la
        pantalla táctil), y lo que deja en mando_virtual() se suma al mando 1 */
     valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_entrada", NULL, 0));
@@ -4320,6 +4423,15 @@ static Valor *fn_jg_movimiento_raton(Valor **a, int n) {
 
 static int jg_entrada(const char *t, JgEntrada *e, char *msg, size_t max) {
     e->mando = -1; e->signo = 0;
+    if (strncmp(t, "inclinacion:", 12) == 0) {       /* inclinar el móvil hacia un lado */
+        const char *q = t + 12;
+        if ((q[0] == 'x' || q[0] == 'y') && (q[1] == '+' || q[1] == '-') && !q[2]) {
+            e->tipo = 'i'; e->codigo = q[0] == 'y'; e->signo = q[1] == '+' ? 1 : -1;
+            return 1;
+        }
+        snprintf(msg, max, "'%s': la inclinación es \"inclinacion:x-\", \"inclinacion:x+\", \"inclinacion:y-\" o \"inclinacion:y+\"", t);
+        return 0;
+    }
     if (strncmp(t, "pantalla:", 9) == 0) {           /* un botón en la pantalla táctil */
         char fin;
         if (sscanf(t + 9, "%f,%f,%f,%f%c", &e->x, &e->y, &e->w, &e->h, &fin) == 4 && e->w > 0 && e->h > 0) {
@@ -4361,6 +4473,10 @@ static float jg_fuerza(const JgEntrada *e, int antes) {
     switch (e->tipo) {
         case 't': return (antes ? _jgs.previas : _jgs.teclas)[e->codigo] ? 1 : 0;
         case 'r': return ((antes ? _jgs.raton_prev : _jgs.raton) & (1u << (e->codigo - 1))) ? 1 : 0;
+        case 'i': {          /* desde un poco inclinado (zona muerta) hasta media inclinación, que cuenta entera */
+            float v = ((antes ? _jgs.incl_prev : _jgs.incl)[e->codigo] * e->signo - 0.08f) / 0.42f;
+            return v < 0 ? 0 : v > 1 ? 1 : v;
+        }
         case 'p': {                                   /* algún dedo dentro del rectángulo */
             const JgToque *t = antes ? _jgs.toques_prev : _jgs.toques;
             int n = antes ? _jgs.ntoques_prev : _jgs.ntoques;
@@ -5518,6 +5634,8 @@ static void cargar_juego(Entorno *entorno) {
         {"movimiento_raton", fn_jg_movimiento_raton, 0},
         {"toques",          fn_jg_toques,           0},
         {"acciones",        fn_jg_acciones,         0},
+        {"vibrar",          fn_jg_vibrar,          -1},
+        {"inclinacion",     fn_jg_inclinacion,      0},
         {"mando_virtual",   fn_jg_mando_virtual,    2},
         {"posicion_camara", fn_jg_posicion_camara,  0},
         {"tactil",          fn_jg_tactil,           0},

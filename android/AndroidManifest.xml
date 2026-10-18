@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 🐆 Lince para Android. android/construir.sh cambia @ID@, @NOMBRE@ y @VERSION@. -->
+<!-- 🐆 Lince para Android. android/construir.sh cambia @ID@, @NOMBRE@ y @VERSION@.
+     configChanges: el juego atiende él mismo esos cambios (girar, modo oscuro,
+     tamaño de letra...). Si no, Android recrea la actividad y SDL se queda
+     esperando a que acabe el juego: la app «no responde». -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="@ID@"
     android:versionCode="@VERSION@"
@@ -23,7 +26,7 @@
             android:label="@NOMBRE@"
             android:alwaysRetainTaskState="true"
             android:launchMode="singleInstance"
-            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation|density|fontScale|fontWeightAdjustment|touchscreen|colorMode|mcc|mnc|grammaticalGender"
             android:preferMinimalPostProcessing="true"
             android:exported="true">
             <intent-filter>

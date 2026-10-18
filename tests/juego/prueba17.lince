@@ -1,0 +1,13 @@
+# Vibrar e inclinar: en el ordenador no hay vibrador ni acelerómetro, así que
+# vibrar() no hace nada (sin error) e inclinacion() da [0, 0]
+importar "juego"
+juego.abrir("Vibrar", 100, 60)
+juego.definir_accion("izquierda", ["izquierda", "inclinacion:x-"])
+juego.vibrar(0.2)
+juego.vibrar(0.1, 0.5)
+juego.presentar()
+escribir("inclinacion: {juego.inclinacion()}")
+escribir("accion: {juego.accion("izquierda")}")
+intentar { juego.vibrar(20) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.vibrar(1, 2) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.definir_accion("mal", ["inclinacion:z+"]) } capturar (error e) { escribir("error: {e.mensaje}") }

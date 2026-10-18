@@ -59,6 +59,9 @@ errores) se ve con `adb logcat -s lince`.
   rápido cuenta al menos un fotograma), y una acción puede tener botones propios
   en la pantalla: `"pantalla:x,y,ancho,alto"`. El primer dedo también mueve el
   ratón (`juego.raton()`, `juego.clic()`). `juego.tactil()` es verdadero.
+- **Vibrar e inclinar**: `juego.vibrar(segundos)` hace vibrar el móvil (y los
+  mandos), y `juego.inclinacion()` dice hacia dónde está inclinado; una acción
+  puede usarlo con `"inclinacion:x-"`, `"inclinacion:x+"`...
 - **Atrás**: el botón «atrás» del móvil cierra el juego (`juego.abierto()` pasa
   a falso).
 - **Archivos**: lo que el juego escribe (récords, partidas) va a su carpeta
