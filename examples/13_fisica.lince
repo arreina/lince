@@ -1,0 +1,104 @@
+# 🐆 Lince — Física
+#
+# Coge las tres monedas. Empuja las cajas para subirte a ellas, deja que las
+# pelotas reboten y súbete al ascensor. Flechas o A/D (o el stick) para
+# moverte, espacio (o A en el mando) para saltar, R para empezar otra vez.
+# Esc sale.
+#
+# Muestra: física sencilla escrita en Lince (juego.fisica, juego.cuerpo,
+# juego.avanzar_fisica): gravedad, cajas que se empujan según su masa y se
+# apilan, pelotas que rebotan, un ascensor que lleva lo que tiene encima y
+# monedas que solo avisan al tocarlas (sensores, juego.tocando).
+importar "juego"
+importar "matematica"
+
+fijo CASILLA = 32
+fijo PLANO = [
+    "####################",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#.........######...#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#####..............#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "#..................#",
+    "####################"
+]
+
+juego.abrir("Física", 640, 480)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("saltar", ["espacio", "w", "arriba", "mando:a"])
+
+sea nivel = nulo
+sea mundo = nulo
+sea yo = nulo
+sea ascensor = nulo
+sea monedas = []
+sea cogidas = 0
+
+funcion empezar(): nulo {
+    nivel = juego.mapa(PLANO, CASILLA, {"bordes": "todos"})
+    mundo = juego.fisica({"gravedad": 1200, "mapa": nivel})
+    yo = juego.cuerpo(mundo, {"x": 60, "y": 380, "ancho": 22, "alto": 30, "friccion": 0})
+    para (i = 0; i < 3; i++) {                                  # cajas, una más pesada
+        juego.cuerpo(mundo, {"x": 200 + i * 60, "y": 300, "ancho": 30, "alto": 30, "masa": si i == 2 { 4 } sino { 1 },
+                             "tipo": "caja"})
+    }
+    juego.cuerpo(mundo, {"x": 400, "y": 60, "radio": 12, "rebote": 0.8, "tipo": "pelota"})
+    juego.cuerpo(mundo, {"x": 460, "y": 100, "radio": 9, "rebote": 0.9, "masa": 0.5, "tipo": "pelota"})
+    ascensor = juego.cuerpo(mundo, {"x": 530, "y": 440, "ancho": 70, "alto": 10, "fijo": verdadero, "vy": -60,
+                                    "tipo": "ascensor"})
+    monedas = []
+    para cada lista sitio en [[50, 250], [360, 130], [590, 60]] {
+        monedas.agregar(juego.cuerpo(mundo, {"x": sitio[0], "y": sitio[1], "radio": 8, "sensor": verdadero,
+                                             "gravedad": 0, "tipo": "moneda"}))
+    }
+    cogidas = 0
+}
+
+si no juego.recargado() { empezar() }
+
+mientras juego.abierto() {
+    si juego.tecla_pulsada("escape") { juego.salir() }
+    si juego.tecla_pulsada("r") { empezar() }
+
+    # tú: andar y saltar; lo demás lo hace la física
+    yo["vx"] = juego.direccion("izquierda", "derecha") * 220
+    si juego.accion_pulsada("saltar") y yo["en_suelo"] { yo["vy"] = -520 }
+    # el ascensor sube y baja entre dos alturas
+    si ascensor["y"] < 150 { ascensor["vy"] = 60 }
+    si ascensor["y"] > 440 { ascensor["vy"] = -60 }
+    juego.avanzar_fisica(mundo)
+    para cada diccionario t en juego.tocando(mundo, yo) {
+        si t["tipo"] == "moneda" {
+            juego.quitar_cuerpo(mundo, t)
+            cogidas = cogidas + 1
+            juego.efecto("moneda")
+        }
+    }
+
+    juego.limpiar([24, 28, 44])
+    juego.dibujar_mapa(nivel, {"#": [70, 80, 110]})
+    para cada diccionario c en mundo["cuerpos"] {
+        si c.contiene("radio") {
+            sea color = si c["tipo"] == "moneda" { [255, 210, 60] } sino { [230, 110, 90] }
+            juego.circulo(c["x"] + c["radio"], c["y"] + c["radio"], c["radio"], color)
+        } sino si c["id_fisica"] == yo["id_fisica"] {
+            juego.rectangulo(c["x"], c["y"], c["ancho"], c["alto"], [235, 235, 245])
+        } sino {
+            sea color = si c["tipo"] == "ascensor" { [120, 200, 140] } sino si c["masa"] > 1 { [140, 90, 50] } sino { [200, 150, 80] }
+            juego.rectangulo(c["x"], c["y"], c["ancho"], c["alto"], color)
+            juego.contorno(c["x"], c["y"], c["ancho"], c["alto"], [40, 30, 20])
+        }
+    }
+    juego.texto("MONEDAS: {cogidas}/3", 10, 10, 2)
+    si cogidas == 3 { juego.texto("¡CONSEGUIDO! (R: OTRA VEZ)", 320, 220, {"escala": 3, "alinear": "centro", "color": [255, 220, 80]}) }
+    juego.presentar()
+}

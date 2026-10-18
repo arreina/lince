@@ -12,6 +12,11 @@ apartado que le toca de este archivo.
 - Lo sólido y las plataformas se marcan en Tiled: una capa «Colisiones» o la propiedad `solido` en una capa o en un tile.
 - `lince compilar` y `lince repartir` meten dentro el mapa, sus tilesets y sus imágenes.
 
+### Física sencilla
+
+- `juego.fisica`, `juego.cuerpo` y `juego.avanzar_fisica`: cuerpos con gravedad, masa, rebote y fricción que chocan entre ellos y con el mapa, plataformas y ascensores que llevan lo que tienen encima, y sensores (`juego.tocando`) para monedas y zonas. Está escrita en Lince.
+- Ejemplo nuevo: `examples/13_fisica.lince`.
+
 ## 0.8.0
 
 Publicar en Google Play, partidas guardadas, y menús y diálogos.

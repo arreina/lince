@@ -13,7 +13,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 ## Versión 0.9
 
 - [x] **Mapas de Tiled:** `juego.mapa_tiled` (.tmx y .tmj, tilesets .tsx y .tsj) y `juego.dibujar_tiled`. Quedan fuera los mapas isométricos y hexagonales, los infinitos, los tilesets de imágenes sueltas y las capas comprimidas con zstd.
-- [ ] **Física sencilla, en Lince:** cuerpos con gravedad, rebotes, empujes y choques entre ellos y con el mapa (cajas que caen, pelotas, plataformas que se mueven), encima de las colisiones que ya hay.
+- [x] **Física sencilla, en Lince:** `juego.fisica`, `juego.cuerpo`, `juego.avanzar_fisica`, `juego.tocando`, `juego.empujar` y `juego.quitar_cuerpo`; `examples/13_fisica.lince`. Sin giros (los cuerpos no rotan) y con choques caja contra caja o círculo contra círculo (un círculo contra una caja cuenta como caja).
 - [ ] **Controles a gusto:** el jugador cambia las teclas y botones de cada acción desde un menú del juego, y se guarda (con los menús y las partidas guardadas de la 0.8).
 
 ## Camino a la 1.0

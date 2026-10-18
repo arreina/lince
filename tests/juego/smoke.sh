@@ -535,4 +535,11 @@ for (x, y), esp, nombre in casos:
     else: print("  ❌ tiled, píxel:", nombre, "→", px(x, y)); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida5b.txt; exit 1; }
+# ── Física sencilla ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=3 timeout 60 "$LINCE" "$DIR/prueba21.lince" > salida27.txt 2>&1
+for l in "caja en el suelo: 204 verdadero" "pelota rebota: verdadero y se para: 208 verdadero" "apiladas: 204 184 verdadero" \
+         "la moneda no cae y avisa: 180 verdadero" "el pasajero sube con el ascensor: 16 verdadero" "empujar: 200 20" "cuerpos: 8" \
+         'error: cuerpo(): falta "y" (un número; o "radio" en vez de ancho y alto)' "error: avanzar_fisica() espera un mundo de juego.fisica()"; do
+    grep -qxF "$l" salida27.txt && ok "física: $l" || mal "falta la línea: $l"
+done
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida5b.txt; exit 1; }

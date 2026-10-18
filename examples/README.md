@@ -31,6 +31,8 @@ Y se reparten como un único ejecutable:
 
 | `12_aventura.lince` | flechas o WASD, espacio para hablar, Esc para la pausa | un **menú** de portada y otro de pausa (`juego.menu`) y **diálogos** con el texto saliendo letra a letra, quién habla y respuestas para elegir (`juego.dialogo`, `juego.respuesta`); todo con teclado, mando, ratón o dedo |
 
+| `13_fisica.lince` | flechas o A/D, espacio para saltar, R para empezar otra vez | **física sencilla** (`juego.fisica`, `juego.cuerpo`, `juego.avanzar_fisica`): cajas que se empujan según su masa y se apilan, pelotas que rebotan, un ascensor que lleva lo que tiene encima y monedas que solo avisan al tocarlas (`juego.tocando`) |
+
 Todos terminan con **Esc** (en la aventura, Esc abre la pausa, que tiene «Salir»).
 
 ## Prueba la recarga en caliente

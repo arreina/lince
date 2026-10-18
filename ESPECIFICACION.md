@@ -1477,6 +1477,34 @@ tilesets de una sola imagen (también con margen, separación y un color transpa
 y lo que usan (tilesets e imágenes) van dentro del juego al hacer `lince compilar` o `lince
 repartir`, como las imágenes.
 
+**Física sencilla.** Cosas que caen, rebotan, se empujan y chocan entre ellas y con un mapa, sin
+girar: cajas, pelotas, plataformas que se mueven y el propio personaje. Está escrita en Lince.
+
+```lince
+sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
+sea yo = juego.cuerpo(mundo, {"x": 40, "y": 300, "ancho": 22, "alto": 30, "friccion": 0})
+sea caja = juego.cuerpo(mundo, {"x": 200, "y": 300, "ancho": 30, "alto": 30, "masa": 2})
+sea pelota = juego.cuerpo(mundo, {"x": 300, "y": 50, "radio": 10, "rebote": 0.8})
+juego.cuerpo(mundo, {"x": 400, "y": 200, "radio": 8, "sensor": verdadero, "gravedad": 0, "tipo": "moneda"})
+# en cada fotograma:
+yo["vx"] = juego.direccion("izquierda", "derecha") * 200
+si juego.accion_pulsada("saltar") y yo["en_suelo"] { yo["vy"] = -500 }
+juego.avanzar_fisica(mundo)
+para cada diccionario t en juego.tocando(mundo, yo) {
+    si t["tipo"] == "moneda" { juego.quitar_cuerpo(mundo, t) }
+}
+```
+
+| Función | Qué hace |
+|---|---|
+| `fisica([opciones])` | un mundo: `gravedad` (900 hacia abajo, o `[x, y]`), `mapa` (un mapa de `mapa()` o `mapa_tiled()` con el que chocar) y `pasos` (120: cuántas veces por segundo se calcula, para que nada atraviese nada) |
+| `cuerpo(mundo, datos)` | añade un cuerpo y lo devuelve: el mismo diccionario, con lo que falte puesto. `x`, `y` (la esquina), `ancho` y `alto`, o `radio` (un círculo); `vx`, `vy`; `masa` (1: el más pesado empuja más y lo empujan menos); `rebote` (0 a 1); `friccion` (0,5: cómo frena en el suelo); `gravedad` (1; 0 para que flote); `fijo` (no lo mueven ni la gravedad ni los choques: suelos, muros y, con `vx` o `vy`, plataformas y ascensores, que llevan lo que tengan encima); `sensor` (no choca, solo cuenta lo que toca: monedas, zonas). Puede llevar más datos tuyos (`"tipo": "caja"`) |
+| `avanzar_fisica(mundo[, dt])` | mueve todo lo de un fotograma: gravedad, mapa y choques. Deja en cada cuerpo `en_suelo` (apoyado en el mapa o en otro cuerpo), y `techo` y `pared` si hay mapa |
+| `tocando(mundo, cuerpo)` · `empujar(cuerpo, fx, fy)` · `quitar_cuerpo(mundo, cuerpo)` | los cuerpos que tocaba en el último `avanzar_fisica` · un golpe que cambia su velocidad según su masa · lo quita del mundo |
+
+Los cuerpos son diccionarios normales: para moverlos se cambian `vx` y `vy` (o `x` e `y`), y se
+dibujan como cada uno quiera. `examples/13_fisica.lince` lo usa todo.
+
 **Partículas.** Chispas, polvo, explosiones: `particulas(x, y[, opciones])` lanza un puñado y
 `dibujar_particulas()` las mueve y las dibuja (llámala en cada fotograma, después de lo que deban
 tapar; respeta la cámara y devuelve cuántas quedan). `borrar_particulas()` las quita todas.
