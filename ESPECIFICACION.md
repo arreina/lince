@@ -1089,6 +1089,7 @@ minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del j
 | `raton()` · `boton_raton(n)` · `clic(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · giro de la rueda |
 | `mandos()` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4) · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
 | `cursor(visible)` · `capturar_raton(si)` · `movimiento_raton()` | muestra u oculta la flecha · encierra y oculta el ratón para apuntar (devuelve si se pudo) · `[dx, dy]` movido desde el fotograma anterior |
+| `toques()` · `tactil()` | los dedos que hay en la pantalla táctil: una lista de `{"id", "x", "y", "nuevo"}` en coordenadas del juego (`nuevo`: empezó a tocar en este fotograma; `id` sigue al mismo dedo mientras no se levante). Sin pantalla táctil, el botón izquierdo del ratón cuenta como un dedo, para probarlo en el ordenador · ¿hay pantalla táctil? (en un móvil, siempre) |
 | `editar(texto[, maximo])` · `texto_escrito()` | el texto con lo tecleado añadido y «borrar» aplicado (tildes y ñ incluidas) · lo tecleado en este fotograma |
 
 **Acciones.** Un nombre para varias teclas, botones y ejes, así el juego funciona igual con teclado, ratón y mando:
@@ -1104,7 +1105,7 @@ x = x + juego.direccion("izquierda", "derecha") * 200 * juego.dt()   # gradual c
 
 | Función | Qué hace |
 |---|---|
-| `definir_accion(nombre, entradas)` | crea o sustituye la acción. Entradas: una tecla (`"espacio"`), `"mando:a"` (botón de cualquier mando), `"mando2:a"` (del mando 2), `"mando:izq_x-"` / `"mando:izq_x+"` (eje hacia un lado), `"raton:izquierdo"` / `"raton:central"` / `"raton:derecho"` |
+| `definir_accion(nombre, entradas)` | crea o sustituye la acción. Entradas: una tecla (`"espacio"`), `"mando:a"` (botón de cualquier mando), `"mando2:a"` (del mando 2), `"mando:izq_x-"` / `"mando:izq_x+"` (eje hacia un lado), `"raton:izquierdo"` / `"raton:central"` / `"raton:derecho"`, `"pantalla:x,y,ancho,alto"` (un botón en la pantalla táctil: cuenta mientras haya un dedo dentro de ese rectángulo; el juego lo dibuja como quiera) |
 | `accion(n)` · `accion_pulsada(n)` · `accion_soltada(n)` | mantenida / empieza en este fotograma / termina en este fotograma |
 | `direccion(negativa, positiva)` | de −1 a 1: entero con teclas, gradual con el stick |
 
@@ -1689,6 +1690,18 @@ y un `LEEME.txt`, y un `.zip` con esa carpeta. Quien lo reciba lo descomprime y 
   instalada y, si no, la de su carpeta.
 - El ejecutable es para el sistema en el que se crea: para Windows, se reparte desde
   Windows (o con el `lince.exe` de `make windows` bajo Wine).
+
+### Android
+
+`android/construir.sh juego.lince` hace un `.apk` para instalar el juego en un móvil Android
+de 64 bits; ver [`android/LEEME.md`](android/LEEME.md). Hacen falta Java, el SDK y el NDK de
+Android y las fuentes de SDL2, fuera del repositorio. En el móvil el juego ocupa la pantalla
+(de lado si es más ancho que alto), se controla con `toques()` y con botones `"pantalla:..."`
+en las acciones, el botón «atrás» lo cierra y lo que escribe va a su carpeta privada.
+`examples/11_movil.lince` sirve para probarlo.
+
+`lince compilar juego.lince --datos -o juego.paq` empaqueta solo el programa y sus archivos,
+sin el intérprete: es lo que va dentro del `.apk`.
 
 ### Rendimiento
 

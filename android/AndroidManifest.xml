@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 🐆 Lince para Android. android/construir.sh cambia @ID@, @NOMBRE@ y @VERSION@. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="@ID@"
+    android:versionCode="@VERSION@"
+    android:versionName="@VERSION@.0"
+    android:installLocation="auto">
+
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
+    <uses-feature android:glEsVersion="0x00020000" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application android:label="@NOMBRE@"
+        android:icon="@drawable/icono"
+        android:allowBackup="true"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+        android:hardwareAccelerated="true">
+        <activity android:name="org.lince.LinceActivity"
+            android:label="@NOMBRE@"
+            android:alwaysRetainTaskState="true"
+            android:launchMode="singleInstance"
+            android:configChanges="layoutDirection|locale|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:preferMinimalPostProcessing="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

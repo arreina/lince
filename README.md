@@ -85,6 +85,14 @@ lince repartir mi_juego.lince
 
 Crea la carpeta `mi_juego-linux` (o `mi_juego-windows`) y un `.zip` con ella: el juego con sus imágenes y sonidos dentro, SDL2 y un `LEEME.txt`. Quien lo reciba lo descomprime y juega, sin instalar Lince. Las imágenes y sonidos que nombra el código van dentro solos; los niveles u otros archivos, con `--incluir`.
 
+### En un móvil Android
+
+```bash
+android/construir.sh mi_juego.lince -o mi_juego.apk --nombre "Mi juego"
+```
+
+Hace un `.apk` para instalar el juego en un móvil Android de 64 bits: a pantalla completa, con la pantalla táctil (`juego.toques()` y botones en pantalla en las acciones) y el botón «atrás» para salir. Necesita Java, el SDK y el NDK de Android y las fuentes de SDL2; ver [`android/LEEME.md`](android/LEEME.md).
+
 ## Uso
 
 ```bash

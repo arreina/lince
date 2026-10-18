@@ -1,0 +1,107 @@
+# 🐆 Lince — En el móvil
+#
+# Para probar Lince en un móvil Android (android/construir.sh), y también en
+# el ordenador: los botones de la pantalla mueven y hacen saltar al lince
+# (con el ratón, que cuenta como un dedo, o con las flechas y el espacio).
+# Cada dedo en la pantalla se ve como un círculo con su número. Una estrella
+# parpadea con una tarea, y el juego cuenta en un archivo cuántas veces se ha
+# abierto. El botón «atrás» del móvil (o Esc) sale.
+#
+# Muestra: juego.toques(), botones táctiles con "pantalla:" en las acciones,
+#          tareas, efectos de sonido y guardar datos.
+importar "juego"
+importar "archivos"
+importar "matematica"
+
+fijo ANCHO = 480
+fijo ALTO = 270
+fijo SUELO = 200
+fijo BOTONES = {"izquierda": [16, 206, 56, 56], "derecha": [80, 206, 56, 56], "saltar": [408, 206, 56, 56]}
+
+juego.abrir("Lince en el móvil", ANCHO, ALTO, {"escala": 2})
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-", "pantalla:16,206,56,56"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+", "pantalla:80,206,56,56"])
+juego.definir_accion("saltar", ["espacio", "arriba", "mando:a", "pantalla:408,206,56,56"])
+juego.definir_accion("salir", ["escape"])
+
+fijo LINCE = juego.sprite([
+    ".X......X.",
+    ".XX....XX.",
+    ".XYXXXXYX.",
+    "XYYYYYYYYX",
+    "XYGKYYGKYX",
+    "XYYYPPYYYX",
+    "XWYYYYYYWX",
+    ".XWWKKWWX.",
+    "..XXXXXX.."
+], {"X": [70, 45, 25], "Y": [255, 200, 80], "G": [90, 200, 90], "K": [20, 20, 20],
+    "P": [230, 120, 140], "W": [255, 250, 240]})
+
+# Cuántas veces se ha abierto (en el móvil, en la carpeta privada del juego)
+fijo ARCHIVO = "veces.txt"
+sea veces = 1
+si archivos.existe(ARCHIVO) { veces = a_numero(archivos.leer(ARCHIVO)) + 1 }
+archivos.escribir(ARCHIVO, a_texto(veces))
+
+sea px = ANCHO / 2
+sea py = SUELO
+sea vy = 0
+sea mira_izquierda = falso
+sea brillo = 0
+sea saltos = 0
+
+# Una estrella que parpadea sola, con una tarea
+tarea parpadear() {
+    mientras verdadero {
+        brillo = 1
+        esperar(0.15)
+        brillo = 0
+        esperar(0.6)
+    }
+}
+parpadear()
+
+funcion boton(val texto nombre, val texto letra): nulo {
+    sea r = BOTONES[nombre]
+    sea color = si juego.accion(nombre) { [255, 200, 80, 220] } sino { [255, 255, 255, 70] }
+    juego.rectangulo(r[0], r[1], r[2], r[3], color)
+    juego.contorno(r[0], r[1], r[2], r[3], [255, 255, 255, 160])
+    juego.texto(letra, r[0] + r[2] / 2 - 6, r[1] + r[3] / 2 - 7, 2, [30, 30, 40])
+}
+
+mientras juego.abierto() {
+    si juego.accion_pulsada("salir") { juego.salir() }
+    sea dt = juego.dt()
+    sea direccion = juego.direccion("izquierda", "derecha")
+    px = matematica.limitar(px + direccion * 160 * dt, 20, ANCHO - 20)
+    si direccion < 0 { mira_izquierda = verdadero }
+    si direccion > 0 { mira_izquierda = falso }
+    si juego.accion_pulsada("saltar") y py >= SUELO {
+        vy = -330
+        saltos++
+        juego.efecto("salto", {"volumen": 0.4})
+    }
+    vy += 900 * dt
+    py = matematica.minimo(py + vy * dt, SUELO)
+
+    juego.limpiar([25, 30, 50])
+    juego.rectangulo(0, SUELO, ANCHO, ALTO - SUELO, [50, 70, 60])
+    si brillo > 0 { juego.circulo(440, 40, 10, [255, 240, 120]) } sino { juego.circulo(440, 40, 4, [200, 190, 120]) }
+    juego.dibujar(LINCE, px, py - 18, {"escala": 4, "centrado": verdadero, "espejo": mira_izquierda})
+    juego.texto("LINCE EN EL MÓVIL", 12, 10, 2, [255, 200, 80])
+    juego.texto("ABIERTO {veces} VECES - SALTOS: {saltos}", 12, 32, 1, [220, 220, 230])
+    juego.texto("TÁCTIL: {si juego.tactil() { "SÍ" } sino { "NO" }} - {matematica.redondear(juego.fps())} FPS", 12, 44, 1, [220, 220, 230])
+
+    # cada dedo, con su número
+    sea dedos = juego.toques()
+    para cada diccionario t en dedos {
+        juego.circulo(t["x"], t["y"], 18, [120, 200, 255, 120])
+        juego.texto(a_texto(t["id"] % 100), t["x"] - 4, t["y"] - 4, 1, [255, 255, 255])
+    }
+    juego.texto("DEDOS: {dedos.longitud()}", 12, 56, 1, [220, 220, 230])
+
+    boton("izquierda", "<")
+    boton("derecha", ">")
+    boton("saltar", "^")
+    juego.presentar()
+}

@@ -1,0 +1,25 @@
+# Pantalla táctil: toques() y botones en la pantalla para las acciones. Sin
+# pantalla táctil, el botón izquierdo del ratón cuenta como un dedo (aquí, el
+# clic de prueba de LINCE_JUEGO_CLIC, que se pulsa en los fotogramas impares).
+importar "juego"
+juego.abrir("Táctil", 100, 60)
+juego.definir_accion("saltar", ["espacio", "pantalla:10,10,20,20"])
+juego.definir_accion("lejos", ["pantalla:60,10,20,20"])
+sea f = 0
+sea pulsada = 0
+sea nuevos = 0
+sea visto = ""
+mientras juego.abierto() {
+    f++
+    si juego.accion_pulsada("saltar") { pulsada++ }
+    si juego.accion("lejos") { escribir("no debería") }
+    para cada diccionario t en juego.toques() {
+        si t["nuevo"] { nuevos++ }
+        visto = "{t["x"]},{t["y"]}"
+    }
+    juego.presentar()
+}
+escribir("tactil: {juego.tactil()}")
+escribir("dedo en: {visto}")
+escribir("pulsada: {pulsada}, nuevos: {nuevos}")
+intentar { juego.definir_accion("mal", ["pantalla:1,2"]) } capturar (error e) { escribir("error: {e.mensaje}") }

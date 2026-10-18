@@ -151,7 +151,7 @@ static int copiar_sdl(const char *carpeta) {
             if (!esta) snprintf(cola[ncola++], 96, "%s", deps[k]);
         }
     }
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__)
     void *h = dlopen("libSDL2-2.0.so.0", RTLD_NOW);
     if (!h) return 0;
     struct link_map *lm = NULL;

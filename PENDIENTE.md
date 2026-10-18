@@ -26,14 +26,14 @@ Nada pendiente ahora mismo.
 
 ## Plataformas
 
-- [ ] **Android** (aplazado): que un juego de Lince se pueda instalar en un móvil. Lo que haría falta:
-  - **Táctil:** `juego.toques()` y botones en pantalla para las acciones. También se podría probar en el ordenador con el ratón.
-  - **Archivos:** leer las imágenes y los sonidos desde dentro del `.apk`, a través de SDL.
-  - **Pila de las tareas:** cambiarla a mano para ARM y x86, porque Android no trae `swapcontext`.
-  - **Ciclo de vida:** pausar el juego al salir de la app y seguir al volver.
-  - **Pantallas:** distintos tamaños y orientación.
-  - **El `.apk`:** un «Lince para Android» hecho una vez en la CI, y `lince repartir --android` que mete el juego dentro y lo firma.
-  - **Pruebas:** el autor, en un móvil de verdad.
+- [ ] **Android**: hecho lo básico (`android/construir.sh`, táctil, botones en pantalla,
+  «atrás», archivos en su carpeta, tareas en arm64). Falta:
+  - **Probarlo en un móvil de verdad** (lo hace el autor).
+  - **`lince repartir --android`** sin que quien hace el juego tenga que instalar el SDK.
+    Por ejemplo, un `.apk` de Lince hecho una vez en la CI al que solo se le añade el
+    juego y se firma.
+  - **Firmar para publicar** en una tienda: hoy se firma con una llave de pruebas.
+  - **Vibrar** (`juego.vibrar()`) y el teclado de la pantalla para `editar()`.
 
 ## Decisiones ya tomadas
 

@@ -77,7 +77,13 @@ static int ejecutar_empaquetado(int argc, char *argv[]) {
 
     interprete_fijar_archivo(ruta);
     interprete_set_args(argc - 1, argv + 1);   /* todos los argumentos son del programa */
-    interprete_ejecutar(interp, programa);
+    char mensaje[700] = "";
+    if (interprete_ejecutar_recargable(interp, programa, mensaje, sizeof mensaje) != 0) {
+        /* Un juego no se cierra sin más: el error se queda en la ventana
+           hasta que se cierre (en el móvil no hay otro sitio donde verlo) */
+        if (juego_ventana_abierta()) juego_esperar_arreglo(mensaje);
+        exit(1);
+    }
 
     interprete_destruir(interp);
     nodo_destruir(programa);
@@ -196,9 +202,11 @@ int main(int argc, char *argv[]) {
         /* Opciones: -o nombre, --incluir ruta (varias) */
         char ruta_bin[512] = "";
         const char *extras[64];
-        int num_extras = 0;
+        int num_extras = 0, solo_datos = 0;
         for (int i = 3; i < argc; i++) {
-            if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
+            if (strcmp(argv[i], "--datos") == 0) {
+                solo_datos = 1;          /* sin el intérprete: lo que va dentro de un .apk */
+            } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
                 snprintf(ruta_bin, sizeof(ruta_bin), "%s", argv[++i]);
             } else if (strcmp(argv[i], "--incluir") == 0 && i + 1 < argc) {
                 if (num_extras < 64) extras[num_extras++] = argv[++i];
@@ -227,7 +235,8 @@ int main(int argc, char *argv[]) {
         printf("   Fuente  : %s\n", archivo);
         printf("   Salida  : %s\n\n", ruta_bin);
 
-        int resultado = empaquetado_crear(archivo, ruta_bin, extras, num_extras);
+        int resultado = solo_datos ? empaquetado_crear_datos(archivo, ruta_bin, extras, num_extras)
+                                   : empaquetado_crear(archivo, ruta_bin, extras, num_extras);
         if (resultado == 0)
             printf("✅ Compilado correctamente → %s\n\n", ruta_bin);
         return resultado;
@@ -314,3 +323,12 @@ int main(int argc, char *argv[]) {
 }
 
 
+
+#ifdef __ANDROID__
+/* En Android, SDLActivity arranca el juego llamando a SDL_main (ver android.c) */
+int android_preparar(void);
+__attribute__((visibility("default"))) int SDL_main(int argc, char *argv[]) {
+    if (!android_preparar()) return 1;
+    return ejecutar_empaquetado(argc, argv);
+}
+#endif

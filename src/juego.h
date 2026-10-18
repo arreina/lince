@@ -95,7 +95,14 @@ static struct {
     int  (*ShowCursor)(int);
     int  (*RelativeMouse)(int);
     void (*StartTextInput)(void);
+    void (*StopTextInput)(void);
     void (*SetWindowSize)(void *, int, int);
+    int  (*NumTouchDevices)(void);
+    long long (*GetTouchDevice)(int);
+    int  (*NumTouchFingers)(long long);
+    void *(*GetTouchFinger)(long long, int);       /* SDL_Finger: id (64 bits), x, y (0 a 1) */
+    void (*GetWindowSize)(void *, int *, int *);
+    int  (*SetHint)(const char *, const char *);
 } _jg;
 
 /* Formato de audio de Lince: 16 bits con signo, estéreo, 44100 Hz */
@@ -145,7 +152,10 @@ typedef struct {
 
 /* Una entrada de una acción: tecla, botón del mando, botón del ratón o eje del mando
    hacia un lado. mando = -1: cualquiera. */
-typedef struct { char tipo; int codigo, mando, signo; } JgEntrada;
+typedef struct { char tipo; int codigo, mando, signo; float x, y, w, h; } JgEntrada;   /* x..h: "pantalla:" */
+/* Un dedo en la pantalla, en coordenadas del juego */
+#define JG_TOQUES 10
+typedef struct { long long id; float x, y; } JgToque;
 /* desde: cuándo se empezó a pulsar (-1: no está pulsada); soltada: cuándo se
    soltó la última vez, tras 'duro' segundos pulsada (para mantenida()) */
 typedef struct { char *nombre; JgEntrada e[JG_ENTRADAS]; int n; double desde, soltada, duro; } JgAccion;
@@ -173,6 +183,8 @@ static struct {
     unsigned char teclas[512], previas[512];   /* estado actual y del fotograma anterior */
     unsigned raton, raton_prev;
     int rx, ry, rueda;
+    JgToque toques[JG_TOQUES], toques_prev[JG_TOQUES];
+    int ntoques, ntoques_prev;
     double t_ultimo, dt, fps, t_fps;
     int cuadros;
     /* Modo de prueba (sin pantalla ni espera): LINCE_JUEGO_FOTOGRAMAS=N cierra tras N
@@ -207,6 +219,7 @@ static struct {
     int mov_x, mov_y;                    /* cuánto se ha movido el ratón en el último fotograma */
     char *escribir_prueba;               /* modo de prueba: LINCE_JUEGO_ESCRIBIR */
     int pide_texto;                      /* el juego ha llamado a editar() o texto_escrito() */
+    int texto_ahora, teclado_puesto;     /* en el móvil: lo ha pedido en este fotograma / teclado a la vista */
     JgAccion acciones[JG_ACCIONES];
     int nacciones;
     int reabrir;                         /* recarga en caliente: abrir() reutiliza la ventana */
@@ -358,7 +371,14 @@ static int jg_cargar(void) {
     *(void **)(&_jg.ShowCursor) = JG_SIMBOLO(h, "SDL_ShowCursor");
     *(void **)(&_jg.RelativeMouse) = JG_SIMBOLO(h, "SDL_SetRelativeMouseMode");
     *(void **)(&_jg.StartTextInput) = JG_SIMBOLO(h, "SDL_StartTextInput");
+    *(void **)(&_jg.StopTextInput) = JG_SIMBOLO(h, "SDL_StopTextInput");
     *(void **)(&_jg.SetWindowSize) = JG_SIMBOLO(h, "SDL_SetWindowSize");
+    *(void **)(&_jg.NumTouchDevices) = JG_SIMBOLO(h, "SDL_GetNumTouchDevices");
+    *(void **)(&_jg.GetTouchDevice) = JG_SIMBOLO(h, "SDL_GetTouchDevice");
+    *(void **)(&_jg.NumTouchFingers) = JG_SIMBOLO(h, "SDL_GetNumTouchFingers");
+    *(void **)(&_jg.GetTouchFinger) = JG_SIMBOLO(h, "SDL_GetTouchFinger");
+    *(void **)(&_jg.GetWindowSize) = JG_SIMBOLO(h, "SDL_GetWindowSize");
+    *(void **)(&_jg.SetHint) = JG_SIMBOLO(h, "SDL_SetHint");
     return 1;
 }
 
@@ -534,7 +554,17 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     }
     _jgs.abierta = 1;
     interprete_reloj_tareas(jg_reloj);             /* esperar(segundos) cuenta el tiempo del juego */
-    _jgs.ventana = _jg.CrearVentana(a[0]->texto, 0x2FFF0000, 0x2FFF0000, (int)(w * z), (int)(h * z), 0);
+#ifdef __ANDROID__
+    /* en el móvil, la pantalla se pone de lado si el juego es más ancho que alto */
+    if (_jg.SetHint) _jg.SetHint("SDL_IOS_ORIENTATIONS", w >= h ? "LandscapeLeft LandscapeRight" : "Portrait PortraitUpsideDown");
+    if (_jg.SetHint) _jg.SetHint("SDL_ANDROID_TRAP_BACK_BUTTON", "1");     /* «atrás» le llega al juego */
+#endif
+#ifdef __ANDROID__
+    unsigned banderas = 1;                /* pantalla completa: sin las barras del sistema */
+#else
+    unsigned banderas = 0;
+#endif
+    _jgs.ventana = _jg.CrearVentana(a[0]->texto, 0x2FFF0000, 0x2FFF0000, (int)(w * z), (int)(h * z), banderas);
     if (_jgs.ventana) {
         _jgs.render = _jg.CreateRenderer(_jgs.ventana, -1, 2 | 4);       /* acelerado + vsync */
         if (!_jgs.render) _jgs.render = _jg.CreateRenderer(_jgs.ventana, -1, 1);   /* por software */
@@ -553,7 +583,9 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     memset(_jgs.ejes, 0, sizeof(_jgs.ejes));
     memset(_jgs.ejes_prev, 0, sizeof(_jgs.ejes_prev));
     _jgs.nescrito = 0; _jgs.mov_x = _jgs.mov_y = 0;
+#ifndef __ANDROID__
     if (_jg.StartTextInput) _jg.StartTextInput();          /* recibir texto tecleado (tildes, ñ…) */
+#endif                                    /* en el móvil sería sacar el teclado: solo con editar() */
     _jgs.cam_x = _jgs.cam_y = _jgs.cu_x = _jgs.cu_y = _jgs.tem_x = _jgs.tem_y = 0;
     _jgs.tem_dur = 0; _jgs.cam_quieta = 0; _jgs.tem_semilla = 12345;
     _jgs.reloj = 0; _jgs.velocidad = 1; _jgs.congelar_hasta = 0; _jgs.reloj_propio = 0;
@@ -897,6 +929,70 @@ static Valor *fn_jg_raton(Valor **a, int n) {
     return l;
 }
 
+/* ── Pantalla táctil ──
+   Los dedos que hay en la pantalla, leídos en cada presentar() y pasados a
+   coordenadas del juego. Sin pantalla táctil (o sin dedos), el botón
+   izquierdo del ratón cuenta como un dedo: así se prueba en el ordenador. En
+   Android, SDL también convierte el primer dedo en ratón: ahí no se mira. */
+static void jg_leer_toques(void) {
+    memcpy(_jgs.toques_prev, _jgs.toques, sizeof _jgs.toques);
+    _jgs.ntoques_prev = _jgs.ntoques;
+    _jgs.ntoques = 0;
+    int nd = _jg.NumTouchDevices && _jg.GetTouchDevice && _jg.NumTouchFingers && _jg.GetTouchFinger
+             ? _jg.NumTouchDevices() : 0;
+    int ww = _jgs.ancho * _jgs.zoom, wh = _jgs.alto * _jgs.zoom;
+    if (_jg.GetWindowSize) _jg.GetWindowSize(_jgs.ventana, &ww, &wh);
+    for (int d = 0; d < nd; d++) {
+        long long dev = _jg.GetTouchDevice(d);
+        int nf = _jg.NumTouchFingers(dev);
+        for (int f = 0; f < nf && _jgs.ntoques < JG_TOQUES; f++) {
+            unsigned char *dedo = _jg.GetTouchFinger(dev, f);
+            if (!dedo) continue;
+            float fx = *(float *)(dedo + 8), fy = *(float *)(dedo + 12);
+            JgToque *t = &_jgs.toques[_jgs.ntoques++];
+            t->id = *(long long *)dedo;
+            if (_jg.WindowToLogical) _jg.WindowToLogical(_jgs.render, (int)(fx * ww), (int)(fy * wh), &t->x, &t->y);
+            else { t->x = fx * _jgs.ancho; t->y = fy * _jgs.alto; }
+        }
+    }
+#ifndef __ANDROID__
+    if (_jgs.ntoques == 0 && (_jgs.raton & 1)) {
+        _jgs.toques[0].id = -1;
+        _jgs.toques[0].x = (float)_jgs.rx;
+        _jgs.toques[0].y = (float)_jgs.ry;
+        _jgs.ntoques = 1;
+    }
+#endif
+}
+
+/* toques() -> [{"id", "x", "y", "nuevo"}, ...]: los dedos que hay en la
+   pantalla; "nuevo" si ha empezado a tocar en este fotograma */
+static Valor *fn_jg_toques(Valor **a, int n) {
+    (void)a; (void)n;
+    Valor *l = valor_lista_crear();
+    for (int i = 0; i < _jgs.ntoques; i++) {
+        int nuevo = 1;
+        for (int j = 0; j < _jgs.ntoques_prev && nuevo; j++) nuevo = _jgs.toques_prev[j].id != _jgs.toques[i].id;
+        Valor *d = valor_diccionario_crear();
+        valor_diccionario_agregar(d, "id", valor_numero((double)_jgs.toques[i].id));
+        valor_diccionario_agregar(d, "x", valor_numero(_jgs.toques[i].x));
+        valor_diccionario_agregar(d, "y", valor_numero(_jgs.toques[i].y));
+        valor_diccionario_agregar(d, "nuevo", valor_booleano(nuevo));
+        lista_agregar(l, d);
+    }
+    return l;
+}
+
+/* tactil(): ¿tiene pantalla táctil? (en un móvil, siempre) */
+static Valor *fn_jg_tactil(Valor **a, int n) {
+    (void)a; (void)n;
+#ifdef __ANDROID__
+    return valor_booleano(1);
+#else
+    return valor_booleano(_jg.NumTouchDevices && _jg.NumTouchDevices() > 0);
+#endif
+}
+
 /* boton_raton(n), n = 1 izquierdo, 2 central, 3 derecho; con 'pulsado' solo el fotograma del clic */
 static Valor *jg_boton(Valor **a, int n, int solo_pulso) {
     double b = 1;
@@ -977,6 +1073,10 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
             const char *t = (const char *)ev + 12;
             size_t l = strnlen(t, 32);
             if (_jgs.nescrito + (int)l < JG_ESCRITO) { memcpy(_jgs.escrito + _jgs.nescrito, t, l); _jgs.nescrito += (int)l; }
+#ifdef __ANDROID__
+        } else if (tipo == 0x300 && *(int *)(ev + 16) == 270) {     /* el botón «atrás» del móvil: salir */
+            _jgs.cierre = 1;
+#endif
         } else if (tipo == 0x300 && *(int *)(ev + 16) == 42) {      /* «borrar», también al repetir */
             if (_jgs.nescrito + 1 < JG_ESCRITO) _jgs.escrito[_jgs.nescrito++] = '\b';
         }
@@ -1021,6 +1121,13 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     for (int i = 0; i < _jgs.nguion; i++)
         if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos)
             _jgs.teclas[_jgs.guion[i].tecla] = 1;
+    jg_leer_toques();                    /* después de los clics de prueba: también cuentan como dedo */
+#ifdef __ANDROID__
+    /* el teclado de la pantalla, mientras el juego pida texto en cada fotograma */
+    if (_jgs.texto_ahora && !_jgs.teclado_puesto && _jg.StartTextInput) { _jg.StartTextInput(); _jgs.teclado_puesto = 1; }
+    if (!_jgs.texto_ahora && _jgs.teclado_puesto && _jg.StopTextInput) { _jg.StopTextInput(); _jgs.teclado_puesto = 0; }
+    _jgs.texto_ahora = 0;
+#endif
     jg_historial();
     /* Código nuevo listo: se corta el programa que corre y main lo relanza */
     if (recargar) return jg_error(ERROR_RECARGA, "recarga en caliente");
@@ -1108,8 +1215,13 @@ static void jg_aviso_error(const char *msg, int pantalla) {
     y += jg_escribir(texto, margen, y, e, w - 2 * margen);
     if (pantalla) {
         jg_pintar(gris);
-        jg_escribir("Corrígelo y guarda: el juego se recarga solo. F5 lo empieza de cero.",
-                    margen, y + 6 * e, e, w - 2 * margen);
+#ifdef __ANDROID__
+        const char *pista = "Pulsa ATRÁS para salir.";
+#else
+        const char *pista = recarga_activa() ? "Corrígelo y guarda: el juego se recarga solo. F5 lo empieza de cero."
+                                             : "Pulsa Esc para salir.";
+#endif
+        jg_escribir(pista, margen, y + 6 * e, e, w - 2 * margen);
     }
 }
 
@@ -1143,12 +1255,17 @@ int juego_esperar_arreglo(const char *msg) {
         memcpy(_jgs.previas, _jgs.teclas, sizeof(_jgs.teclas));
         unsigned long long ev_buf[16];
         unsigned char *ev = (unsigned char *)ev_buf;
-        while (_jg.PollEvent(ev)) if (*(unsigned *)ev == 0x100) _jgs.cierre = 1;
+        while (_jg.PollEvent(ev)) {
+            if (*(unsigned *)ev == 0x100) _jgs.cierre = 1;
+#ifdef __ANDROID__
+            if (*(unsigned *)ev == 0x300 && *(int *)(ev + 16) == 270) _jgs.cierre = 1;    /* «atrás» */
+#endif
+        }
         int nt = 0;
         const unsigned char *k = _jg.KeyboardState(&nt);
         memcpy(_jgs.teclas, k, (size_t)(nt > 512 ? 512 : nt));
         if (_jgs.teclas[41]) _jgs.cierre = 1;                      /* Esc */
-        if (jg_vigilar()) { r = 1; break; }
+        if (recarga_activa() && jg_vigilar()) { r = 1; break; }
         if (_jgs.limite) { if (++_jgs.total >= _jgs.limite) _jgs.cierre = 1; }
         else _jg.Delay(30);
     }
@@ -4038,7 +4155,7 @@ static Valor *fn_jg_eje(Valor **a, int n) {
 static Valor *fn_jg_texto_escrito(Valor **a, int n) {
     (void)a; (void)n;
     JG_ABIERTA();
-    _jgs.pide_texto = 1;
+    _jgs.pide_texto = _jgs.texto_ahora = 1;
     char buf[JG_ESCRITO];
     int k = 0;
     for (int i = 0; i < _jgs.nescrito; i++) if (_jgs.escrito[i] != '\b') buf[k++] = _jgs.escrito[i];
@@ -4057,7 +4174,7 @@ static int jg_caracteres(const char *t) {
 static Valor *fn_jg_editar(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "editar() espera (texto[, máximo de caracteres])");
-    _jgs.pide_texto = 1;
+    _jgs.pide_texto = _jgs.texto_ahora = 1;
     double max = 0;
     if (n > 1 && !jg_num(a, n, 1, &max, "editar")) return valor_nulo();
     size_t largo = strlen(a[0]->texto);
@@ -4125,6 +4242,15 @@ static Valor *fn_jg_movimiento_raton(Valor **a, int n) {
 
 static int jg_entrada(const char *t, JgEntrada *e, char *msg, size_t max) {
     e->mando = -1; e->signo = 0;
+    if (strncmp(t, "pantalla:", 9) == 0) {           /* un botón en la pantalla táctil */
+        char fin;
+        if (sscanf(t + 9, "%f,%f,%f,%f%c", &e->x, &e->y, &e->w, &e->h, &fin) == 4 && e->w > 0 && e->h > 0) {
+            e->tipo = 'p';
+            return 1;
+        }
+        snprintf(msg, max, "'%s': un botón en la pantalla es \"pantalla:x,y,ancho,alto\", por ejemplo \"pantalla:20,300,80,80\"", t);
+        return 0;
+    }
     if (strncmp(t, "raton:", 6) == 0) {
         static const char *const B[] = {"izquierdo", "central", "derecho"};
         for (int i = 0; i < 3; i++) if (strcmp(t + 6, B[i]) == 0) { e->tipo = 'r'; e->codigo = i + 1; return 1; }
@@ -4157,6 +4283,13 @@ static float jg_fuerza(const JgEntrada *e, int antes) {
     switch (e->tipo) {
         case 't': return (antes ? _jgs.previas : _jgs.teclas)[e->codigo] ? 1 : 0;
         case 'r': return ((antes ? _jgs.raton_prev : _jgs.raton) & (1u << (e->codigo - 1))) ? 1 : 0;
+        case 'p': {                                   /* algún dedo dentro del rectángulo */
+            const JgToque *t = antes ? _jgs.toques_prev : _jgs.toques;
+            int n = antes ? _jgs.ntoques_prev : _jgs.ntoques;
+            for (int i = 0; i < n; i++)
+                if (t[i].x >= e->x && t[i].x < e->x + e->w && t[i].y >= e->y && t[i].y < e->y + e->h) return 1;
+            return 0;
+        }
         case 'b': case 'e': {
             float mejor = 0;
             for (int m = 0; m < JG_MANDOS; m++) {
@@ -5287,6 +5420,8 @@ static void cargar_juego(Entorno *entorno) {
         {"cursor",          fn_jg_cursor,           1},
         {"capturar_raton",  fn_jg_capturar_raton,   1},
         {"movimiento_raton", fn_jg_movimiento_raton, 0},
+        {"toques",          fn_jg_toques,           0},
+        {"tactil",          fn_jg_tactil,           0},
         {"definir_accion",  fn_jg_definir_accion,   2},
         {"accion",          fn_jg_accion,           1},
         {"accion_pulsada",  fn_jg_accion_pulsada,   1},

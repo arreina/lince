@@ -13,6 +13,11 @@
 /* Crea 'salida' a partir de 'archivo', con los archivos o carpetas 'extras'
    (niveles, imágenes…) dentro. 0 si va bien. */
 int empaquetado_crear(const char *archivo, const char *salida, const char *const *extras, int num_extras);
+/* Lo mismo pero sin el intérprete: solo el programa y sus archivos (lo que va
+   dentro de un .apk de Android) */
+int empaquetado_crear_datos(const char *archivo, const char *salida, const char *const *extras, int num_extras);
+/* Carga un programa empaquetado que ya está en memoria (el de un .apk) */
+int empaquetado_cargar_datos(const unsigned char *datos, size_t largo);
 
 /* ¿Lleva este ejecutable un programa dentro? Si es así lo carga y devuelve 1.
    'argv0' sirve para localizarse en sistemas sin /proc. */

@@ -460,4 +460,10 @@ else: print("  ❌ cubrir():", px(2, 25), px(38, 2)); sys.exit(1)
 PY
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=8 LINCE_JUEGO_PULSAR=f5 timeout 20 "$LINCE" "$DIR/prueba14.lince" > salida19.txt 2>&1
 [ "$(grep -cxF "tarea: marca parada" salida19.txt)" -ge 2 ] && ok "F5 para las tareas y vuelven a empezar" || mal "F5 no para las tareas"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida5b.txt; exit 1; }
+# ── Pantalla táctil: toques() y botones en la pantalla (el clic de prueba hace de dedo) ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 LINCE_JUEGO_CLIC=15,15 timeout 20 "$LINCE" "$DIR/prueba15.lince" > salida20.txt 2>&1
+for l in "tactil: falso" "dedo en: 15,15" "pulsada: 5, nuevos: 5"; do
+    grep -qxF "$l" salida20.txt && ok "táctil: $l" || mal "falta la línea: $l"
+done
+grep -qF 'un botón en la pantalla es "pantalla:x,y,ancho,alto"' salida20.txt && ok "táctil: error de un botón mal escrito" || mal "falta el error de pantalla:"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida5b.txt; exit 1; }

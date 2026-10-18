@@ -1,0 +1,37 @@
+# El icono de los juegos de Lince en Android: una cara de lince en pixel art,
+# guardada como PNG. android/construir.sh lo ejecuta así:
+#   SDL_VIDEODRIVER=dummy lince android/icono.lince icono.png
+importar "juego"
+fijo CARA = [
+    "................",
+    ".X............X.",
+    ".XX..........XX.",
+    ".XYX........XYX.",
+    ".XYYXXXXXXXXYYX.",
+    ".XYYYYYYYYYYYYX.",
+    "XYYYYYYYYYYYYYYX",
+    "XYYGGYYYYYYGGYYX",
+    "XYYGKYYYYYYGKYYX",
+    "XYYYYYYYYYYYYYYX",
+    "XYYYYYYPPYYYYYYX",
+    "XWYYYYYYYYYYYYWX",
+    "XWWYYYKYYKYYYWWX",
+    ".XWWWYYKKYYWWWX.",
+    "..XXWWWWWWWWXX..",
+    "....XXXXXXXX...."
+]
+fijo VECES = 12                      # 16 × 12 = 192 píxeles
+sea filas = []
+para cada texto fila en CARA {
+    sea ancha = ""
+    para cada texto c en fila {
+        para (i = 0; i < VECES; i++) { ancha += c }
+    }
+    para (i = 0; i < VECES; i++) { filas.agregar(ancha) }
+}
+juego.abrir("icono", 16, 16)
+sea args = argumentos()
+fijo SALIDA = si args.longitud() > 0 { args[0] } sino { "icono.png" }
+juego.guardar_imagen(juego.sprite(filas, {"X": [70, 45, 25], "Y": [255, 200, 80], "G": [90, 200, 90],
+                                          "K": [20, 20, 20], "P": [230, 120, 140], "W": [255, 250, 240]}), SALIDA)
+juego.cerrar()

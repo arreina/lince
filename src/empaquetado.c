@@ -65,6 +65,34 @@ static void poner_u64(unsigned char *p, uint64_t v) { for (int i = 0; i < 8; i++
 static uint32_t leer_u32(const unsigned char *p) { uint32_t v = 0; for (int i = 3; i >= 0; i--) v = v << 8 | p[i]; return v; }
 static uint64_t leer_u64(const unsigned char *p) { uint64_t v = 0; for (int i = 7; i >= 0; i--) v = v << 8 | p[i]; return v; }
 
+/* La carga (sin el pie) ya leída: la reparte en entradas */
+static int repartir_carga(const unsigned char *carga, uint64_t largo) {
+    size_t pos = 0;
+    if (largo < 4) return 0;
+    int n = (int)leer_u32(carga); pos = 4;
+    _entradas = calloc((size_t)n + 1, sizeof(Entrada));
+    for (int i = 0; i < n; i++) {
+        if (pos + 4 > largo) break;
+        uint32_t lk = leer_u32(carga + pos); pos += 4;
+        if (pos + lk + 8 > largo) break;
+        char *clave = malloc(lk + 1);
+        memcpy(clave, carga + pos, lk); clave[lk] = '\0'; pos += lk;
+        uint64_t lc = leer_u64(carga + pos); pos += 8;
+        if (pos + lc > largo) { free(clave); break; }
+        char *cont = malloc((size_t)lc + 1);
+        memcpy(cont, carga + pos, (size_t)lc); cont[lc] = '\0'; pos += (size_t)lc;
+        _entradas[_num_entradas++] = (Entrada){ clave, cont, (size_t)lc };
+    }
+    return _num_entradas > 0;
+}
+
+int empaquetado_cargar_datos(const unsigned char *datos, size_t largo) {
+    if (largo < PIE_TAM || memcmp(datos + largo - PIE_TAM, MAGIA, 8) != 0) return 0;
+    uint64_t carga = leer_u64(datos + largo - PIE_TAM + 8);
+    if (carga > largo - PIE_TAM) return 0;
+    return repartir_carga(datos + (largo - PIE_TAM - carga), carga);
+}
+
 /* ── Lectura (arranque de un programa empaquetado) ── */
 int empaquetado_cargar(const char *argv0) {
     char ruta[PATH_MAXIMO + 1];
@@ -81,25 +109,9 @@ int empaquetado_cargar(const char *argv0) {
     if (!carga || fseek(f, fin - PIE_TAM - (long)largo, SEEK_SET) != 0 ||
         fread(carga, 1, (size_t)largo, f) != (size_t)largo) { free(carga); fclose(f); return 0; }
     fclose(f);
-
-    size_t pos = 0;
-    if (largo < 4) { free(carga); return 0; }
-    int n = (int)leer_u32(carga); pos = 4;
-    _entradas = calloc((size_t)n + 1, sizeof(Entrada));
-    for (int i = 0; i < n; i++) {
-        if (pos + 4 > largo) break;
-        uint32_t lk = leer_u32(carga + pos); pos += 4;
-        if (pos + lk + 8 > largo) break;
-        char *clave = malloc(lk + 1);
-        memcpy(clave, carga + pos, lk); clave[lk] = '\0'; pos += lk;
-        uint64_t lc = leer_u64(carga + pos); pos += 8;
-        if (pos + lc > largo) { free(clave); break; }
-        char *cont = malloc((size_t)lc + 1);
-        memcpy(cont, carga + pos, (size_t)lc); cont[lc] = '\0'; pos += (size_t)lc;
-        _entradas[_num_entradas++] = (Entrada){ clave, cont, (size_t)lc };
-    }
+    int ok = repartir_carga(carga, largo);
     free(carga);
-    return _num_entradas > 0;
+    return ok;
 }
 
 const char *empaquetado_ruta_principal(void)   { return _num_entradas ? _entradas[0].clave : NULL; }
@@ -254,6 +266,15 @@ static void recoger(const char *codigo, const char *actual) {
     lexer_destruir(lx);
 }
 
+static int _solo_datos = 0;
+
+int empaquetado_crear_datos(const char *archivo, const char *salida, const char *const *extras, int num_extras) {
+    _solo_datos = 1;
+    int r = empaquetado_crear(archivo, salida, extras, num_extras);
+    _solo_datos = 0;
+    return r;
+}
+
 int empaquetado_crear(const char *archivo, const char *salida, const char *const *extras, int num_extras) {
     char principal[PATH_MAXIMO + 1];
 #ifdef _WIN32
@@ -273,6 +294,12 @@ int empaquetado_crear(const char *archivo, const char *salida, const char *const
     for (int i = 0; i < num_extras; i++)
         if (!anadir_extra(extras[i])) return 1;
 
+    FILE *out;
+    if (_solo_datos) {                  /* solo el programa y sus archivos, sin el intérprete */
+        out = fopen(salida, "wb");
+        if (!out) { fprintf(stderr, "\n❌ No se pudo crear '%s'.\n\n", salida); return 1; }
+        goto carga;
+    }
     char yo[PATH_MAXIMO + 1];
     if (!ruta_ejecutable(NULL, yo, sizeof(yo))) {
         fprintf(stderr, "\n❌ No se pudo localizar el ejecutable de Lince.\n\n");
@@ -291,7 +318,7 @@ int empaquetado_crear(const char *archivo, const char *salida, const char *const
             fin_ejecutable -= PIE_TAM + (long)leer_u64(pie + 8);
         rewind(in);
     }
-    FILE *out = fopen(salida, "wb");
+    out = fopen(salida, "wb");
     if (!out) { fclose(in); fprintf(stderr, "\n❌ No se pudo crear '%s'.\n\n", salida); return 1; }
 
     char buf[65536];
@@ -304,6 +331,7 @@ int empaquetado_crear(const char *archivo, const char *salida, const char *const
     }
     fclose(in);
 
+carga:;
     uint64_t total = 4;
     unsigned char tmp[8];
     poner_u32(tmp, (uint32_t)_num_entradas);
@@ -324,7 +352,7 @@ int empaquetado_crear(const char *archivo, const char *salida, const char *const
     fclose(out);
     if (mal) { fprintf(stderr, "\n❌ Error al escribir '%s'.\n\n", salida); return 1; }
 #ifndef _WIN32
-    chmod(salida, 0755);
+    if (!_solo_datos) chmod(salida, 0755);
 #endif
     return 0;
 }
