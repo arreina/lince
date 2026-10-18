@@ -999,7 +999,9 @@ la pone).
 Casi todo `juego` está en C, porque habla con la pantalla, el teclado, el mando y el altavoz o
 trabaja píxel a píxel. Lo que no lo necesita está escrito en Lince, en
 [`src/lince/juego.lince`](src/lince/juego.lince), y va dentro del ejecutable: `combo`,
-`mantenida`, `pulsaciones`, `curva`, `suavizar`, `acercar` y las escenas. Para quien lo usa no hay
+`mantenida`, `pulsaciones`, `curva`, `suavizar`, `acercar`, las escenas y el animador (`animador`,
+`animacion`, `acabada`, `pisada`, `golpe` y `libre`; `dibujar()` y `caja()` le preguntan qué
+cuadro toca). Para quien lo usa no hay
 diferencia; quien quiera una versión distinta puede leerla y copiarla. Un error dentro de una de
 esas funciones se cuenta en la línea del programa que la llamó.
 
@@ -1203,7 +1205,11 @@ juego.dibujar(PJ, x, y, {"fila": fila, "cuadro": juego.cuadro(PJ["por_fila"][fil
 mira los cuadros y devuelve en cuáles hay una pisada: cuando aterriza un pie (tras ir por el aire,
 o al lado del otro) o cuando el pie de delante aparece más adelante que en el cuadro anterior
 (andando, con los dos pies casi siempre en el suelo). Supone que el personaje mira a la derecha y
-que la animación da la vuelta (el último cuadro va antes del primero). Los sonidos los pones tú:
+que la animación da la vuelta (el último cuadro va antes del primero). Con un tercer argumento,
+`pisadas(hoja, fila, cuadros)`, mira esa secuencia (una lista de cuadros de la fila, o cuántos
+desde el 0) y da las posiciones dentro de ella; `fila` puede ser `nulo` para toda la hoja. Se
+calcula una vez por hoja y secuencia. `cuadros_de(hoja[, fila])` dice cuántos cuadros con dibujo
+tiene esa fila (en una rejilla no cuentan las celdas vacías del final). Los sonidos los pones tú:
 
 ```lince
 fijo PASOS = juego.pisadas(CORRE)                     # por ejemplo [1, 7, 13, 19, 26, 31]
@@ -1267,7 +1273,8 @@ con el aire. `caja()` da el rectángulo de lo que se ve en el cuadro que toca, c
 `cuadro` y `fila` con una hoja; con un animador, el cuadro que toca ahora). Se calcula al dividir la
 hoja, así que no cuesta nada pedirla en cada fotograma. `margen` la encoge por cada lado, en píxeles
 de pantalla (o la agranda si es negativo), para que un choque de refilón no cuente. El ángulo no se
-tiene en cuenta.
+tiene en cuenta. Con `"trozo": [x, y, ancho, alto]`, en vez de lo que se ve coloca ese rectángulo
+de la celda (medido con el personaje mirando a la derecha): es lo que hace `golpe()`.
 
 ```lince
 fijo OPCIONES = {"escala": 2, "centrado": verdadero}

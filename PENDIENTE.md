@@ -12,7 +12,7 @@ Nada pendiente ahora mismo: lo que vaya saliendo se apunta aquí.
 
 La lógica de juego reutilizable va escrita en Lince, en `src/lince/juego.lince`, encima de primitivas pequeñas en C: es lo que aporta Lince.
 
-- [ ] **Animador en Lince.** Está atado a las hojas y a la recarga en caliente de C; habría que separar qué parte es lógica y cuál es dibujo.
+Nada pendiente ahora mismo.
 
 ## Rendimiento
 
@@ -48,5 +48,5 @@ La lógica de juego reutilizable va escrita en Lince, en `src/lince/juego.lince`
 - **Palabras reservadas que no pueden ser nombres:** entre otras, `y`, `o`, `no`, `lista`, `mi`, `caso`, `otro`, `romper` y `continuar`.
   - Por eso no vale `sea [x, y] = ...`.
   - `en`, `cualquiera`, `tarea`, `es`, `como`, `obtener`, `fijar`, etc. solo cuentan en su sitio.
-- **Ya están en Lince** los combos, `mantenida`, `pulsaciones`, las curvas, `suavizar`, `acercar` y las escenas. `presentar()` llama en cada fotograma a `_presentar()` de la biblioteca, y las variables de la biblioteca se conservan al recargar en caliente.
-- **El animador se queda en C de momento** (ver arriba).
+- **Ya están en Lince** los combos, `mantenida`, `pulsaciones`, las curvas, `suavizar`, `acercar`, las escenas y el animador. `presentar()` llama en cada fotograma a `_presentar()` de la biblioteca; `dibujar()` y `caja()` llaman a `_cuadro()` con un animador; las variables de la biblioteca se conservan al recargar en caliente.
+- **En C se queda** lo que habla con la pantalla, el teclado o el altavoz, o mira píxeles: dibujar, las hojas (dividirlas, la caja de lo que se ve, las pisadas), los sonidos, las fuentes, los mapas.

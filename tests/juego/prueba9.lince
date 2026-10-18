@@ -60,3 +60,8 @@ intentar {
 } capturar (error e) {
     escribir("error: " + e.mensaje)
 }
+# Lo de C en que se apoya el animador (escrito en Lince)
+escribir("cuadros_de: " + a_texto(juego.cuadros_de(HOJA, 0)) + " " + a_texto(juego.cuadros_de(HOJA, 1)) + " " + a_texto(juego.cuadros_de(HOJA)))
+escribir("pisadas de una secuencia: {juego.pisadas(HOJA, 0)} {juego.pisadas(HOJA, 0, [3, 2, 1, 0])} {juego.pisadas(HOJA, 0, 2)}")
+escribir("trozo: {juego.caja(HOJA, 10, 10, {"trozo": [1, 2, 3, 4], "escala": 2})}")
+intentar { juego.caja(HOJA, 0, 0, {"trozo": [1, 2]}) } capturar (error e) { escribir("error: " + e.mensaje) }

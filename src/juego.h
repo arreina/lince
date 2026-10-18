@@ -2327,7 +2327,9 @@ static JgRect jg_visible(const unsigned char *px, int W, int H, JgRect r) {
     return v;
 }
 
+static void jg_pisadas_olvidar(void);
 static void jg_hojas_liberar(void) {
+    jg_pisadas_olvidar();
     for (int i = 0; i < _jg_nhojas; i++) {
         free(_jg_hojas[i].quitar); free(_jg_hojas[i].por_fila); free(_jg_hojas[i].rec); free(_jg_hojas[i].caja);
     }
@@ -2618,14 +2620,51 @@ static int jg_pisadas_secuencia(const JgHoja *h, const int *filas, const int *cu
 
 /* pisadas(hoja[, fila]): los cuadros en que un pie toca el suelo, para que
    suenen los pasos a su tiempo. Con 'fila', los números son dentro de esa fila. */
+/* Las pisadas ya calculadas: mirar los píxeles de cada cuadro cuesta, y el
+   animador las pide en cada fotograma. Valen mientras no cambie la hoja. */
+#define JG_PISADAS_GUARDADAS 32
+static struct { int hoja, version, fila, n; int *cuadros; char *pisa; } _jg_pisadas[JG_PISADAS_GUARDADAS];
+static int _jg_npisadas, _jg_pisadas_sig;
+
+static void jg_pisadas_olvidar(void) {
+    for (int i = 0; i < _jg_npisadas; i++) { free(_jg_pisadas[i].cuadros); free(_jg_pisadas[i].pisa); }
+    memset(_jg_pisadas, 0, sizeof _jg_pisadas);
+    _jg_npisadas = _jg_pisadas_sig = 0;
+}
+
+static const char *jg_pisadas_de(JgHoja *h, int fila, const int *cuadros, int n) {
+    int hi = (int)(h - _jg_hojas);
+    for (int i = 0; i < _jg_npisadas; i++)
+        if (_jg_pisadas[i].hoja == hi && _jg_pisadas[i].version == h->version && _jg_pisadas[i].fila == fila &&
+            _jg_pisadas[i].n == n && memcmp(_jg_pisadas[i].cuadros, cuadros, sizeof(int) * (size_t)n) == 0)
+            return _jg_pisadas[i].pisa;
+    int *filas = malloc(sizeof(int) * (size_t)n), *copia = malloc(sizeof(int) * (size_t)n);
+    char *pisa = malloc((size_t)n);
+    if (!filas || !copia || !pisa) { free(filas); free(copia); free(pisa); return NULL; }
+    for (int i = 0; i < n; i++) filas[i] = fila;
+    memcpy(copia, cuadros, sizeof(int) * (size_t)n);
+    int ok = jg_pisadas_secuencia(h, filas, cuadros, n, pisa);
+    free(filas);
+    if (!ok) { free(copia); free(pisa); return NULL; }
+    int k = _jg_npisadas < JG_PISADAS_GUARDADAS ? _jg_npisadas++ : (_jg_pisadas_sig++ % JG_PISADAS_GUARDADAS);
+    free(_jg_pisadas[k].cuadros); free(_jg_pisadas[k].pisa);
+    _jg_pisadas[k].hoja = hi; _jg_pisadas[k].version = h->version; _jg_pisadas[k].fila = fila;
+    _jg_pisadas[k].n = n; _jg_pisadas[k].cuadros = copia; _jg_pisadas[k].pisa = pisa;
+    return pisa;
+}
+
+/* pisadas(hoja[, fila[, cuadros]]): en qué cuadros toca un pie el suelo. Con
+   'cuadros' (la lista de una animación, o cuántos desde el 0), en esa
+   secuencia: da sus posiciones en ella */
 static Valor *fn_jg_pisadas(Valor **a, int n) {
     JG_ABIERTA();
     JgHoja *h = n > 0 ? jg_hoja_de(a[0]) : NULL;
     if (!h) return jg_error("ErrorTipo", "pisadas() espera una hoja de juego.hoja() (y, si quieres, una fila)");
     int fila = -1;
-    if (n > 1) {
+    if (n > 1 && a[1]->tipo != VAL_NULO) {
         if (a[1]->tipo != VAL_NUMERO || a[1]->numero < 0) return jg_error("ErrorTipo", "pisadas(): la fila es un número desde 0");
         fila = (int)a[1]->numero;
+        if (fila >= h->nf && n > 2) fila = h->nf - 1;
         if (fila >= h->nf) {
             char msg[120];
             snprintf(msg, sizeof msg, "pisadas(): la hoja no tiene fila %d (tiene %d)", fila, h->nf);
@@ -2633,15 +2672,24 @@ static Valor *fn_jg_pisadas(Valor **a, int n) {
         }
     }
     int cuantos = fila >= 0 ? h->por_fila[fila] : h->total;
-    int *filas = malloc(sizeof(int) * cuantos), *cuadros = malloc(sizeof(int) * cuantos);
-    char *pisa = malloc((size_t)cuantos);
-    if (!filas || !cuadros || !pisa) { free(filas); free(cuadros); free(pisa); return jg_error("Error", "sin memoria"); }
-    for (int i = 0; i < cuantos; i++) { filas[i] = fila; cuadros[i] = i; }
-    int ok = jg_pisadas_secuencia(h, filas, cuadros, cuantos, pisa);
+    Valor *lista = NULL;
+    if (n > 2 && a[2]->tipo == VAL_NUMERO && a[2]->numero >= 1) cuantos = (int)a[2]->numero;
+    else if (n > 2 && a[2]->tipo == VAL_LISTA && a[2]->lista.cantidad > 0) {
+        lista = a[2];
+        cuantos = lista->lista.cantidad;
+        for (int i = 0; i < cuantos; i++)
+            if (lista->lista.elementos[i]->tipo != VAL_NUMERO)
+                return jg_error("ErrorTipo", "pisadas(): los cuadros son números");
+    } else if (n > 2 && a[2]->tipo != VAL_NULO)
+        return jg_error("ErrorTipo", "pisadas(): los cuadros son una lista de números, o cuántos");
+    int *cuadros = malloc(sizeof(int) * (size_t)cuantos);
+    if (!cuadros) return jg_error("Error", "sin memoria");
+    for (int i = 0; i < cuantos; i++) cuadros[i] = lista ? (int)lista->lista.elementos[i]->numero : i;
+    const char *pisa = jg_pisadas_de(h, fila, cuadros, cuantos);
+    free(cuadros);
+    if (!pisa) return jg_error("Error", "sin memoria");
     Valor *l = valor_lista_crear();
-    for (int i = 0; ok && i < cuantos; i++) if (pisa[i]) lista_agregar(l, valor_numero(i));
-    free(filas); free(cuadros); free(pisa);
-    if (!ok) { valor_destruir(l); return jg_error("Error", "sin memoria"); }
+    for (int i = 0; i < cuantos; i++) if (pisa[i]) lista_agregar(l, valor_numero(i));
     return l;
 }
 
@@ -2784,295 +2832,52 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     return jg_hoja_valor(hi);
 }
 
-/* ── Animador ──
-   Lleva por ti qué animación toca, desde cuándo, si se repite o se queda en
-   el último cuadro (y cuál va después), y cuándo hay una pisada:
-     sea pj = juego.animador(HOJA, {"andar": {"fila": 0, "por_segundo": 10},
-                                    "saltar": {"fila": 2, "repetir": falso, "siguiente": "quieto"},
-                                    "quieto": {"fila": 2, "cuadros": [0]}})
-     juego.animacion(pj, "andar")           (cambia solo si no estaba ya)
-     juego.dibujar(pj, x, y, opciones)
-     si juego.pisada(pj) { ... }            (un pie acaba de tocar el suelo)
-   Cada animación puede ir en otra hoja ("hoja": OTRA), por ejemplo las que
-   hace animar(). Todo su estado va en el diccionario (se puede leer:
-   "actual", "cuadro"), así que sobrevive a la recarga en caliente. */
+/* ── Animador ── está escrito en Lince (src/lince/juego.lince): qué animación
+   toca, desde cuándo, cuál va después, las pisadas, los golpes... dibujar() y
+   caja() le preguntan qué cuadro toca (_cuadro) y usan de aquí cuadros_de(),
+   pisadas() y caja() con "trozo". */
 static Valor *jg_dic(Valor *d, const char *clave) {
     int k = valor_diccionario_buscar(d, clave);
     return k < 0 ? NULL : d->diccionario.valores[k];
 }
 
-/* La secuencia de cuadros de una animación: fila (o -1) y cuadro de cada uno */
-static int jg_anim_secuencia(const JgHoja *h, Valor *cfg, int *fila, int *cuadros, int max) {
-    Valor *f = jg_dic(cfg, "fila"), *c = jg_dic(cfg, "cuadros");
-    int fl = f ? (int)f->numero : -1, n = 0;
-    *fila = fl < h->nf ? fl : h->nf - 1;
-    if (c) {
-        for (int i = 0; i < c->lista.cantidad && n < max; i++) cuadros[n++] = (int)c->lista.elementos[i]->numero;
-    } else {
-        int total = fl >= 0 ? h->por_fila[*fila] : h->total, base = 0;
-        for (int f = 0; fl >= 0 && f < *fila; f++) base += h->por_fila[f];
-        /* en una rejilla, las celdas vacías del final de la fila no son cuadros de la animación */
-        while (total > 1 && h->caja && h->caja[base + total - 1].w == 0) total--;
-        for (int i = 0; i < total && n < max; i++) cuadros[n++] = i;
-    }
-    return n;
+/* Cuántos cuadros con dibujo tiene la fila (o la hoja entera, con -1): en una
+   rejilla no cuentan las celdas vacías del final de la fila */
+static int jg_cuadros_fila(const JgHoja *h, int fila) {
+    if (fila >= h->nf) fila = h->nf - 1;
+    int total = fila >= 0 ? h->por_fila[fila] : h->total, base = 0;
+    for (int f = 0; fila >= 0 && f < fila; f++) base += h->por_fila[f];
+    while (total > 1 && h->caja && h->caja[base + total - 1].w == 0) total--;
+    return total;
 }
 
-#define JG_MAX_SECUENCIA 1024
-typedef struct {
-    JgHoja *h;
-    Valor *cfg;
-    int fila, n, cuadros[JG_MAX_SECUENCIA];
-    long k;                 /* cuántos cuadros han pasado desde que empezó (sin dar la vuelta) */
-    int pos, acabada, repetir;
-    double por_segundo;
-} JgAnimEstado;
-
-/* Dónde va el animador ahora; pasa a la siguiente animación si la que había acabó */
-static int jg_anim_estado(Valor *pj, JgAnimEstado *e) {
-    e->h = jg_hoja_de(jg_dic(pj, "hoja"));
-    Valor *anims = jg_dic(pj, "animaciones");
-    if (!e->h || !anims) return 0;
-    for (int vueltas = 0; vueltas < 8; vueltas++) {
-        Valor *actual = jg_dic(pj, "actual"), *desde = jg_dic(pj, "desde");
-        e->cfg = actual && actual->tipo == VAL_TEXTO ? jg_dic(anims, actual->texto) : NULL;
-        if (!e->cfg || !desde) return 0;
-        Valor *ps = jg_dic(e->cfg, "por_segundo"), *rep = jg_dic(e->cfg, "repetir"), *sig = jg_dic(e->cfg, "siguiente");
-        JgHoja *propia = jg_hoja_de(jg_dic(e->cfg, "hoja"));      /* una animación puede ir en otra hoja */
-        e->h = propia ? propia : jg_hoja_de(jg_dic(pj, "hoja"));
-        e->por_segundo = ps ? ps->numero : 10;
-        e->repetir = rep ? rep->booleano : !sig;
-        e->n = jg_anim_secuencia(e->h, e->cfg, &e->fila, e->cuadros, JG_MAX_SECUENCIA);
-        if (e->n < 1) return 0;
-        double t = jg_reloj() - desde->numero;
-        e->k = (long)floor(t * e->por_segundo + 1e-9);
-        if (e->k < 0) e->k = 0;
-        e->acabada = !e->repetir && e->k >= e->n;
-        if (e->acabada && sig && sig->tipo == VAL_TEXTO && jg_dic(anims, sig->texto)) {
-            /* sigue la siguiente, como si hubiera empezado justo al acabar esta */
-            jg_dic_poner(pj, "actual", valor_texto(sig->texto));
-            jg_dic_poner(pj, "desde", valor_numero(desde->numero + e->n / e->por_segundo));
-            continue;
-        }
-        e->pos = e->repetir ? (int)(e->k % e->n) : (int)(e->k < e->n ? e->k : e->n - 1);
-        return 1;
-    }
-    return 0;
-}
-
-static Valor *jg_animador_arg(Valor **a, int n, const char *fn) {
-    if (n < 1 || a[0]->tipo != VAL_DICCIONARIO || !jg_dic(a[0], "animador")) {
-        char msg[120];
-        snprintf(msg, sizeof msg, "%s() espera un animador de juego.animador()", fn);
-        jg_error("ErrorTipo", msg);
-        return NULL;
-    }
-    return a[0];
-}
-
-/* animador(hoja, animaciones[, inicial]) */
-static Valor *fn_jg_animador(Valor **a, int n) {
-    JG_ABIERTA();
+/* cuadros_de(hoja[, fila]) */
+static Valor *fn_jg_cuadros_de(Valor **a, int n) {
     JgHoja *h = n > 0 ? jg_hoja_de(a[0]) : NULL;
-    char msg[300];
-    if (!h || n < 2 || a[1]->tipo != VAL_DICCIONARIO || a[1]->diccionario.cantidad == 0)
-        return jg_error("ErrorTipo", "animador() espera (hoja, {nombre: {\"fila\": n, \"por_segundo\": n, ...}, ...}[, inicial])");
-    Valor *anims = a[1];
-    for (int i = 0; i < anims->diccionario.cantidad; i++) {
-        const char *nombre = anims->diccionario.claves[i];
-        Valor *cfg = anims->diccionario.valores[i];
-        if (cfg->tipo != VAL_DICCIONARIO) {
-            snprintf(msg, sizeof msg, "animador(): \"%s\" va con un diccionario, por ejemplo {\"fila\": 0}", nombre);
-            return jg_error("ErrorTipo", msg);
-        }
-        int fila = -1;
-        JgHoja *hc = jg_dic(cfg, "hoja") ? jg_hoja_de(jg_dic(cfg, "hoja")) : h;
-        if (!hc) {
-            snprintf(msg, sizeof msg, "animador(): en \"%s\", \"hoja\" es una hoja de juego.hoja() o juego.animar()", nombre);
-            return jg_error("ErrorTipo", msg);
-        }
-        for (int j = 0; j < cfg->diccionario.cantidad; j++) {
-            const char *c = cfg->diccionario.claves[j];
-            Valor *v = cfg->diccionario.valores[j];
-            int ok = 1;
-            if (!strcmp(c, "hoja")) continue;
-            if (!strcmp(c, "fila")) {
-                ok = v->tipo == VAL_NUMERO && v->numero >= 0 && v->numero < hc->nf && v->numero == floor(v->numero);
-                if (ok) fila = (int)v->numero;
-                else snprintf(msg, sizeof msg, "animador(): en \"%s\", \"fila\" va de 0 a %d", nombre, hc->nf - 1);
-            } else if (!strcmp(c, "por_segundo")) {
-                ok = v->tipo == VAL_NUMERO && v->numero > 0;
-                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"por_segundo\" es un número mayor que 0", nombre);
-            } else if (!strcmp(c, "repetir")) {
-                ok = v->tipo == VAL_BOOLEANO;
-                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"repetir\" es verdadero o falso", nombre);
-            } else if (!strcmp(c, "siguiente")) {
-                ok = v->tipo == VAL_TEXTO && jg_dic(anims, v->texto);
-                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"siguiente\" es el nombre de otra de las animaciones", nombre);
-            } else if (!strcmp(c, "pisadas")) {
-                ok = v->tipo == VAL_BOOLEANO || v->tipo == VAL_LISTA;
-                for (int q = 0; ok && v->tipo == VAL_LISTA && q < v->lista.cantidad; q++) ok = v->lista.elementos[q]->tipo == VAL_NUMERO;
-                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"pisadas\" es verdadero, falso o la lista de cuadros con pisada", nombre);
-            } else if (!strcmp(c, "cuadros")) {
-                ok = v->tipo == VAL_LISTA && v->lista.cantidad > 0 && v->lista.cantidad <= JG_MAX_SECUENCIA;
-                for (int q = 0; ok && q < v->lista.cantidad; q++) ok = v->lista.elementos[q]->tipo == VAL_NUMERO;
-                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"cuadros\" es la lista de cuadros que se van mostrando", nombre);
-            } else if (!strcmp(c, "golpes")) {
-                ok = v->tipo == VAL_LISTA;
-                for (int q = 0; ok && q < v->lista.cantidad; q++) {
-                    Valor *g = v->lista.elementos[q];
-                    ok = g->tipo == VAL_LISTA && g->lista.cantidad == 5;
-                    for (int r = 0; ok && r < 5; r++) ok = g->lista.elementos[r]->tipo == VAL_NUMERO;
-                    if (ok) ok = g->lista.elementos[0]->numero >= 0 && g->lista.elementos[3]->numero > 0 && g->lista.elementos[4]->numero > 0;
-                }
-                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"golpes\" es una lista de [cuadro, x, y, ancho, alto] "
-                                  "(la caja que golpea en ese cuadro, medida dentro de la celda)", nombre);
-            } else if (!strcmp(c, "cancelar")) {
-                ok = v->tipo == VAL_NUMERO && v->numero >= 0;
-                if (!ok) snprintf(msg, sizeof msg, "animador(): en \"%s\", \"cancelar\" es el cuadro desde el que se puede pasar a otra animación", nombre);
-            } else {
-                snprintf(msg, sizeof msg, "animador(): en \"%s\", no conozco '%s' (hay \"fila\", \"cuadros\", \"por_segundo\", "
-                         "\"repetir\", \"siguiente\", \"pisadas\", \"golpes\", \"cancelar\" y \"hoja\")", nombre, c);
-                return jg_error("Error", msg);
-            }
-            if (!ok) return jg_error("Error", msg);
-        }
-        Valor *c = jg_dic(cfg, "cuadros");
-        int limite = fila >= 0 ? hc->por_fila[fila] : hc->total;
-        for (int q = 0; c && q < c->lista.cantidad; q++) {
-            double v = c->lista.elementos[q]->numero;
-            if (v < 0 || v >= limite || v != floor(v)) {
-                snprintf(msg, sizeof msg, "animador(): en \"%s\", los cuadros van de 0 a %d%s", nombre, limite - 1,
-                         fila >= 0 ? " (contando dentro de su fila)" : "");
-                return jg_error("Error", msg);
-            }
-        }
+    if (!h) return jg_error("ErrorTipo", "cuadros_de() espera una hoja de juego.hoja() (y, si quieres, una fila)");
+    int fila = -1;
+    if (n > 1 && a[1]->tipo != VAL_NULO) {
+        if (a[1]->tipo != VAL_NUMERO || a[1]->numero < 0) return jg_error("ErrorTipo", "cuadros_de(): la fila es un número desde 0");
+        fila = (int)a[1]->numero;
     }
-    const char *inicial = anims->diccionario.claves[0];
-    if (n > 2) {
-        if (a[2]->tipo != VAL_TEXTO || !jg_dic(anims, a[2]->texto))
-            return jg_error("Error", "animador(): la animación inicial es el nombre de una de las animaciones");
-        inicial = a[2]->texto;
-    }
-    Valor *pj = valor_diccionario_crear();
-    valor_diccionario_agregar(pj, "animador", valor_booleano(1));
-    a[0]->refs++;
-    valor_diccionario_agregar(pj, "hoja", a[0]);
-    anims->refs++;
-    valor_diccionario_agregar(pj, "animaciones", anims);
-    valor_diccionario_agregar(pj, "actual", valor_texto(inicial));
-    valor_diccionario_agregar(pj, "desde", valor_numero(jg_reloj()));
-    valor_diccionario_agregar(pj, "cuadro", valor_numero(0));
-    return pj;
+    return valor_numero(jg_cuadros_fila(h, fila));
 }
 
-/* animacion(animador, nombre[, desde_el_principio]): pone esa animación; si ya
-   estaba puesta sigue por donde iba, salvo que se pida empezar de nuevo */
-static Valor *fn_jg_animacion(Valor **a, int n) {
-    JG_ABIERTA();
-    Valor *pj = jg_animador_arg(a, n, "animacion");
-    if (!pj) return valor_nulo();
-    Valor *anims = jg_dic(pj, "animaciones");
-    if (n < 2 || a[1]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "animacion() espera (animador, nombre)");
-    if (!jg_dic(anims, a[1]->texto)) {
-        char msg[400];
-        int l = snprintf(msg, sizeof msg, "animacion(): no hay ninguna animación '%s'; hay", a[1]->texto);
-        for (int i = 0; i < anims->diccionario.cantidad && l < (int)sizeof msg - 40; i++)
-            l += snprintf(msg + l, sizeof msg - l, "%s \"%s\"", i == 0 ? "" : (i == anims->diccionario.cantidad - 1 ? " y" : ","),
-                          anims->diccionario.claves[i]);
-        return jg_error("Error", msg);
+/* El cuadro que toca ahora a un animador: su hoja, su fila y el cuadro dentro
+   de ella. 1 si lo hay, 0 si no tiene animación, -1 si hubo un error. */
+static int jg_cuadro_animador(Valor *pj, JgHoja **h, int *fila, int *cuadro) {
+    pj->refs++;
+    Valor *args[1] = {pj};
+    Valor *r = interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_cuadro", args, 1);
+    if (hay_error) { valor_destruir(r); return -1; }
+    int ok = r->tipo == VAL_LISTA && r->lista.cantidad == 3 && (*h = jg_hoja_de(r->lista.elementos[0])) != NULL;
+    if (ok) {
+        *fila   = (int)r->lista.elementos[1]->numero;
+        *cuadro = (int)r->lista.elementos[2]->numero;
+        if (*fila >= (*h)->nf) *fila = (*h)->nf - 1;
     }
-    JgAnimEstado e;
-    jg_anim_estado(pj, &e);                  /* por si acabó una con "siguiente" */
-    Valor *actual = jg_dic(pj, "actual");
-    int reiniciar = n > 2 && a[2]->tipo == VAL_BOOLEANO && a[2]->booleano;
-    if (reiniciar || !actual || strcmp(actual->texto, a[1]->texto)) {
-        jg_dic_poner(pj, "actual", valor_texto(a[1]->texto));
-        jg_dic_poner(pj, "desde", valor_numero(jg_reloj()));
-    }
-    return valor_nulo();
-}
-
-/* acabada(animador): ¿ha llegado al final una animación que no se repite? */
-static Valor *fn_jg_acabada(Valor **a, int n) {
-    JG_ABIERTA();
-    Valor *pj = jg_animador_arg(a, n, "acabada");
-    if (!pj) return valor_nulo();
-    JgAnimEstado e;
-    if (!jg_anim_estado(pj, &e)) return valor_booleano(0);
-    return valor_booleano(e.acabada);
-}
-
-/* Los cuadros con pisada de la animación actual (posiciones en su secuencia):
-   los que diga su "pisadas", o calculados (y guardados) si se repite */
-static char *jg_anim_pasos(Valor *pj, JgAnimEstado *e) {
-    char *pisa = calloc((size_t)e->n, 1);
-    if (!pisa) return NULL;
-    Valor *p = jg_dic(e->cfg, "pisadas");
-    if (p && p->tipo == VAL_LISTA) {
-        for (int i = 0; i < p->lista.cantidad; i++) {
-            int q = (int)p->lista.elementos[i]->numero;
-            if (q >= 0 && q < e->n) pisa[q] = 1;
-        }
-        return pisa;
-    }
-    if (p ? !p->booleano : !e->repetir) return pisa;
-    /* calculadas: se guardan en el animador, con la versión de la hoja */
-    Valor *actual = jg_dic(pj, "actual");
-    Valor *cache = jg_dic(pj, "pisadas_calculadas");
-    if (!cache) { cache = valor_diccionario_crear(); jg_dic_poner(pj, "pisadas_calculadas", cache); }
-    Valor *g = jg_dic(cache, actual->texto);
-    if (g && g->tipo == VAL_LISTA && g->lista.cantidad == 2 && g->lista.elementos[0]->numero == e->h->version &&
-        g->lista.elementos[1]->tipo == VAL_LISTA) {
-        Valor *l = g->lista.elementos[1];
-        for (int i = 0; i < l->lista.cantidad; i++) {
-            int q = (int)l->lista.elementos[i]->numero;
-            if (q >= 0 && q < e->n) pisa[q] = 1;
-        }
-        return pisa;
-    }
-    int *filas = malloc(sizeof(int) * e->n);
-    if (!filas) return pisa;
-    for (int i = 0; i < e->n; i++) filas[i] = e->fila;
-    jg_pisadas_secuencia(e->h, filas, e->cuadros, e->n, pisa);
-    free(filas);
-    Valor *l = valor_lista_crear();
-    for (int i = 0; i < e->n; i++) if (pisa[i]) lista_agregar(l, valor_numero(i));
-    Valor *par = valor_lista_crear();
-    lista_agregar(par, valor_numero(e->h->version));
-    lista_agregar(par, l);
-    jg_dic_poner(cache, actual->texto, par);
-    return pisa;
-}
-
-/* pisada(animador): ¿ha tocado un pie el suelo desde la última vez que se
-   preguntó? (llámala una vez por fotograma) */
-static Valor *fn_jg_pisada(Valor **a, int n) {
-    JG_ABIERTA();
-    Valor *pj = jg_animador_arg(a, n, "pisada");
-    if (!pj) return valor_nulo();
-    JgAnimEstado e;
-    if (!jg_anim_estado(pj, &e)) return valor_booleano(0);
-    /* desde dónde mirar: lo último visto de esta misma animación, o justo antes de empezar */
-    Valor *actual = jg_dic(pj, "actual"), *desde = jg_dic(pj, "desde");
-    Valor *visto = jg_dic(pj, "visto"), *visto_de = jg_dic(pj, "visto_de"), *visto_desde = jg_dic(pj, "visto_desde");
-    long ultimo = e.k - 1;
-    if (visto && visto_de && visto_desde && !strcmp(visto_de->texto, actual->texto) && visto_desde->numero == desde->numero)
-        ultimo = (long)visto->numero;
-    int hay = 0;
-    if (e.k > ultimo) {
-        char *pisa = jg_anim_pasos(pj, &e);
-        long desde_k = e.k - ultimo > e.n ? e.k - e.n + 1 : ultimo + 1;
-        for (long j = desde_k; pisa && j <= e.k && !hay; j++) {
-            if (!e.repetir && j >= e.n) break;
-            hay = pisa[e.repetir ? j % e.n : j];
-        }
-        free(pisa);
-    }
-    jg_dic_poner(pj, "visto", valor_numero((double)e.k));
-    jg_dic_poner(pj, "visto_de", valor_texto(actual->texto));
-    jg_dic_poner(pj, "visto_desde", valor_numero(desde->numero));
-    return valor_booleano(hay);
+    valor_destruir(r);
+    return ok;
 }
 
 /* ── Animaciones generadas ──
@@ -3458,9 +3263,8 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     JgHoja *hoja = NULL;
     int anim_fila = -1, anim_cuadro = 0, es_animador = n > 0 && a[0]->tipo == VAL_DICCIONARIO && jg_dic(a[0], "animador");
     if (es_animador) {
-        JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
-        int ok = jg_anim_estado(a[0], e);
-        if (ok) { hoja = e->h; anim_fila = e->fila; anim_cuadro = e->cuadros[e->pos]; }
+        int ok = jg_cuadro_animador(a[0], &hoja, &anim_fila, &anim_cuadro);
+        if (ok < 0) return valor_nulo();
         if (!ok) return jg_error("Error", "dibujar(): el animador no tiene una animación que se pueda dibujar");
     } else if (n > 0) hoja = jg_hoja_de(a[0]);
     int k = hoja ? hoja->imagen : n > 0 ? jg_id_de(a[0], "imagen") : -1;
@@ -3600,9 +3404,8 @@ static Valor *fn_jg_caja(Valor **a, int n) {
         return jg_error("ErrorTipo", "caja(): las opciones van en un diccionario, como en dibujar()");
     double v;
     if (es_animador) {
-        JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
-        int ok = jg_anim_estado(a[0], e);
-        if (ok) { hoja = e->h; fila = e->fila; cuadro = e->cuadros[e->pos]; }
+        int ok = jg_cuadro_animador(a[0], &hoja, &fila, &cuadro);
+        if (ok < 0) return valor_nulo();
         if (!ok) return jg_error("Error", "caja(): el animador no tiene ninguna animación puesta");
     } else if (n > 0 && (hoja = jg_hoja_de(a[0])) != NULL) {
         if (jg_opcion(op, "cuadro", &v)) cuadro = (int)floor(v);
@@ -3642,56 +3445,17 @@ static Valor *fn_jg_caja(Valor **a, int n) {
         c = _jg_caja_imagen[k].r;
         cw = im->ancho; ch = im->alto;
     }
-    return jg_caja_en_pantalla(c, cw, ch, x, y, op);
-}
-
-/* golpe(animador, x, y[, opciones]): la caja [x, y, ancho, alto] con la que
-   golpea ahora el animador (la de "golpes" del cuadro que toca), puesta como
-   se dibuja (las mismas opciones que dibujar: escala, centrado, espejo...).
-   nulo si en este cuadro no golpea. Varias cajas en el mismo cuadro se juntan. */
-static Valor *fn_jg_golpe(Valor **a, int n) {
-    JG_ABIERTA();
-    Valor *pj = jg_animador_arg(a, n, "golpe");
-    if (!pj) return valor_nulo();
-    Valor *op = n > 3 ? a[3] : NULL;
-    if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
-        return jg_error("ErrorTipo", "golpe(): las opciones van en un diccionario, como en dibujar()");
-    double x, y;
-    if (!jg_num(a, n, 1, &x, "golpe") || !jg_num(a, n, 2, &y, "golpe")) return valor_nulo();
-    JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
-    int ok = jg_anim_estado(pj, e);
-    Valor *gs = ok ? jg_dic(e->cfg, "golpes") : NULL;
-    int x0 = 0, y0 = 0, x1 = 0, y1 = 0, hay = 0, pos = ok ? e->pos : 0, cw = ok ? e->h->cw : 0, ch = ok ? e->h->ch : 0;
-    if (ok && e->acabada) gs = NULL;             /* quieta en el último cuadro: ya no golpea */
-    for (int i = 0; gs && i < gs->lista.cantidad; i++) {
-        Valor **g = gs->lista.elementos[i]->lista.elementos;
-        if ((int)g[0]->numero != pos) continue;
-        int gx0 = (int)g[1]->numero, gy0 = (int)g[2]->numero, gx1 = gx0 + (int)g[3]->numero, gy1 = gy0 + (int)g[4]->numero;
-        if (!hay || gx0 < x0) x0 = gx0;
-        if (!hay || gy0 < y0) y0 = gy0;
-        if (!hay || gx1 > x1) x1 = gx1;
-        if (!hay || gy1 > y1) y1 = gy1;
-        hay = 1;
+    /* "trozo": [x, y, ancho, alto] de la celda en vez de lo que se ve (la caja
+       de un golpe, medida con el personaje mirando a la derecha) */
+    Valor *trozo = jg_opcion_valor(op, "trozo");
+    if (trozo) {
+        int bien = trozo->tipo == VAL_LISTA && trozo->lista.cantidad == 4;
+        for (int i = 0; bien && i < 4; i++) bien = trozo->lista.elementos[i]->tipo == VAL_NUMERO;
+        if (!bien) return jg_error("ErrorTipo", "caja(): \"trozo\" es [x, y, ancho, alto] dentro de la celda");
+        c.x = (int)trozo->lista.elementos[0]->numero; c.y = (int)trozo->lista.elementos[1]->numero;
+        c.w = (int)trozo->lista.elementos[2]->numero; c.h = (int)trozo->lista.elementos[3]->numero;
     }
-    if (!hay) return valor_nulo();
-    JgRect c = {x0, y0, x1 - x0, y1 - y0};
     return jg_caja_en_pantalla(c, cw, ch, x, y, op);
-}
-
-/* libre(animador): ¿se puede pasar ya a otra animación? Sí si la actual se
-   repite, si ha acabado o si ha llegado a su cuadro "cancelar" (así se
-   encadenan los golpes de un combo sin esperar a que acabe cada uno). */
-static Valor *fn_jg_libre(Valor **a, int n) {
-    JG_ABIERTA();
-    Valor *pj = jg_animador_arg(a, n, "libre");
-    if (!pj) return valor_nulo();
-    JgAnimEstado est, *e = &est;          /* en la pila, como en animacion() */
-    int libre = 1;
-    if (jg_anim_estado(pj, e) && !e->repetir && !e->acabada) {
-        Valor *c = jg_dic(e->cfg, "cancelar");
-        libre = c && e->k >= (long)c->numero;
-    }
-    return valor_booleano(libre);
 }
 
 /* ── Fuentes ──
@@ -5500,12 +5264,7 @@ static void cargar_juego(Entorno *entorno) {
         {"sprite",          fn_jg_sprite,           2},
         {"hoja",            fn_jg_hoja,            -1},
         {"pisadas",         fn_jg_pisadas,         -1},
-        {"animador",        fn_jg_animador,        -1},
-        {"animacion",       fn_jg_animacion,       -1},
-        {"acabada",         fn_jg_acabada,          1},
-        {"golpe",           fn_jg_golpe,           -1},
-        {"libre",           fn_jg_libre,            1},
-        {"pisada",          fn_jg_pisada,           1},
+        {"cuadros_de",      fn_jg_cuadros_de,      -1},
         {"animar",          fn_jg_animar,          -1},
         {"guardar_imagen",  fn_jg_guardar_imagen,   2},
         {"sonido",          fn_jg_sonido,           1},

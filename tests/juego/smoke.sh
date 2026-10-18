@@ -259,7 +259,10 @@ for l in "pisadas: 11 31 51" \
          "registro: correr:0:falso correr:1:falso correr:2:falso correr:3:falso correr:0:falso saltar:4:falso saltar:5:falso saltar:6:falso quieto:4:falso una_vez:4:falso una_vez:5:falso una_vez:6:falso una_vez:6:verdadero una_vez:6:verdadero"; do
     grep -qxF "$l" salida13.txt && ok "animador: ${l:0:40}" || mal "falta la línea: $l"
 done
-for e in "no hay ninguna animación 'volar'" '"fila" va de 0 a 1' "no conozco 'filas'" '"siguiente" es el nombre' "pisada() espera un animador"; do
+for l in "cuadros_de: 4 3 7" "pisadas de una secuencia: [1, 3] [0] [1]" "trozo: [12, 14, 6, 8]"; do
+    grep -qxF "$l" salida13.txt && ok "animador: $l" || mal "falta la línea: $l"
+done
+for e in "no hay ninguna animación 'volar'" '"fila" va de 0 a 1' "no conozco 'filas'" '"siguiente" es el nombre' "pisada() espera un animador" '"trozo" es [x, y, ancho, alto]'; do
     grep -qF "$e" salida13.txt && ok "animador: error «$e»" || mal "falta el error: $e"
 done
 # ── caja(): lo que se ve de cada cuadro, y colision/dentro con cajas ──

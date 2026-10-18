@@ -243,3 +243,287 @@ funcion _presentar(): nulo {
     sea alfa = si _fase == 1 { p } sino { 1 - p }
     juego.cubrir([0, 0, 0, matematica.limitar(alfa, 0, 1) * 255])
 }
+
+# ── Animador ──
+# Lleva por ti qué animación toca, desde cuándo, si se repite o se queda en el
+# último cuadro (y cuál va después), cuándo hay una pisada y con qué golpea:
+#   sea pj = juego.animador(HOJA, {"andar": {"fila": 0, "por_segundo": 10},
+#                                  "saltar": {"fila": 2, "repetir": falso, "siguiente": "quieto"},
+#                                  "quieto": {"fila": 2, "cuadros": [0]}})
+#   juego.animacion(pj, "andar")           (cambia solo si no estaba ya)
+#   juego.dibujar(pj, x, y, opciones)      (dibujar() pregunta a _cuadro())
+#   si juego.pisada(pj) { ... }            (un pie acaba de tocar el suelo)
+# Todo su estado va en el diccionario ("actual", "desde"...), así que se
+# conserva al recargar el programa en caliente.
+
+fijo _OPCIONES_ANIMACION = ["fila", "cuadros", "por_segundo", "repetir", "siguiente", "pisadas", "golpes", "cancelar", "hoja"]
+
+funcion _es_hoja(val cualquiera h): logico {
+    devolver h es diccionario y h.contiene("hoja") y h["hoja"] es numero
+}
+
+funcion _es_animador(val cualquiera pj, val texto fn): diccionario {
+    si no (pj es diccionario) o no pj.contiene("animador") {
+        lanzar ErrorTipo("{fn}() espera un animador de juego.animador()")
+    }
+    devolver pj
+}
+
+funcion _son_numeros(val cualquiera l): logico {
+    si no (l es lista) { devolver falso }
+    para cada cualquiera v en l {
+        si no (v es numero) { devolver falso }
+    }
+    devolver verdadero
+}
+
+# Comprueba una opción de una animación; devuelve el mensaje si está mal, o nulo
+funcion _opcion_mala(val texto nombre, val texto c, val cualquiera v, val diccionario hoja,
+                     val diccionario animaciones): cualquiera {
+    elegir c {
+        caso "fila" {
+            si v es numero y v >= 0 y v < hoja["filas"] y v == matematica.piso(v) { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"fila\" va de 0 a {hoja["filas"] - 1}"
+        }
+        caso "por_segundo" {
+            si v es numero y v > 0 { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"por_segundo\" es un número mayor que 0"
+        }
+        caso "repetir" {
+            si v es logico { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"repetir\" es verdadero o falso"
+        }
+        caso "siguiente" {
+            si v es texto y animaciones.contiene(v) { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"siguiente\" es el nombre de otra de las animaciones"
+        }
+        caso "pisadas" {
+            si v es logico o _son_numeros(v) { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"pisadas\" es verdadero, falso o la lista de cuadros con pisada"
+        }
+        caso "cuadros" {
+            si _son_numeros(v) y v.longitud() > 0 y v.longitud() <= 1024 { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"cuadros\" es la lista de cuadros que se van mostrando"
+        }
+        caso "golpes" {
+            sea bien = v es lista
+            para cada cualquiera g en (si bien { v } sino { [] }) {
+                bien = bien y _son_numeros(g) y g.longitud() == 5 y g[0] >= 0 y g[3] > 0 y g[4] > 0
+            }
+            si bien { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"golpes\" es una lista de [cuadro, x, y, ancho, alto] " +
+                     "(la caja que golpea en ese cuadro, medida dentro de la celda)"
+        }
+        caso "cancelar" {
+            si v es numero y v >= 0 { devolver nulo }
+            devolver "animador(): en \"{nombre}\", \"cancelar\" es el cuadro desde el que se puede pasar a otra animación"
+        }
+    }
+    devolver nulo
+}
+
+# animador(hoja, animaciones[, inicial])
+funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera inicial = nulo): diccionario {
+    si no _es_hoja(hoja) o no (animaciones es diccionario) o animaciones.longitud() == 0 {
+        lanzar ErrorTipo("animador() espera (hoja, \{nombre: \{\"fila\": n, \"por_segundo\": n, ...}, ...}[, inicial])")
+    }
+    para cada texto nombre en animaciones {
+        sea cfg = animaciones[nombre]
+        si no (cfg es diccionario) {
+            lanzar ErrorTipo("animador(): \"{nombre}\" va con un diccionario, por ejemplo \{\"fila\": 0}")
+        }
+        sea hc = hoja
+        si cfg.contiene("hoja") {
+            hc = cfg["hoja"]
+            si no _es_hoja(hc) {
+                lanzar ErrorTipo("animador(): en \"{nombre}\", \"hoja\" es una hoja de juego.hoja() o juego.animar()")
+            }
+        }
+        para cada texto c en cfg {
+            si no _OPCIONES_ANIMACION.contiene(c) {
+                lanzar Error("animador(): en \"{nombre}\", no conozco '{c}' (hay \"fila\", \"cuadros\", \"por_segundo\", " +
+                             "\"repetir\", \"siguiente\", \"pisadas\", \"golpes\", \"cancelar\" y \"hoja\")")
+            }
+            sea mal = _opcion_mala(nombre, c, cfg[c], hc, animaciones)
+            si mal != nulo { lanzar Error(mal) }
+        }
+        si cfg.contiene("cuadros") {
+            sea fila = si cfg.contiene("fila") { cfg["fila"] } sino { -1 }
+            sea limite = si fila >= 0 { hc["por_fila"][fila] } sino { hc["cuadros"] }
+            para cada numero q en cfg["cuadros"] {
+                si q < 0 o q >= limite o q != matematica.piso(q) {
+                    sea dentro = si fila >= 0 { " (contando dentro de su fila)" } sino { "" }
+                    lanzar Error("animador(): en \"{nombre}\", los cuadros van de 0 a {limite - 1}{dentro}")
+                }
+            }
+        }
+    }
+    sea primera = ""
+    para cada texto nombre en animaciones {
+        primera = nombre
+        romper
+    }
+    si inicial != nulo {
+        si no (inicial es texto) o no animaciones.contiene(inicial) {
+            lanzar Error("animador(): la animación inicial es el nombre de una de las animaciones")
+        }
+        primera = inicial
+    }
+    devolver {"animador": verdadero, "hoja": hoja, "animaciones": animaciones,
+              "actual": primera, "desde": juego.tiempo(), "cuadro": 0}
+}
+
+# Dónde va el animador ahora (o nulo si no tiene animación): la hoja, la fila
+# y el cuadro, cuántos han pasado (k), en qué posición de la secuencia va
+# (pos, de n)... Si la que había acabó y tiene "siguiente", pasa a esa como si
+# hubiera empezado justo al acabar.
+funcion _estado(val diccionario pj): cualquiera {
+    sea animaciones = pj["animaciones"]
+    para (vueltas = 0; vueltas < 8; vueltas++) {
+        sea actual = pj["actual"]
+        si no (actual es texto) o no animaciones.contiene(actual) { devolver nulo }
+        sea cfg = animaciones[actual]
+        sea hoja = si cfg.contiene("hoja") { cfg["hoja"] } sino { pj["hoja"] }
+        sea por_segundo = si cfg.contiene("por_segundo") { cfg["por_segundo"] } sino { 10 }
+        sea siguiente = si cfg.contiene("siguiente") { cfg["siguiente"] } sino { nulo }
+        sea repetir = si cfg.contiene("repetir") { cfg["repetir"] } sino { siguiente == nulo }
+        sea fila = si cfg.contiene("fila") { matematica.truncar(cfg["fila"]) } sino { -1 }
+        sea cuadros = si cfg.contiene("cuadros") { cfg["cuadros"] } sino { nulo }
+        sea n = si cuadros != nulo { cuadros.longitud() } sino { juego.cuadros_de(hoja, si fila >= 0 { fila } sino { nulo }) }
+        si n < 1 { devolver nulo }
+        sea k = matematica.piso((juego.tiempo() - pj["desde"]) * por_segundo + 0.000000001)
+        si k < 0 { k = 0 }
+        sea acabada = no repetir y k >= n
+        si acabada y siguiente es texto y animaciones.contiene(siguiente) {
+            pj["actual"] = siguiente
+            pj["desde"] = pj["desde"] + n / por_segundo
+            continuar
+        }
+        sea pos = si repetir { k % n } sino { matematica.minimo(k, n - 1) }
+        sea cuadro = si cuadros != nulo { matematica.truncar(cuadros[pos]) } sino { pos }
+        devolver {"hoja": hoja, "fila": fila, "cuadro": cuadro, "cuadros": cuadros, "k": k, "n": n,
+                  "pos": pos, "acabada": acabada, "repetir": repetir, "cfg": cfg}
+    }
+    devolver nulo
+}
+
+# Para dibujar() y caja(): [hoja, fila, cuadro] de lo que toca, o nulo
+funcion _cuadro(val diccionario pj): cualquiera {
+    sea e = _estado(pj)
+    si e == nulo { devolver nulo }
+    devolver [e["hoja"], e["fila"], e["cuadro"]]
+}
+
+# animacion(animador, nombre[, desde_el_principio]): pone esa animación; si ya
+# estaba puesta sigue por donde iba, salvo que se pida empezar de nuevo
+funcion animacion(val cualquiera pj, val cualquiera nombre, val cualquiera desde_el_principio = falso): nulo {
+    _es_animador(pj, "animacion")
+    sea animaciones = pj["animaciones"]
+    si no (nombre es texto) { lanzar ErrorTipo("animacion() espera (animador, nombre)") }
+    si no animaciones.contiene(nombre) {
+        sea hay = ""
+        sea i = 0
+        para cada texto otra en animaciones {
+            sea antes = si i == 0 { "" } sino si i == animaciones.longitud() - 1 { " y" } sino { "," }
+            hay += "{antes} \"{otra}\""
+            i++
+        }
+        lanzar Error("animacion(): no hay ninguna animación '{nombre}'; hay{hay}")
+    }
+    _estado(pj)                       # por si acabó una con "siguiente"
+    si (desde_el_principio es logico y desde_el_principio) o pj["actual"] != nombre {
+        pj["actual"] = nombre
+        pj["desde"] = juego.tiempo()
+    }
+}
+
+# acabada(animador): ¿ha llegado al final una animación que no se repite?
+funcion acabada(val cualquiera pj): logico {
+    sea e = _estado(_es_animador(pj, "acabada"))
+    devolver e != nulo y e["acabada"]
+}
+
+# libre(animador): ¿se puede pasar ya a otra animación? Sí si la actual se
+# repite, si ha acabado o si ha llegado a su cuadro "cancelar" (así se
+# encadenan los golpes de un combo sin esperar a que acabe cada uno)
+funcion libre(val cualquiera pj): logico {
+    sea e = _estado(_es_animador(pj, "libre"))
+    si e == nulo o e["repetir"] o e["acabada"] { devolver verdadero }
+    devolver e["cfg"].contiene("cancelar") y e["k"] >= matematica.truncar(e["cfg"]["cancelar"])
+}
+
+# golpe(animador, x, y[, opciones]): la caja [x, y, ancho, alto] con la que
+# golpea ahora (la de "golpes" del cuadro que toca), puesta como se dibuja (las
+# mismas opciones que dibujar: escala, centrado, espejo...); nulo si en este
+# cuadro no golpea. Varias cajas en el mismo cuadro se juntan.
+funcion golpe(val cualquiera pj, val cualquiera px, val cualquiera py, val cualquiera opciones = nulo): cualquiera {
+    _es_animador(pj, "golpe")
+    si opciones != nulo y no (opciones es diccionario) {
+        lanzar ErrorTipo("golpe(): las opciones van en un diccionario, como en dibujar()")
+    }
+    si no (px es numero) { lanzar ErrorTipo("golpe(): el argumento 2 debe ser un número") }
+    si no (py es numero) { lanzar ErrorTipo("golpe(): el argumento 3 debe ser un número") }
+    sea e = _estado(pj)
+    si e == nulo o e["acabada"] o no e["cfg"].contiene("golpes") { devolver nulo }   # quieta al final: ya no golpea
+    sea caja = nulo
+    para cada lista g en e["cfg"]["golpes"] {
+        si matematica.truncar(g[0]) == e["pos"] {
+            sea x0 = matematica.truncar(g[1])
+            sea y0 = matematica.truncar(g[2])
+            sea x1 = x0 + matematica.truncar(g[3])
+            sea y1 = y0 + matematica.truncar(g[4])
+            si caja == nulo {
+                caja = [x0, y0, x1, y1]
+            } sino {
+                caja = [matematica.minimo(caja[0], x0), matematica.minimo(caja[1], y0),
+                        matematica.maximo(caja[2], x1), matematica.maximo(caja[3], y1)]
+            }
+        }
+    }
+    si caja == nulo { devolver nulo }
+    sea op = {}
+    si opciones != nulo {
+        para cada texto c en opciones { op[c] = opciones[c] }
+    }
+    op["trozo"] = [caja[0], caja[1], caja[2] - caja[0], caja[3] - caja[1]]
+    devolver juego.caja(e["hoja"], px, py, op)
+}
+
+# Los cuadros con pisada de la animación actual (posiciones en su secuencia):
+# los que diga su "pisadas", o los que se ven en la hoja si se repite
+funcion _pisadas(val diccionario e): lista {
+    sea cfg = e["cfg"]
+    si cfg.contiene("pisadas") y cfg["pisadas"] es lista { devolver cfg["pisadas"] }
+    sea calcular = si cfg.contiene("pisadas") { cfg["pisadas"] } sino { e["repetir"] }
+    si no calcular { devolver [] }
+    sea fila = si e["fila"] >= 0 { e["fila"] } sino { nulo }
+    devolver juego.pisadas(e["hoja"], fila, si e["cuadros"] != nulo { e["cuadros"] } sino { e["n"] })
+}
+
+# pisada(animador): ¿ha tocado un pie el suelo desde la última vez que se
+# preguntó? (llámala una vez por fotograma)
+funcion pisada(val cualquiera pj): logico {
+    sea e = _estado(_es_animador(pj, "pisada"))
+    si e == nulo { devolver falso }
+    # desde dónde mirar: lo último visto de esta misma animación, o justo antes de empezar
+    sea actual = pj["actual"]
+    sea desde = pj["desde"]
+    sea k = e["k"]
+    sea n = e["n"]
+    sea ultimo = k - 1
+    si pj.contiene("visto_de") y pj["visto_de"] == actual y pj["visto_desde"] == desde { ultimo = pj["visto"] }
+    sea hay = falso
+    si k > ultimo {
+        sea pisa = _pisadas(e)
+        sea j = si k - ultimo > n { k - n + 1 } sino { ultimo + 1 }
+        mientras j <= k y no hay {
+            si no e["repetir"] y j >= n { romper }
+            hay = pisa.contiene(si e["repetir"] { j % n } sino { j })
+            j++
+        }
+    }
+    pj["visto"] = k
+    pj["visto_de"] = actual
+    pj["visto_desde"] = desde
+    devolver hay
+}
