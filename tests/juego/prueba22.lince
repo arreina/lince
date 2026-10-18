@@ -1,0 +1,32 @@
+# Controles a gusto: cambiar una tecla en menu_controles (con LINCE_JUEGO_GUION),
+# que se guarde y se aplique solo al volver a definir la acción, y restablecer
+importar "juego"
+juego.abrir("Controles", 640, 360)
+juego.definir_accion("saltar", ["espacio", "mando:a"])
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("disparar", ["z", "mando:x"])
+sea dentro = verdadero
+sea despues = 0
+mientras juego.abierto() {
+    juego.limpiar([10, 10, 20])
+    si dentro {
+        si juego.menu_controles({"nombres": {"saltar": "Saltar", "izquierda": "Izquierda", "disparar": "Disparar"}}) == "volver" {
+            dentro = falso
+            sea acc = juego.acciones()
+            escribir("saltar: {acc["saltar"]}")
+            escribir("disparar: {acc["disparar"]}")
+            escribir("guardado: {juego.cargar("lince_controles")}")
+            # como al abrir el juego otra vez: definir_accion pone lo del jugador
+            juego.definir_accion("saltar", ["espacio", "mando:a"])
+            escribir("al definirla otra vez: {juego.acciones()["saltar"]}")
+            juego.restablecer_controles()
+            escribir("restablecidos: {juego.acciones()["saltar"]} {juego.acciones()["disparar"]} {juego.cargar("lince_controles")}")
+        }
+    } sino {
+        # un botón del mando (de mentira) también se lee
+        despues = despues + 1
+        si despues == 2 { juego.mando_virtual(["y"], {}) }
+        si despues == 3 { escribir("mando: {juego.entrada_pulsada()}") }
+    }
+    juego.presentar()
+}

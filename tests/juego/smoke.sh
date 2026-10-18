@@ -542,4 +542,11 @@ for l in "caja en el suelo: 204 verdadero" "pelota rebota: verdadero y se para: 
          'error: cuerpo(): falta "y" (un número; o "radio" en vez de ancho y alto)' "error: avanzar_fisica() espera un mundo de juego.fisica()"; do
     grep -qxF "$l" salida27.txt && ok "física: $l" || mal "falta la línea: $l"
 done
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida5b.txt; exit 1; }
+# ── Controles a gusto (en una carpeta de partidas de mentira) ──
+LINCE_JUEGO_GUARDADO="$T/controles" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=40 \
+    LINCE_JUEGO_GUION=5:entrar:1,10:z:1,20:escape:1 timeout 30 "$LINCE" "$DIR/prueba22.lince" > salida28.txt 2>&1
+for l in 'saltar: ["z", "mando:a"]' 'disparar: ["espacio", "mando:x"]' 'guardado: {"disparar": ["espacio", "mando:x"], "saltar": ["z", "mando:a"]}' \
+         'al definirla otra vez: ["z", "mando:a"]' 'restablecidos: ["espacio", "mando:a"] ["z", "mando:x"] nulo' "mando: mando:y"; do
+    grep -qxF "$l" salida28.txt && ok "controles: $l" || mal "falta la línea: $l"
+done
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida5b.txt; exit 1; }

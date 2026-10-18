@@ -6,7 +6,8 @@
 #
 # Muestra: un menú de portada y otro de pausa (juego.menu), una caja de
 # diálogo con el texto saliendo letra a letra, quién habla y respuestas para
-# elegir (juego.dialogo, juego.dialogo_abierto, juego.respuesta), y escenas
+# elegir (juego.dialogo, juego.dialogo_abierto, juego.respuesta), cambiar los
+# controles desde la pausa (juego.menu_controles; se guardan solos) y escenas
 # (juego.cambiar_escena). Todo se maneja igual con teclado, mando, ratón o dedo.
 importar "juego"
 importar "matematica"
@@ -29,6 +30,7 @@ sea lince_x = 460
 sea lince_y = 240
 sea amigos = falso          # ¿ha dicho que sí?
 sea pausa = falso
+sea en_controles = falso
 
 si no juego.recargado() { juego.cambiar_escena("portada") }
 
@@ -73,10 +75,16 @@ mientras juego.abierto() {
         si eleccion == "Salir" { juego.salir() }
     } sino {
         dibujar_mundo()
-        si pausa {
+        si en_controles {
+            juego.cubrir([0, 0, 0, 200])
+            si juego.menu_controles({"acciones": ["izquierda", "derecha", "arriba", "abajo", "hablar", "pausa"]}) == "volver" {
+                en_controles = falso
+            }
+        } sino si pausa {
             juego.cubrir([0, 0, 0, 150])
-            sea eleccion = juego.menu(["Continuar", "Volver a la portada", "Salir"], {"atras": "Continuar"})
+            sea eleccion = juego.menu(["Continuar", "Controles", "Volver a la portada", "Salir"], {"atras": "Continuar"})
             si eleccion == "Continuar" { pausa = falso }
+            si eleccion == "Controles" { en_controles = verdadero }
             si eleccion == "Volver a la portada" {
                 pausa = falso
                 juego.cambiar_escena("portada", 0.6)

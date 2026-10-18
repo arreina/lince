@@ -57,6 +57,7 @@ static struct {
     const unsigned char *(*KeyboardState)(int *);
     unsigned (*MouseState)(int *, int *);
     int  (*ScancodeFromName)(const char *);
+    const char *(*ScancodeName)(int);
     void (*Delay)(unsigned);
     void (*SetTitle)(void *, const char *);
     unsigned (*OpenAudio)(const char *, int, const void *, void *, int);
@@ -384,6 +385,7 @@ static int jg_cargar(void) {
     JG_FN(KeyboardState, "SDL_GetKeyboardState")
     JG_FN(MouseState, "SDL_GetMouseState")
     JG_FN(ScancodeFromName, "SDL_GetScancodeFromName")
+    JG_FN(ScancodeName, "SDL_GetScancodeName")
     JG_FN(Delay, "SDL_Delay")
     JG_FN(SetTitle, "SDL_SetWindowTitle")
     JG_FN(OpenAudio, "SDL_OpenAudioDevice")
@@ -4533,36 +4535,101 @@ static JgAccion *jg_buscar_accion(const char *nombre) {
 }
 
 /* definir_accion(nombre, [entradas]): crea o sustituye la acción */
+static Valor *jg_definir(const char *nombre_accion, Valor *entradas);
 static Valor *fn_jg_definir_accion(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_LISTA)
         return jg_error("ErrorTipo", "definir_accion() espera (nombre, lista de entradas), por ejemplo (\"saltar\", [\"espacio\", \"mando:a\"])");
     if (a[1]->lista.cantidad > JG_ENTRADAS) return jg_error("Error", "definir_accion(): como mucho 16 entradas por acción");
+    /* si el jugador cambió los controles de esta acción (menu_controles), los suyos */
+    a[0]->refs++;
+    a[1]->refs++;
+    Valor *args[2] = {a[0], a[1]};
+    Valor *suyas = interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_controles_de", args, 2);
+    if (hay_error) { if (suyas) valor_destruir(suyas); return valor_nulo(); }
+    Valor *lista_entradas = suyas && suyas->tipo == VAL_LISTA ? suyas : a[1];
+    Valor *r = jg_definir(a[0]->texto, lista_entradas);
+    if (suyas) valor_destruir(suyas);
+    return r;
+}
+
+static Valor *jg_definir(const char *nombre_accion, Valor *entradas) {
+    if (entradas->lista.cantidad > JG_ENTRADAS) return jg_error("Error", "definir_accion(): como mucho 16 entradas por acción");
     JgAccion nueva = {0};
-    for (int i = 0; i < a[1]->lista.cantidad; i++) {
-        Valor *v = a[1]->lista.elementos[i];
+    for (int i = 0; i < entradas->lista.cantidad; i++) {
+        Valor *v = entradas->lista.elementos[i];
         char msg[300];
         if (v->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "definir_accion(): cada entrada es un texto, por ejemplo \"espacio\" o \"mando:a\"");
         if (!jg_entrada(v->texto, &nueva.e[nueva.n], msg, sizeof msg)) {
             char m2[400];
-            snprintf(m2, sizeof m2, "definir_accion(\"%s\"): %s", a[0]->texto, msg);
+            snprintf(m2, sizeof m2, "definir_accion(\"%s\"): %s", nombre_accion, msg);
             for (int k = 0; k < nueva.n; k++) free(nueva.textos[k]);
             return jg_error("Error", m2);
         }
         nueva.textos[nueva.n] = strdup(v->texto);
         nueva.n++;
     }
-    JgAccion *acc = jg_buscar_accion(a[0]->texto);
+    JgAccion *acc = jg_buscar_accion(nombre_accion);
     if (!acc) {
         if (_jgs.nacciones == JG_ACCIONES) return jg_error("Error", "definir_accion(): como mucho 64 acciones");
         acc = &_jgs.acciones[_jgs.nacciones++];
-        acc->nombre = strdup(a[0]->texto);
+        acc->nombre = strdup(nombre_accion);
         acc->desde = acc->soltada = -1; acc->duro = 0;
     }
     nueva.nombre = acc->nombre;
     nueva.desde = acc->desde; nueva.soltada = acc->soltada; nueva.duro = acc->duro;   /* se puede redefinir sin perder la carga */
     for (int k = 0; k < acc->n; k++) free(acc->textos[k]);
     *acc = nueva;
+    return valor_nulo();
+}
+
+/* entrada_pulsada(): lo que se acaba de pulsar, escrito como en
+   definir_accion ("espacio", "mando:a", "mando:izq_x-", "raton:izquierdo"), o
+   nulo. Para que el jugador elija sus controles. */
+static Valor *fn_jg_entrada_pulsada(Valor **a, int n) {
+    (void)a; (void)n;
+    JG_ABIERTA();
+    static const char *const PROPIOS[][2] = {{"arriba", "82"}, {"abajo", "81"}, {"izquierda", "80"}, {"derecha", "79"},
+        {"espacio", "44"}, {"entrar", "40"}, {"escape", "41"}, {"borrar", "42"}, {"tab", "43"},
+        {"mayus", "225"}, {"ctrl", "224"}, {"alt", "226"}};
+    char t[96];
+    for (int c = 1; c < 512; c++) {
+        if (!_jgs.teclas[c] || _jgs.previas[c]) continue;
+        t[0] = '\0';
+        for (size_t i = 0; i < sizeof PROPIOS / sizeof PROPIOS[0]; i++) if (atoi(PROPIOS[i][1]) == c) snprintf(t, sizeof t, "%s", PROPIOS[i][0]);
+        if (!t[0] && c >= 4 && c <= 29) snprintf(t, sizeof t, "%c", 'a' + (c - 4));
+        else if (!t[0] && c >= 30 && c <= 38) snprintf(t, sizeof t, "%c", '1' + (c - 30));
+        else if (!t[0] && c == 39) snprintf(t, sizeof t, "0");
+        else if (!t[0] && c >= 58 && c <= 69) snprintf(t, sizeof t, "f%d", c - 57);
+        else if (!t[0]) {
+            const char *sdl = _jg.ScancodeName(c);
+            if (!sdl || !sdl[0]) continue;
+            snprintf(t, sizeof t, "%s", sdl);
+            for (char *q = t; *q; q++) *q = (char)tolower((unsigned char)*q);
+            if (jg_tecla_codigo(t) != c) continue;          /* que se pueda volver a leer */
+        }
+        return valor_texto(t);
+    }
+    static const char *const RATON[] = {"izquierdo", "central", "derecho"};
+    for (int b = 0; b < 3; b++)
+        if ((_jgs.raton & (1u << b)) && !(_jgs.raton_prev & (1u << b))) {
+            snprintf(t, sizeof t, "raton:%s", RATON[b]);
+            return valor_texto(t);
+        }
+    for (int m = 0; m < JG_MANDOS; m++) {
+        for (int b = 0; b < JG_BOTONES; b++)
+            if (_jgs.botones[m][b] && !_jgs.botones_prev[m][b]) {
+                snprintf(t, sizeof t, "mando:%s", JG_NOMBRES_BOTON[b]);
+                return valor_texto(t);
+            }
+        for (int e = 0; e < JG_EJES; e++) {
+            float v = _jgs.ejes[m][e], antes = _jgs.ejes_prev[m][e];
+            if (fabsf(v) > 0.6f && fabsf(antes) <= 0.6f) {
+                snprintf(t, sizeof t, "mando:%s%c", JG_NOMBRES_EJE[e], v > 0 ? '+' : '-');
+                return valor_texto(t);
+            }
+        }
+    }
     return valor_nulo();
 }
 
@@ -5176,7 +5243,7 @@ static int jg_crear_carpetas(char *ruta) {
     }
 }
 
-static int jg_carpeta_guardado(char *ruta, size_t max) {
+static int jg_carpeta_guardado(char *ruta, size_t max, int crear) {
     const char *e = getenv("LINCE_JUEGO_GUARDADO");
     if (e && e[0]) snprintf(ruta, max, "%s", e);
     else {
@@ -5206,12 +5273,13 @@ static int jg_carpeta_guardado(char *ruta, size_t max) {
         }
 #endif
     }
-    return jg_crear_carpetas(ruta);
+    return crear ? jg_crear_carpetas(ruta) : 1;
 }
 
 /* La ruta del archivo de un nombre ("partida" → .../partida.json); 0 si el
    nombre no vale */
 static int jg_ruta_guardado(Valor **a, int n, const char *fn, char *ruta, size_t max) {
+    int crear = strcmp(fn, "guardar") == 0;          /* cargar u olvidar no crean la carpeta */
     if (n < 1 || a[0]->tipo != VAL_TEXTO) {
         char m[160];
         snprintf(m, sizeof m, "%s() espera un nombre, como \"partida\" o \"opciones\"", fn);
@@ -5228,7 +5296,7 @@ static int jg_ruta_guardado(Valor **a, int n, const char *fn, char *ruta, size_t
         return 0;
     }
     char carpeta[900];
-    if (!jg_carpeta_guardado(carpeta, sizeof carpeta)) {
+    if (!jg_carpeta_guardado(carpeta, sizeof carpeta, crear)) {
         char m[160];
         snprintf(m, sizeof m, "%s(): no se pudo crear la carpeta de las partidas guardadas", fn);
         jg_error("Error", m);
@@ -5315,7 +5383,7 @@ static Valor *fn_jg_olvidar(Valor **a, int n) {
 static Valor *fn_jg_carpeta_guardado(Valor **a, int n) {
     (void)a; (void)n;
     char carpeta[900];
-    if (!jg_carpeta_guardado(carpeta, sizeof carpeta)) return jg_error("Error", "carpeta_guardado(): no se pudo crear la carpeta de las partidas guardadas");
+    if (!jg_carpeta_guardado(carpeta, sizeof carpeta, 1)) return jg_error("Error", "carpeta_guardado(): no se pudo crear la carpeta de las partidas guardadas");
     return valor_texto(carpeta);
 }
 
@@ -6287,6 +6355,7 @@ static void cargar_juego(Entorno *entorno) {
         {"crear_efecto",    fn_jg_crear_efecto,    -1},
         {"guardar_sonido",  fn_jg_guardar_sonido,   2},
         {"guardar",         fn_jg_guardar,          2},
+        {"entrada_pulsada", fn_jg_entrada_pulsada,  0},
         {"mapa_tiled",      fn_jg_mapa_tiled,      -1},
         {"dibujar_tiled",   fn_jg_dibujar_tiled,   -1},
         {"cargar",          fn_jg_cargar,          -1},

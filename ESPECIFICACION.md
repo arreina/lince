@@ -1571,6 +1571,19 @@ si juego.respuesta() == "Sí" { ... }
 El juego sigue viendo las teclas mientras hay un menú o un diálogo: lo normal es no mover al
 personaje mientras `dialogo_abierto()`, como en el ejemplo. `examples/12_aventura.lince` lo usa todo.
 
+**Controles a gusto.** El jugador puede cambiar las teclas y los botones de cada acción:
+
+```lince
+# en una pantalla de opciones, en cada fotograma:
+si juego.menu_controles() == "volver" { ...salir de las opciones... }
+```
+
+| Función | Qué hace |
+|---|---|
+| `menu_controles([ajustes])` | enseña cada acción con sus teclas y sus botones; se elige una y se pulsa lo nuevo (Esc deja como estaba). Una tecla nueva sustituye a las teclas que tenía la acción, un botón de mando a sus botones y una dirección de la palanca a sus direcciones; si otra acción ya la usaba, se intercambian. Lo cambiado **se guarda solo** y se aplica solo la próxima vez que el juego defina esa acción con `definir_accion`, sin hacer nada más. Tiene «Restablecer» y «Volver»; devuelve `"volver"` al salir (también con Esc o B). Ajustes: `acciones` (cuáles y en qué orden), `nombres` (`{acción: cómo se enseña}`), `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
+| `restablecer_controles()` | vuelven los controles que definió el juego |
+| `entrada_pulsada()` | lo que se acaba de pulsar (tecla, botón del ratón, botón o dirección de la palanca de un mando), escrito como en `definir_accion` (`"espacio"`, `"mando:a"`, `"mando:izq_x-"`), o `nulo`: para hacer un menú de controles propio |
+
 **Partidas guardadas.** Récords, opciones y avances que siguen ahí al volver a abrir el juego:
 
 ```lince

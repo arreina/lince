@@ -17,6 +17,13 @@ apartado que le toca de este archivo.
 - `juego.fisica`, `juego.cuerpo` y `juego.avanzar_fisica`: cuerpos con gravedad, masa, rebote y fricción que chocan entre ellos y con el mapa, plataformas y ascensores que llevan lo que tienen encima, y sensores (`juego.tocando`) para monedas y zonas. Está escrita en Lince.
 - Ejemplo nuevo: `examples/13_fisica.lince`.
 
+### Controles a gusto
+
+- `juego.menu_controles()` deja al jugador cambiar las teclas y botones de cada acción. Lo cambiado se guarda y se aplica solo la próxima vez, sin que el juego haga nada más.
+- `juego.restablecer_controles()` y `juego.entrada_pulsada()` (lo que se acaba de pulsar, para hacer un menú propio).
+- La aventura (`examples/12_aventura.lince`) tiene «Controles» en la pausa.
+- `juego.cargar()` ya no crea la carpeta de las partidas si no existe.
+
 ## 0.8.0
 
 Publicar en Google Play, partidas guardadas, y menús y diálogos.
