@@ -127,6 +127,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # SDL2 del sistema: Lince dibuja el icono de la app (android/icono.lince)
+      - name: SDL2
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
+
       - name: Compilar Lince
         run: make
 
