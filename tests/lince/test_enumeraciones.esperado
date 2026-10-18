@@ -13,3 +13,32 @@ Color.Rojo
 Color.Azul
 Direccion.Norte
 Direccion.Oeste
+Izquierda
+2
+[-1, 0]
+1
+vamos a la Mover.Izquierda
+en texto: Mover.Izquierda
+Arriba: [0, -1]
+Abajo: [0, 1]
+Izquierda: [-1, 0]
+Derecha: [1, 0]
+verdadero
+verdadero
+verdadero
+verdadero
+falso
+verdadero
+{"Mover.Arriba": 1, "Mover.Izquierda": 2}
+2
+{"mover": "Mover.Izquierda"}
+Abajo
+25
+La enumeración Mover no tiene 'Atras'. Tiene Arriba, Abajo, Izquierda y Derecha.
+Un valor de una enumeración tiene 'nombre', 'valor' e 'indice'; no tiene 'color'.
+⚠️  Aviso en línea 3: este 'elegir' no trata E.B ni E.C: añádelos, o pon 'otro { }' si no hace falta.
+✅ Sintaxis correcta: test_enumeraciones_tmp.lince
+⚠️  Aviso en línea 3: este 'elegir' no trata E.B: añádelo, o pon 'otro { }' si no hace falta.
+✅ Sintaxis correcta: test_enumeraciones_tmp.lince
+✅ Sintaxis correcta: test_enumeraciones_tmp.lince
+✅ Sintaxis correcta: test_enumeraciones_tmp.lince

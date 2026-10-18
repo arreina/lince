@@ -64,6 +64,14 @@ ok = 'sea a = 1\nescribir(a)\n'
 send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
     "textDocument": {"uri": uri}, "contentChanges": [{"text": ok}]}})
 comprobar(recv()["params"]["diagnostics"] == [], "código correcto: sin diagnósticos")
+# ── aviso: a un 'elegir' le faltan valores de una enumeración ──
+falta = ('enumeracion Estado { Quieto Andando Saltando }\nsea e = Estado.Quieto\n'
+         'elegir e {\n    caso Estado.Quieto { escribir(1) }\n}\n')
+send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
+    "textDocument": {"uri": uri}, "contentChanges": [{"text": falta}]}})
+d = recv()["params"]["diagnostics"]
+comprobar(len(d) == 1 and d[0]["severity"] == 2 and d[0]["range"]["start"]["line"] == 2 and
+          "Estado.Andando ni Estado.Saltando" in d[0]["message"], "aviso de un elegir al que le faltan casos")
 send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
     "textDocument": {"uri": uri}, "contentChanges": [{"text": src}]}})
 recv()

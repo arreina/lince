@@ -6,18 +6,12 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Lenguaje
 
-- [ ] **Enumeraciones de verdad.**
-  - Ahora sus valores son textos (`"Color.Rojo"`).
-  - Faltaría:
-    - que tengan valores propios;
-    - recorrerlas con `para cada`;
-    - que `elegir` avise de un caso que falta: añadir `Estado.Agarrado` y que Lince diga dónde se ha olvidado.
+- [ ] **Llamar a algo que no es un nombre**: `(f)(1)`, `lista[0](1)` o `(tarea() { ... })()` dan error de sintaxis; hay que guardarlo antes en una variable.
+- [ ] **El aviso de `elegir` incompleto** solo mira las enumeraciones del mismo archivo; podría mirar también las de los archivos importados.
 - [ ] **Guardar un generador en una variable.**
   - `sea g = contar(5)` deja `g` en `nulo`, porque copiar un generador da `nulo`.
   - Solo se puede recorrer directamente: `para cada x en contar(5)`.
   - Si se arregla, el generador se recorrerá una sola vez.
-- [ ] **Tareas sin nombre**, como `tarea() { ... }` igual que las lambdas. Hoy una tarea se declara siempre con nombre (`tarea nombre() { }`), también dentro de una clase.
-- [ ] **El tipo `tarea` en los parámetros** (`val tarea t`). Hoy se usa `val cualquiera t`, y `t es tarea` para comprobarlo.
 
 ## Biblioteca de juego en Lince
 

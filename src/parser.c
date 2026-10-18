@@ -113,6 +113,25 @@ static const char *op_compuesto(TipoToken t) {
     }
 }
 
+/* 'tarea(' de una tarea sin nombre: tarea() { ... } o tarea(val ...) ...
+   ('tarea' no es palabra reservada: tarea(x) puede ser llamar a una función) */
+static int tarea_sin_nombre(Parser *p) {
+    Token *t = &p->tokens[p->pos];
+    if (t->tipo != TOK_IDENTIFICADOR || !t->valor || strcmp(t->valor, "tarea") != 0) return 0;
+    if (p->pos + 2 >= p->cantidad || p->tokens[p->pos + 1].tipo != TOK_PAREN_IZQ) return 0;
+    TipoToken dentro = p->tokens[p->pos + 2].tipo;
+    if (dentro == TOK_VAL || dentro == TOK_REF) return 1;
+    if (dentro != TOK_PAREN_DER || p->pos + 3 >= p->cantidad) return 0;
+    TipoToken tras = p->tokens[p->pos + 3].tipo;
+    return tras == TOK_LLAVE_IZQ || tras == TOK_DOS_PUNTOS;
+}
+
+/* Guarda el nodo en una de las listas del parser (para los avisos del final) */
+static void apuntar(Nodo ***lista, int *n, Nodo *nodo) {
+    if ((*n & (*n - 1)) == 0) *lista = realloc(*lista, sizeof(Nodo*) * (size_t)(*n ? *n * 2 : 4));
+    (*lista)[(*n)++] = nodo;
+}
+
 /* Cada rama de un 'si' que da valor: '{', una expresión y '}' */
 static Nodo *rama_si(Parser *p) {
     consumir(p, TOK_LLAVE_IZQ, "'{'");
@@ -233,9 +252,11 @@ static Nodo *postfijo(Parser *p, Nodo *base) {
 static Nodo *primario(Parser *p) {
     Token *t = actual(p);
 
-    /* Lambda: funcion(params): tipo { cuerpo } */
-    if (coincide(p, TOK_FUNCION)) {
-        consumir(p, TOK_FUNCION, "'funcion'");
+    /* Lambda: funcion(params): tipo { cuerpo }, o una tarea sin nombre:
+       tarea(params) { cuerpo }, con el tipo opcional */
+    int es_tarea = tarea_sin_nombre(p);
+    if (coincide(p, TOK_FUNCION) || es_tarea) {
+        consumir_cualquiera(p);
         consumir(p, TOK_PAREN_IZQ, "'('");
 
         Parametro *params     = calloc(64, sizeof(Parametro));
@@ -271,12 +292,16 @@ static Nodo *primario(Parser *p) {
             } while (coincide(p, TOK_COMA));
         }
         consumir(p, TOK_PAREN_DER, "')'");
-        consumir(p, TOK_DOS_PUNTOS, "':'");
         char *tipo_ret_clase = NULL;
-        TipoDato tipo_retorno = parsear_tipo(p, &tipo_ret_clase);
+        TipoDato tipo_retorno = TIPO_CUALQUIERA;
+        if (!es_tarea || coincide(p, TOK_DOS_PUNTOS)) {
+            consumir(p, TOK_DOS_PUNTOS, "':'");
+            tipo_retorno = parsear_tipo(p, &tipo_ret_clase);
+        }
         Nodo *cuerpo = cuerpo_funcion(p);
 
         Nodo *n = nodo_nuevo(NODO_LAMBDA, p);
+        n->lambda.es_tarea           = es_tarea;
         n->lambda.parametros         = params;
         n->lambda.num_parametros     = num_params;
         n->lambda.tipo_retorno       = tipo_retorno;
@@ -892,6 +917,7 @@ static TipoDato parsear_tipo(Parser *p, char **tipo_clase_out) {
         /* 'cualquiera': acepta un valor de cualquier tipo (no es palabra
            reservada, solo significa eso donde va un tipo) */
         if (strcmp(t->valor, "cualquiera") == 0) return TIPO_CUALQUIERA;
+        if (strcmp(t->valor, "tarea") == 0)      return TIPO_TAREA;
         if (tipo_clase_out) *tipo_clase_out = strdup(t->valor);
         return TIPO_CLASE;
     }
@@ -1162,14 +1188,20 @@ static Nodo *sent_elegir(Parser *p) {
     Nodo *sujeto = expresion(p);
     consumir(p, TOK_LLAVE_IZQ, "'{'");
 
-    Nodo **valores  = malloc(sizeof(Nodo*) * 64);
-    Nodo **cuerpos  = malloc(sizeof(Nodo*) * 64);
+    int    cap      = 16;
+    Nodo **valores  = malloc(sizeof(Nodo*) * cap);
+    Nodo **cuerpos  = malloc(sizeof(Nodo*) * cap);
     int    num      = 0;
     Nodo  *otro     = NULL;
 
     while (!coincide(p, TOK_LLAVE_DER) && !coincide(p, TOK_EOF)) {
         if (coincide(p, TOK_CASO)) {
             consumir(p, TOK_CASO, "'caso'");
+            if (num == cap) {
+                cap *= 2;
+                valores = realloc(valores, sizeof(Nodo*) * cap);
+                cuerpos = realloc(cuerpos, sizeof(Nodo*) * cap);
+            }
             valores[num] = expresion(p);
             cuerpos[num] = bloque(p);
             num++;
@@ -1192,27 +1224,50 @@ static Nodo *sent_elegir(Parser *p) {
     n->elegir.cuerpos   = cuerpos;
     n->elegir.num_casos = num;
     n->elegir.otro      = otro;
+    apuntar(&p->elegires, &p->nelegires, n);
     return n;
 }
 
+/* enumeracion Estado { Quieto Andando Saltando }, cada uno con un valor si
+   se quiere: enumeracion Direccion { Arriba = [0, -1], Abajo = [0, 1] }. Se
+   separan con espacios, saltos de línea o comas. */
 static Nodo *sent_enumeracion(Parser *p) {
     consumir(p, TOK_ENUMERACION, "'enumeracion'");
     Token *nombre = consumir(p, TOK_IDENTIFICADOR, "nombre de la enumeración");
     consumir(p, TOK_LLAVE_IZQ, "'{'");
 
-    char **valores    = malloc(sizeof(char*) * 64);
+    int    cap         = 16;
+    char **valores     = malloc(sizeof(char*) * cap);
+    Nodo **expresiones = malloc(sizeof(Nodo*) * cap);
     int    num_valores = 0;
 
     while (!coincide(p, TOK_LLAVE_DER) && !coincide(p, TOK_EOF)) {
         Token *val = consumir(p, TOK_IDENTIFICADOR, "nombre del valor");
-        valores[num_valores++] = strdup(val->valor);
+        for (int i = 0; i < num_valores; i++)
+            if (strcmp(valores[i], val->valor) == 0)
+                error_sintaxis(p, "Ese valor ya está en la enumeración: cada uno tiene que tener un nombre distinto.");
+        if (num_valores == cap) {
+            cap *= 2;
+            valores     = realloc(valores, sizeof(char*) * cap);
+            expresiones = realloc(expresiones, sizeof(Nodo*) * cap);
+        }
+        valores[num_valores] = strdup(val->valor);
+        expresiones[num_valores] = NULL;
+        if (coincide(p, TOK_IGUAL)) {
+            consumir_cualquiera(p);
+            expresiones[num_valores] = expresion(p);
+        }
+        num_valores++;
+        if (coincide(p, TOK_COMA)) consumir_cualquiera(p);
     }
     consumir(p, TOK_LLAVE_DER, "'}'");
 
     Nodo *n = nodo_nuevo(NODO_ENUMERACION, p);
-    n->enumeracion.nombre     = strdup(nombre->valor);
-    n->enumeracion.valores    = valores;
+    n->enumeracion.nombre      = strdup(nombre->valor);
+    n->enumeracion.valores     = valores;
+    n->enumeracion.expresiones = expresiones;
     n->enumeracion.num_valores = num_valores;
+    apuntar(&p->enums, &p->nenums, n);
     return n;
 }
 
@@ -1444,42 +1499,7 @@ static Nodo *sentencia_interna(Parser *p) {
     if (coincide(p, TOK_DEVOLVER)) return sent_devolver(p);
     if (coincide(p, TOK_CLASE))    return sent_clase(p);
     if (es_palabra(p, "abstracta") && ver_siguiente(p)->tipo == TOK_CLASE) return sent_clase(p);
-    if (coincide(p, TOK_ELEGIR)) {
-        consumir(p, TOK_ELEGIR, "'elegir'");
-        Nodo *sujeto = expresion(p);
-        consumir(p, TOK_LLAVE_IZQ, "'{'");
-
-        Nodo **valores   = malloc(sizeof(Nodo*) * 64);
-        Nodo **cuerpos   = malloc(sizeof(Nodo*) * 64);
-        int    num_casos = 0;
-        Nodo  *otro      = NULL;
-
-        while (!coincide(p, TOK_LLAVE_DER) && !coincide(p, TOK_EOF)) {
-            if (coincide(p, TOK_CASO)) {
-                consumir(p, TOK_CASO, "'caso'");
-                valores[num_casos]   = expresion(p);
-                cuerpos[num_casos++] = bloque(p);
-            } else if (coincide(p, TOK_OTRO)) {
-                consumir(p, TOK_OTRO, "'otro'");
-                otro = bloque(p);
-            } else {
-                fprintf(stderr,
-                    "\n❌ Error en línea %d:\n"
-                    "   Dentro de 'elegir' solo puede haber 'caso' u 'otro'.\n\n",
-                    actual(p)->linea);
-                exit(1);
-            }
-        }
-        consumir(p, TOK_LLAVE_DER, "'}'");
-
-        Nodo *n = nodo_nuevo(NODO_ELEGIR, p);
-        n->elegir.sujeto    = sujeto;
-        n->elegir.valores   = valores;
-        n->elegir.cuerpos   = cuerpos;
-        n->elegir.num_casos = num_casos;
-        n->elegir.otro      = otro;
-        return n;
-    }
+    if (coincide(p, TOK_ELEGIR))   return sent_elegir(p);
 
     if (coincide(p, TOK_ROMPER) || coincide(p, TOK_CONTINUAR)) {
         int romper = coincide(p, TOK_ROMPER);
@@ -1592,11 +1612,62 @@ Parser *parser_crear(Token *tokens, int cantidad) {
     p->pos      = 0;
     p->bucles   = 0;
     p->tarea    = 0;
+    p->enums    = p->elegires = NULL;
+    p->nenums   = p->nelegires = 0;
     return p;
 }
 
 void parser_destruir(Parser *p) {
+    free(p->enums);
+    free(p->elegires);
     free(p);
+}
+
+/* Un 'elegir' sin 'otro' cuyos casos son todos de la misma enumeración
+   (declarada en este archivo) y no la cubren entera: casi siempre es que se
+   ha añadido un valor nuevo y se ha olvidado aquí. */
+void parser_avisos(Parser *p, void (*avisar)(int linea, const char *mensaje)) {
+    for (int i = 0; i < p->nelegires; i++) {
+        Nodo *el = p->elegires[i];
+        if (el->elegir.otro || el->elegir.num_casos == 0) continue;
+        const char *nombre = NULL;
+        int todos = 1;
+        for (int c = 0; c < el->elegir.num_casos && todos; c++) {
+            Nodo *v = el->elegir.valores[c];
+            todos = v->tipo == NODO_ACCESO && v->acceso.objeto->tipo == NODO_IDENTIFICADOR &&
+                    (!nombre || strcmp(nombre, v->acceso.objeto->identificador) == 0);
+            if (todos) nombre = v->acceso.objeto->identificador;
+        }
+        Nodo *en = NULL;
+        for (int k = 0; todos && k < p->nenums && !en; k++)
+            if (strcmp(p->enums[k]->enumeracion.nombre, nombre) == 0) en = p->enums[k];
+        if (!en) continue;
+        char msg[600];
+        size_t m = 0;
+        int faltan = 0, ultimo = -1;
+        for (int k = 0; k < en->enumeracion.num_valores; k++) {
+            int esta = 0;
+            for (int c = 0; c < el->elegir.num_casos && !esta; c++)
+                esta = strcmp(el->elegir.valores[c]->acceso.campo, en->enumeracion.valores[k]) == 0;
+            if (!esta) { faltan++; ultimo = k; }
+        }
+        if (!faltan) continue;
+        m += (size_t)snprintf(msg + m, sizeof msg - m, "este 'elegir' no trata ");
+        int puestos = 0;
+        for (int k = 0; k < en->enumeracion.num_valores && m < sizeof msg - 80; k++) {
+            int esta = 0;
+            for (int c = 0; c < el->elegir.num_casos && !esta; c++)
+                esta = strcmp(el->elegir.valores[c]->acceso.campo, en->enumeracion.valores[k]) == 0;
+            if (esta) continue;
+            m += (size_t)snprintf(msg + m, sizeof msg - m, "%s%s.%s",
+                                  puestos == 0 ? "" : k == ultimo ? " ni " : ", ",
+                                  nombre, en->enumeracion.valores[k]);
+            puestos++;
+        }
+        snprintf(msg + m, sizeof msg - m, ": %s, o pon 'otro { }' si no hace falta.",
+                 faltan == 1 ? "añádelo" : "añádelos");
+        avisar(el->linea_ini ? el->linea_ini : el->linea, msg);
+    }
 }
 
 Nodo *parser_parsear(Parser *p) {

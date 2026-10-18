@@ -21,12 +21,18 @@
 #include "lexer.h"
 #include "parser.h"
 
+static void avisar_stderr(int linea, const char *mensaje) {
+    fprintf(stderr, "⚠️  Aviso en línea %d: %s\n", linea, mensaje);
+}
+
 void lsp_analizar(const char *texto) {
     Lexer  *l = lexer_crear(texto);
     int     n = 0;
     Token  *t = lexer_tokenizar(l, &n);
     Parser *p = parser_crear(t, n);
     parser_parsear(p);         /* termina el proceso si hay un error */
+    parser_avisos(p, avisar_stderr);
+    fflush(stderr);
 }
 
 #ifdef _WIN32
@@ -44,8 +50,9 @@ void lsp_analizar(const char *texto) {
 /* ─────────────────────────────────────────
    Comprobación de sintaxis
    Se hace en otro proceso porque el parser termina en el primer error.
-   Deja en buf lo que el parser escribió en stderr; devuelve 1 si hubo error
-   de sintaxis, 0 si el texto es correcto o el proceso no terminó bien.
+   Deja en buf lo que el parser escribió en stderr (el error, o si no lo hay,
+   los avisos); devuelve 1 si hubo error de sintaxis, 0 si el texto es
+   correcto o el proceso no terminó bien.
 ───────────────────────────────────────── */
 #ifdef _WIN32
 static int analizar_aparte(const char *texto, char *buf, size_t max) {
@@ -130,15 +137,24 @@ static int analizar_aparte(const char *texto, char *buf, size_t max) {
 }
 #endif
 
+static void quitar_retornos(char *buf) {    /* en Windows stderr sale con \r\n */
+    char *w = buf;
+    for (char *r = buf; *r; r++) if (*r != '\r') *w++ = *r;
+    *w = '\0';
+}
+
+static void leer_error(char *buf, int *linea, char *mensaje, size_t max);
+
 int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max) {
     char buf[4096];
     if (!analizar_aparte(texto, buf, sizeof buf)) return 0;
-    {   /* en Windows stderr sale con \r\n */
-        char *w = buf;
-        for (char *r = buf; *r; r++) if (*r != '\r') *w++ = *r;
-        *w = '\0';
-    }
+    quitar_retornos(buf);
+    leer_error(buf, linea, mensaje, max);
+    return 1;
+}
 
+/* "❌ Error en línea N:\n   mensaje..." → la línea y el mensaje en una sola línea */
+static void leer_error(char *buf, int *linea, char *mensaje, size_t max) {
     /* "❌ Error en línea N:\n   mensaje\n   mensaje" */
     *linea = 1;
     const char *lp = strstr(buf, "línea ");
@@ -172,7 +188,6 @@ int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max
     while (m > 0 && mensaje[m-1] == ' ') m--;
     mensaje[m] = '\0';
     if (!mensaje[0]) snprintf(mensaje, max, "Error de sintaxis.");
-    return 1;
 }
 
 /* ─────────────────────────────────────────
@@ -679,18 +694,38 @@ static void responder(const char *id, const char *resultado) {
     free(b.d);
 }
 
+static void diagnostico(Buf *b, int linea, int gravedad, const char *msg, int primero) {
+    buf_fmt(b, "%s{\"range\":{\"start\":{\"line\":%d,\"character\":0},"
+                "\"end\":{\"line\":%d,\"character\":1000}},\"severity\":%d,"
+                "\"source\":\"lince\",\"message\":", primero ? "" : ",", linea - 1, linea - 1, gravedad);
+    buf_json(b, msg);
+    buf_str(b, "}");
+}
+
 static void publicar_diagnosticos(const char *uri, const char *texto) {
-    int linea = 1; char msg[1024];
+    int linea = 1; char msg[1024], buf[4096];
     Buf b = {0};
     buf_str(&b, "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":");
     buf_json(&b, uri);
     buf_str(&b, ",\"diagnostics\":[");
-    if (lsp_comprobar_texto(texto, &linea, msg, sizeof(msg))) {
-        buf_fmt(&b, "{\"range\":{\"start\":{\"line\":%d,\"character\":0},"
-                    "\"end\":{\"line\":%d,\"character\":1000}},\"severity\":1,"
-                    "\"source\":\"lince\",\"message\":", linea - 1, linea - 1);
-        buf_json(&b, msg);
-        buf_str(&b, "}");
+    buf[0] = '\0';
+    int error = analizar_aparte(texto, buf, sizeof buf);
+    quitar_retornos(buf);
+    if (error) {
+        leer_error(buf, &linea, msg, sizeof msg);
+        diagnostico(&b, linea, 1, msg, 1);
+    } else {
+        /* "⚠️  Aviso en línea N: mensaje", uno por línea */
+        int n = 0;
+        for (char *l = buf; *l; ) {
+            char *fin = strchr(l, '\n');
+            if (fin) *fin = '\0';
+            const char *lp = strstr(l, "Aviso en línea ");
+            const char *dp = lp ? strchr(lp, ':') : NULL;
+            if (dp) diagnostico(&b, atoi(lp + strlen("Aviso en línea ")), 2, dp + 2, n++ == 0);
+            if (!fin) break;
+            l = fin + 1;
+        }
     }
     buf_str(&b, "]}}");
     enviar(b.d);

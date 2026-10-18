@@ -1334,6 +1334,11 @@ static void json_escribir_valor(Valor *v, char *buf, size_t max) {
             strncat(buf, "\"", max - strlen(buf) - 1);
             break;
         }
+        case VAL_ENUMERADO:              /* como el texto "Estado.Quieto" */
+            strncat(buf, "\"", max - strlen(buf) - 1);
+            strncat(buf, v->miembro->texto, max - strlen(buf) - 1);
+            strncat(buf, "\"", max - strlen(buf) - 1);
+            break;
         case VAL_BOOLEANO:
             strncat(buf, v->booleano ? "true" : "false", max - strlen(buf) - 1);
             break;
@@ -1455,6 +1460,7 @@ static int prb_iguales(Valor *a, Valor *b) {
     switch (a->tipo) {
         case VAL_NUMERO:    return a->numero == b->numero;
         case VAL_TEXTO:     return strcmp(a->texto, b->texto) == 0;
+        case VAL_ENUMERADO: return strcmp(a->miembro->texto, b->miembro->texto) == 0;
         case VAL_BOOLEANO:  return a->booleano == b->booleano;
         case VAL_NULO:      return 1;
         case VAL_LISTA:

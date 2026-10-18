@@ -106,6 +106,24 @@ intentar { t.correr() } capturar (error e) { escribir(e.mensaje) }
 tarea con_tipo(): numero { devolver "no" }
 intentar { esperar(con_tipo()) } capturar (error e) { escribir(e.mensaje) }
 
+# Tareas sin nombre, como las lambdas; y el tipo 'tarea' en un parámetro
+sea parpadeo = tarea(val numero veces) {
+    para (i = 0; i < veces; i++) {
+        escribir("brilla {i}")
+        esperar()
+    }
+}
+sea tp = parpadeo(2)
+escribir(tp)
+esperar(tp)
+sea doble = tarea(val numero x): numero {
+    esperar()
+    devolver x * 2
+}
+funcion esperar_a(val tarea t): cualquiera { devolver esperar(t) }
+escribir(esperar_a(doble(21)))
+intentar { esperar_a(3) } capturar (error e) { escribir(e.mensaje) }
+
 # 'tarea' no es palabra reservada
 sea tarea = "fregar"
 escribir(tarea)

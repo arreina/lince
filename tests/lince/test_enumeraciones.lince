@@ -57,3 +57,65 @@ enumeracion Direccion {
 }
 escribir(Direccion.Norte)
 escribir(Direccion.Oeste)
+
+# Cada valor tiene nombre, posición y valor (si no se le da, su posición)
+enumeracion Mover {
+    Arriba = [0, -1]
+    Abajo = [0, 1],
+    Izquierda = [-1, 0], Derecha = [1, 0]
+}
+sea m = Mover.Izquierda
+escribir(m.nombre)
+escribir(m.indice)
+escribir(m.valor)
+escribir(Color.Verde.valor)
+escribir("vamos a la " + m)
+escribir("en texto: {m}")
+
+# Se recorren en orden
+para cada Mover d en Mover { escribir("{d.nombre}: {d.valor}") }
+
+# Iguales al mismo valor y a su texto (lo que eran antes)
+escribir(m == Mover.Izquierda)
+escribir(m == "Mover.Izquierda")
+escribir(m != Mover.Derecha)
+escribir(m es Mover)
+escribir(m es Color)
+escribir([Mover.Arriba, m].contiene(Mover.Izquierda))
+
+# Como clave de un diccionario cuenta su texto
+sea veces = {}
+veces[Mover.Arriba] = 1
+veces[m] = 2
+escribir(veces)
+escribir(veces[Mover.Izquierda])
+importar "json"
+escribir(json.texto({"mover": m}))
+
+# Un parámetro del tipo de la enumeración
+funcion nombre_de(val Mover d): texto { devolver d.nombre }
+escribir(nombre_de(Mover.Abajo))
+
+# Muchos valores
+enumeracion Letra { A B C D E F G H I J K L M N O P Q R S T U V W X Y Z }
+escribir(Letra.Z.indice)
+
+# Errores
+intentar { escribir(Mover.Atras) } capturar (error e) { escribir(e.mensaje) }
+intentar { escribir(m.color) } capturar (error e) { escribir(e.mensaje) }
+
+# Un 'elegir' sin 'otro' al que le faltan valores da un aviso al comprobar
+importar "archivos"
+importar "sistema"
+fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
+fijo TMP = "test_enumeraciones_tmp.lince"
+funcion avisos(val texto codigo): texto {
+    archivos.escribir(TMP, codigo)
+    devolver sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1").recortar()
+}
+fijo E3 = "enumeracion E \{ A B C }\nsea e = E.A\n"
+escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n}\n"))
+escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n caso E.C \{ }\n}\n"))
+escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n otro \{ }\n}\n"))
+escribir(avisos(E3 + "elegir e \{\n caso E.A \{ }\n caso E.B \{ }\n caso E.C \{ }\n}\n"))
+archivos.eliminar(TMP)

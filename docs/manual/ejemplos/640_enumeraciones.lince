@@ -1,23 +1,30 @@
 # @seccion: Clases
 # @titulo: Enumeraciones
-# @nota: Una `enumeracion` da nombre a un conjunto fijo de valores. Se comparan con `==` y encajan en `elegir`.
-enumeracion Semaforo {
-    Rojo
-    Ambar
-    Verde
+# @nota: Una `enumeracion` da nombre a un conjunto fijo de valores: los estados de un personaje, las direcciones... Se comparan con `==`, encajan en `elegir` y se recorren con `para cada`. Cada uno tiene `nombre`, `indice` (su posición) y `valor`: el que se le dé con `=`, o su posición. Si a un `elegir` sin `otro` le faltan valores, Lince avisa al empezar.
+enumeracion Estado { Quieto Andando Saltando }
+
+enumeracion Direccion {
+    Arriba = [0, -1]
+    Abajo = [0, 1]
+    Izquierda = [-1, 0]
+    Derecha = [1, 0]
 }
 
-funcion accion(val texto s): texto {
-    elegir s {
-        caso Semaforo.Rojo  { devolver "parar" }
-        caso Semaforo.Ambar { devolver "precaución" }
-        otro                { devolver "avanzar" }
+funcion animacion(val Estado e): texto {
+    elegir e {
+        caso Estado.Quieto   { devolver "respirar" }
+        caso Estado.Andando  { devolver "andar" }
+        caso Estado.Saltando { devolver "saltar" }
     }
     devolver ""
 }
 
-sea luz = Semaforo.Ambar
-escribir(luz == Semaforo.Ambar)
-escribir(accion(Semaforo.Rojo))
-escribir(accion(luz))
-escribir(accion(Semaforo.Verde))
+sea estado = Estado.Andando
+escribir(estado)
+escribir(animacion(estado))
+escribir(estado == Estado.Andando)
+
+para cada Direccion d en Direccion {
+    escribir(d.nombre + " mueve " + d.valor)
+}
+escribir(Direccion.Izquierda.indice)

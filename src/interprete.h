@@ -24,10 +24,21 @@ typedef enum {
     VAL_GENERADOR,
     VAL_BYTES,      /* datos binarios: cada elemento es un número de 0 a 255 */
     VAL_TAREA,      /* lo que devuelve llamar a una tarea (ver TareaLince en interprete.c) */
+    VAL_ENUMERADO,  /* un valor de una enumeración: Estado.Quieto */
 } TipoValor;
 
 typedef struct Valor Valor;
 typedef struct Entorno Entorno;
+
+/* Un valor de una enumeración. Se escribe y se compara por su texto,
+   "Estado.Quieto": así es igual al de antes de recargar el programa, y al
+   texto que eran antes los valores de las enumeraciones. */
+typedef struct {
+    char  *texto;       /* "Estado.Quieto" */
+    int    largo_enum;  /* cuánto mide "Estado" */
+    int    indice;      /* su posición: 0, 1, 2... */
+    Valor *valor;       /* el que se le dio (Arriba = [0, -1]), o su posición */
+} MiembroEnum;
 
 /* Función nativa de Lince */
 typedef struct {
@@ -135,6 +146,7 @@ struct Valor {
             int            capacidad;
         } bytes;
         struct TareaLince *tarea;       /* VAL_TAREA */
+        MiembroEnum       *miembro;     /* VAL_ENUMERADO */
         /* VAL_GENERADOR — da sus valores de uno en uno, según se recorre: los
            de un 'generador' los va produciendo su cuerpo, que corre aparte
            (como una tarea), y los de rango() se calculan */

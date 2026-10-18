@@ -268,6 +268,10 @@ static Valor *valor_retener(Valor *v) {
     return v;
 }
 
+/* es_modulo de los diccionarios que son módulos (1), interfaces (2) o
+   enumeraciones */
+#define ES_ENUMERACION 3
+
 typedef struct TareaLince TareaLince;
 static void tarea_liberar(TareaLince *t);
 static void generador_liberar(TareaLince *g);
@@ -319,6 +323,11 @@ static void valor_liberar(Valor *v) {
     }
     if (v->tipo == VAL_BYTES) free(v->bytes.datos);
     if (v->tipo == VAL_TAREA) tarea_liberar(v->tarea);
+    if (v->tipo == VAL_ENUMERADO) {
+        free(v->miembro->texto);
+        valor_liberar(v->miembro->valor);
+        free(v->miembro);
+    }
     if (v->tipo == VAL_GENERADOR && v->generador.productor) generador_liberar(v->generador.productor);
     if (v->tipo == VAL_ERROR) {
         free(v->error->tipo);
@@ -566,9 +575,28 @@ static Valor *valor_copiar(Valor *v) {
         case VAL_OBJETO:
         case VAL_BYTES:
         case VAL_TAREA:
+        case VAL_ENUMERADO:
             return valor_retener(v);
         default:              return valor_nulo();
     }
+}
+
+/* Un valor de enumeración es igual a otro con el mismo texto (aunque sea de
+   antes de recargar el programa) y al texto "Estado.Quieto". Devuelve -1 si
+   ninguno de los dos es de una enumeración. */
+static int iguales_enum(Valor *a, Valor *b) {
+    if (a->tipo != VAL_ENUMERADO && b->tipo != VAL_ENUMERADO) return -1;
+    const char *ta = a->tipo == VAL_ENUMERADO ? a->miembro->texto : a->tipo == VAL_TEXTO ? a->texto : NULL;
+    const char *tb = b->tipo == VAL_ENUMERADO ? b->miembro->texto : b->tipo == VAL_TEXTO ? b->texto : NULL;
+    return ta && tb && strcmp(ta, tb) == 0;
+}
+
+/* d[Estado.Quieto]: como clave de un diccionario cuenta su texto */
+static Valor *clave_de(Valor *idx) {
+    if (idx->tipo != VAL_ENUMERADO) return idx;
+    Valor *t = valor_texto(idx->miembro->texto);
+    valor_destruir(idx);
+    return t;
 }
 
 /* Convierte un valor a texto para escribir() */
@@ -592,6 +620,8 @@ static char *valor_a_texto(Valor *v) {
         case VAL_TAREA:
             snprintf(buf, sizeof(buf), "<tarea %s>", tarea_nombre(v->tarea));
             return strdup(buf);
+        case VAL_ENUMERADO:
+            return strdup(v->miembro->texto);
         case VAL_CLASE:
             snprintf(buf, sizeof(buf), "<clase %s>", v->clase->nombre);
             return strdup(buf);
@@ -1065,6 +1095,9 @@ static Valor *exec_es(Nodo *n, Entorno *e) {
             else if (v->tipo == VAL_OBJETO) r = clase_deriva(v->objeto->clase, t->clase);
             else if (v->tipo == VAL_ERROR)
                 r = strcmp(v->error->tipo, nm) == 0 || strcmp(nm, "Error") == 0;
+        } else if (t->tipo == VAL_DICCIONARIO && t->es_modulo == ES_ENUMERACION) {
+            r = v->tipo == VAL_ENUMERADO && v->miembro->largo_enum == (int)strlen(nm) &&
+                strncmp(v->miembro->texto, nm, (size_t)v->miembro->largo_enum) == 0;
         } else if (t->tipo == VAL_DICCIONARIO && t->es_modulo == 2) {
             InterfazLince *iface = (InterfazLince*)(uintptr_t)
                 (long long)t->diccionario.valores[0]->numero;
@@ -1292,6 +1325,12 @@ static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
         resultado = valor_booleano(op[0] == '=' ? ig : !ig);
     }
 
+    /* Enumeraciones */
+    if (!resultado && (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0)) {
+        int ig = iguales_enum(izq, der);
+        if (ig >= 0) resultado = valor_booleano(op[0] == '=' ? ig : !ig);
+    }
+
     /* Tareas: iguales si son la misma */
     if (!resultado && izq->tipo == VAL_TAREA && der->tipo == VAL_TAREA &&
         (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0))
@@ -1351,27 +1390,32 @@ static void validar_tipo(Valor *v, TipoDato tipo, const char *contexto,
     int ok = 1;
     switch (tipo) {
         case TIPO_NUMERO:      ok = (v->tipo == VAL_NUMERO);      break;
-        case TIPO_TEXTO:       ok = (v->tipo == VAL_TEXTO);       break;
+        /* un valor de enumeración se escribe y se compara como su texto:
+           así siguen valiendo las funciones de cuando lo era */
+        case TIPO_TEXTO:       ok = (v->tipo == VAL_TEXTO || v->tipo == VAL_ENUMERADO); break;
         case TIPO_LOGICO:      ok = (v->tipo == VAL_BOOLEANO);    break;
         case TIPO_LISTA:       ok = (v->tipo == VAL_LISTA);       break;
         case TIPO_DICCIONARIO: ok = (v->tipo == VAL_DICCIONARIO); break;
         case TIPO_NULO:        ok = (v->tipo == VAL_NULO);        break;
+        case TIPO_TAREA:       ok = (v->tipo == VAL_TAREA);       break;
         default: break;
     }
     if (!ok) {
         const char *esperado[] = {
-            "numero", "texto", "logico", "lista", "diccionario", "nulo", "clase", "cualquiera"
+            "numero", "texto", "logico", "lista", "diccionario", "nulo", "clase", "funcion",
+            "cualquiera", "tarea"
         };
         const char *recibido[] = {
             "numero", "texto", "logico", "nulo", "funcion",
-            "lista", "diccionario", "clase", "objeto", "error", "generador", "bytes", "tarea"
+            "lista", "diccionario", "clase", "objeto", "error", "generador", "bytes", "tarea",
+            "valor de enumeración"
         };
         char msg[256];
         snprintf(msg, sizeof(msg),
             "Error de tipo en %s '%s': se esperaba '%s' pero se recibió '%s'.",
             contexto, nombre,
-            tipo < 8 ? esperado[tipo] : "?",
-            v->tipo <= VAL_TAREA ? recibido[v->tipo] : "?");
+            tipo <= TIPO_TAREA ? esperado[tipo] : "?",
+            v->tipo <= VAL_ENUMERADO ? recibido[v->tipo] : "?");
         valor_error = valor_error_nuevo("ErrorTipo", msg, linea);
         hay_error = 1;
     }
@@ -2583,6 +2627,21 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
         return valor_nulo();
     }
 
+    /* ── Enumeración: sus valores, en orden ── */
+    if (col->tipo == VAL_DICCIONARIO && col->es_modulo == ES_ENUMERACION) {
+        for (int i = 0; i < col->diccionario.cantidad && !hay_retorno && !hay_error; i++) {
+            Valor *elem = valor_retener(col->diccionario.valores[i]);
+            validar_tipo(elem, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
+            Entorno *iter = entorno_crear(e);
+            entorno_definir_i(iter, NI(n, n->para_cada.variable), elem, 0);
+            valor_destruir(ejecutar(n->para_cada.cuerpo, iter));
+            entorno_destruir(iter);
+            if (hay_salto && fin_de_vuelta()) break;
+        }
+        valor_destruir(col);
+        return valor_nulo();
+    }
+
     /* ── Diccionario — itera sobre claves ── */
     if (col->tipo == VAL_DICCIONARIO) {
         for (int i = 0; i < col->diccionario.cantidad && !hay_retorno && !hay_error; i++) {
@@ -2799,7 +2858,7 @@ static int pos_bytes(Valor *b, Valor *idx) {
 
 static Valor *exec_indice(Nodo *n, Entorno *e) {
     Valor *obj = ejecutar(n->acceso_indice.objeto, e);
-    Valor *idx = ejecutar(n->acceso_indice.indice, e);
+    Valor *idx = clave_de(ejecutar(n->acceso_indice.indice, e));
 
     if (obj->tipo == VAL_BYTES) {
         int i = pos_bytes(obj, idx), cant = obj->bytes.cantidad;
@@ -2920,7 +2979,7 @@ static Valor *valor_en_indice(Valor *obj, Valor *idx) {
 
 static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
     Valor *obj = ejecutar(n->asignacion_indice.objeto, e);
-    Valor *idx = ejecutar(n->asignacion_indice.indice, e);
+    Valor *idx = clave_de(ejecutar(n->asignacion_indice.indice, e));
     Valor *val = ejecutar(n->asignacion_indice.valor,  e);
 
     if (n->asignacion_indice.op[0] && !hay_error) {          /* lista[i] += v */
@@ -3384,6 +3443,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 Valor *el = obj->lista.elementos[i];
                 if (el->tipo == VAL_NUMERO && buscado->tipo == VAL_NUMERO && el->numero == buscado->numero) { encontrado = 1; break; }
                 if (el->tipo == VAL_TEXTO  && buscado->tipo == VAL_TEXTO  && strcmp(el->texto, buscado->texto) == 0) { encontrado = 1; break; }
+                if (iguales_enum(el, buscado) == 1) { encontrado = 1; break; }
             }
             valor_destruir(buscado); valor_destruir(obj);
             return valor_booleano(encontrado);
@@ -3603,8 +3663,9 @@ static Valor *exec_elegir(Nodo *n, Entorno *e) {
         Valor *caso_val = ejecutar(n->elegir.valores[i], e);
 
         /* Comparación por igualdad */
-        int iguales = 0;
-        if (sujeto->tipo == VAL_NUMERO && caso_val->tipo == VAL_NUMERO)
+        int iguales = iguales_enum(sujeto, caso_val);
+        if (iguales >= 0) {}
+        else if (sujeto->tipo == VAL_NUMERO && caso_val->tipo == VAL_NUMERO)
             iguales = (sujeto->numero == caso_val->numero);
         else if (sujeto->tipo == VAL_TEXTO && caso_val->tipo == VAL_TEXTO)
             iguales = (strcmp(sujeto->texto, caso_val->texto) == 0);
@@ -3786,6 +3847,18 @@ static inline CampoClase *campo_declarado(Nodo *n, ClaseLince *c, const char *ca
 /* obj.campo con obj ya calculado (se queda con él). Lo usan la lectura y
    'obj.campo += v'. */
 static Valor *acceso_en(Nodo *n, Valor *obj, const char *campo, Entorno *e) {
+    /* Estado.Quieto.nombre · .valor · .indice */
+    if (obj->tipo == VAL_ENUMERADO) {
+        MiembroEnum *m = obj->miembro;
+        Valor *r = NULL;
+        if (strcmp(campo, "nombre") == 0)      r = valor_texto(m->texto + m->largo_enum + 1);
+        else if (strcmp(campo, "valor") == 0)  r = valor_copiar(m->valor);
+        else if (strcmp(campo, "indice") == 0) r = valor_numero(m->indice);
+        valor_destruir(obj);
+        if (r) return r;
+        return error_rt("Error", n->linea,
+            "Un valor de una enumeración tiene 'nombre', 'valor' e 'indice'; no tiene '%s'.", campo);
+    }
     /* Acceso a constante de módulo */
     if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
         {
@@ -3795,6 +3868,20 @@ static Valor *acceso_en(Nodo *n, Valor *obj, const char *campo, Entorno *e) {
                 valor_destruir(obj);
                 return r;
             }
+        }
+        if (obj->es_modulo == ES_ENUMERACION && obj->diccionario.cantidad > 0) {
+            /* "Estado no tiene 'Volando'. Tiene Quieto, Andando y Saltando." */
+            MiembroEnum *m0 = obj->diccionario.valores[0]->miembro;
+            char lista[400] = "";
+            size_t l = 0;
+            int cant = obj->diccionario.cantidad;
+            for (int i = 0; i < cant && l < sizeof lista - 40; i++)
+                l += (size_t)snprintf(lista + l, sizeof lista - l, "%s%s",
+                                      i == 0 ? "" : i == cant - 1 ? " y " : ", ", obj->diccionario.claves[i]);
+            Valor *err = error_rt("Error", n->linea, "La enumeración %.*s no tiene '%s'. Tiene %s.",
+                                  m0->largo_enum, m0->texto, campo, lista);
+            valor_destruir(obj);
+            return err;
         }
         valor_destruir(obj);
         return error_rt("Error", n->linea, "El módulo no tiene el campo '%s'.", campo);
@@ -4434,21 +4521,28 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         }
 
         case NODO_ENUMERACION: {
-            /* Crea un diccionario con los valores de la enum */
+            /* Un diccionario con sus valores, que no es un diccionario más
+               (se recorre con 'para cada' y no se puede cambiar) */
             Valor *dic = valor_diccionario_crear();
-            dic->es_modulo = 1; /* marcar como namespace — no iterable */
-
-            for (int i = 0; i < n->enumeracion.num_valores; i++) {
-                dic->diccionario.claves[i]  = strdup(n->enumeracion.valores[i]);
-                /* El valor es un texto especial: "NombreEnum.Valor" */
-                char buf[256];
-                snprintf(buf, sizeof(buf), "%s.%s",
-                    n->enumeracion.nombre,
-                    n->enumeracion.valores[i]);
-                dic->diccionario.valores[i] = valor_texto(buf);
-                dic->diccionario.cantidad++;
+            dic->es_modulo = ES_ENUMERACION;
+            int largo = (int)strlen(n->enumeracion.nombre);
+            for (int i = 0; i < n->enumeracion.num_valores && !hay_error; i++) {
+                Nodo *ex = n->enumeracion.expresiones ? n->enumeracion.expresiones[i] : NULL;
+                Valor *v = ex ? ejecutar(ex, e) : valor_numero(i);
+                MiembroEnum *m = calloc(1, sizeof(MiembroEnum));
+                size_t tam = (size_t)largo + strlen(n->enumeracion.valores[i]) + 2;
+                m->texto = malloc(tam);
+                snprintf(m->texto, tam, "%s.%s", n->enumeracion.nombre, n->enumeracion.valores[i]);
+                m->largo_enum = largo;
+                m->indice = i;
+                m->valor  = v;
+                Valor *mv = valor_alloc();
+                mv->tipo = VAL_ENUMERADO;
+                mv->refs = 1; mv->es_modulo = 0;
+                mv->miembro = m;
+                valor_diccionario_agregar(dic, n->enumeracion.valores[i], mv);
             }
-            if (redefinido(e, n->enumeracion.nombre, "esta enumeración", 0, n->linea)) {
+            if (hay_error || redefinido(e, n->enumeracion.nombre, "esta enumeración", 0, n->linea)) {
                 valor_destruir(dic);
                 return valor_nulo();
             }
@@ -4469,6 +4563,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             f->cuerpo           = n->lambda.cuerpo;
             f->entorno_closure  = e;
             e->refs++;  /* el closure retiene el entorno */
+            if (n->lambda.es_tarea) {
+                free(f->nombre);
+                f->nombre       = strdup("sin nombre");
+                f->es_tarea     = 1;
+                f->tipo_tarea   = f->tipo_retorno;
+                f->tipo_retorno = TIPO_CUALQUIERA;
+            }
             return valor_funcion(f);
         }
 

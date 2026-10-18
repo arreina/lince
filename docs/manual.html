@@ -441,29 +441,40 @@ lista: [1, 2, 3]
 <span class="k">para</span> <span class="k">cada</span> elemento f <span class="k">en</span> formas {
     <span class="k">escribir</span>(f.describir() + <span class="s">&quot; → &quot;</span> + f.area())
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Rectángulo 2x3 → 6
-Cuadrado de lado 5 → 25</pre></div><span class="fuente">630_interfaces.lince</span></article><article class="ej" id="clases-3"><h3>Enumeraciones</h3><p class="nota">Una `enumeracion` da nombre a un conjunto fijo de valores. Se comparan con `==` y encajan en `elegir`.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">enumeracion</span> Semaforo {
-    Rojo
-    Ambar
-    Verde
+Cuadrado de lado 5 → 25</pre></div><span class="fuente">630_interfaces.lince</span></article><article class="ej" id="clases-3"><h3>Enumeraciones</h3><p class="nota">Una `enumeracion` da nombre a un conjunto fijo de valores: los estados de un personaje, las direcciones... Se comparan con `==`, encajan en `elegir` y se recorren con `para cada`. Cada uno tiene `nombre`, `indice` (su posición) y `valor`: el que se le dé con `=`, o su posición. Si a un `elegir` sin `otro` le faltan valores, Lince avisa al empezar.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">enumeracion</span> Estado { Quieto Andando Saltando }
+
+<span class="k">enumeracion</span> Direccion {
+    Arriba = [<span class="n">0</span>, -<span class="n">1</span>]
+    Abajo = [<span class="n">0</span>, <span class="n">1</span>]
+    Izquierda = [-<span class="n">1</span>, <span class="n">0</span>]
+    Derecha = [<span class="n">1</span>, <span class="n">0</span>]
 }
 
-<span class="k">funcion</span> accion(<span class="k">val</span> <span class="t">texto</span> s): <span class="t">texto</span> {
-    <span class="k">elegir</span> s {
-        <span class="k">caso</span> Semaforo.Rojo  { <span class="k">devolver</span> <span class="s">&quot;parar&quot;</span> }
-        <span class="k">caso</span> Semaforo.Ambar { <span class="k">devolver</span> <span class="s">&quot;precaución&quot;</span> }
-        <span class="k">otro</span>                { <span class="k">devolver</span> <span class="s">&quot;avanzar&quot;</span> }
+<span class="k">funcion</span> animacion(<span class="k">val</span> Estado e): <span class="t">texto</span> {
+    <span class="k">elegir</span> e {
+        <span class="k">caso</span> Estado.Quieto   { <span class="k">devolver</span> <span class="s">&quot;respirar&quot;</span> }
+        <span class="k">caso</span> Estado.Andando  { <span class="k">devolver</span> <span class="s">&quot;andar&quot;</span> }
+        <span class="k">caso</span> Estado.Saltando { <span class="k">devolver</span> <span class="s">&quot;saltar&quot;</span> }
     }
     <span class="k">devolver</span> <span class="s">&quot;&quot;</span>
 }
 
-<span class="k">sea</span> luz = Semaforo.Ambar
-<span class="k">escribir</span>(luz == Semaforo.Ambar)
-<span class="k">escribir</span>(accion(Semaforo.Rojo))
-<span class="k">escribir</span>(accion(luz))
-<span class="k">escribir</span>(accion(Semaforo.Verde))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero
-parar
-precaución
-avanzar</pre></div><span class="fuente">640_enumeraciones.lince</span></article><article class="ej" id="clases-4"><h3>Visibilidad: `privado` y `protegido`</h3><p class="nota">Lo `privado` sólo se ve desde dentro de la clase; lo `protegido`, también desde sus subclases. Saltárselo lanza un `ErrorAcceso`, que se captura como cualquier error.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Cuenta {
+<span class="k">sea</span> estado = Estado.Andando
+<span class="k">escribir</span>(estado)
+<span class="k">escribir</span>(animacion(estado))
+<span class="k">escribir</span>(estado == Estado.Andando)
+
+<span class="k">para</span> <span class="k">cada</span> Direccion d <span class="k">en</span> Direccion {
+    <span class="k">escribir</span>(d.nombre + <span class="s">&quot; mueve &quot;</span> + d.valor)
+}
+<span class="k">escribir</span>(Direccion.Izquierda.indice)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Estado.Andando
+andar
+verdadero
+Arriba mueve [0, -1]
+Abajo mueve [0, 1]
+Izquierda mueve [-1, 0]
+Derecha mueve [1, 0]
+2</pre></div><span class="fuente">640_enumeraciones.lince</span></article><article class="ej" id="clases-4"><h3>Visibilidad: `privado` y `protegido`</h3><p class="nota">Lo `privado` sólo se ve desde dentro de la clase; lo `protegido`, también desde sus subclases. Saltárselo lanza un `ErrorAcceso`, que se captura como cualquier error.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Cuenta {
     privado <span class="k">sea</span> saldo = <span class="n">0</span>
 
     <span class="k">funcion</span> ingresar(<span class="k">val</span> <span class="t">numero</span> cantidad): <span class="k">nulo</span> {

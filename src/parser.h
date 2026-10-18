@@ -72,6 +72,7 @@ typedef enum {
     TIPO_CLASE,      /* nombre de clase como tipo */
     TIPO_FUNCION,    /* función / lambda */
     TIPO_CUALQUIERA, /* sin tipo declarado */
+    TIPO_TAREA,      /* val tarea t */
 } TipoDato;
 
 /* ─────────────────────────────────────────
@@ -353,12 +354,14 @@ struct Nodo {
             TipoDato   tipo_retorno;
             char      *tipo_retorno_clase;
             Nodo      *cuerpo;
+            int        es_tarea;     /* tarea(...) { } */
         } lambda;
 
         /* NODO_ENUMERACION */
         struct {
             char  *nombre;
             char **valores;
+            Nodo **expresiones;    /* el valor de cada uno (Arriba = [0, -1]), o NULL */
             int    num_valores;
         } enumeracion;
 
@@ -394,6 +397,8 @@ typedef struct {
     int    pos;
     int    bucles;   /* bucles abiertos en la función actual (para 'romper') */
     int    tarea;    /* la función que viene es una tarea: el tipo de retorno es opcional */
+    Nodo **enums, **elegires;   /* para parser_avisos */
+    int    nenums, nelegires;
 } Parser;
 
 /* ─────────────────────────────────────────
@@ -402,6 +407,9 @@ typedef struct {
 Parser *parser_crear(Token *tokens, int cantidad);
 void    parser_destruir(Parser *p);
 Nodo   *parser_parsear(Parser *p);
+/* Avisos de lo ya leído que no es un error pero casi seguro es un descuido
+   (un 'elegir' al que le faltan valores de una enumeración) */
+void    parser_avisos(Parser *p, void (*avisar)(int linea, const char *mensaje));
 void    nodo_destruir(Nodo *n);
 void    nodo_imprimir(Nodo *n, int nivel);
 

@@ -92,6 +92,10 @@ static int ejecutar_empaquetado(int argc, char *argv[]) {
    variables 'sea' del nivel superior (o desde cero, con F5). Si el programa
    se para por un error con la ventana abierta, el error se muestra en ella
    hasta que se guarde un arreglo. Sin ventana, todo es como siempre. */
+static void avisar(int linea, const char *mensaje) {
+    fprintf(stderr, "⚠️  Aviso en línea %d: %s\n", linea, mensaje);
+}
+
 static int ejecutar_recargable(const char *archivo) {
     recarga_iniciar(archivo);
     Interprete *anterior = NULL;
@@ -105,6 +109,7 @@ static int ejecutar_recargable(const char *archivo) {
         Parser     *parser   = parser_crear(tokens, cantidad);
         Nodo       *programa = parser_parsear(parser);
         Interprete *interp   = interprete_crear();
+        parser_avisos(parser, avisar);
 
         /* Para resolver los 'importar "./x"' junto a este fichero */
         interprete_fijar_archivo(archivo);

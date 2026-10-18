@@ -656,7 +656,45 @@ elegir c {
 }
 ```
 
-Los valores se representan como texto `"Nombre.Valor"`, son constantes y funcionan en `elegir/caso`.
+### Con valor, y recorrerlas
+
+```lince
+enumeracion Direccion {
+    Arriba = [0, -1]
+    Abajo = [0, 1],
+    Izquierda = [-1, 0], Derecha = [1, 0]      # espacios, saltos de línea o comas
+}
+
+sea d = Direccion.Izquierda
+escribir(d.nombre)     # "Izquierda"
+escribir(d.indice)     # 2: su posición
+escribir(d.valor)      # [-1, 0]; sin '=', el valor es su posición
+
+para cada Direccion dir en Direccion {
+    escribir(dir.nombre + ": " + dir.valor)
+}
+```
+
+### Reglas
+
+- Los valores son constantes: ni se cambian ni se añaden. `Estado.Volando` es un error que
+  dice qué valores tiene `Estado`
+- Cada valor se escribe como su texto, `"Estado.Quieto"` (en `escribir`, al sumarlo a un
+  texto, dentro de `"{e}"` y en `json.texto`), y es igual a otro valor igual y a ese texto:
+  `e == "Estado.Quieto"`. Así un valor guardado se sigue reconociendo tras recargar el
+  programa en caliente
+- `e es Estado` dice si `e` es un valor de esa enumeración. Un parámetro puede declararse
+  `val Estado e`, y `val texto e` también lo acepta
+- Como clave de un diccionario cuenta su texto: `veces[Estado.Quieto] = 1` es la clave
+  `"Estado.Quieto"`
+- **Aviso de `elegir`**: si un `elegir` sin `otro` tiene todos sus casos de la misma
+  enumeración (declarada en el mismo archivo) pero le faltan valores, Lince avisa al empezar,
+  con `lince comprobar` y en el editor. Lo normal es que se haya añadido un valor y se haya
+  olvidado ahí:
+
+  ```
+  ⚠️  Aviso en línea 12: este 'elegir' no trata Estado.Saltando ni Estado.Golpeando: añádelos, o pon 'otro { }' si no hace falta.
+  ```
 
 ---
 
@@ -749,6 +787,9 @@ ataque_jefe()                    # empieza ya, y sigue sola en cada fotograma
   ritmo, en el orden en que empezaron
 - Un método también puede ser una tarea, con `mi`: `tarea patrullar() { ... }` dentro de la
   clase, y `enemigo.patrullar()` la empieza (`crear` no puede serlo)
+- Una tarea **sin nombre** se escribe como una lambda, y se empieza al llamarla:
+  `sea parpadeo = tarea(val numero veces) { ... }` y luego `parpadeo(3)`
+- En un parámetro, `val tarea t` solo acepta una tarea
 - `t.terminada()` dice si ha acabado; `t.parar()` la para: se deshace desde donde esperaba,
   ejecutando sus `finalmente` (un `capturar` no lo captura). `t es tarea` comprueba el tipo
 - Un error dentro de una tarea, antes de su primer `esperar`, le llega a quien la llamó;

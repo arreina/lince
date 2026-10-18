@@ -29,6 +29,11 @@ esperar() espera los segundos (un número) o una tarea; sin nada, espera al sigu
 esperar(): los segundos no pueden ser negativos.
 Una tarea no tiene el método 'correr'. Tiene terminada() y parar(); para esperar a que acabe, esperar(tarea).
 Error de tipo en retorno de tarea 'con_tipo': se esperaba 'numero' pero se recibió 'texto'.
+brilla 0
+<tarea sin nombre>
+brilla 1
+42
+Error de tipo en parámetro 't': se esperaba 'tarea' pero se recibió 'numero'.
 fregar
 verdadero
 verdadero
