@@ -621,6 +621,21 @@ static Nodo *bloque(Parser *p) {
     Nodo *n = nodo_nuevo(NODO_BLOQUE, p);
     n->bloque.sentencias = sentencias;
     n->bloque.cantidad   = cantidad;
+    /* Un bloque que no define nada no necesita ámbito propio: el intérprete
+       se ahorra crearlo en cada vuelta de un bucle */
+    for (int i = 0; i < cantidad; i++) {
+        Nodo *s = sentencias[i];
+        if (!s) continue;
+        switch (s->tipo) {
+            case NODO_DECLARACION: case NODO_FUNCION: case NODO_CLASE: case NODO_ENUMERACION:
+            case NODO_INTERFAZ: case NODO_GENERADOR: case NODO_IMPORTAR:
+                n->bloque.declara = 1; break;
+            case NODO_DESESTRUCTURAR:
+                if (s->desestructurar.declarar) n->bloque.declara = 1;
+                break;
+            default: break;
+        }
+    }
     return n;
 }
 

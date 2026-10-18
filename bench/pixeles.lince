@@ -1,0 +1,20 @@
+# Trabajo por píxel: 320x180 colores cambiados con cuentas parecidas a las
+# de un filtro, diez veces.
+importar "matematica"
+sea pix = []
+para (i = 0; i < 57600; i++) { pix.agregar(i % 256) }
+sea cambiados = 0
+para (vuelta = 0; vuelta < 10; vuelta++) {
+    para (i = 0; i < 57600; i++) {
+        sea r = pix[i]
+        sea g = (r * 7) % 256
+        sea b = (r * 13) % 256
+        sea mx = matematica.maximo(r, matematica.maximo(g, b))
+        sea mn = matematica.minimo(r, matematica.minimo(g, b))
+        si mx - mn > 20 {
+            pix[i] = (r + 90) % 256
+            cambiados++
+        }
+    }
+}
+escribir(cambiados)

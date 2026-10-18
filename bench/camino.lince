@@ -1,0 +1,35 @@
+# Búsqueda de camino en anchura por una rejilla de 64x64 con muros, 100 veces
+# (lo que harían varios enemigos buscando al jugador).
+importar "matematica"
+fijo N = 64
+fijo DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+sea muro = []
+para (i = 0; i < N * N; i++) { muro.agregar(i % 7 == 3 y i % N != 0) }
+
+funcion buscar(val numero desde): numero {
+    sea visto = []
+    para (i = 0; i < N * N; i++) { visto.agregar(falso) }
+    sea cola = [desde]
+    visto[desde] = verdadero
+    sea ini = 0
+    mientras ini < cola.longitud() {
+        sea c = cola[ini]
+        ini++
+        sea cx = c % N
+        sea cy = matematica.piso(c / N)
+        para cada lista d en DIRS {
+            sea [dx, dy] = d
+            sea nx = cx + dx
+            sea ny = cy + dy
+            si nx < 0 o ny < 0 o nx >= N o ny >= N { continuar }
+            sea k = ny * N + nx
+            si visto[k] o muro[k] { continuar }
+            visto[k] = verdadero
+            cola.agregar(k)
+        }
+    }
+    devolver cola.longitud()
+}
+sea total = 0
+para (v = 0; v < 100; v++) { total += buscar(v) }
+escribir(total)

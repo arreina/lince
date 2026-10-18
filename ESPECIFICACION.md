@@ -1525,8 +1525,10 @@ y un `LEEME.txt`, y un `.zip` con esa carpeta. Quien lo reciba lo descomprime y 
 ### Rendimiento
 
 El ejecutable va a la velocidad del intérprete. Mediciones con los programas de
-`bench/` (`make bench`), en segundos: `fib(30)` 0,3 · bucle de 5 millones de
-iteraciones 0,5 · diccionario de 50.000 claves 0,04.
+`bench/` (`make bench`), en segundos: `fib(30)` 0,28 · bucle de 5 millones de
+iteraciones 0,35 · diccionario de 50.000 claves 0,03 · 576.000 píxeles con
+cuentas 0,3. Una vuelta de bucle cuesta unos 30 ns; una llamada a función,
+unos 70.
 
 ---
 

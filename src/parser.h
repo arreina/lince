@@ -97,6 +97,12 @@ struct Nodo {
     int         cache_i;
     const void *cache_clase;
     void       *cache_cd;
+    /* Caché de variables: dónde se encontró la última vez el nombre que usa
+       este nodo (ámbitos hacia fuera y posición, +1; 0 = sin caché) */
+    int         var_saltos;
+    int         var_pos;
+    /* NODO_NUMERO y NODO_TEXTO: su valor, creado una vez (lo crea el intérprete) */
+    void       *valor_fijo;
     union {
         /* NODO_NUMERO */
         double numero;
@@ -165,6 +171,7 @@ struct Nodo {
         struct {
             Nodo **sentencias;
             int    cantidad;
+            int    declara;   /* 1 si define algo en su ámbito (sea, funcion, clase...) */
         } bloque;
 
         /* NODO_SI */

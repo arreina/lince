@@ -897,6 +897,52 @@ static Valor *entorno_obtener_i(Entorno *e, const char *id, const char *nombre, 
     return valor_nulo();
 }
 
+static void entorno_asignar_i(Entorno *e, const char *id, const char *nombre, Valor *nuevo, int linea);
+
+/* La entrada de 'id' vista desde 'e', o NULL. Igual que buscar ámbito por
+   ámbito, pero el nodo recuerda en qué ámbito y posición la encontró: los
+   ámbitos de más cerca se siguen mirando enteros (así un nombre que los tape
+   gana, como siempre) y en el de la última vez se mira directamente esa
+   posición en vez de recorrerlo. Lo que más se ahorra es en las globales, que
+   pueden ser cientos. */
+static EntradaVar *buscar_var(Nodo *n, Entorno *e, const char *id) {
+    int saltos = n->var_saltos, pos = n->var_pos - 1, h = 0;
+    Entorno *x = e;
+    if (pos >= 0) {
+        for (; x && h < saltos; h++, x = x->padre)
+            for (int i = 0; i < x->cantidad; i++)
+                if (x->vars[i].nombre == id) {
+                    n->var_saltos = h; n->var_pos = i + 1;
+                    return &x->vars[i];
+                }
+        if (x && pos < x->cantidad && x->vars[pos].nombre == id) return &x->vars[pos];
+        x = e; h = 0;          /* la caché ya no vale (pasa poco): búsqueda completa */
+    }
+    for (; x; h++, x = x->padre)
+        for (int i = 0; i < x->cantidad; i++)
+            if (x->vars[i].nombre == id) {
+                n->var_saltos = h; n->var_pos = i + 1;
+                return &x->vars[i];
+            }
+    return NULL;
+}
+
+/* Como entorno_obtener_i / entorno_asignar_i, con la caché del nodo */
+static Valor *obtener_var(Nodo *n, Entorno *e, const char *id, const char *nombre) {
+    EntradaVar *v = buscar_var(n, e, id);
+    if (v) return valor_copiar(v->valor);
+    poner_error("Error", n->linea, "La variable '%s' no está definida.", nombre);
+    return valor_nulo();
+}
+
+static void asignar_var(Nodo *n, Entorno *e, const char *id, const char *nombre, Valor *nuevo) {
+    EntradaVar *v = buscar_var(n, e, id);
+    if (!v) { entorno_asignar_i(e, id, nombre, nuevo, n->linea); return; }   /* da el error */
+    if (v->constante) { entorno_asignar_i(e, id, nombre, nuevo, n->linea); return; }
+    valor_destruir(v->valor);
+    v->valor = nuevo;
+}
+
 static Valor *entorno_obtener(Entorno *e, const char *nombre, int linea) {
     return entorno_obtener_i(e, intern_buscar(nombre), nombre, linea);
 }
@@ -1145,6 +1191,33 @@ static Valor *exec_binario(Nodo *n, Entorno *e) {
         return valor_booleano(d);
     }
     Valor *der = ejecutar(n->binario.derecha,   e);
+    /* Lo más frecuente, número con número, sin pasar por operar(). El
+       resultado reutiliza uno de los dos si nadie más lo tiene. */
+    if (izq->tipo == VAL_NUMERO && der->tipo == VAL_NUMERO) {
+        double a = izq->numero, b = der->numero, r;
+        int logico = -1;
+        switch (op[0] | (op[1] << 8)) {
+            case '+': r = a + b; break;
+            case '-': r = a - b; break;
+            case '*': r = a * b; break;
+            case '<': logico = a < b;  break;
+            case '>': logico = a > b;  break;
+            case '<' | ('=' << 8): logico = a <= b; break;
+            case '>' | ('=' << 8): logico = a >= b; break;
+            case '=' | ('=' << 8): logico = a == b; break;
+            case '!' | ('=' << 8): logico = a != b; break;
+            default: return operar(izq, der, op, n->linea);   /* '/' y '%' con sus errores */
+        }
+        if (op[1] && op[2]) return operar(izq, der, op, n->linea);
+        if (logico >= 0) {
+            valor_destruir(izq); valor_destruir(der);
+            return valor_booleano(logico);
+        }
+        if (izq->refs == 1) { izq->numero = r; valor_destruir(der); return izq; }
+        if (der->refs == 1) { der->numero = r; valor_destruir(izq); return der; }
+        valor_destruir(izq); valor_destruir(der);
+        return valor_numero(r);
+    }
     return operar(izq, der, op, n->linea);
 }
 
@@ -1882,7 +1955,7 @@ static Valor *exec_desestructurar(Nodo *n, Entorno *e) {
 
     /* Se toman todos antes de guardar ninguno: así '[a, b] = [b, a]' cambia
        los dos (la lista de la derecha ya está hecha) */
-    Valor *vals[num > 0 ? num : 1];
+    Valor *vals_pila[8], **vals = num <= 8 ? vals_pila : malloc(sizeof(Valor*) * num);
     for (int i = 0; i < num; i++)
         vals[i] = valor_retener(dic ? v->diccionario.valores[valor_diccionario_buscar(v, n->desestructurar.nombres[i])]
                                     : v->lista.elementos[i]);
@@ -1904,6 +1977,7 @@ static Valor *exec_desestructurar(Nodo *n, Entorno *e) {
         }
         entorno_definir_i(e, id, vals[i], n->desestructurar.constante);
     }
+    if (vals != vals_pila) free(vals);
     return valor_nulo();
 }
 
@@ -1937,15 +2011,23 @@ static Valor *exec_plantilla(Nodo *n, Entorno *e) {
     return valor_texto_propio(buf);
 }
 
+/* Ejecuta un bloque en un ámbito nuevo, salvo que no defina nada: entonces
+   no hace falta (nadie notaría la diferencia) y se ahorra crearlo. */
+static Valor *ejecutar_en_ambito(Nodo *b, Entorno *e) {
+    if (b && b->tipo == NODO_BLOQUE && !b->bloque.declara) return ejecutar(b, e);
+    Entorno *nuevo = entorno_crear(e);
+    Valor   *r     = ejecutar(b, nuevo);
+    entorno_destruir(nuevo);
+    return r;
+}
+
 static Valor *exec_si(Nodo *n, Entorno *e) {
     Valor *cond = ejecutar(n->si.condicion, e);
     int    ok   = es_verdadero(cond);
     valor_destruir(cond);
 
     if (ok) {
-        Entorno *nuevo = entorno_crear(e);
-        Valor   *r     = ejecutar(n->si.entonces, nuevo);
-        entorno_destruir(nuevo);
+        Valor   *r     = ejecutar_en_ambito(n->si.entonces, e);
         return r;
     }
     for (int i = 0; i < n->si.cantidad_sino_si; i++) {
@@ -1953,16 +2035,12 @@ static Valor *exec_si(Nodo *n, Entorno *e) {
         int    b = es_verdadero(c);
         valor_destruir(c);
         if (b) {
-            Entorno *nuevo = entorno_crear(e);
-            Valor   *r     = ejecutar(n->si.bloques_sino_si[i], nuevo);
-            entorno_destruir(nuevo);
+            Valor   *r     = ejecutar_en_ambito(n->si.bloques_sino_si[i], e);
             return r;
         }
     }
     if (n->si.sino) {
-        Entorno *nuevo = entorno_crear(e);
-        Valor   *r     = ejecutar(n->si.sino, nuevo);
-        entorno_destruir(nuevo);
+        Valor   *r     = ejecutar_en_ambito(n->si.sino, e);
         return r;
     }
     return valor_nulo();
@@ -1979,10 +2057,7 @@ static Valor *exec_para(Nodo *n, Entorno *e) {
         valor_destruir(cond);
         if (!ok) break;
 
-        Entorno *cuerpo_e = entorno_crear(bucle);
-        Valor   *r = ejecutar(n->para.cuerpo, cuerpo_e);
-        valor_destruir(r);
-        entorno_destruir(cuerpo_e);
+        valor_destruir(ejecutar_en_ambito(n->para.cuerpo, bucle));
         if (hay_salto && fin_de_vuelta()) break;
         if (hay_retorno || hay_error) break;
 
@@ -1990,7 +2065,12 @@ static Valor *exec_para(Nodo *n, Entorno *e) {
             valor_destruir(ejecutar(n->para.paso, bucle));
             continue;
         }
-        Valor *vactual = entorno_obtener_i(bucle, NI(n, n->para.var_incremento), n->para.var_incremento, n->linea);
+        EntradaVar *ev = buscar_var(n, bucle, NI(n, n->para.var_incremento));
+        if (ev && !ev->constante && ev->valor->tipo == VAL_NUMERO && ev->valor->refs == 1) {
+            ev->valor->numero += n->para.op_incremento[0] == '+' ? 1 : -1;
+            continue;
+        }
+        Valor *vactual = obtener_var(n, bucle, NI(n, n->para.var_incremento), n->para.var_incremento);
         if (hay_error) { valor_destruir(vactual); break; }
         Valor *vnuevo;
         if (strcmp(n->para.op_incremento, "++") == 0)
@@ -1998,7 +2078,7 @@ static Valor *exec_para(Nodo *n, Entorno *e) {
         else
             vnuevo = valor_numero(vactual->numero - 1);
         valor_destruir(vactual);
-        entorno_asignar_i(bucle, NI(n, n->para.var_incremento), n->para.var_incremento, vnuevo, n->linea);
+        asignar_var(n, bucle, NI(n, n->para.var_incremento), n->para.var_incremento, vnuevo);
     }
     entorno_destruir(bucle);
     return valor_nulo();
@@ -2104,7 +2184,7 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
         hay_error   = 1;
         return valor_nulo();
     }
-    Valor *vfun = entorno_obtener_i(e, NI(n, n->llamada.nombre), n->llamada.nombre, n->linea);
+    Valor *vfun = obtener_var(n, e, NI(n, n->llamada.nombre), n->llamada.nombre);
 
     /* Si el nombre no existe, entorno_obtener ya ha puesto el error:
        se propaga tal cual en vez de añadir un "no es una función"
@@ -2181,12 +2261,13 @@ static Valor *exec_llamada(Nodo *n, Entorno *e) {
         typedef Valor *(*FnNativa)(Valor**, int);
         FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
         int nargs = n->llamada.num_argumentos;
-        Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
+        Valor *args_pila[8];
+        Valor **args = nargs < 8 ? args_pila : malloc(sizeof(Valor*) * (nargs + 1));
         for (int i = 0; i < nargs; i++)
             args[i] = ejecutar(n->llamada.argumentos[i], e);
         Valor *resultado = fn(args, nargs);
         for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
-        free(args);
+        if (args != args_pila) free(args);
         valor_destruir(vfun);
         profundidad--;
         return resultado ? resultado : valor_nulo();
@@ -2559,6 +2640,21 @@ desconocido:
     return r;
 }
 
+/* 'src' con cada 'pat' (no vacío) cambiado por 'rep', en memoria nueva */
+static char *texto_reemplazar(const char *src, const char *pat, const char *rep) {
+    size_t lp = strlen(pat), lr = strlen(rep), veces = 0;
+    for (const char *q = src; (q = strstr(q, pat)); q += lp) veces++;
+    char *r = malloc(strlen(src) + veces * lr + 1), *w = r;
+    const char *pos;
+    while ((pos = strstr(src, pat))) {
+        memcpy(w, src, (size_t)(pos - src)); w += pos - src;
+        memcpy(w, rep, lr); w += lr;
+        src = pos + lp;
+    }
+    strcpy(w, src);
+    return r;
+}
+
 static Valor *exec_metodo(Nodo *n, Entorno *e) {
     Valor *obj = ejecutar(n->metodo.objeto, e);
     const char *met = n->metodo.metodo;
@@ -2567,9 +2663,17 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
     if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
         const char *met = n->metodo.metodo;
         {
-            int i = valor_diccionario_buscar(obj, met);
-            if (i >= 0) {
-                Valor *vf = obj->diccionario.valores[i];
+            /* El nodo recuerda en qué posición del módulo estaba la función
+               (comprobando el nombre, por si es otro módulo) */
+            Valor *vf = NULL;
+            int i = n->cache_i;
+            if (i < obj->diccionario.cantidad && strcmp(obj->diccionario.claves[i], met) == 0)
+                vf = obj->diccionario.valores[i];
+            else if ((i = valor_diccionario_buscar(obj, met)) >= 0) {
+                vf = obj->diccionario.valores[i];
+                n->cache_i = i;
+            }
+            if (vf) {
                 if (vf->tipo == VAL_CLASE) {
                     Valor *cls = valor_retener(vf);
                     valor_destruir(obj);
@@ -2584,7 +2688,8 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 FuncionLince *f = vf->funcion;
 
                 int nargs = n->metodo.num_argumentos;
-                Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
+                Valor *args_pila[8];
+                Valor **args = nargs < 8 ? args_pila : malloc(sizeof(Valor*) * (nargs + 1));
                 for (int j = 0; j < nargs; j++)
                     args[j] = ejecutar(n->metodo.argumentos[j], e);
 
@@ -2606,7 +2711,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                        los argumentos y valida aridad y tipos. */
                     resultado = interprete_llamar_funcion(vf, args, nargs);
                 }
-                free(args);
+                if (args != args_pila) free(args);
                 valor_destruir(obj);
                 return resultado ? resultado : valor_nulo();
             }
@@ -2903,16 +3008,13 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
             }
             Valor *buscar = ejecutar(n->metodo.argumentos[0], e);
             Valor *repla  = ejecutar(n->metodo.argumentos[1], e);
-            char *src = obj->texto, *pat = buscar->texto, *rep = repla->texto;
-            char resultado[4096] = "";
-            char *pos;
-            while ((pos = strstr(src, pat)) != NULL) {
-                strncat(resultado, src, pos - src);
-                strcat(resultado, rep);
-                src = pos + strlen(pat);
-            }
-            strcat(resultado, src);
-            Valor *r = valor_texto(resultado);
+            Valor *r;
+            if (hay_error) r = valor_nulo();
+            else if (buscar->tipo != VAL_TEXTO || repla->tipo != VAL_TEXTO)
+                r = error_rt("ErrorTipo", n->linea, "'reemplazar' necesita dos textos: buscar y reemplazo.");
+            else if (!buscar->texto[0])
+                r = error_rt("ErrorArgumento", n->linea, "'reemplazar': el texto que se busca no puede estar vacío.");
+            else r = valor_texto_propio(texto_reemplazar(obj->texto, buscar->texto, repla->texto));
             valor_destruir(buscar); valor_destruir(repla); valor_destruir(obj);
             return r;
         }
@@ -3002,20 +3104,14 @@ static Valor *exec_elegir(Nodo *n, Entorno *e) {
 
         if (iguales) {
             encontrado = 1;
-            Entorno *caso_e = entorno_crear(e);
-            Valor   *r      = ejecutar(n->elegir.cuerpos[i], caso_e);
-            valor_destruir(r);
-            entorno_destruir(caso_e);
+            valor_destruir(ejecutar_en_ambito(n->elegir.cuerpos[i], e));
             break;
         }
     }
 
     /* Si no coincidió ningún caso, ejecutar otro */
     if (!encontrado && n->elegir.otro && !hay_error && !hay_retorno) {
-        Entorno *otro_e = entorno_crear(e);
-        Valor   *r      = ejecutar(n->elegir.otro, otro_e);
-        valor_destruir(r);
-        entorno_destruir(otro_e);
+        valor_destruir(ejecutar_en_ambito(n->elegir.otro, e));
     }
 
     valor_destruir(sujeto);
@@ -3515,11 +3611,17 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
     switch (n->tipo) {
 
+        /* Un número o un texto escrito en el programa vale siempre lo mismo:
+           se crea la primera vez y luego solo se comparte (inmortal, así que
+           nadie lo cambia en su sitio: eso solo se hace con refs == 1) */
         case NODO_NUMERO:
-            return valor_numero(n->numero);
-
         case NODO_TEXTO:
-            return valor_texto(n->texto);
+            if (!n->valor_fijo) {
+                Valor *v = n->tipo == NODO_NUMERO ? valor_numero(n->numero) : valor_texto(n->texto);
+                v->refs = REFS_INMORTAL;
+                n->valor_fijo = v;
+            }
+            return valor_retener((Valor *)n->valor_fijo);
 
         case NODO_BOOLEANO:
             return valor_booleano(n->booleano);
@@ -3528,7 +3630,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             return valor_nulo();
 
         case NODO_IDENTIFICADOR:
-            return entorno_obtener_i(e, NI(n, n->identificador), n->identificador, n->linea);
+            return obtener_var(n, e, NI(n, n->identificador), n->identificador);
 
         case NODO_BINARIO:
             return exec_binario(n, e);
@@ -3577,17 +3679,35 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_ASIGNACION: {
             Valor *v = ejecutar(n->asignacion.valor, e);
+            if (n->asignacion.op[0] && !hay_error && v->tipo == VAL_NUMERO &&
+                (n->asignacion.op[0] == '+' || n->asignacion.op[0] == '-' || n->asignacion.op[0] == '*')) {
+                EntradaVar *ev = buscar_var(n, e, NI(n, n->asignacion.nombre));
+                if (ev && !ev->constante && ev->valor->tipo == VAL_NUMERO && ev->valor->refs == 1) {
+                    char o = n->asignacion.op[0];
+                    ev->valor->numero = o == '+' ? ev->valor->numero + v->numero
+                                      : o == '-' ? ev->valor->numero - v->numero
+                                                 : ev->valor->numero * v->numero;
+                    valor_destruir(v);
+                    return valor_nulo();
+                }
+            }
             if (n->asignacion.op[0] && !hay_error) {      /* x += v */
-                Valor *antes = entorno_obtener_i(e, NI(n, n->asignacion.nombre), n->asignacion.nombre, n->linea);
+                Valor *antes = obtener_var(n, e, NI(n, n->asignacion.nombre), n->asignacion.nombre);
                 v = operar(antes, v, n->asignacion.op, n->linea);
             }
             if (hay_error) { valor_destruir(v); return valor_nulo(); }
-            entorno_asignar_i(e, NI(n, n->asignacion.nombre), n->asignacion.nombre, v, n->linea);
+            asignar_var(n, e, NI(n, n->asignacion.nombre), n->asignacion.nombre, v);
             return valor_nulo();
         }
 
         case NODO_INCREMENTO: {
-            Valor *v = entorno_obtener_i(e, NI(n, n->incremento.nombre), n->incremento.nombre, n->linea);
+            /* Si la variable es la única dueña de su número, se cambia ahí */
+            EntradaVar *ev = buscar_var(n, e, NI(n, n->incremento.nombre));
+            if (ev && !ev->constante && ev->valor->tipo == VAL_NUMERO && ev->valor->refs == 1) {
+                ev->valor->numero += n->incremento.operador[0] == '+' ? 1 : -1;
+                return valor_nulo();
+            }
+            Valor *v = obtener_var(n, e, NI(n, n->incremento.nombre), n->incremento.nombre);
             /* Si la variable no existe, entorno_obtener ya ha puesto ese
                error: se propaga, no se le añade encima uno de "no contiene un
                número" que sería la consecuencia y no la causa. */
@@ -3606,7 +3726,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             /* 'v' es una copia hecha por entorno_obtener y nadie la soltaba:
                cada 'x++' suelto fugaba una asignación. */
             valor_destruir(v);
-            entorno_asignar_i(e, NI(n, n->incremento.nombre), n->incremento.nombre, nuevo, n->linea);
+            asignar_var(n, e, NI(n, n->incremento.nombre), n->incremento.nombre, nuevo);
             return valor_nulo();
         }
 
@@ -3648,9 +3768,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(cond);
                 if (!ok) break;
                 valor_destruir(r);
-                Entorno *nuevo = entorno_crear(e);
-                r = ejecutar(n->mientras.cuerpo, nuevo);
-                entorno_destruir(nuevo);
+                r = ejecutar_en_ambito(n->mientras.cuerpo, e);
                 if (hay_salto && fin_de_vuelta()) break;
             }
             return r;
@@ -3660,9 +3778,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             Valor *r = valor_nulo();
             do {
                 valor_destruir(r);
-                Entorno *nuevo = entorno_crear(e);
-                r = ejecutar(n->hacer.cuerpo, nuevo);
-                entorno_destruir(nuevo);
+                r = ejecutar_en_ambito(n->hacer.cuerpo, e);
                 if (hay_salto && fin_de_vuelta()) break;
                 if (hay_retorno) break;
                 Valor *cond = ejecutar(n->hacer.condicion, e);
