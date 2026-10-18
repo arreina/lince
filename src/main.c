@@ -81,6 +81,7 @@ static int ejecutar_empaquetado(int argc, char *argv[]) {
     Interprete *interp   = interprete_crear();
 
     interprete_fijar_archivo(ruta);
+    interprete_fijar_principal(ruta);
     interprete_set_args(argc - 1, argv + 1);   /* todos los argumentos son del programa */
     char mensaje[700] = "";
     if (interprete_ejecutar_recargable(interp, programa, mensaje, sizeof mensaje) != 0) {
@@ -125,6 +126,7 @@ static int ejecutar_recargable(const char *archivo) {
 
         /* Para resolver los 'importar "./x"' junto a este fichero */
         interprete_fijar_archivo(archivo);
+        interprete_fijar_principal(archivo);
         interprete_conservar(anterior ? anterior->global : NULL, interp);
         char mensaje[700] = "";
         int r = interprete_ejecutar_recargable(interp, programa, mensaje, sizeof mensaje);

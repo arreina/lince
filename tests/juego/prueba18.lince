@@ -1,0 +1,18 @@
+# Partidas guardadas: guardar, cargar (con valores por defecto), olvidar
+importar "juego"
+
+escribir("nada: {juego.cargar("partida")}")
+sea opciones = juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})
+escribir("por defecto: {opciones["musica"]}")
+juego.guardar("partida", {"nivel": 3, "nombre": "Ñandú", "records": [120, 95.5], "llaves": {"roja": verdadero}})
+juego.guardar("opciones", {"musica": 0.25})
+sea p = juego.cargar("partida")
+escribir("nivel: {p["nivel"]}, {p["nombre"]}, {p["records"][1]}, {p["llaves"]["roja"]}")
+sea op = juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})
+escribir("opciones: {op["musica"]} {op["idioma"]}")
+juego.guardar("partida", {"nivel": 4})
+escribir("otra vez: {juego.cargar("partida")["nivel"]}")
+escribir("olvidar: {juego.olvidar("partida")} {juego.olvidar("partida")}")
+escribir("carpeta: {juego.carpeta_guardado().contiene("prueba18")}")
+intentar { juego.guardar("../fuera", 1) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.guardar("f", juego.cargar) } capturar (error e) { escribir("error: {e.mensaje}") }

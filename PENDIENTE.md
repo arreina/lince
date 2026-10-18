@@ -7,7 +7,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 ## Versión 0.8
 
 - [x] **Google Play:** `lince repartir --aab` hace el `.aab` firmado que pide Google Play, en C como el `.apk`. Probado con bundletool y en un emulador con Android 16; falta subir uno de verdad a Play Console (lo hace el autor, cuando tenga cuenta).
-- [ ] **Partidas guardadas:** `juego.guardar("partida", datos)` y `juego.cargar("partida")` guardan récords, opciones y avances en la carpeta del usuario de cada sistema (también en Android), sin pensar en rutas.
+- [x] **Partidas guardadas:** `juego.guardar`, `juego.cargar` (con valores por defecto), `juego.olvidar` y `juego.carpeta_guardado`, en la carpeta de datos del usuario de cada sistema.
 - [ ] **Menús y diálogos, en Lince:** menús que se manejan con teclado, mando o dedo (portada, pausa, opciones) y cajas de diálogo con el texto saliendo letra a letra.
 
 Para más adelante: **juegos en el navegador** (`lince repartir --web`, con una plantilla en WebAssembly, como la de Android).

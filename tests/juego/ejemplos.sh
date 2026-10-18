@@ -14,6 +14,7 @@ T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 cd "$T"
 export SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy
+export LINCE_JUEGO_GUARDADO="$T/partidas"   # lo que guarden los ejemplos, aquí y no en tu carpeta
 fallos=0
 # archivo : variable de prueba que lo maneja
 while IFS='|' read -r archivo var valor; do

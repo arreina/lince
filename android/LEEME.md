@@ -122,8 +122,8 @@ errores) se ve con `adb logcat -s lince`.
   puede usarlo con `"inclinacion:x-"`, `"inclinacion:x+"`...
 - **Atrás**: el botón «atrás» del móvil cierra el juego (`juego.abierto()` pasa
   a falso).
-- **Archivos**: lo que el juego escribe (récords, partidas) va a su carpeta
-  privada del móvil.
+- **Archivos**: lo que el juego escribe va a su carpeta privada del móvil, y
+  las partidas guardadas (`juego.guardar`) a `partidas/` dentro de ella.
 - **Errores**: si el juego se para por un error, el error se queda en la
   pantalla hasta que se pulse «atrás».
 - **Pausa**: al salir de la app el juego se queda parado, y sigue al volver.

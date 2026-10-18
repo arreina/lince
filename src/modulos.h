@@ -46,6 +46,14 @@ void modulo_registrar(Entorno *entorno, const char *nombre,
 typedef int (*ModuloExterno)(const char *nombre, Entorno *entorno);
 void modulo_fijar_externo(ModuloExterno fn);
 
+/* ── JSON (módulo json y partidas guardadas) ──
+   json_a_valor: NULL si el texto no es JSON válido. json_de_valor (malloc):
+   con 'sangria' >= 0, en varias líneas. json_lo_que_no_cabe: NULL si el valor
+   se puede guardar en JSON, o por qué no. */
+Valor      *json_a_valor(const char *s);
+char       *json_de_valor(Valor *v, int sangria);
+const char *json_lo_que_no_cabe(Valor *v);
+
 /* ── Recarga en caliente (módulo juego) ── */
 int  juego_ventana_abierta(void);
 void juego_preparar_recarga(int conserva);

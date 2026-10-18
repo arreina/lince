@@ -1183,197 +1183,265 @@ static Valor *fn_sis_salir(Valor **a, int n) {
    MÓDULO: json
 ───────────────────────────────────────── */
 
-/* Parser JSON interno — convierte JSON a valores de Lince */
-static Valor *json_parsear_valor(const char *s, int *pos);
+/* ── JSON ──
+   json_a_valor: el valor de Lince de un texto JSON (NULL si no es JSON
+   válido); json_de_valor: el texto JSON de un valor (malloc). Lo usan el
+   módulo json y las partidas guardadas de juego. */
+typedef struct { const char *s; size_t i; int hondo; } JsonLector;
+typedef struct { char *p; size_t n, cap; } JsonBuf;
 
-static void json_saltar_espacios(const char *s, int *pos) {
-    while (s[*pos] && (s[*pos] == ' ' || s[*pos] == '\t' ||
-                       s[*pos] == '\n' || s[*pos] == '\r'))
-        (*pos)++;
+static void jb_mas(JsonBuf *b, const char *p, size_t n) {
+    if (b->n + n + 1 > b->cap) { b->cap = (b->n + n + 1) * 2; b->p = realloc(b->p, b->cap); }
+    memcpy(b->p + b->n, p, n);
+    b->n += n;
+    b->p[b->n] = '\0';
+}
+static void jb_txt(JsonBuf *b, const char *t) { jb_mas(b, t, strlen(t)); }
+
+static void json_espacios(JsonLector *l) {
+    while (l->s[l->i] == ' ' || l->s[l->i] == '\t' || l->s[l->i] == '\n' || l->s[l->i] == '\r') l->i++;
 }
 
-static Valor *json_parsear_texto(const char *s, int *pos) {
-    (*pos)++; /* saltar " */
-    char buf[8192]; int bi = 0;
-    while (s[*pos] && s[*pos] != '"') {
-        if (s[*pos] == '\\') {
-            (*pos)++;
-            switch (s[*pos]) {
-                case 'n': buf[bi++] = '\n'; break;
-                case 't': buf[bi++] = '\t'; break;
-                case '"': buf[bi++] = '"';  break;
-                case '\\':buf[bi++] = '\\'; break;
-                default:  buf[bi++] = s[*pos]; break;
+static void jb_utf8(JsonBuf *b, unsigned c) {
+    char u[4];
+    if (c < 0x80) { u[0] = (char)c; jb_mas(b, u, 1); }
+    else if (c < 0x800) { u[0] = (char)(0xC0 | c >> 6); u[1] = (char)(0x80 | (c & 0x3F)); jb_mas(b, u, 2); }
+    else if (c < 0x10000) { u[0] = (char)(0xE0 | c >> 12); u[1] = (char)(0x80 | ((c >> 6) & 0x3F)); u[2] = (char)(0x80 | (c & 0x3F)); jb_mas(b, u, 3); }
+    else { u[0] = (char)(0xF0 | c >> 18); u[1] = (char)(0x80 | ((c >> 12) & 0x3F)); u[2] = (char)(0x80 | ((c >> 6) & 0x3F)); u[3] = (char)(0x80 | (c & 0x3F)); jb_mas(b, u, 4); }
+}
+
+static int json_hex4(JsonLector *l, unsigned *c) {
+    *c = 0;
+    for (int k = 0; k < 4; k++) {
+        char h = l->s[l->i++];
+        *c <<= 4;
+        if (h >= '0' && h <= '9') *c |= (unsigned)(h - '0');
+        else if (h >= 'a' && h <= 'f') *c |= (unsigned)(h - 'a' + 10);
+        else if (h >= 'A' && h <= 'F') *c |= (unsigned)(h - 'A' + 10);
+        else return 0;
+    }
+    return 1;
+}
+
+/* El texto entre comillas (malloc), o NULL si está mal */
+static char *json_leer_texto(JsonLector *l) {
+    if (l->s[l->i] != '"') return NULL;
+    l->i++;
+    JsonBuf b = {0};
+    jb_mas(&b, "", 0);
+    for (;;) {
+        unsigned char c = (unsigned char)l->s[l->i];
+        if (c == '\0') { free(b.p); return NULL; }
+        l->i++;
+        if (c == '"') return b.p;
+        if (c != '\\') { jb_mas(&b, (const char *)&c, 1); continue; }
+        char e = l->s[l->i++];
+        switch (e) {
+            case '"': jb_txt(&b, "\""); break;
+            case '\\': jb_txt(&b, "\\"); break;
+            case '/': jb_txt(&b, "/"); break;
+            case 'b': jb_txt(&b, "\b"); break;
+            case 'f': jb_txt(&b, "\f"); break;
+            case 'n': jb_txt(&b, "\n"); break;
+            case 'r': jb_txt(&b, "\r"); break;
+            case 't': jb_txt(&b, "\t"); break;
+            case 'u': {
+                unsigned u, u2;
+                if (!json_hex4(l, &u)) { free(b.p); return NULL; }
+                if (u >= 0xD800 && u < 0xDC00 && l->s[l->i] == '\\' && l->s[l->i + 1] == 'u') {
+                    l->i += 2;
+                    if (!json_hex4(l, &u2)) { free(b.p); return NULL; }
+                    if (u2 >= 0xDC00 && u2 < 0xE000) u = 0x10000 + ((u - 0xD800) << 10) + (u2 - 0xDC00);
+                }
+                jb_utf8(&b, u);
+                break;
             }
-        } else {
-            buf[bi++] = s[*pos];
+            default: free(b.p); return NULL;
         }
-        (*pos)++;
     }
-    if (s[*pos] == '"') (*pos)++;
-    buf[bi] = '\0';
-    return valor_texto(buf);
 }
 
-static Valor *json_parsear_numero(const char *s, int *pos) {
-    int inicio = *pos;
-    if (s[*pos] == '-') (*pos)++;
-    while (s[*pos] >= '0' && s[*pos] <= '9') (*pos)++;
-    if (s[*pos] == '.') {
-        (*pos)++;
-        while (s[*pos] >= '0' && s[*pos] <= '9') (*pos)++;
+static Valor *json_leer(JsonLector *l) {
+    json_espacios(l);
+    const char *s = l->s;
+    char c = s[l->i];
+    if (++l->hondo > 500) return NULL;
+    Valor *r = NULL;
+    if (c == '"') {
+        char *t = json_leer_texto(l);
+        if (t) { r = valor_texto(t); free(t); }
+    } else if (c == '[') {
+        l->i++;
+        r = valor_lista_crear();
+        json_espacios(l);
+        if (s[l->i] == ']') l->i++;
+        else for (;;) {
+            Valor *e = json_leer(l);
+            if (!e) { valor_destruir(r); r = NULL; break; }
+            lista_agregar(r, e);
+            json_espacios(l);
+            if (s[l->i] == ',') { l->i++; continue; }
+            if (s[l->i] == ']') { l->i++; break; }
+            valor_destruir(r); r = NULL; break;
+        }
+    } else if (c == '{') {
+        l->i++;
+        r = valor_diccionario_crear();
+        json_espacios(l);
+        if (s[l->i] == '}') l->i++;
+        else for (;;) {
+            json_espacios(l);
+            char *clave = json_leer_texto(l);
+            json_espacios(l);
+            Valor *v = NULL;
+            if (clave && s[l->i] == ':') { l->i++; v = json_leer(l); }
+            if (!v) { free(clave); valor_destruir(r); r = NULL; break; }
+            int ya = valor_diccionario_buscar(r, clave);
+            if (ya >= 0) { valor_destruir(r->diccionario.valores[ya]); r->diccionario.valores[ya] = v; }
+            else valor_diccionario_agregar(r, clave, v);
+            free(clave);
+            json_espacios(l);
+            if (s[l->i] == ',') { l->i++; continue; }
+            if (s[l->i] == '}') { l->i++; break; }
+            valor_destruir(r); r = NULL; break;
+        }
+    } else if (c == '-' || (c >= '0' && c <= '9')) {
+        char *fin;
+        double d = strtod(s + l->i, &fin);
+        if (fin > s + l->i) { l->i = (size_t)(fin - s); r = valor_numero(d); }
+    } else if (strncmp(s + l->i, "true", 4) == 0) { l->i += 4; r = valor_booleano(1); }
+    else if (strncmp(s + l->i, "false", 5) == 0) { l->i += 5; r = valor_booleano(0); }
+    else if (strncmp(s + l->i, "null", 4) == 0) { l->i += 4; r = valor_nulo(); }
+    l->hondo--;
+    return r;
+}
+
+Valor *json_a_valor(const char *s) {
+    JsonLector l = {s, 0, 0};
+    Valor *v = json_leer(&l);
+    if (!v) return NULL;
+    json_espacios(&l);
+    if (s[l.i] != '\0') { valor_destruir(v); return NULL; }
+    return v;
+}
+
+static void json_escribir_texto(JsonBuf *b, const char *t) {
+    jb_txt(b, "\"");
+    for (const unsigned char *p = (const unsigned char *)t; *p; p++) {
+        char esc[8];
+        switch (*p) {
+            case '"':  jb_txt(b, "\\\""); break;
+            case '\\': jb_txt(b, "\\\\"); break;
+            case '\n': jb_txt(b, "\\n"); break;
+            case '\r': jb_txt(b, "\\r"); break;
+            case '\t': jb_txt(b, "\\t"); break;
+            default:
+                if (*p < 0x20) { snprintf(esc, sizeof esc, "\\u%04x", *p); jb_txt(b, esc); }
+                else jb_mas(b, (const char *)p, 1);
+        }
     }
-    if (s[*pos] == 'e' || s[*pos] == 'E') {
-        (*pos)++;
-        if (s[*pos] == '+' || s[*pos] == '-') (*pos)++;
-        while (s[*pos] >= '0' && s[*pos] <= '9') (*pos)++;
-    }
+    jb_txt(b, "\"");
+}
+
+/* 'sangria' < 0: todo en una línea; si no, con saltos y esa sangría */
+static void json_escribir(JsonBuf *b, Valor *v, int sangria, int hondo) {
     char tmp[64];
-    int len = *pos - inicio;
-    strncpy(tmp, s + inicio, len); tmp[len] = '\0';
-    return valor_numero(atof(tmp));
-}
-
-static Valor *json_parsear_array(const char *s, int *pos) {
-    (*pos)++; /* saltar [ */
-    Valor *lista = valor_lista_crear();
-    json_saltar_espacios(s, pos);
-    if (s[*pos] == ']') { (*pos)++; return lista; }
-    while (s[*pos]) {
-        json_saltar_espacios(s, pos);
-        Valor *elem = json_parsear_valor(s, pos);
-        lista_agregar(lista, elem);
-        json_saltar_espacios(s, pos);
-        if (s[*pos] == ',') { (*pos)++; continue; }
-        if (s[*pos] == ']') { (*pos)++; break; }
+    if (hondo > 500) { jb_txt(b, "null"); return; }
+    switch (v ? v->tipo : VAL_NULO) {
+        case VAL_NUMERO:
+            if (v->numero != v->numero || v->numero - v->numero != 0) jb_txt(b, "null");   /* NaN o infinito */
+            else if (v->numero == (long long)v->numero && fabs(v->numero) < 1e15) {
+                snprintf(tmp, sizeof tmp, "%lld", (long long)v->numero); jb_txt(b, tmp);
+            } else {
+                for (int cifras = 15; cifras <= 17; cifras++) {          /* lo más corto que vuelve igual */
+                    snprintf(tmp, sizeof tmp, "%.*g", cifras, v->numero);
+                    if (strtod(tmp, NULL) == v->numero) break;
+                }
+                jb_txt(b, tmp);
+            }
+            break;
+        case VAL_TEXTO: json_escribir_texto(b, v->texto); break;
+        case VAL_ENUMERADO: json_escribir_texto(b, v->miembro->texto); break;   /* "Estado.Quieto" */
+        case VAL_BOOLEANO: jb_txt(b, v->booleano ? "true" : "false"); break;
+        case VAL_LISTA:
+        case VAL_DICCIONARIO: {
+            int dic = v->tipo == VAL_DICCIONARIO;
+            int n = dic ? v->diccionario.cantidad : v->lista.cantidad;
+            jb_txt(b, dic ? "{" : "[");
+            for (int i = 0; i < n; i++) {
+                if (i > 0) jb_txt(b, sangria < 0 ? ", " : ",");
+                if (sangria >= 0) {
+                    jb_txt(b, "\n");
+                    for (int k = 0; k < (hondo + 1) * sangria; k++) jb_txt(b, " ");
+                }
+                if (dic) {
+                    json_escribir_texto(b, v->diccionario.claves[i]);
+                    jb_txt(b, ": ");
+                    json_escribir(b, v->diccionario.valores[i], sangria, hondo + 1);
+                } else json_escribir(b, v->lista.elementos[i], sangria, hondo + 1);
+            }
+            if (sangria >= 0 && n > 0) {
+                jb_txt(b, "\n");
+                for (int k = 0; k < hondo * sangria; k++) jb_txt(b, " ");
+            }
+            jb_txt(b, dic ? "}" : "]");
+            break;
+        }
+        default: jb_txt(b, "null"); break;
     }
-    return lista;
 }
 
-static Valor *json_parsear_objeto(const char *s, int *pos) {
-    (*pos)++; /* saltar { */
-    Valor *dic = valor_diccionario_crear();
-    json_saltar_espacios(s, pos);
-    if (s[*pos] == '}') { (*pos)++; return dic; }
-    while (s[*pos]) {
-        json_saltar_espacios(s, pos);
-        if (s[*pos] != '"') break;
-        Valor *vclave = json_parsear_texto(s, pos);
-        char  *clave  = strdup(vclave->texto);
-        valor_destruir(vclave);
-        json_saltar_espacios(s, pos);
-        if (s[*pos] == ':') (*pos)++;
-        json_saltar_espacios(s, pos);
-        Valor *valor = json_parsear_valor(s, pos);
-        valor_diccionario_asegurar(dic, dic->diccionario.cantidad + 1);
-        int i = dic->diccionario.cantidad;
-        dic->diccionario.claves[i]  = clave;
-        dic->diccionario.valores[i] = valor;
-        dic->diccionario.cantidad++;
-        json_saltar_espacios(s, pos);
-        if (s[*pos] == ',') { (*pos)++; continue; }
-        if (s[*pos] == '}') { (*pos)++; break; }
+char *json_de_valor(Valor *v, int sangria) {
+    JsonBuf b = {0};
+    jb_mas(&b, "", 0);
+    json_escribir(&b, v, sangria, 0);
+    return b.p;
+}
+
+/* Lo que no se puede guardar en JSON (funciones, objetos...), o NULL */
+const char *json_lo_que_no_cabe(Valor *v) {
+    if (!v) return NULL;
+    switch (v->tipo) {
+        case VAL_NULO: case VAL_NUMERO: case VAL_TEXTO: case VAL_BOOLEANO: case VAL_ENUMERADO: return NULL;
+        case VAL_LISTA:
+            for (int i = 0; i < v->lista.cantidad; i++) {
+                const char *m = json_lo_que_no_cabe(v->lista.elementos[i]);
+                if (m) return m;
+            }
+            return NULL;
+        case VAL_DICCIONARIO:
+            for (int i = 0; i < v->diccionario.cantidad; i++) {
+                const char *m = json_lo_que_no_cabe(v->diccionario.valores[i]);
+                if (m) return m;
+            }
+            return NULL;
+        default: return "solo números, textos, lógicos, nulo, listas y diccionarios";
     }
-    return dic;
-}
-
-static Valor *json_parsear_valor(const char *s, int *pos) {
-    json_saltar_espacios(s, pos);
-    char c = s[*pos];
-    if (c == '"') return json_parsear_texto(s, pos);
-    if (c == '[') return json_parsear_array(s, pos);
-    if (c == '{') return json_parsear_objeto(s, pos);
-    if (c == '-' || (c >= '0' && c <= '9')) return json_parsear_numero(s, pos);
-    if (strncmp(s + *pos, "true",  4) == 0) { *pos += 4; return valor_booleano(1); }
-    if (strncmp(s + *pos, "false", 5) == 0) { *pos += 5; return valor_booleano(0); }
-    if (strncmp(s + *pos, "null",  4) == 0) { *pos += 4; return valor_nulo(); }
-    return valor_nulo();
 }
 
 static Valor *fn_json_parsear(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO) {
         hay_error = 1;
-        valor_error = valor_error_nuevo("ErrorTipo",
-            "json.parsear() espera un texto", 0);
+        valor_error = valor_error_nuevo("ErrorTipo", "json.parsear() espera un texto", 0);
         return valor_nulo();
     }
-    int pos = 0;
-    return json_parsear_valor(a[0]->texto, &pos);
-}
-
-/* Serializar valor de Lince a JSON */
-static void json_escribir_valor(Valor *v, char *buf, size_t max) {
-    char tmp[256];
-    if (!v || v->tipo == VAL_NULO) {
-        strncat(buf, "null", max - strlen(buf) - 1);
-        return;
+    Valor *v = json_a_valor(a[0]->texto);
+    if (!v) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("Error", "json.parsear(): el texto no es JSON válido", 0);
+        return valor_nulo();
     }
-    switch (v->tipo) {
-        case VAL_NUMERO:
-            if (v->numero == (long long)v->numero)
-                snprintf(tmp, sizeof(tmp), "%lld", (long long)v->numero);
-            else
-                snprintf(tmp, sizeof(tmp), "%g", v->numero);
-            strncat(buf, tmp, max - strlen(buf) - 1);
-            break;
-        case VAL_TEXTO: {
-            strncat(buf, "\"", max - strlen(buf) - 1);
-            /* Escapar caracteres especiales */
-            for (int i = 0; v->texto[i]; i++) {
-                char esc[4] = {0};
-                switch (v->texto[i]) {
-                    case '"':  strcpy(esc, "\\\""); break;
-                    case '\\': strcpy(esc, "\\\\"); break;
-                    case '\n': strcpy(esc, "\\n");  break;
-                    case '\t': strcpy(esc, "\\t");  break;
-                    default: esc[0] = v->texto[i]; esc[1] = '\0'; break;
-                }
-                strncat(buf, esc, max - strlen(buf) - 1);
-            }
-            strncat(buf, "\"", max - strlen(buf) - 1);
-            break;
-        }
-        case VAL_ENUMERADO:              /* como el texto "Estado.Quieto" */
-            strncat(buf, "\"", max - strlen(buf) - 1);
-            strncat(buf, v->miembro->texto, max - strlen(buf) - 1);
-            strncat(buf, "\"", max - strlen(buf) - 1);
-            break;
-        case VAL_BOOLEANO:
-            strncat(buf, v->booleano ? "true" : "false", max - strlen(buf) - 1);
-            break;
-        case VAL_LISTA:
-            strncat(buf, "[", max - strlen(buf) - 1);
-            for (int i = 0; i < v->lista.cantidad; i++) {
-                json_escribir_valor(v->lista.elementos[i], buf, max);
-                if (i < v->lista.cantidad - 1)
-                    strncat(buf, ", ", max - strlen(buf) - 1);
-            }
-            strncat(buf, "]", max - strlen(buf) - 1);
-            break;
-        case VAL_DICCIONARIO:
-            strncat(buf, "{", max - strlen(buf) - 1);
-            for (int i = 0; i < v->diccionario.cantidad; i++) {
-                strncat(buf, "\"", max - strlen(buf) - 1);
-                strncat(buf, v->diccionario.claves[i], max - strlen(buf) - 1);
-                strncat(buf, "\": ", max - strlen(buf) - 1);
-                json_escribir_valor(v->diccionario.valores[i], buf, max);
-                if (i < v->diccionario.cantidad - 1)
-                    strncat(buf, ", ", max - strlen(buf) - 1);
-            }
-            strncat(buf, "}", max - strlen(buf) - 1);
-            break;
-        default:
-            strncat(buf, "null", max - strlen(buf) - 1);
-            break;
-    }
+    return v;
 }
 
 static Valor *fn_json_texto(Valor **a, int n) {
-    (void)n;
-    char buf[65536] = "";
-    json_escribir_valor(a[0], buf, sizeof(buf));
-    return valor_texto(buf);
+    int sangria = -1;
+    if (n > 1 && a[1]->tipo == VAL_BOOLEANO && a[1]->booleano) sangria = 2;
+    char *t = json_de_valor(a[0], sangria);
+    Valor *r = valor_texto(t);
+    free(t);
+    return r;
 }
 
 /* Gancho de anfitrión — ver modulos.h */
@@ -1689,7 +1757,7 @@ static void cargar_sistema(Entorno *entorno) {
 static void cargar_json(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"parsear", fn_json_parsear, 1},
-        {"texto",   fn_json_texto,   1},
+        {"texto",   fn_json_texto,  -1},
     };
     registrar_modulo_diccionario(entorno, "json",
         fns, 2, NULL, NULL, 0);

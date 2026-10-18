@@ -2,11 +2,12 @@
 #
 # Flechas (o WASD) para girar; come para crecer; no te muerdas ni toques el borde.
 # Espacio reinicia tras perder. Si superas el récord, escribe tu nombre y pulsa
-# Entrar. Esc sale.
+# Entrar: el récord se guarda y sigue ahí la próxima vez. Esc sale.
 #
 # Muestra: listas de listas, un bucle de juego con tiempo acumulado (dt),
-#          funciones que usan variables globales, texto en pantalla y escribir
-#          texto con el teclado (juego.editar).
+#          funciones que usan variables globales, texto en pantalla, escribir
+#          texto con el teclado (juego.editar) y guardar el récord
+#          (juego.guardar y juego.cargar).
 importar "juego"
 importar "matematica"
 
@@ -21,8 +22,9 @@ sea dx = 1
 sea dy = 0
 sea comida = [0, 0]
 sea puntos = 0
-sea record = 0
-sea nombre_record = ""
+sea guardado = juego.cargar("record", {"puntos": 0, "nombre": ""})
+sea record = guardado["puntos"]
+sea nombre_record = guardado["nombre"]
 sea escribiendo = falso         # pidiendo el nombre para el récord
 sea nombre = ""
 sea vivo = verdadero
@@ -87,6 +89,7 @@ mientras juego.abierto() {
         si juego.tecla_pulsada("entrar") y nombre.recortar() != "" {
             nombre_record = nombre.recortar()
             escribiendo = falso
+            juego.guardar("record", {"puntos": record, "nombre": nombre_record})
         }
     } sino si vivo {
         si (juego.tecla("arriba") o juego.tecla("w")) y dy == 0 {

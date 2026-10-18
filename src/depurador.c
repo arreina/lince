@@ -273,6 +273,7 @@ int depurador_ejecutar(const char *archivo, int argc, char *argv[]) {
     _global = interp->global;
 
     interprete_fijar_archivo(archivo);
+    interprete_fijar_principal(archivo);
     interprete_set_args(argc, argv);
 
     printf("🐆 Depurador de Lince — h para ver la ayuda\n\n");

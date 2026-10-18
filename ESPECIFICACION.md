@@ -968,7 +968,11 @@ sistema.salir(0)
 sea datos = json.parsear("\{\"nombre\": \"Ana\"}")   # \{: la llave tal cual
 escribir(datos["nombre"])
 escribir(json.texto({"clave": "valor"}))
+escribir(json.texto({"clave": [1, 2]}, verdadero))   # en varias líneas, con sangría
 ```
+
+`json.parsear` da un error si el texto no es JSON válido. Los números se escriben con las cifras
+justas para leerlos después iguales.
 
 Lo normal es leer el JSON de un archivo (`json.parsear(archivos.leer("datos.json"))`);
 escrito dentro de un texto, cada `{` lleva delante `\` para que no se tome por
@@ -1478,6 +1482,29 @@ En `matematica` hay además `distancia`, `angulo`, `interpolar`, `limitar`, `sig
 vectores (listas `[x, y]`), `longitud(x, y)`, `normalizar(x, y)`, `vector(angulo, largo)` (el
 contrario de `angulo`), `rotar(x, y, grados)` y `acercar(actual, objetivo, paso)` (avanza sin
 pasarse: frenar, perseguir, cámaras suaves).
+
+**Partidas guardadas.** Récords, opciones y avances que siguen ahí al volver a abrir el juego:
+
+```lince
+sea opciones = juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})
+sea partida = juego.cargar("partida")           # nulo si no hay nada guardado
+juego.guardar("partida", {"nivel": 3, "vidas": 2, "llaves": ["roja"]})
+juego.olvidar("partida")                         # empezar de cero
+```
+
+| Función | Qué hace |
+|---|---|
+| `guardar(nombre, datos)` | guarda `datos` (números, textos, lógicos, nulo, listas y diccionarios) con ese nombre; lo de antes con el mismo nombre se cambia. Si el juego se cierra a medias, lo guardado antes sigue entero |
+| `cargar(nombre[, por_defecto])` | lo guardado con ese nombre, o `por_defecto` (`nulo` si no se da) si no hay nada. Si los dos son diccionarios, lo que falte en lo guardado se toma de `por_defecto`: así una opción nueva de una versión posterior del juego tiene valor desde el principio |
+| `olvidar(nombre)` | borra lo guardado; verdadero si había algo |
+| `carpeta_guardado()` | la carpeta donde se guarda |
+
+Cada nombre es un archivo JSON en una carpeta del usuario para cada juego, que se llama como el programa
+(`serpiente.lince` → `serpiente`): `~/.local/share/lince/serpiente/` en Linux,
+`%APPDATA%\Lince\serpiente\` en Windows y la carpeta privada de la app en Android. No hay que
+pensar en rutas, y un juego hecho con `lince compilar` o `lince repartir` guarda en el mismo sitio.
+Los nombres no llevan `/ \ : * ? " < > |` ni empiezan por punto. `LINCE_JUEGO_GUARDADO` cambia la
+carpeta (para las pruebas).
 
 **Recarga en caliente.** Con `lince juego.lince` el juego se vigila mientras corre: al guardar el
 programa (o un archivo que importa) se vuelve a ejecutar con el código nuevo **sin cerrar la

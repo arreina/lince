@@ -276,6 +276,10 @@ void interprete_parar_tareas(void);
    de trabajo de quien lanza el programa. */
 void interprete_fijar_archivo(const char *ruta);
 const char *interprete_archivo_actual(void);
+/* El programa que se ejecuta (no el archivo importado que corre ahora): las
+   partidas guardadas van a una carpeta con su nombre */
+void interprete_fijar_principal(const char *ruta);
+const char *interprete_archivo_principal(void);
 
 /* Depuración: el hook se llama antes de cada sentencia de un bloque. */
 void interprete_fijar_hook(void (*hook)(Nodo *sentencia, Entorno *e));

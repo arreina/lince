@@ -479,4 +479,17 @@ for l in "inclinacion: [0, 0]" "accion: falso" "error: vibrar(): los segundos va
     grep -qxF "$l" salida22.txt && ok "vibrar e inclinar: $l" || mal "falta la línea: $l"
 done
 grep -qF 'la inclinación es "inclinacion:x-"' salida22.txt && ok "inclinar: error de una entrada mal escrita" || mal "falta el error de inclinacion:"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida5b.txt; exit 1; }
+# ── Partidas guardadas (en una casa de mentira: ~/.local/share/lince/prueba18 o %APPDATA%\Lince\prueba18) ──
+mkdir -p casa
+CASA="$T/casa"; CASA_W="$CASA"
+command -v cygpath > /dev/null && CASA_W="$(cygpath -w "$CASA")"
+HOME="$CASA" APPDATA="$CASA_W" XDG_DATA_HOME= timeout 20 "$LINCE" "$DIR/prueba18.lince" > salida23.txt 2>&1
+for l in "nada: nulo" "por defecto: 0.8" "nivel: 3, Ñandú, 95.5, verdadero" "opciones: 0.25 es" "otra vez: 4" \
+         "olvidar: verdadero falso" "carpeta: verdadero" \
+         'error: guardar(): el nombre "../fuera" no vale (sin / \ : * ? " < > |, y que no empiece por punto)' \
+         "error: guardar(): no se puede guardar eso; se guardan solo números, textos, lógicos, nulo, listas y diccionarios"; do
+    grep -qxF "$l" salida23.txt && ok "partidas: $l" || mal "falta la línea: $l"
+done
+[ -f casa/.local/share/lince/prueba18/opciones.json ] || [ -f casa/Lince/prueba18/opciones.json ] \
+    && ok "partidas: en la carpeta de datos del usuario" || mal "partidas: no está opciones.json en la carpeta de datos"
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida5b.txt; exit 1; }

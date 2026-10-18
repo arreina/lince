@@ -44,6 +44,11 @@ static inline int fin_de_vuelta(void) {
 static char _archivo_actual[1024] = "";
 
 const char *interprete_archivo_actual(void) { return _archivo_actual; }
+static char _archivo_principal[1024] = "";
+void interprete_fijar_principal(const char *ruta) {
+    snprintf(_archivo_principal, sizeof _archivo_principal, "%s", ruta ? ruta : "");
+}
+const char *interprete_archivo_principal(void) { return _archivo_principal; }
 void interprete_fijar_archivo(const char *ruta) {
     snprintf(_archivo_actual, sizeof(_archivo_actual), "%s", ruta ? ruta : "");
 }

@@ -11,6 +11,12 @@ apartado que le toca de este archivo.
 - `--version N` pone el número de versión del `.apk` o del `.aab`. Cada versión nueva lleva un número mayor.
 - Los juegos para Android apuntan a Android 16 (API 36) y sus bibliotecas sirven en móviles con páginas de memoria de 16 KB, como pide Google Play.
 
+### Partidas guardadas
+
+- `juego.guardar("partida", datos)`, `juego.cargar("partida"[, por_defecto])` y `juego.olvidar("partida")` guardan récords, opciones y avances en la carpeta de datos del usuario (también en Android). Con un diccionario por defecto, las opciones nuevas de una versión posterior del juego toman su valor solas.
+- La serpiente (`examples/02_serpiente.lince`) guarda el récord.
+- `json` se ha rehecho: textos de cualquier largo, `\u00f1` y emojis, decimales que se leen iguales, claves con comillas, `json.texto(valor, verdadero)` en varias líneas y un error si el texto no es JSON válido.
+
 ## 0.7.0
 
 La primera versión publicada. Lince pasa a ser un lenguaje para hacer videojuegos.

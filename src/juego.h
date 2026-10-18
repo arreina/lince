@@ -5121,6 +5121,176 @@ static Valor *fn_jg_guardar_sonido(Valor **a, int n) {
     return valor_nulo();
 }
 
+/* ── Partidas guardadas ──
+   guardar("partida", datos) / cargar("partida"[, por_defecto]) / olvidar(...):
+   cada nombre es un archivo JSON en la carpeta de datos del usuario, una por
+   juego (el nombre del programa): en Linux ~/.local/share/lince/<juego>, en
+   Windows %APPDATA%\Lince\<juego> y en Android la carpeta privada de la app.
+   LINCE_JUEGO_GUARDADO la cambia (para las pruebas). */
+static int jg_crear_carpetas(char *ruta) {
+    char *inicio = ruta + 1;
+    if (ruta[0] && ruta[1] == ':' && (ruta[2] == '\\' || ruta[2] == '/')) inicio = ruta + 3;   /* C:\ */
+    for (char *p = inicio; ; p++) {
+        if (*p == '/' || *p == '\\' || *p == '\0') {
+            char c = *p;
+            *p = '\0';
+            struct stat st;
+            if (stat(ruta, &st) != 0) {
+#ifdef _WIN32
+                if (_mkdir(ruta) != 0 && stat(ruta, &st) != 0) { *p = c; return 0; }
+#else
+                if (mkdir(ruta, 0755) != 0 && stat(ruta, &st) != 0) { *p = c; return 0; }
+#endif
+            }
+            *p = c;
+            if (c == '\0') return 1;
+        }
+    }
+}
+
+static int jg_carpeta_guardado(char *ruta, size_t max) {
+    const char *e = getenv("LINCE_JUEGO_GUARDADO");
+    if (e && e[0]) snprintf(ruta, max, "%s", e);
+    else {
+        /* el nombre del juego: el del programa, sin carpeta ni ".lince" */
+        char juego[256];
+        const char *pr = interprete_archivo_principal(), *b = pr;
+        for (const char *c = pr; *c; c++) if (*c == '/' || *c == '\\') b = c + 1;
+        snprintf(juego, sizeof juego, "%s", *b ? b : "lince");
+        size_t l = strlen(juego);
+        if (l > 6 && strcmp(juego + l - 6, ".lince") == 0) juego[l - 6] = '\0';
+#if defined(__ANDROID__)
+        char aqui[900];
+        if (!getcwd(aqui, sizeof aqui)) return 0;
+        snprintf(ruta, max, "%s/partidas", aqui);      /* ya en la carpeta privada de la app */
+#elif defined(_WIN32)
+        const char *d = getenv("APPDATA");
+        if (!d || !d[0]) d = getenv("USERPROFILE");
+        if (!d || !d[0]) return 0;
+        snprintf(ruta, max, "%s\\Lince\\%s", d, juego);
+#else
+        const char *d = getenv("XDG_DATA_HOME");
+        if (d && d[0]) snprintf(ruta, max, "%s/lince/%s", d, juego);
+        else {
+            const char *h = getenv("HOME");
+            if (!h || !h[0]) return 0;
+            snprintf(ruta, max, "%s/.local/share/lince/%s", h, juego);
+        }
+#endif
+    }
+    return jg_crear_carpetas(ruta);
+}
+
+/* La ruta del archivo de un nombre ("partida" → .../partida.json); 0 si el
+   nombre no vale */
+static int jg_ruta_guardado(Valor **a, int n, const char *fn, char *ruta, size_t max) {
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) {
+        char m[160];
+        snprintf(m, sizeof m, "%s() espera un nombre, como \"partida\" o \"opciones\"", fn);
+        jg_error("ErrorTipo", m);
+        return 0;
+    }
+    const char *t = a[0]->texto;
+    int bien = t[0] != '\0' && t[0] != '.' && strlen(t) <= 100;
+    for (const char *c = t; *c && bien; c++) bien = !strchr("/\\:*?\"<>|", *c) && (unsigned char)*c >= 0x20;
+    if (!bien) {
+        char m[200];
+        snprintf(m, sizeof m, "%s(): el nombre \"%s\" no vale (sin / \\ : * ? \" < > |, y que no empiece por punto)", fn, t);
+        jg_error("ErrorArgumento", m);
+        return 0;
+    }
+    char carpeta[900];
+    if (!jg_carpeta_guardado(carpeta, sizeof carpeta)) {
+        char m[160];
+        snprintf(m, sizeof m, "%s(): no se pudo crear la carpeta de las partidas guardadas", fn);
+        jg_error("Error", m);
+        return 0;
+    }
+    snprintf(ruta, max, "%s/%s.json", carpeta, t);
+    return 1;
+}
+
+/* guardar(nombre, datos): números, textos, lógicos, nulo, listas y diccionarios */
+static Valor *fn_jg_guardar(Valor **a, int n) {
+    char ruta[1100], temporal[1110];
+    if (!jg_ruta_guardado(a, n, "guardar", ruta, sizeof ruta)) return valor_nulo();
+    if (n < 2) return jg_error("ErrorTipo", "guardar() espera (nombre, datos): guardar(\"partida\", {\"nivel\": 3})");
+    const char *no = json_lo_que_no_cabe(a[1]);
+    if (no) {
+        char m[200];
+        snprintf(m, sizeof m, "guardar(): no se puede guardar eso; se guardan %s", no);
+        return jg_error("ErrorTipo", m);
+    }
+    char *json = json_de_valor(a[1], 2);
+    /* primero a un archivo aparte y luego en su sitio: si el juego se cierra
+       a medias, la partida de antes sigue entera */
+    snprintf(temporal, sizeof temporal, "%s.nuevo", ruta);
+    FILE *f = fopen(temporal, "wb");
+    int ok = f && fwrite(json, 1, strlen(json), f) == strlen(json) && fputc('\n', f) != EOF;
+    if (f) ok = fclose(f) == 0 && ok;
+    free(json);
+#ifdef _WIN32
+    if (ok) ok = MoveFileExA(temporal, ruta, MOVEFILE_REPLACE_EXISTING) != 0;
+#else
+    if (ok) ok = rename(temporal, ruta) == 0;
+#endif
+    if (!ok) { remove(temporal); return jg_error("Error", "guardar(): no se pudo escribir la partida"); }
+    return valor_booleano(1);
+}
+
+/* Una copia de un valor que se puede guardar (pasándolo por JSON) */
+static Valor *jg_copia(Valor *v) {
+    char *t = json_de_valor(v, -1);
+    Valor *r = json_a_valor(t);
+    free(t);
+    return r ? r : valor_nulo();
+}
+
+/* cargar(nombre[, por_defecto]): lo guardado, o por_defecto (nulo) si no hay
+   nada. Si los dos son diccionarios, lo que falte en lo guardado (una opción
+   nueva de una versión posterior del juego) se toma de por_defecto */
+static Valor *fn_jg_cargar(Valor **a, int n) {
+    char ruta[1100];
+    if (!jg_ruta_guardado(a, n, "cargar", ruta, sizeof ruta)) return valor_nulo();
+    Valor *defecto = n > 1 ? a[1] : NULL;
+    if (defecto && json_lo_que_no_cabe(defecto)) return jg_error("ErrorTipo", "cargar(): el valor por defecto tiene que poder guardarse (números, textos, listas, diccionarios...)");
+    FILE *f = fopen(ruta, "rb");
+    if (!f) return defecto ? jg_copia(defecto) : valor_nulo();
+    fseek(f, 0, SEEK_END);
+    long largo = ftell(f);
+    rewind(f);
+    char *t = malloc(largo > 0 ? (size_t)largo + 1 : 1);
+    size_t leido = largo > 0 ? fread(t, 1, (size_t)largo, f) : 0;
+    t[leido] = '\0';
+    fclose(f);
+    Valor *v = json_a_valor(t);
+    free(t);
+    if (!v) {
+        fprintf(stderr, "⚠️  cargar(\"%s\"): el archivo %s está estropeado; se usa el valor por defecto\n", a[0]->texto, ruta);
+        return defecto ? jg_copia(defecto) : valor_nulo();
+    }
+    if (defecto && defecto->tipo == VAL_DICCIONARIO && v->tipo == VAL_DICCIONARIO)
+        for (int i = 0; i < defecto->diccionario.cantidad; i++)
+            if (valor_diccionario_buscar(v, defecto->diccionario.claves[i]) < 0)
+                valor_diccionario_agregar(v, defecto->diccionario.claves[i], jg_copia(defecto->diccionario.valores[i]));
+    return v;
+}
+
+/* olvidar(nombre): borra lo guardado; verdadero si había algo */
+static Valor *fn_jg_olvidar(Valor **a, int n) {
+    char ruta[1100];
+    if (!jg_ruta_guardado(a, n, "olvidar", ruta, sizeof ruta)) return valor_nulo();
+    return valor_booleano(remove(ruta) == 0);
+}
+
+/* carpeta_guardado(): dónde van las partidas guardadas de este juego */
+static Valor *fn_jg_carpeta_guardado(Valor **a, int n) {
+    (void)a; (void)n;
+    char carpeta[900];
+    if (!jg_carpeta_guardado(carpeta, sizeof carpeta)) return jg_error("Error", "carpeta_guardado(): no se pudo crear la carpeta de las partidas guardadas");
+    return valor_texto(carpeta);
+}
+
 /* ── Mapas de casillas ──
    Un nivel escrito con texto, un carácter por casilla, para cualquier juego 2D:
    plataformas, vista cenital (mazmorras, laberintos), puzles por casillas... */
@@ -5658,6 +5828,10 @@ static void cargar_juego(Entorno *entorno) {
         {"efecto",          fn_jg_efecto,          -1},
         {"crear_efecto",    fn_jg_crear_efecto,    -1},
         {"guardar_sonido",  fn_jg_guardar_sonido,   2},
+        {"guardar",         fn_jg_guardar,          2},
+        {"cargar",          fn_jg_cargar,          -1},
+        {"olvidar",         fn_jg_olvidar,          1},
+        {"carpeta_guardado", fn_jg_carpeta_guardado, 0},
         {"casilla",         fn_jg_casilla,          3},
         {"poner_casilla",   fn_jg_poner_casilla,    4},
         {"solido",          fn_jg_solido,           3},

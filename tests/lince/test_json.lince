@@ -48,3 +48,28 @@ sea original = "\{\"x\": 1, \"y\": 2}"
 sea obj = json.parsear(original)
 escribir(obj["x"])
 escribir(obj["y"])
+
+# Textos con escapes, \u y emojis; decimales que vuelven iguales
+sea raro = {"t": "comillas \" barra \\ salto \n tab \t", "ñ": "año"}
+sea raro2 = json.parsear(json.texto(raro))
+escribir(raro2["t"] == raro["t"] y raro2["ñ"] == "año")
+escribir(json.parsear("\"\\u00f1\\u00e1 \\ud83d\\ude00\"").longitud())
+escribir(json.parsear(json.texto(0.1 + 0.2)) == 0.1 + 0.2)
+escribir(json.texto(1 / 3))
+
+# Muchas claves (más de 8) y textos largos
+sea grande = {}
+para cada numero i en rango(20) { grande["clave{i}"] = i }
+sea g2 = json.parsear(json.texto(grande))
+escribir(g2["clave17"])
+sea largo = ""
+para (k = 0; k < 2000; k++) { largo = largo + "0123456789" }
+escribir(json.parsear(json.texto([largo]))[0].longitud())
+
+# Varias líneas
+escribir(json.texto({"a": [1, {"b": nulo}], "c": []}, verdadero))
+
+# JSON mal escrito: error
+intentar { json.parsear("\{\"a\": 1,}") } capturar (error e) { escribir(e.mensaje) }
+intentar { json.parsear("[1, 2") } capturar (error e) { escribir(e.mensaje) }
+intentar { json.parsear("1 2") } capturar (error e) { escribir(e.mensaje) }
