@@ -10,8 +10,8 @@
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
 [![Versión](https://img.shields.io/badge/versión-0.10-F1BF00.svg)]()
-[![Tests](https://img.shields.io/badge/tests-31%2F31-C60B1E.svg)]()
-[![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows-6A2D72.svg)]()
+[![Tests](https://img.shields.io/badge/tests-38%2F38-C60B1E.svg)]()
+[![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows%20·%20Android-6A2D72.svg)]()
 
 [🌐 Web](https://arreina.github.io/lince) · [🎮 Tu primer juego](https://arreina.github.io/lince/tutorial.html) · [📖 Manual](https://arreina.github.io/lince/manual.html)
 
@@ -38,12 +38,20 @@ mientras juego.abierto() {
 }
 ```
 
-Diez minijuegos completos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, memoria, tres en raya, un plataformas con cámara y sprites, una mazmorra de tiles con fantasmas que te persiguen y un paseo con animaciones generadas a partir de un solo dibujo) están en [`examples/`](examples/).
+Trece minijuegos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, memoria, tres en raya, un plataformas con cámara y sprites, una mazmorra de tiles con fantasmas que te persiguen, un paseo con animaciones generadas a partir de un solo dibujo, uno para el móvil, una aventura con menús y diálogos y uno de física) están en [`examples/`](examples/).
 
 <p align="center">
   <img src="docs/img/08_plataformas.png" width="320" alt="Plataformas">
   <img src="docs/img/09_mazmorra.png" width="320" alt="Mazmorra">
   <img src="docs/img/10_paseo.png" width="320" alt="Paseo">
+</p>
+
+### Un juego completo: La Piedra del Lince
+
+[`juegos/la_piedra_del_lince`](juegos/la_piedra_del_lince) es una aventura entera hecha con Lince: un pueblo, un bosque y una fortaleza dibujados en Tiled, diálogos, una tienda, cofres, enemigos, un jefe, partida guardada y créditos. Se juega con teclado, con mando o con el dedo en el móvil. Los gráficos, la música y los sonidos son de terceros con licencias libres (Kenney y OpenGameArt).
+
+<p align="center">
+  <img src="docs/img/juegos/la_piedra_del_lince.png" width="720" alt="La Piedra del Lince: la portada, la sabia Ura, el cofre de la llave y Grum">
 </p>
 
 ## ¿Por qué Lince?
