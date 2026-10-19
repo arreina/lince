@@ -6,7 +6,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Versión 0.8
 
-- [x] **Google Play:** `lince repartir --aab` hace el `.aab` firmado que pide Google Play, en C como el `.apk`. Probado con bundletool y en un emulador con Android 16; falta subir uno de verdad a Play Console (lo hace el autor, cuando tenga cuenta).
+- [x] **Google Play:** `lince repartir --aab` hace el `.aab` firmado que pide Google Play, en C como el `.apk`. Probado con bundletool y en un emulador con Android 16; falta subir uno de verdad a Play Console (lo hace el autor, cuando tenga cuenta; no hace falta para la 1.0).
 - [x] **Partidas guardadas:** `juego.guardar`, `juego.cargar` (con valores por defecto), `juego.olvidar` y `juego.carpeta_guardado`, en la carpeta de datos del usuario de cada sistema.
 - [x] **Menús y diálogos, en Lince:** `juego.menu` y `juego.dialogo` (con quién habla, retrato y respuestas), con teclado, mando, ratón o dedo; `examples/12_aventura.lince`.
 
@@ -21,7 +21,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10, 0.11... **Cuando la 1.0 esté terminada y probada, el lenguaje se queda ahí y se pasa a trabajar en el IDE** (lince-motor, en su propia conversación). Para llegar a ella:
 
 - [ ] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
-- [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad, y un juego subido a Google Play.
+- [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad. Subir un juego a Google Play queda para después de la 1.0.
 - [x] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta: `juegos/la_piedra_del_lince` (falta probarlo en Windows y en un móvil de verdad).
 - [x] **El manual lo cubre todo:** el del lenguaje (con los módulos `matematica`, `texto`, `json`, `bytes` y `bits` y las herramientas) y una página para el módulo `juego` (`docs/juego.html`) con un ejemplo y su captura real para cada tema. La lista completa de funciones y opciones sigue en la especificación.
 
