@@ -3,6 +3,12 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 0.10.0 (en preparación)
+
+### El lenguaje
+
+- `mapear`, `filtrar` y `reducir` aceptan también generadores (`filtrar(rango(10), ...)`) y bytes.
+
 ## 0.9.0
 
 Mapas de Tiled, física sencilla, controles a gusto del jugador y un manual completo.

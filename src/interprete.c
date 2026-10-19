@@ -4733,16 +4733,56 @@ static Valor *fn_argumentos(Valor **a, int n) {
     return valor_retener(args_globales);
 }
 
+/* Lo que recorren mapear(), filtrar() y reducir(): una lista tal cual, o los
+   valores de un generador (también rango()) o de unos bytes, recogidos en una
+   lista. NULL si no es nada de eso, o si hubo un error (con hay_error). */
+#define MAX_ELEMENTOS_RECOGIDOS 1000000
+static Valor *como_lista(Valor *col, const char *fn) {
+    if (col->tipo == VAL_LISTA) return valor_retener(col);
+    Valor *l = NULL;
+    if (col->tipo == VAL_BYTES) {
+        l = valor_lista_crear();
+        for (int i = 0; i < col->bytes.cantidad; i++) lista_agregar(l, valor_numero(col->bytes.datos[i]));
+        return l;
+    }
+    if (col->tipo != VAL_GENERADOR) return NULL;
+    l = valor_lista_crear();
+    TareaLince *g = col->generador.productor;
+    double i = col->generador.desde, hasta = col->generador.hasta, paso = col->generador.paso;
+    for (;;) {
+        Valor *v;
+        if (g) {
+            v = generador_siguiente(g);
+            if (!v) break;
+        } else {                                   /* rango() */
+            if (paso > 0 ? i >= hasta : i <= hasta) break;
+            v = valor_numero(i);
+            i += paso;
+        }
+        if (l->lista.cantidad >= MAX_ELEMENTOS_RECOGIDOS) {
+            valor_destruir(v);
+            valor_destruir(l);
+            error_rt("ErrorRango", linea_llamada(),
+                     "%s(): el generador da más de un millón de valores (¿no acaba nunca?); recórrelo con 'para cada' y 'romper'", fn);
+            return NULL;
+        }
+        lista_agregar(l, v);
+    }
+    if (hay_error) { valor_destruir(l); return NULL; }
+    return l;
+}
+
 /* Función nativa global — mapear() */
 static Valor *fn_mapear(Valor **a, int n) {
     (void)n;
-    if (a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_FUNCION) {
+    Valor *lista = a[1]->tipo == VAL_FUNCION ? como_lista(a[0], "mapear") : NULL;
+    if (!lista) {
+        if (hay_error) return valor_nulo();
         hay_error = 1;
         valor_error = valor_error_nuevo("ErrorTipo",
-            "mapear() espera una lista y una función", 0);
+            "mapear() espera una lista (o un generador) y una función", 0);
         return valor_nulo();
     }
-    Valor        *lista     = a[0];
     FuncionLince *f         = a[1]->funcion;
     Valor        *resultado = valor_lista_crear();
 
@@ -4768,19 +4808,21 @@ static Valor *fn_mapear(Valor **a, int n) {
             lista_agregar(resultado, r);
         }
     }
+    valor_destruir(lista);
     return resultado;
 }
 
 /* Función nativa global — filtrar() */
 static Valor *fn_filtrar(Valor **a, int n) {
     (void)n;
-    if (a[0]->tipo != VAL_LISTA || a[1]->tipo != VAL_FUNCION) {
+    Valor *lista = a[1]->tipo == VAL_FUNCION ? como_lista(a[0], "filtrar") : NULL;
+    if (!lista) {
+        if (hay_error) return valor_nulo();
         hay_error = 1;
         valor_error = valor_error_nuevo("ErrorTipo",
-            "filtrar() espera una lista y una función", 0);
+            "filtrar() espera una lista (o un generador) y una función", 0);
         return valor_nulo();
     }
-    Valor        *lista     = a[0];
     FuncionLince *f         = a[1]->funcion;
     Valor        *resultado = valor_lista_crear();
 
@@ -4809,19 +4851,21 @@ static Valor *fn_filtrar(Valor **a, int n) {
         if (ok)
             lista_agregar(resultado, valor_copiar(elem));
     }
+    valor_destruir(lista);
     return resultado;
 }
 
 /* Función nativa global — reducir() */
 static Valor *fn_reducir(Valor **a, int n) {
     (void)n;
-    if (a[0]->tipo != VAL_LISTA || a[2]->tipo != VAL_FUNCION) {
+    Valor *lista = a[2]->tipo == VAL_FUNCION ? como_lista(a[0], "reducir") : NULL;
+    if (!lista) {
+        if (hay_error) return valor_nulo();
         hay_error = 1;
         valor_error = valor_error_nuevo("ErrorTipo",
-            "reducir() espera una lista, valor inicial y una función", 0);
+            "reducir() espera una lista (o un generador), el valor inicial y una función", 0);
         return valor_nulo();
     }
-    Valor        *lista = a[0];
     Valor        *acc   = valor_copiar(a[1]);
     FuncionLince *f     = a[2]->funcion;
 
@@ -4849,6 +4893,7 @@ static Valor *fn_reducir(Valor **a, int n) {
         valor_destruir(acc);
         acc = nuevo_acc;
     }
+    valor_destruir(lista);
     return acc;
 }
 /* rango() — genera una secuencia de números */

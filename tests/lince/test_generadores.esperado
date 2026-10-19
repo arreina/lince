@@ -55,3 +55,7 @@ otra vez 0
 otra vez 1
 1
 Un generador no puede recorrerse a sí mismo mientras produce.
+[0, 3, 6, 9]
+[2, 9, 28]
+55
+reducir(): el generador da más de un millón de valores (¿no acaba nunca?); recórrelo con 'para cada' y 'romper'

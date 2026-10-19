@@ -238,6 +238,11 @@ filtrar(lista, funcion)    # filtra según condición
 reducir(lista, inicial, f) # acumula un valor
 ```
 
+`mapear`, `filtrar` y `reducir` aceptan una lista, un generador (también `rango()`) o unos
+bytes, y devuelven una lista (o el valor acumulado): `filtrar(rango(100), es_primo)`. Un
+generador se recorre entero antes; si da más de un millón de valores (uno que no acaba nunca)
+es un error, y lo que hay que hacer es recorrerlo con `para cada` y `romper`.
+
 ---
 
 ## Control de flujo

@@ -154,3 +154,15 @@ generador propio(): numero {
 }
 sea yo = propio()
 intentar { para cada numero x en yo { escribir(x) } } capturar (error e) { escribir(e.mensaje) }
+
+# mapear, filtrar y reducir también con generadores (y rango)
+generador cubos(val numero n): numero {
+    para (i = 1; i <= n; i++) { producir i * i * i }
+}
+escribir(filtrar(rango(10), funcion(val numero x): logico { devolver x % 3 == 0 }))
+escribir(mapear(cubos(3), funcion(val numero x): numero { devolver x + 1 }))
+escribir(reducir(rango(1, 11), 0, funcion(val numero a, val numero x): numero { devolver a + x }))
+generador sin_fin(): numero {
+    mientras verdadero { producir 1 }
+}
+intentar { reducir(sin_fin(), 0, funcion(val numero a, val numero x): numero { devolver a + x }) } capturar (error e) { escribir(e.mensaje) }

@@ -18,7 +18,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Camino a la 1.0
 
-La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10, 0.11... Para llegar a ella:
+La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10, 0.11... **Cuando la 1.0 esté terminada y probada, el lenguaje se queda ahí y se pasa a trabajar en el IDE** (lince-motor, en su propia conversación). Para llegar a ella:
 
 - [ ] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
 - [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad, y un juego subido a Google Play.
@@ -27,7 +27,7 @@ La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10,
 
 ## Lenguaje
 
-- [ ] `mapear`, `filtrar` y `reducir` solo aceptan listas: que acepten también generadores (`filtrar(rango(10), ...)`). Salió escribiendo el manual.
+- [x] `mapear`, `filtrar` y `reducir` aceptan también generadores y bytes (salió escribiendo el manual).
 
 ## Biblioteca de juego en Lince
 
