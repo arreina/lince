@@ -1,0 +1,1264 @@
+# 🐆 La Piedra del Lince
+#
+# Una aventura de vista cenital hecha con Lince. Grum, el cíclope, ha robado
+# la Piedra del Lince, la que protege el pueblo de Valleclaro. La sabia Ura te
+# da la espada de tu abuelo: cruza el Bosque Viejo, encuentra la llave de la
+# fortaleza y recupera la piedra.
+#
+# Controles: flechas o WASD para andar; espacio (o Z, o A en el mando) para
+# hablar, abrir y dar espadazos; Esc (o P, o inicio) para la pausa, donde se
+# pueden cambiar los controles. En el móvil sale un mando en la pantalla.
+#
+# Para jugar:  cd juegos/la_piedra_del_lince  y  lince la_piedra_del_lince.lince
+#
+# Los mapas son de Tiled (mapas/*.tmx): se pueden abrir y cambiar en Tiled.
+# Los gráficos, la música y los sonidos son de terceros, con licencias libres
+# (ver CREDITOS.md). Los corazones, las monedas y la piedra se dibujan aquí.
+
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 320
+fijo ALTO = 180
+fijo VELOCIDAD = 72            # píxeles por segundo
+fijo VIDA_INICIAL = 6          # en medios corazones: 3 corazones
+fijo VIDA_MAXIMA = 12
+
+juego.abrir("La Piedra del Lince", ANCHO, ALTO, {"escala": 4})
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("arriba", ["arriba", "w", "mando:arriba", "mando:izq_y-"])
+juego.definir_accion("abajo", ["abajo", "s", "mando:abajo", "mando:izq_y+"])
+juego.definir_accion("accion", ["espacio", "z", "entrar", "mando:a"])
+juego.definir_accion("pausa", ["escape", "p", "mando:inicio"])
+
+# ── Recursos ─────────────────────────────────────────────────────────
+fijo LETRA = juego.fuente("recursos/PressStart2P-Regular.ttf", 8)
+fijo GRANDE = juego.fuente("recursos/PressStart2P-Regular.ttf", 16)
+fijo TP = juego.hoja("recursos/tiles_pueblo.png", 16)       # Kenney, Tiny Town
+fijo TM = juego.hoja("recursos/tiles_mazmorra.png", 16)     # Kenney, Tiny Dungeon
+
+# Las rutas, enteras: así «lince compilar» y «lince repartir» saben qué meter en el juego
+fijo SONIDO = {
+    "espada": juego.sonido("recursos/sonidos/espada.ogg"), "golpe": juego.sonido("recursos/sonidos/golpe.ogg"),
+    "dano": juego.sonido("recursos/sonidos/dano.ogg"), "moneda": juego.sonido("recursos/sonidos/moneda.ogg"),
+    "cofre": juego.sonido("recursos/sonidos/cofre.ogg"), "puerta": juego.sonido("recursos/sonidos/puerta.ogg"),
+    "arbusto": juego.sonido("recursos/sonidos/arbusto.ogg"), "roca": juego.sonido("recursos/sonidos/roca.ogg"),
+    "llave": juego.sonido("recursos/sonidos/llave.ogg"),
+    "hierba": [juego.sonido("recursos/sonidos/paso_hierba1.ogg"), juego.sonido("recursos/sonidos/paso_hierba2.ogg")],
+    "piedra": [juego.sonido("recursos/sonidos/paso_piedra1.ogg"), juego.sonido("recursos/sonidos/paso_piedra2.ogg")]
+}
+fijo MUSICA = {"pueblo": "recursos/musica/pueblo.ogg", "bosque": "recursos/musica/bosque.ogg",
+               "mazmorra": "recursos/musica/mazmorra.ogg", "jefe": "recursos/musica/jefe.ogg"}
+fijo LETRITA = juego.crear_efecto("clic", {"volumen": 0.12, "tono": 1.6, "largo": 0.4})
+
+# Los cuadros de las hojas de Kenney
+fijo HEROE = 112
+fijo ESPADA = 104
+fijo COFRE = 89
+fijo COFRE_ABIERTO = 91
+fijo REJA = 77
+fijo LLAVE = 117          # en la hoja del pueblo
+fijo ARBUSTO = 5          # en la hoja del pueblo
+fijo ENEMIGOS = {
+    "babosa":     {"cuadro": 108, "vida": 2, "dano": 1, "ancho": 10, "alto": 8},
+    "murcielago": {"cuadro": 120, "vida": 1, "dano": 1, "ancho": 8, "alto": 6},
+    "arana":      {"cuadro": 122, "vida": 2, "dano": 1, "ancho": 10, "alto": 8},
+    "fantasma":   {"cuadro": 121, "vida": 3, "dano": 2, "ancho": 10, "alto": 10},
+    "grum":       {"cuadro": 109, "vida": 14, "dano": 1, "ancho": 20, "alto": 14}
+}
+
+# Lo que se dibuja aquí, con texto
+fijo COLORES = {"R": [228, 59, 68], "r": [158, 40, 53], "W": [255, 230, 230], "K": [38, 23, 33],
+                "Y": [254, 231, 97], "y": [228, 166, 54], "o": [170, 110, 40],
+                "G": [99, 199, 77], "g": [38, 140, 70], "C": [200, 255, 230], "D": [24, 70, 50]}
+fijo CORAZON = juego.sprite([
+    ".KK.KK.",
+    "KRWKRRK",
+    "KRRRRRK",
+    ".KRRRK.",
+    "..KRK..",
+    "...K..."], COLORES)
+fijo MEDIO_CORAZON = juego.sprite([
+    ".KK.KK.",
+    "KRWKKKK",
+    "KRRK..K",
+    ".KRK.K.",
+    "..KKK..",
+    "...K..."], COLORES)
+fijo SIN_CORAZON = juego.sprite([
+    ".KK.KK.",
+    "K..K..K",
+    "K.....K",
+    ".K...K.",
+    "..K.K..",
+    "...K..."], COLORES)
+fijo MONEDA = juego.sprite([
+    ".KKKK.",
+    "KYYYyK",
+    "KYWYyK",
+    "KYYYyK",
+    "KyyyoK",
+    ".KKKK."], COLORES)
+fijo PIEDRA = juego.sprite([
+    "...KKK...",
+    "..KGCGK..",
+    ".KGCGGgK.",
+    "KGGGKGGgK",
+    "KGGKDKGgK",
+    "KgGGKGggK",
+    ".KgGGggK.",
+    "..KgggK..",
+    "...KKK..."], COLORES)
+fijo ROCA = juego.sprite([
+    ".KKK.",
+    "KoyoK",
+    "KyooK",
+    "KoooK",
+    ".KKK."], COLORES)
+
+# Los mapas de Tiled
+fijo MAPAS = {
+    "pueblo": juego.mapa_tiled("mapas/pueblo.tmx"),
+    "bosque": juego.mapa_tiled("mapas/bosque.tmx"),
+    "fortaleza": juego.mapa_tiled("mapas/fortaleza.tmx")
+}
+
+# ── La partida (lo que se guarda) ────────────────────────────────────
+funcion partida_nueva(): diccionario {
+    devolver {"mapa": "pueblo", "entrada": "inicio", "x": nulo, "y": nulo,
+              "vida": VIDA_INICIAL, "maximo": VIDA_INICIAL, "monedas": 0,
+              "espada": falso, "llave": falso, "puerta": falso, "reja": falso,
+              "jefe": falso, "piedra": falso, "mision": 0, "cofres": []}
+}
+sea partida = partida_nueva()
+
+funcion guardar_partida(): nulo { juego.guardar("partida", partida) }
+
+# ── Lo que hay en el mapa en que se está ─────────────────────────────
+sea mapa = nulo
+sea nombre_mapa = ""
+sea yo = {"x": 0, "y": 0, "ancho": 10, "alto": 8, "vx": 0, "vy": 0}
+sea mira = "abajo"
+sea ataque = 0             # segundos que le quedan al espadazo
+sea golpe_id = 0           # cada espadazo, un número: a cada enemigo le da una vez
+sea invencible = 0
+sea empuje = [0, 0]
+sea t_paso = 0
+sea gente = []
+sea enemigos = []
+sea cofres = []
+sea arbustos = []
+sea carteles = []
+sea salidas = []
+sea pozos = []
+sea puerta = nulo
+sea reja = nulo
+sea jefe = nulo
+sea piedra = nulo          # dónde aparece la piedra
+sea rocas = []
+sea sueltos = []           # monedas y corazones que han caído
+sea cam = [0, 0]
+sea cartel_nombre = 0      # cuánto se ve aún el nombre del lugar
+sea saliendo = falso
+sea obtenido = nulo        # el objeto que se acaba de conseguir, en alto
+sea esperando = nulo       # una respuesta de un diálogo que hay que atender
+sea despues = nulo         # un diálogo que va después de levantar un objeto
+sea pausa = falso
+sea en_controles = falso
+sea muerto = 0
+sea jefe_despierto = falso
+
+funcion centro_x(val diccionario c): numero { devolver c["x"] + c["ancho"] / 2 }
+funcion centro_y(val diccionario c): numero { devolver c["y"] + c["alto"] / 2 }
+
+funcion bloquear(val numero px, val numero py, val numero ancho, val numero alto, val texto como): nulo {
+    para (f = matematica.piso(py / 16); f < matematica.techo((py + alto) / 16); f++) {
+        para (c = matematica.piso(px / 16); c < matematica.techo((px + ancho) / 16); c++) {
+            juego.poner_casilla(mapa, c, f, como)
+        }
+    }
+}
+
+funcion propiedad(val diccionario ob, val texto nombre, val cualquiera defecto): cualquiera {
+    si ob["propiedades"].contiene(nombre) { devolver ob["propiedades"][nombre] }
+    devolver defecto
+}
+
+funcion nuevo_enemigo(val texto tipo, val numero px, val numero py, val texto sala): diccionario {
+    sea d = ENEMIGOS[tipo]
+    devolver {"tipo": tipo, "x": px + (16 - d["ancho"]) / 2, "y": py + 16 - d["alto"], "ancho": d["ancho"], "alto": d["alto"],
+              "vx": 0, "vy": 0, "vida": d["vida"], "golpe": -1, "flash": 0, "t": matematica.aleatorio() * 1.5,
+              "estado": "quieto", "sala": sala, "fase": matematica.aleatorio() * 6, "inv": 0}
+}
+
+# Entrar en un mapa: se colocan sus cosas según cómo va la partida
+funcion entrar_mapa(val texto nombre): nulo {
+    nombre_mapa = nombre
+    mapa = MAPAS[nombre]
+    gente = []
+    enemigos = []
+    cofres = []
+    arbustos = []
+    carteles = []
+    salidas = []
+    pozos = []
+    rocas = []
+    sueltos = []
+    puerta = nulo
+    reja = nulo
+    jefe = nulo
+    piedra = nulo
+    jefe_despierto = falso
+    ataque = 0
+    empuje = [0, 0]
+    saliendo = falso
+    juego.borrar_particulas()
+    para cada diccionario ob en mapa["objetos"] {
+        sea px = ob["x"]
+        sea py = ob["y"]
+        elegir ob["tipo"] {
+            caso "entrada" {
+                si partida["x"] == nulo y ob["nombre"] == partida["entrada"] {
+                    yo["x"] = px + 3
+                    yo["y"] = py + 6
+                }
+            }
+            caso "salida" { salidas.agregar(ob) }
+            caso "npc" {
+                sea p = {"nombre": ob["nombre"], "x": px, "y": py, "cara": propiedad(ob, "cara", 85), "fase": px * 0.13}
+                si partida["espada"] y ob["nombre"] == "guardia" { p["x"] = px - 32 }       # se apartan
+                si partida["espada"] y ob["nombre"] == "guardia2" { p["x"] = px + 32 }
+                gente.agregar(p)
+                bloquear(p["x"], p["y"], 16, 16, "#")
+            }
+            caso "enemigo" {
+                sea sala = propiedad(ob, "sala", "")
+                si no (sala == "sala2" y partida["reja"]) {
+                    enemigos.agregar(nuevo_enemigo(ob["nombre"], px, py, sala))
+                }
+            }
+            caso "cofre" {
+                cofres.agregar({"nombre": ob["nombre"], "x": px, "y": py, "contenido": propiedad(ob, "contenido", "monedas"),
+                                "cantidad": propiedad(ob, "cantidad", 5), "abierto": partida["cofres"].contiene(ob["nombre"])})
+                bloquear(px, py, 16, 16, "#")
+            }
+            caso "arbusto" {
+                arbustos.agregar({"x": px, "y": py})
+                bloquear(px, py, 16, 16, "#")
+            }
+            caso "cartel" { carteles.agregar({"x": px, "y": py, "texto": propiedad(ob, "texto", "")}) }
+            caso "guardar" { pozos.agregar({"x": px, "y": py}) }
+            caso "puerta" {
+                puerta = {"x": px, "y": py, "ancho": ob["ancho"], "alto": ob["alto"]}
+                bloquear(px, py, ob["ancho"], ob["alto"], si partida["puerta"] { "." } sino { "#" })
+            }
+            caso "reja" {
+                reja = {"x": px, "y": py, "ancho": ob["ancho"], "alto": ob["alto"], "sala": propiedad(ob, "sala", "")}
+                bloquear(px, py, ob["ancho"], ob["alto"], si partida["reja"] { "." } sino { "#" })
+            }
+            caso "jefe" {
+                si no partida["jefe"] {
+                    jefe = nuevo_enemigo("grum", px, py, "")
+                    jefe["x"] = px + 6
+                    jefe["y"] = py + 14
+                    jefe["estado"] = "dormido"
+                }
+            }
+            caso "piedra" { piedra = {"x": px, "y": py} }
+        }
+    }
+    si partida["x"] != nulo {             # se cargó una partida guardada en un sitio
+        yo["x"] = partida["x"]
+        yo["y"] = partida["y"]
+        partida["x"] = nulo
+        partida["y"] = nulo
+    }
+    partida["mapa"] = nombre
+    guardar_partida()                     # se guarda sola al llegar a cada sitio
+    si nombre == "pueblo" y partida["mision"] == 0 {        # al empezar, la sabia te llama
+        para cada diccionario p en gente { si p["nombre"] == "sabia" { hablar(p) } }
+        mira = "arriba"
+    }
+    juego.musica(MUSICA[mapa["propiedades"]["musica"]], 0.5)
+    cartel_nombre = 2.5
+    colocar_camara(verdadero)
+}
+
+# ── Diálogos ─────────────────────────────────────────────────────────
+funcion decir(val cualquiera paginas): nulo {
+    juego.dialogo(paginas, {"fuente": LETRA, "escala": 1, "sonido": LETRITA, "velocidad": 45})
+}
+
+funcion pagina(val texto quien, val cualquiera cara, val texto t): diccionario {
+    sea p = {"nombre": quien, "texto": t}
+    si cara != nulo { p["retrato"] = [TM, cara] }
+    devolver p
+}
+
+funcion obtener(val cualquiera hoja, val numero cuadro, val texto que): nulo {
+    obtenido = {"hoja": hoja, "cuadro": cuadro, "texto": que, "t": 0}
+    juego.efecto("subir", {"volumen": 0.4})
+}
+
+funcion hablar(val diccionario p): nulo {
+    sea c = p["cara"]
+    elegir p["nombre"] {
+        caso "sabia" {
+            si partida["mision"] == 0 {
+                decir([pagina("Ura", c, "¡Por fin despiertas! Esta noche ha pasado algo terrible."),
+                       pagina("Ura", c, "Grum, el cíclope de las ruinas, ha robado la Piedra del Lince. Sin ella, el bosque se volverá contra el pueblo."),
+                       pagina("Ura", c, "Eres el único que puede recuperarla. Toma: era la espada de tu abuelo.")])
+                despues = "espada"
+            } sino si partida["mision"] == 1 {
+                decir(pagina("Ura", c, "La fortaleza de Grum está al norte del Bosque Viejo. Su puerta está cerrada: busca la llave en el bosque."))
+            } sino si partida["mision"] == 2 {
+                decir([pagina("Ura", c, "¡La Piedra del Lince! ¡Lo has conseguido!"),
+                       pagina("Ura", c, "Mira cómo brilla... El bosque ya está en calma. Valleclaro te debe mucho."),
+                       pagina("Ura", c, "Tu abuelo estaría orgulloso de ti.")])
+                despues = "final"
+            }
+        }
+        caso "guardia" {
+            si partida["espada"] {
+                decir(pagina("Guardia", c, "Ten cuidado en el bosque. Las babosas saltan cuando te acercas."))
+            } sino {
+                decir(pagina("Guardia", c, "Sin espada no te dejo ir al bosque. Habla con la sabia Ura, junto al pozo."))
+            }
+        }
+        caso "guardia2" { decir(pagina("Guardia", c, "Dicen que Grum duerme de día. ¡Pero ronca como un oso!")) }
+        caso "herrero" {
+            decir([pagina("Herrero", c, "Grum lanza rocas, pero es lento. Muévete sin parar y atácale por los lados."),
+                   pagina("Herrero", c, "Y si te hiere, vuelve al pueblo: la tendera vende pociones.")])
+        }
+        caso "tendera" {
+            sea p = pagina("Tendera", c, "¡Bienvenido! ¿Qué te pongo?")
+            p["respuestas"] = ["Poción: 5 monedas", "Corazón: 20 monedas", "Nada, gracias"]
+            decir(p)
+            esperando = "tienda"
+        }
+        caso "abuela" {
+            decir(pagina("Abuela", c, "Corta los arbustos con la espada: a veces esconden monedas o un corazón."))
+        }
+        caso "nino" {
+            si partida["llave"] {
+                decir(pagina("Nico", c, "¡Hala, la llave de la fortaleza! ¿Me dejas tocarla?"))
+            } sino {
+                decir(pagina("Nico", c, "Mi hermana vio un cofre en el claro del este del bosque. ¡Y lo vigilaban babosas!"))
+            }
+        }
+    }
+}
+
+funcion atender_respuestas(): nulo {
+    si juego.dialogo_abierto() { devolver nulo }
+    si despues == "espada" {
+        despues = nulo
+        partida["espada"] = verdadero
+        partida["mision"] = 1
+        obtener(TM, ESPADA, "¡La espada del abuelo!")
+        para cada diccionario p en gente {      # los guardias se apartan
+            si p["nombre"] == "guardia" o p["nombre"] == "guardia2" {
+                bloquear(p["x"], p["y"], 16, 16, ".")
+                p["x"] = p["x"] + (si p["nombre"] == "guardia" { -32 } sino { 32 })
+                bloquear(p["x"], p["y"], 16, 16, "#")
+            }
+        }
+        devolver nulo
+    }
+    si despues == "final" {
+        despues = nulo
+        partida["mision"] = 3
+        juego.olvidar("partida")
+        juego.guardar("logros", {"terminado": verdadero})
+        juego.cambiar_escena("fin", 1.2)
+        devolver nulo
+    }
+    si despues == "piedra" {
+        despues = nulo
+        decir("Vuelve a Valleclaro y llévasela a la sabia Ura.")
+        devolver nulo
+    }
+    si esperando == "tienda" {
+        esperando = nulo
+        sea r = juego.respuesta()
+        si r == "Poción: 5 monedas" {
+            si partida["monedas"] < 5 { decir(pagina("Tendera", 99, "Te faltan monedas, cariño.")) }
+            sino {
+                partida["monedas"] = partida["monedas"] - 5
+                partida["vida"] = partida["maximo"]
+                juego.reproducir(SONIDO["moneda"])
+                juego.efecto("subir", {"volumen": 0.3, "tono": 1.4})
+                decir(pagina("Tendera", 99, "¡Aquí tienes! Ya estás como nuevo."))
+            }
+        }
+        si r == "Corazón: 20 monedas" {
+            si partida["maximo"] >= VIDA_MAXIMA { decir(pagina("Tendera", 99, "Ya no me quedan más, lo siento.")) }
+            sino si partida["monedas"] < 20 { decir(pagina("Tendera", 99, "Te faltan monedas, cariño.")) }
+            sino {
+                partida["monedas"] = partida["monedas"] - 20
+                partida["maximo"] = partida["maximo"] + 2
+                partida["vida"] = partida["maximo"]
+                juego.reproducir(SONIDO["moneda"])
+                obtener(nulo, 0, "¡Un corazón más!")
+            }
+        }
+    }
+    si esperando == "pozo" {
+        esperando = nulo
+        si juego.respuesta() == "Sí" {
+            partida["x"] = yo["x"]
+            partida["y"] = yo["y"]
+            guardar_partida()
+            partida["x"] = nulo
+            partida["y"] = nulo
+            juego.efecto("moneda", {"volumen": 0.3, "tono": 0.8})
+            decir("Partida guardada.")
+        }
+    }
+}
+
+# ── Usar lo que hay delante ──────────────────────────────────────────
+funcion delante(): lista {
+    sea px = centro_x(yo)
+    sea py = centro_y(yo)
+    elegir mira {
+        caso "arriba" { devolver [px, py - 12] }
+        caso "abajo" { devolver [px, py + 12] }
+        caso "izquierda" { devolver [px - 12, py] }
+    }
+    devolver [px + 12, py]
+}
+
+funcion cerca_de(val lista punto, val numero px, val numero py, val numero ancho, val numero alto): logico {
+    devolver juego.dentro(punto[0], punto[1], [px - 3, py - 3, ancho + 6, alto + 6])
+}
+
+funcion usar(): logico {
+    sea d = delante()
+    para cada diccionario p en gente {
+        si cerca_de(d, p["x"], p["y"], 16, 16) {
+            hablar(p)
+            devolver verdadero
+        }
+    }
+    para cada diccionario c en cofres {
+        si cerca_de(d, c["x"], c["y"], 16, 16) {
+            si no c["abierto"] { abrir_cofre(c) }
+            devolver verdadero
+        }
+    }
+    para cada diccionario c en carteles {
+        si cerca_de(d, c["x"], c["y"], 16, 16) {
+            decir({"nombre": "Cartel", "texto": c["texto"]})
+            devolver verdadero
+        }
+    }
+    para cada diccionario p en pozos {
+        si cerca_de(d, p["x"], p["y"], 16, 16) {
+            decir({"texto": "Un pozo de agua clara. ¿Guardar la partida?", "respuestas": ["Sí", "No"]})
+            esperando = "pozo"
+            devolver verdadero
+        }
+    }
+    si puerta != nulo y no partida["puerta"] y cerca_de(d, puerta["x"], puerta["y"] - 16, puerta["ancho"], 32) {
+        si partida["llave"] {
+            partida["puerta"] = verdadero
+            bloquear(puerta["x"], puerta["y"], puerta["ancho"], puerta["alto"], ".")
+            juego.reproducir(SONIDO["llave"])
+            juego.reproducir(SONIDO["puerta"], 0.8)
+            juego.temblor(2, 0.3)
+            decir("La llave gira con un chasquido. ¡La reja se levanta!")
+        } sino {
+            decir("Una reja de hierro cierra la entrada. Tiene una cerradura enorme.")
+        }
+        devolver verdadero
+    }
+    devolver falso
+}
+
+funcion abrir_cofre(val diccionario c): nulo {
+    c["abierto"] = verdadero
+    partida["cofres"].agregar(c["nombre"])
+    juego.reproducir(SONIDO["cofre"])
+    elegir c["contenido"] {
+        caso "llave" {
+            partida["llave"] = verdadero
+            obtener(TP, LLAVE, "¡La llave de la fortaleza!")
+        }
+        caso "corazon" {
+            partida["maximo"] = matematica.minimo(VIDA_MAXIMA, partida["maximo"] + 2)
+            partida["vida"] = partida["maximo"]
+            obtener(nulo, 0, "¡Un corazón más!")
+        }
+        caso "pocion" {
+            partida["vida"] = partida["maximo"]
+            obtener(TM, 115, "¡Una poción! Te cura del todo.")
+        }
+        caso "monedas" {
+            partida["monedas"] = partida["monedas"] + c["cantidad"]
+            juego.reproducir(SONIDO["moneda"])
+            obtener(nulo, 1, "¡{c["cantidad"]} monedas!")
+        }
+    }
+}
+
+# ── El héroe ─────────────────────────────────────────────────────────
+funcion mover_heroe(val numero dt): nulo {
+    sea dx = juego.direccion("izquierda", "derecha")
+    sea dy = juego.direccion("arriba", "abajo")
+    si ataque > 0 {                       # mientras da el espadazo, va más despacio
+        dx = dx * 0.3
+        dy = dy * 0.3
+    } sino {
+        si dx < 0 { mira = "izquierda" }
+        si dx > 0 { mira = "derecha" }
+        si dy < 0 y dx == 0 { mira = "arriba" }
+        si dy > 0 y dx == 0 { mira = "abajo" }
+    }
+    sea largo = matematica.longitud(dx, dy)
+    si largo > 1 {
+        dx = dx / largo
+        dy = dy / largo
+    }
+    yo["vx"] = dx * VELOCIDAD + empuje[0]
+    yo["vy"] = dy * VELOCIDAD + empuje[1]
+    empuje = [matematica.acercar(empuje[0], 0, 900 * dt), matematica.acercar(empuje[1], 0, 900 * dt)]
+    juego.mover_en_mapa(mapa, yo, dt)
+    # los pasos
+    si largo > 0.1 {
+        t_paso = t_paso - dt
+        si t_paso <= 0 {
+            t_paso = 0.3
+            sea pasos = si nombre_mapa == "fortaleza" { SONIDO["piedra"] } sino { SONIDO["hierba"] }
+            juego.reproducir(pasos[matematica.aleatorio(0, 1)], {"volumen": 0.18, "tono": 0.9 + matematica.aleatorio() * 0.2})
+        }
+    } sino {
+        t_paso = 0.05
+    }
+    si juego.accion_pulsada("accion") {
+        si no usar() y partida["espada"] y ataque <= 0 {
+            ataque = 0.25
+            golpe_id = golpe_id + 1
+            juego.reproducir(SONIDO["espada"], {"volumen": 0.5, "tono": 0.9 + matematica.aleatorio() * 0.2})
+        }
+    }
+    ataque = matematica.maximo(0, ataque - dt)
+    invencible = matematica.maximo(0, invencible - dt)
+}
+
+# El rectángulo al que llega la espada
+funcion alcance(): lista {
+    sea px = yo["x"]
+    sea py = yo["y"]
+    elegir mira {
+        caso "arriba" { devolver [px - 5, py - 20, 20, 18] }
+        caso "abajo" { devolver [px - 5, py + 4, 20, 18] }
+        caso "izquierda" { devolver [px - 16, py - 10, 18, 20] }
+    }
+    devolver [px + 8, py - 10, 18, 20]
+}
+
+funcion herir_heroe(val numero dano, val numero desde_x, val numero desde_y): nulo {
+    si invencible > 0 o obtenido != nulo { devolver nulo }
+    partida["vida"] = partida["vida"] - dano
+    invencible = 1.0
+    sea dir = matematica.normalizar(centro_x(yo) - desde_x, centro_y(yo) - desde_y)
+    empuje = [dir[0] * 220, dir[1] * 220]
+    juego.reproducir(SONIDO["dano"], 0.7)
+    juego.temblor(3, 0.2)
+    si partida["vida"] <= 0 {
+        partida["vida"] = 0
+        muerto = 1.2
+        juego.musica(nulo)
+        juego.efecto("perder", {"volumen": 0.5})
+    }
+}
+
+# ── Los enemigos ─────────────────────────────────────────────────────
+funcion soltar(val numero px, val numero py): nulo {
+    sea r = matematica.aleatorio()
+    si r < 0.35 { sueltos.agregar({"tipo": "moneda", "x": px, "y": py, "t": 0}) }
+    sino si r < 0.55 y partida["vida"] < partida["maximo"] { sueltos.agregar({"tipo": "corazon", "x": px, "y": py, "t": 0}) }
+}
+
+funcion herir_enemigo(val diccionario e, val numero dano): nulo {
+    e["vida"] = e["vida"] - dano
+    e["golpe"] = golpe_id
+    e["flash"] = 0.2
+    sea dir = matematica.normalizar(centro_x(e) - centro_x(yo), centro_y(e) - centro_y(yo))
+    sea fuerza = 170
+    si e["tipo"] != "grum" {                # a Grum un golpe no le para: sigue con lo suyo
+        e["vx"] = dir[0] * fuerza
+        e["vy"] = dir[1] * fuerza
+        e["estado"] = "empujado"
+        e["t"] = 0.18
+    }
+    juego.reproducir(SONIDO["golpe"], {"volumen": 0.6, "tono": 0.9 + matematica.aleatorio() * 0.2})
+    juego.particulas(centro_x(e), centro_y(e), {"cantidad": 8, "color": [255, 255, 255], "velocidad": [40, 120],
+                                                 "vida": [0.1, 0.3], "tamaño": 2})
+}
+
+funcion morir_enemigo(val diccionario e): nulo {
+    juego.particulas(centro_x(e), centro_y(e), {"cantidad": 24, "color": [255, 240, 200], "color_final": [120, 90, 160, 0],
+                                                 "velocidad": [30, 110], "vida": [0.3, 0.7], "tamaño": 3, "tamaño_final": 0})
+    juego.efecto("explosion", {"volumen": 0.25, "tono": 1.6, "largo": 0.5})
+    soltar(e["x"], e["y"])
+}
+
+funcion pensar_enemigo(val diccionario e, val numero dt): nulo {
+    sea dx = centro_x(yo) - centro_x(e)
+    sea dy = centro_y(yo) - centro_y(e)
+    sea d = matematica.longitud(dx, dy)
+    sea hacia = matematica.normalizar(dx, dy)
+    e["t"] = e["t"] - dt
+    e["flash"] = matematica.maximo(0, e["flash"] - dt)
+    si e["estado"] == "empujado" {
+        si e["t"] <= 0 {
+            e["estado"] = "quieto"
+            e["t"] = 0.4
+            e["vx"] = 0
+            e["vy"] = 0
+        }
+    } sino {
+        elegir e["tipo"] {
+            caso "babosa" {                           # da saltitos; si te ve, hacia ti
+                si e["t"] <= 0 {
+                    si e["estado"] == "salto" {
+                        e["estado"] = "quieto"
+                        e["t"] = 0.6 + matematica.aleatorio() * 0.6
+                        e["vx"] = 0
+                        e["vy"] = 0
+                    } sino {
+                        e["estado"] = "salto"
+                        e["t"] = 0.35
+                        sea dir = si d < 100 { hacia } sino { matematica.vector(matematica.aleatorio(0, 359), 1) }
+                        e["vx"] = dir[0] * 55
+                        e["vy"] = dir[1] * 55
+                    }
+                }
+            }
+            caso "arana" {                            # se acerca a trompicones, muy deprisa
+                si e["t"] <= 0 {
+                    si e["estado"] == "carrera" {
+                        e["estado"] = "quieto"
+                        e["t"] = 0.7 + matematica.aleatorio() * 0.5
+                        e["vx"] = 0
+                        e["vy"] = 0
+                    } sino si d < 140 {
+                        e["estado"] = "carrera"
+                        e["t"] = 0.3
+                        e["vx"] = hacia[0] * 120
+                        e["vy"] = hacia[1] * 120
+                    } sino {
+                        e["t"] = 0.5
+                    }
+                }
+            }
+            caso "murcielago" {                       # revolotea hacia ti
+                e["fase"] = e["fase"] + dt * 6
+                si d < 130 {
+                    e["vx"] = hacia[0] * 42 + matematica.coseno(e["fase"]) * 40
+                    e["vy"] = hacia[1] * 42 + matematica.seno(e["fase"] * 1.3) * 40
+                } sino {
+                    e["vx"] = matematica.coseno(e["fase"] * 0.5) * 20
+                    e["vy"] = matematica.seno(e["fase"] * 0.7) * 20
+                }
+            }
+            caso "fantasma" {                         # atraviesa las paredes, despacito
+                e["fase"] = e["fase"] + dt * 3
+                si d < 160 {
+                    e["vx"] = hacia[0] * 26
+                    e["vy"] = hacia[1] * 26 + matematica.seno(e["fase"]) * 10
+                } sino {
+                    e["vx"] = 0
+                    e["vy"] = matematica.seno(e["fase"]) * 10
+                }
+            }
+        }
+    }
+    # moverse
+    si e["tipo"] == "murcielago" o e["tipo"] == "fantasma" {
+        e["x"] = matematica.limitar(e["x"] + e["vx"] * dt, 0, mapa["ancho"] - e["ancho"])
+        e["y"] = matematica.limitar(e["y"] + e["vy"] * dt, 0, mapa["alto"] - e["alto"])
+    } sino {
+        juego.mover_en_mapa(mapa, e, dt)
+    }
+    # ¿te toca?
+    si juego.colision(e, yo) { herir_heroe(ENEMIGOS[e["tipo"]]["dano"], centro_x(e), centro_y(e)) }
+}
+
+# Grum: anda hacia ti, se para y lanza rocas; con la mitad de la vida, más deprisa y más rocas
+funcion pensar_jefe(val numero dt): nulo {
+    sea e = jefe
+    e["flash"] = matematica.maximo(0, e["flash"] - dt)
+    e["inv"] = matematica.maximo(0, e["inv"] - dt)
+    sea furioso = e["vida"] <= ENEMIGOS["grum"]["vida"] / 2
+    si e["estado"] == "dormido" {
+        si yo["y"] < 12 * 16 {
+            e["estado"] = "despierta"
+            e["t"] = 1.0
+            jefe_despierto = verdadero
+            juego.musica(MUSICA["jefe"], 0.6)
+            juego.temblor(3, 0.6)
+            decir(pagina("Grum", 109, "¡GRRR! ¿Quién se atreve a despertar a Grum? ¡La piedra es MÍA!"))
+        }
+        devolver nulo
+    }
+    e["t"] = e["t"] - dt
+    sea hacia = matematica.normalizar(centro_x(yo) - centro_x(e), centro_y(yo) - centro_y(e))
+    elegir e["estado"] {
+        caso "despierta" {
+            si e["t"] <= 0 {
+                e["estado"] = "andar"
+                e["t"] = 2
+            }
+        }
+        caso "andar" {
+            sea rapidez = si furioso { 46 } sino { 30 }
+            e["vx"] = hacia[0] * rapidez
+            e["vy"] = hacia[1] * rapidez
+            si e["t"] <= 0 {
+                e["estado"] = "lanzar"
+                e["t"] = 0.7
+                e["vx"] = 0
+                e["vy"] = 0
+            }
+        }
+        caso "lanzar" {
+            si e["t"] <= 0 {
+                sea cuantas = si furioso { 5 } sino { 3 }
+                sea base = matematica.angulo(centro_x(e), centro_y(e), centro_x(yo), centro_y(yo))
+                para (i = 0; i < cuantas; i++) {
+                    sea v = matematica.vector(base + (i - (cuantas - 1) / 2) * 18, si furioso { 105 } sino { 85 })
+                    rocas.agregar({"x": centro_x(e), "y": centro_y(e) - 6, "vx": v[0], "vy": v[1], "t": 3})
+                }
+                juego.reproducir(SONIDO["roca"], 0.6)
+                si furioso y no e.contiene("llamo") {      # llama a sus murciélagos
+                    e["llamo"] = verdadero
+                    para (i = 0; i < 2; i++) { enemigos.agregar(nuevo_enemigo("murcielago", e["x"] - 30 + i * 60, e["y"] - 20, "")) }
+                }
+                e["estado"] = "cansado"
+                e["t"] = si furioso { 0.6 } sino { 1.1 }
+            }
+        }
+        caso "cansado" {
+            si e["t"] <= 0 {
+                e["estado"] = "andar"
+                e["t"] = 1.6 + matematica.aleatorio()
+            }
+        }
+        caso "empujado" {
+            si e["t"] <= 0 {
+                e["estado"] = "andar"
+                e["t"] = 1.2
+            }
+        }
+    }
+    juego.mover_en_mapa(mapa, e, dt)
+    si juego.colision(e, yo) { herir_heroe(1, centro_x(e), centro_y(e)) }
+}
+
+funcion mover_enemigos(val numero dt): nulo {
+    sea golpe = alcance()
+    para cada diccionario e en enemigos {
+        pensar_enemigo(e, dt)
+        si ataque > 0 y e["golpe"] != golpe_id y juego.colision(golpe, e) { herir_enemigo(e, 1) }
+    }
+    sea vivos = filtrar(enemigos, funcion(val diccionario e): logico { devolver e["vida"] > 0 })
+    si vivos.longitud() != enemigos.longitud() {
+        para cada diccionario e en enemigos { si e["vida"] <= 0 { morir_enemigo(e) } }
+        enemigos = vivos
+    }
+    si jefe != nulo {
+        pensar_jefe(dt)
+        si ataque > 0 y jefe["golpe"] != golpe_id y jefe["inv"] <= 0 y jefe["estado"] != "dormido" y juego.colision(golpe, jefe) {
+            herir_enemigo(jefe, 1)
+            jefe["inv"] = 0.7                   # tras un golpe, un momento sin que le hagan nada
+            juego.temblor(1.5, 0.15)
+        }
+        si jefe["vida"] <= 0 { vencer_jefe() }
+    }
+    # las rocas de Grum
+    para cada diccionario r en rocas {
+        r["x"] = r["x"] + r["vx"] * dt
+        r["y"] = r["y"] + r["vy"] * dt
+        r["t"] = r["t"] - dt
+        si juego.solido(mapa, matematica.piso(r["x"] / 16), matematica.piso(r["y"] / 16)) { r["t"] = 0 }
+        si juego.colision_circulo_rect([r["x"], r["y"], 3], yo) {
+            herir_heroe(1, r["x"], r["y"])
+            r["t"] = 0
+        }
+        si ataque > 0 y juego.colision_circulo_rect([r["x"], r["y"], 3], golpe) {      # se pueden devolver... o romper
+            r["t"] = 0
+            juego.particulas(r["x"], r["y"], {"cantidad": 6, "color": [170, 110, 40], "velocidad": [30, 90], "vida": [0.2, 0.4], "tamaño": 2})
+        }
+    }
+    rocas = filtrar(rocas, funcion(val diccionario r): logico { devolver r["t"] > 0 })
+    # la reja: se abre cuando no queda nadie en su sala
+    si reja != nulo y no partida["reja"] {
+        sea quedan = filtrar(enemigos, funcion(val diccionario e): logico { devolver e["sala"] == reja["sala"] })
+        si quedan.longitud() == 0 {
+            partida["reja"] = verdadero
+            bloquear(reja["x"], reja["y"], reja["ancho"], reja["alto"], ".")
+            juego.reproducir(SONIDO["puerta"])
+            juego.temblor(2, 0.4)
+            juego.particulas(reja["x"] + reja["ancho"] / 2, reja["y"] + 8, {"cantidad": 30, "color": [200, 200, 220],
+                                                                           "velocidad": [20, 80], "vida": [0.3, 0.8]})
+        }
+    }
+}
+
+funcion vencer_jefe(): nulo {
+    juego.particulas(centro_x(jefe), centro_y(jefe), {"cantidad": 80, "color": [255, 230, 150], "color_final": [200, 60, 40, 0],
+                                                       "velocidad": [40, 200], "vida": [0.5, 1.2], "tamaño": 4, "tamaño_final": 0})
+    juego.efecto("explosion", {"volumen": 0.5, "largo": 1.5, "tono": 0.7})
+    juego.temblor(5, 0.8)
+    juego.congelar(0.25)
+    partida["jefe"] = verdadero
+    jefe = nulo
+    rocas = []
+    enemigos = []
+    juego.musica(MUSICA["mazmorra"], 0.5)
+}
+
+# ── Lo que se coge del suelo ─────────────────────────────────────────
+funcion recoger(val numero dt): nulo {
+    para cada diccionario s en sueltos {
+        s["t"] = s["t"] + dt
+        si juego.colision([s["x"] + 4, s["y"] + 4, 8, 8], yo) {
+            s["t"] = 99
+            si s["tipo"] == "moneda" {
+                partida["monedas"] = partida["monedas"] + 1
+                juego.reproducir(SONIDO["moneda"], 0.5)
+            } sino {
+                partida["vida"] = matematica.minimo(partida["maximo"], partida["vida"] + 2)
+                juego.efecto("moneda", {"volumen": 0.3, "tono": 1.5})
+            }
+        }
+    }
+    sueltos = filtrar(sueltos, funcion(val diccionario s): logico { devolver s["t"] < 9 })
+    # la piedra, cuando Grum ya no está
+    si piedra != nulo y partida["jefe"] y no partida["piedra"] y juego.colision([piedra["x"], piedra["y"], 16, 16], yo) {
+        partida["piedra"] = verdadero
+        partida["mision"] = 2
+        obtener(nulo, 2, "¡La Piedra del Lince!")
+        despues = "piedra"
+    }
+}
+
+funcion cortar_arbustos(): nulo {
+    si ataque <= 0 { devolver nulo }
+    sea golpe = alcance()
+    sea quedan = []
+    para cada diccionario a en arbustos {
+        si juego.colision(golpe, [a["x"] + 2, a["y"] + 2, 12, 12]) {
+            bloquear(a["x"], a["y"], 16, 16, ".")
+            juego.reproducir(SONIDO["arbusto"], 0.6)
+            juego.particulas(a["x"] + 8, a["y"] + 8, {"cantidad": 14, "color": [80, 170, 70], "color_final": [40, 100, 40, 0],
+                                                       "velocidad": [30, 100], "vida": [0.3, 0.6], "tamaño": 3, "gravedad": 120})
+            soltar(a["x"], a["y"])
+        } sino {
+            quedan.agregar(a)
+        }
+    }
+    arbustos = quedan
+}
+
+# ── Salidas a otros mapas ────────────────────────────────────────────
+funcion mirar_salidas(): nulo {
+    si saliendo { devolver nulo }
+    para cada diccionario s en salidas {
+        si juego.colision(yo, [s["x"], s["y"], s["ancho"], s["alto"]]) {
+            saliendo = verdadero
+            partida["entrada"] = s["propiedades"]["entrada"]
+            juego.cambiar_escena(s["propiedades"]["destino"], 0.5)
+        }
+    }
+}
+
+# ── La cámara y el dibujo ────────────────────────────────────────────
+funcion colocar_camara(val logico de_golpe): nulo {
+    sea ox = matematica.limitar(centro_x(yo) - ANCHO / 2, 0, matematica.maximo(0, mapa["ancho"] - ANCHO))
+    sea oy = matematica.limitar(centro_y(yo) - ALTO / 2, 0, matematica.maximo(0, mapa["alto"] - ALTO))
+    si de_golpe { cam = [ox, oy] } sino { cam = [juego.acercar(cam[0], ox, 10), juego.acercar(cam[1], oy, 10)] }
+}
+
+funcion dibujar_tile(val cualquiera hoja, val numero cuadro, val numero px, val numero py, val cualquiera mas = nulo): nulo {
+    sea op = {"cuadro": cuadro}
+    si mas != nulo { para cada texto c en mas { op[c] = mas[c] } }
+    juego.dibujar(hoja, matematica.redondear(px), matematica.redondear(py), op)
+}
+
+funcion sombra(val numero px, val numero py, val numero ancho): nulo {
+    juego.rectangulo(matematica.redondear(px - ancho / 2), matematica.redondear(py - 1), ancho, 3, [0, 0, 0, 60])
+}
+
+funcion dibujar_heroe(): nulo {
+    si invencible > 0 y juego.cuadro(2, 16) == 0 { devolver nulo }
+    sea px = yo["x"] - 3
+    sea py = yo["y"] - 8
+    sea andando = matematica.longitud(yo["vx"], yo["vy"]) > 5
+    sea bote = si andando { juego.cuadro([0, -1], 8) } sino { 0 }
+    sombra(centro_x(yo), yo["y"] + yo["alto"], 10)
+    # la espada, detrás si mira hacia arriba
+    si ataque > 0 y mira == "arriba" { dibujar_espada() }
+    dibujar_tile(TM, HEROE, px, py + bote, {"espejo": mira == "izquierda"})
+    si ataque > 0 y mira != "arriba" { dibujar_espada() }
+}
+
+funcion dibujar_espada(): nulo {
+    sea base = {"derecha": 0, "abajo": 90, "izquierda": 180, "arriba": 270}[mira]
+    sea avance = 1 - ataque / 0.25                          # de 0 a 1 durante el espadazo
+    sea ang = base - 70 + avance * 140
+    sea punta = matematica.vector(ang, 10)
+    juego.dibujar(TM, centro_x(yo) + punta[0], centro_y(yo) - 3 + punta[1],
+                  {"cuadro": ESPADA, "angulo": ang + 90, "centrado": verdadero})
+}
+
+funcion dibujar_enemigo(val diccionario e): nulo {
+    sea d = ENEMIGOS[e["tipo"]]
+    sea px = centro_x(e) - 8
+    sea py = e["y"] + e["alto"] - 16
+    sea op = {"blanco": si e["flash"] > 0 { 0.8 } sino { 0 }, "espejo": centro_x(yo) < centro_x(e)}
+    si e["tipo"] == "babosa" {
+        sea aplasta = si e["estado"] == "salto" { -2 } sino { matematica.seno(juego.tiempo() * 6 + e["fase"]) }
+        sombra(centro_x(e), e["y"] + e["alto"], 10)
+        dibujar_tile(TM, d["cuadro"], px, py + aplasta, op)
+    } sino si e["tipo"] == "murcielago" {
+        sombra(centro_x(e), e["y"] + e["alto"] + 8, 6)
+        dibujar_tile(TM, d["cuadro"], px, py + matematica.seno(juego.tiempo() * 14 + e["fase"]) * 1.5, op)
+    } sino si e["tipo"] == "fantasma" {
+        op["alfa"] = 150 + matematica.seno(juego.tiempo() * 4 + e["fase"]) * 60
+        dibujar_tile(TM, d["cuadro"], px, py, op)
+    } sino {
+        sombra(centro_x(e), e["y"] + e["alto"], 10)
+        dibujar_tile(TM, d["cuadro"], px, py, op)
+    }
+}
+
+funcion dibujar_jefe(): nulo {
+    sea e = jefe
+    sea op = {"blanco": si e["flash"] > 0 { 0.8 } sino { 0 }, "escala": 2, "espejo": centro_x(yo) < centro_x(e)}
+    sea px = centro_x(e) - 16
+    sea py = e["y"] + e["alto"] - 32
+    si e["estado"] == "dormido" {                             # duerme: zzz
+        py = py + 2
+        sea z = (juego.tiempo() * 0.8) % 1
+        juego.texto("z", px + 26 + z * 6, py - z * 14, {"fuente": LETRA, "color": [255, 255, 255, 255 * (1 - z)]})
+    }
+    si e["estado"] == "lanzar" {                              # avisa antes de lanzar
+        px = px + matematica.seno(juego.tiempo() * 60) * 1
+    }
+    sombra(centro_x(e), e["y"] + e["alto"], 22)
+    dibujar_tile(TM, ENEMIGOS["grum"]["cuadro"], px, py, op)
+}
+
+funcion dibujar_mundo(): nulo {
+    juego.limpiar([20, 12, 18])
+    juego.camara(matematica.redondear(cam[0]), matematica.redondear(cam[1]))
+    juego.dibujar_tiled(mapa, ["Suelo", "Decorado"])
+    # la puerta y la reja, cerradas
+    si puerta != nulo y no partida["puerta"] {
+        dibujar_tile(TP, 111, puerta["x"], puerta["y"] - 16)
+        dibujar_tile(TP, 112, puerta["x"] + 16, puerta["y"] - 16)
+        para (i = 0; i < 6; i++) { juego.rectangulo(puerta["x"] + 3 + i * 5, puerta["y"], 2, 16, [60, 60, 80]) }
+        juego.rectangulo(puerta["x"] + 1, puerta["y"] + 6, 30, 2, [60, 60, 80])
+    }
+    si reja != nulo y no partida["reja"] {
+        dibujar_tile(TM, REJA, reja["x"], reja["y"])
+        dibujar_tile(TM, REJA, reja["x"] + 16, reja["y"])
+    }
+    # todo lo demás, ordenado por su base (lo de más abajo tapa a lo de arriba)
+    sea cosas = []
+    para cada diccionario c en cofres { cosas.agregar({"y": c["y"] + 16, "que": "cofre", "c": c}) }
+    para cada diccionario a en arbustos { cosas.agregar({"y": a["y"] + 16, "que": "arbusto", "c": a}) }
+    para cada diccionario p en gente { cosas.agregar({"y": p["y"] + 16, "que": "gente", "c": p}) }
+    para cada diccionario e en enemigos { cosas.agregar({"y": e["y"] + e["alto"] + (si e["tipo"] == "murcielago" { 10 } sino { 0 }), "que": "enemigo", "c": e}) }
+    para cada diccionario s en sueltos { cosas.agregar({"y": s["y"] + 12, "que": "suelto", "c": s}) }
+    si jefe != nulo { cosas.agregar({"y": jefe["y"] + jefe["alto"], "que": "jefe", "c": jefe}) }
+    si piedra != nulo y partida["jefe"] y no partida["piedra"] { cosas.agregar({"y": piedra["y"] + 16, "que": "piedra", "c": piedra}) }
+    si muerto <= 0 o juego.cuadro(2, 10) == 0 { cosas.agregar({"y": yo["y"] + yo["alto"], "que": "heroe", "c": yo}) }
+    cosas.ordenar(funcion(val diccionario a, val diccionario b): numero { devolver a["y"] - b["y"] })
+    para cada diccionario k en cosas {
+        sea c = k["c"]
+        elegir k["que"] {
+            caso "cofre" { dibujar_tile(TM, si c["abierto"] { COFRE_ABIERTO } sino { COFRE }, c["x"], c["y"]) }
+            caso "arbusto" { dibujar_tile(TP, ARBUSTO, c["x"], c["y"]) }
+            caso "gente" {
+                sea respira = si juego.cuadro(2, 1.5, c["fase"]) == 0 { 0 } sino { -1 }
+                sombra(c["x"] + 8, c["y"] + 15, 10)
+                dibujar_tile(TM, c["cara"], c["x"], c["y"] + respira, {"espejo": centro_x(yo) < c["x"] + 8})
+            }
+            caso "enemigo" { dibujar_enemigo(c) }
+            caso "jefe" { dibujar_jefe() }
+            caso "suelto" {
+                sea parpadea = c["t"] > 6 y juego.cuadro(2, 10) == 0
+                si no parpadea {
+                    sea bote = matematica.maximo(0, 6 - c["t"] * 30) * matematica.abs(matematica.seno(c["t"] * 12))
+                    si c["tipo"] == "moneda" { juego.dibujar(MONEDA, c["x"] + 5, c["y"] + 6 - bote) }
+                    sino { juego.dibujar(CORAZON, c["x"] + 4, c["y"] + 6 - bote) }
+                }
+            }
+            caso "piedra" {
+                sea flota = matematica.seno(juego.tiempo() * 3) * 2
+                juego.dibujar(PIEDRA, c["x"] + 8, c["y"] + 4 + flota, {"centrado": verdadero, "escala": 1})
+                juego.circulo(c["x"] + 8, c["y"] + 4 + flota, 9 + matematica.seno(juego.tiempo() * 5) * 2, [120, 255, 180, 50])
+            }
+            caso "heroe" { dibujar_heroe() }
+        }
+    }
+    para cada diccionario r en rocas { juego.dibujar(ROCA, r["x"] - 2, r["y"] - 2) }
+    juego.dibujar_particulas()
+    juego.camara()
+}
+
+funcion dibujar_marcador(): nulo {
+    # los corazones
+    para (i = 0; i < partida["maximo"] / 2; i++) {
+        sea queda = partida["vida"] - i * 2
+        sea img = si queda >= 2 { CORAZON } sino si queda == 1 { MEDIO_CORAZON } sino { SIN_CORAZON }
+        juego.dibujar(img, 6 + i * 9, 6)
+    }
+    # las monedas y lo que lleva
+    juego.dibujar(MONEDA, ANCHO - 40, 6)
+    juego.texto("{partida["monedas"]}", ANCHO - 31, 6, {"fuente": LETRA})
+    sea px = ANCHO - 58
+    si partida["llave"] y no partida["puerta"] {
+        dibujar_tile(TP, LLAVE, px, 2)
+        px = px - 16
+    }
+    si partida["espada"] { dibujar_tile(TM, ESPADA, px, 2) }
+    # la vida de Grum
+    si jefe != nulo y jefe_despierto y no juego.dialogo_abierto() {
+        sea total = ENEMIGOS["grum"]["vida"]
+        juego.texto("GRUM", ANCHO / 2, ALTO - 20, {"fuente": LETRA, "alinear": "centro", "color": [255, 200, 120]})
+        juego.rectangulo(ANCHO / 2 - 61, ALTO - 11, 122, 6, [20, 10, 20])
+        juego.rectangulo(ANCHO / 2 - 60, ALTO - 10, 120 * jefe["vida"] / total, 4, [220, 60, 60])
+    }
+    # el nombre del sitio, al entrar
+    si cartel_nombre > 0 {
+        sea alfa = matematica.minimo(1, cartel_nombre) * 255
+        sea nombre = mapa["propiedades"]["nombre"]
+        sea w = juego.ancho_texto(nombre, {"fuente": LETRA}) + 16
+        juego.rectangulo(ANCHO / 2 - w / 2, 22, w, 16, [10, 10, 20, alfa * 0.7])
+        juego.texto(nombre, ANCHO / 2, 26, {"fuente": LETRA, "alinear": "centro", "color": [255, 230, 160, alfa]})
+    }
+}
+
+funcion dibujar_obtenido(): nulo {
+    sea ob = obtenido
+    sea px = yo["x"] - 3
+    sea py = yo["y"] - 8
+    juego.camara(matematica.redondear(cam[0]), matematica.redondear(cam[1]))
+    sea sube = matematica.minimo(1, ob["t"] * 4) * 6
+    sea cx = px + 8
+    sea cy = py - 6 - sube
+    juego.circulo(cx, cy, 10 + matematica.seno(juego.tiempo() * 6) * 2, [255, 255, 200, 60])
+    si ob["hoja"] != nulo { dibujar_tile(ob["hoja"], ob["cuadro"], cx - 8, cy - 8) }
+    sino si ob["cuadro"] == 0 { juego.dibujar(CORAZON, cx - 3, cy - 3, {"escala": 1}) }
+    sino si ob["cuadro"] == 1 { juego.dibujar(MONEDA, cx - 3, cy - 3) }
+    sino { juego.dibujar(PIEDRA, cx, cy, {"centrado": verdadero}) }
+    juego.camara()
+    sea w = juego.ancho_texto(ob["texto"], {"fuente": LETRA}) + 16
+    juego.rectangulo(ANCHO / 2 - w / 2, ALTO - 34, w, 18, [10, 10, 30, 220])
+    juego.contorno(ANCHO / 2 - w / 2, ALTO - 34, w, 18, [255, 230, 160])
+    juego.texto(ob["texto"], ANCHO / 2, ALTO - 29, {"fuente": LETRA, "alinear": "centro", "color": [255, 240, 200]})
+}
+
+# ── Las escenas ──────────────────────────────────────────────────────
+funcion jugar(): nulo {
+    si juego.escena_nueva() { entrar_mapa(juego.escena()) }
+    sea dt = juego.dt()
+    si en_controles {
+        dibujar_mundo()
+        juego.cubrir([0, 0, 0, 210])
+        si juego.menu_controles({"acciones": ["izquierda", "derecha", "arriba", "abajo", "accion", "pausa"],
+                                 "nombres": {"accion": "hablar / espada"}, "fuente": LETRA, "escala": 1}) == "volver" {
+            en_controles = falso
+        }
+        devolver nulo
+    }
+    si pausa {
+        dibujar_mundo()
+        dibujar_marcador()
+        juego.cubrir([0, 0, 0, 160])
+        juego.texto("PAUSA", ANCHO / 2, 40, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]})
+        sea e = juego.menu(["Continuar", "Controles", "Volver a la portada"],
+                           {"fuente": LETRA, "escala": 1, "y": 80, "atras": "Continuar", "separacion": 8})
+        si e == "Continuar" { pausa = falso }
+        si e == "Controles" { en_controles = verdadero }
+        si e == "Volver a la portada" {
+            pausa = falso
+            juego.cambiar_escena("portada", 0.6)
+        }
+        devolver nulo
+    }
+    si muerto > 0 {
+        muerto = muerto - dt
+        si muerto <= 0 { juego.cambiar_escena("derrota", 0.8) }
+    } sino si obtenido != nulo {
+        obtenido["t"] = obtenido["t"] + dt
+        si obtenido["t"] > 1.6 { obtenido = nulo }
+    } sino si juego.dialogo_abierto() {
+        atender_respuestas()
+    } sino si no saliendo {
+        atender_respuestas()
+        si no juego.dialogo_abierto() y obtenido == nulo {
+            mover_heroe(dt)
+            mover_enemigos(dt)
+            cortar_arbustos()
+            recoger(dt)
+            mirar_salidas()
+            si juego.accion_pulsada("pausa") { pausa = verdadero }
+        }
+    }
+    cartel_nombre = matematica.maximo(0, cartel_nombre - dt)
+    colocar_camara(falso)
+    dibujar_mundo()
+    dibujar_marcador()
+    si obtenido != nulo { dibujar_obtenido() }
+}
+
+sea guardada = nulo
+sea terminado = falso
+
+funcion portada(): nulo {
+    si juego.escena_nueva() {
+        guardada = juego.cargar("partida")
+        terminado = juego.cargar("logros", {"terminado": falso})["terminado"]
+        mapa = MAPAS["pueblo"]
+        juego.musica(MUSICA["pueblo"], 0.5)
+        juego.borrar_particulas()
+    }
+    # de fondo, el pueblo, de un lado a otro muy despacio
+    sea t = juego.tiempo_escena()
+    juego.limpiar([0, 0, 0])
+    juego.camara(matematica.redondear((mapa["ancho"] - ANCHO) * (0.5 + 0.5 * matematica.seno(t * 0.08))), 60)
+    juego.dibujar_tiled(mapa, ["Suelo", "Decorado"])
+    juego.camara()
+    juego.cubrir([10, 14, 30, 150])
+    # el título
+    sea py = 26 + matematica.seno(t * 1.5) * 2
+    juego.texto("LA PIEDRA", ANCHO / 2 + 2, py + 2, {"fuente": GRANDE, "alinear": "centro", "color": [20, 10, 20]})
+    juego.texto("LA PIEDRA", ANCHO / 2, py, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]})
+    juego.texto("DEL LINCE", ANCHO / 2 + 2, py + 22, {"fuente": GRANDE, "alinear": "centro", "color": [20, 10, 20]})
+    juego.texto("DEL LINCE", ANCHO / 2, py + 20, {"fuente": GRANDE, "alinear": "centro", "color": [120, 230, 170]})
+    juego.dibujar(PIEDRA, ANCHO / 2, py + 52, {"centrado": verdadero, "escala": 2})
+    si terminado { juego.texto("TERMINADO", ANCHO - 6, ALTO - 12, {"fuente": LETRA, "alinear": "derecha", "color": [255, 220, 120]}) }
+    juego.texto("Hecho con Lince", 6, ALTO - 12, {"fuente": LETRA, "color": [180, 180, 200]})
+    sea opciones = si guardada != nulo { ["Continuar", "Nueva partida", "Controles", "Salir"] } sino { ["Nueva partida", "Controles", "Salir"] }
+    si en_controles {
+        juego.cubrir([0, 0, 0, 200])
+        si juego.menu_controles({"acciones": ["izquierda", "derecha", "arriba", "abajo", "accion", "pausa"],
+                                 "nombres": {"accion": "hablar / espada"}, "fuente": LETRA, "escala": 1}) == "volver" {
+            en_controles = falso
+        }
+        devolver nulo
+    }
+    sea e = juego.menu(opciones, {"fuente": LETRA, "escala": 1, "y": 104, "separacion": 6})
+    si e == "Continuar" {
+        partida = guardada
+        empezar_partida()
+    }
+    si e == "Nueva partida" {
+        partida = partida_nueva()
+        empezar_partida()
+    }
+    si e == "Controles" { en_controles = verdadero }
+    si e == "Salir" { juego.salir() }
+}
+
+funcion empezar_partida(): nulo {
+    pausa = falso
+    muerto = 0
+    obtenido = nulo
+    despues = nulo
+    esperando = nulo
+    invencible = 0
+    mira = "abajo"
+    juego.cambiar_escena(partida["mapa"], 0.8)
+}
+
+funcion derrota(): nulo {
+    si juego.escena_nueva() { guardada = juego.cargar("partida") }
+    juego.limpiar([12, 6, 10])
+    juego.texto("HAS CAÍDO", ANCHO / 2, 50, {"fuente": GRANDE, "alinear": "centro", "color": [230, 80, 80]})
+    juego.texto("Pero un héroe siempre se levanta.", ANCHO / 2, 76, {"fuente": LETRA, "alinear": "centro", "color": [200, 190, 200]})
+    sea e = juego.menu(["Volver a intentarlo", "Ir a la portada"], {"fuente": LETRA, "escala": 1, "y": 110, "separacion": 8})
+    si e == "Volver a intentarlo" {
+        partida = si guardada != nulo { guardada } sino { partida_nueva() }
+        partida["vida"] = partida["maximo"]
+        empezar_partida()
+    }
+    si e == "Ir a la portada" { juego.cambiar_escena("portada", 0.6) }
+}
+
+fijo CREDITOS = [
+    ["grande", "¡GRACIAS!"],
+    ["", ""],
+    ["", "Valleclaro recuperó su piedra"],
+    ["", "y el Bosque Viejo volvió a dormir."],
+    ["", ""], ["", ""],
+    ["titulo", "LA PIEDRA DEL LINCE"],
+    ["", "Un juego hecho con Lince"],
+    ["", "github.com/arreina/lince"],
+    ["", ""],
+    ["titulo", "GRÁFICOS"],
+    ["", "Tiny Town y Tiny Dungeon"],
+    ["", "de Kenney (kenney.nl) · CC0"],
+    ["", ""],
+    ["titulo", "MÚSICA"],
+    ["", "Town Theme, Forest Theme y"],
+    ["", "Battle Theme A, de cynicmusic"],
+    ["", "Cave, de hornpipe2"],
+    ["", "(OpenGameArt) · CC0"],
+    ["", ""],
+    ["titulo", "SONIDOS"],
+    ["", "RPG Audio e Impact Sounds"],
+    ["", "de Kenney · CC0"],
+    ["", ""],
+    ["titulo", "LETRA"],
+    ["", "Press Start 2P, de CodeMan38"],
+    ["", "SIL Open Font License"],
+    ["", ""], ["", ""],
+    ["grande", "FIN"]
+]
+
+funcion final(): nulo {
+    si juego.escena_nueva() {
+        mapa = MAPAS["pueblo"]
+        juego.musica(MUSICA["pueblo"], 0.6)
+    }
+    sea t = juego.tiempo_escena()
+    juego.limpiar([0, 0, 0])
+    juego.camara(matematica.redondear((mapa["ancho"] - ANCHO) / 2), matematica.redondear(matematica.minimo(mapa["alto"] - ALTO, t * 3)))
+    juego.dibujar_tiled(mapa, ["Suelo", "Decorado"])
+    juego.camara()
+    juego.cubrir([5, 8, 20, 170])
+    sea py = ALTO + 10 - t * 18
+    para cada lista linea en CREDITOS {
+        si py > -20 y py < ALTO + 10 {
+            elegir linea[0] {
+                caso "grande" { juego.texto(linea[1], ANCHO / 2, py, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]}) }
+                caso "titulo" { juego.texto(linea[1], ANCHO / 2, py, {"fuente": LETRA, "alinear": "centro", "color": [120, 230, 170]}) }
+                otro { juego.texto(linea[1], ANCHO / 2, py, {"fuente": LETRA, "alinear": "centro", "color": [230, 230, 240]}) }
+            }
+        }
+        py = py + (si linea[0] == "grande" { 26 } sino { 12 })
+    }
+    si py < ALTO / 2 - 20 o (t > 2 y juego.accion_pulsada("accion")) { juego.cambiar_escena("portada", 1.5) }
+}
+
+# ── El bucle ─────────────────────────────────────────────────────────
+si no juego.recargado() { juego.cambiar_escena("portada") }
+
+mientras juego.abierto() {
+    elegir juego.escena() {
+        caso "portada" { portada() }
+        caso "derrota" { derrota() }
+        caso "fin" { final() }
+        otro { jugar() }
+    }
+    juego.presentar()
+}

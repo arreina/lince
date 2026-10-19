@@ -39,4 +39,14 @@ done <<'LISTA'
 12_aventura.lince|LINCE_JUEGO_PULSAR|espacio,derecha
 13_fisica.lince|LINCE_JUEGO_PULSAR|derecha,espacio
 LISTA
+# El juego completo: el principio jugado con teclas (la portada, la sabia, el
+# pueblo, guardar en el pozo y entrar en el bosque); tiene que acabar en el bosque.
+GUION="170:espacio:1,432:espacio:1,644:espacio:1,846:espacio:1,1018:espacio:1,1220:derecha:67,1287:arriba:50,1357:espacio:1,1509:espacio:1,1571:abajo:110,1701:espacio:1,1873:espacio:1,1915:arriba:97,2012:izquierda:60,2082:espacio:1,2174:espacio:1,2256:espacio:1,2298:derecha:3,2301:arriba:170"
+salida="$(cd "$RAIZ/juegos/la_piedra_del_lince" && env LINCE_JUEGO_FOTOGRAMAS=2520 LINCE_JUEGO_SEMILLA=1 LINCE_JUEGO_GUION="$GUION" \
+          timeout 120 "$LINCE" la_piedra_del_lince.lince 2>&1)"
+if [ $? -eq 0 ] && [ -z "$salida" ] && grep -q '"mapa": *"bosque"' "$T/partidas/partida.json" 2>/dev/null; then
+    echo "  ✅ juegos/la_piedra_del_lince (llega al bosque)"
+else
+    echo "  ❌ juegos/la_piedra_del_lince"; echo "$salida" | head -5; fallos=$((fallos+1))
+fi
 [ "$fallos" -eq 0 ] && echo "✅ Minijuegos: todos se ejecutan" || exit 1

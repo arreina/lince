@@ -22,7 +22,7 @@ La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10,
 
 - [ ] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
 - [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad, y un juego subido a Google Play.
-- [ ] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta.
+- [x] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta: `juegos/la_piedra_del_lince` (falta probarlo en Windows y en un móvil de verdad).
 - [x] **El manual lo cubre todo:** el del lenguaje (con los módulos `matematica`, `texto`, `json`, `bytes` y `bits` y las herramientas) y una página para el módulo `juego` (`docs/juego.html`) con un ejemplo y su captura real para cada tema. La lista completa de funciones y opciones sigue en la especificación.
 
 ## Lenguaje

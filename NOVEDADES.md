@@ -24,6 +24,20 @@ Cosas nuevas:
 - `juego.boton_soltado()` (mando) y `juego.boton_raton_soltado()`, como `tecla_soltada()`.
 - `colision_circulos` y `colision_circulo_rect` aceptan círculos como `[x, y, radio]`.
 
+### Un juego completo: La Piedra del Lince
+
+`juegos/la_piedra_del_lince` es una aventura entera hecha con Lince: un pueblo, un bosque
+y una fortaleza (mapas de Tiled), diálogos, tienda, cofres, cuatro clases de enemigos, un
+jefe, partida guardada, pausa con controles y créditos. Los gráficos, la música y los
+sonidos son de terceros con licencias libres (Kenney, OpenGameArt). Al hacerlo salieron:
+
+- **Arreglado:** los menús y los diálogos no hacían caso a la palanca ni a la cruceta del
+  mando de la pantalla del móvil (ni a `mando_virtual`): se leían antes de sumarlo. Ahora
+  se leen después.
+- El `retrato` de un diálogo puede ser un cuadro de una hoja: `[hoja, cuadro]`.
+- `colision`, `colision_circulo_rect` y `dentro` aceptan como rectángulo un diccionario con
+  `x`, `y`, `ancho` y `alto` (lo que mueve `mover_en_mapa`): `juego.colision(yo, enemigo)`.
+
 ## 0.9.0
 
 Mapas de Tiled, física sencilla, controles a gusto del jugador y un manual completo.

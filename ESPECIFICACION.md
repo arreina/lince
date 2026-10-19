@@ -1162,8 +1162,9 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | `caja(cosa, x, y[, opciones])` | el rectángulo `[x, y, ancho, alto]` de lo que se ve de verdad al dibujar `cosa` (una imagen, una hoja o un animador) con esas mismas `x`, `y` y opciones, sin el hueco transparente de alrededor (ver abajo) |
 
 En `colision`, `colision_circulos`, `colision_circulo_rect` y `dentro`, cada rectángulo puede ir en cuatro
-números o en una lista `[x, y, ancho, alto]`, como las que da `caja()`, y cada círculo en tres o en
-`[x, y, radio]`.
+números o en una lista `[x, y, ancho, alto]`, como las que da `caja()`, o en un diccionario con
+`x`, `y`, `ancho` y `alto` (lo que mueve `mover_en_mapa`, un cuerpo de la física): `juego.colision(yo,
+enemigo)`. Cada círculo va en tres números o en `[x, y, radio]`.
 | `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
 
 **Movimiento suave.** Para que las cosas no aparezcan de golpe: un menú que entra desde un lado,
@@ -1583,7 +1584,7 @@ si juego.respuesta() == "Sí" { ... }
 | Función | Qué hace |
 |---|---|
 | `menu(textos[, opciones])` | dibuja los textos para elegir, uno debajo de otro, y devuelve el elegido en el fotograma en que se elige; si no, `nulo`. Se llama en cada fotograma mientras se vea, y vuelve a la primera opción si deja de verse un rato. Opciones: `x`, `y` (el centro de la primera opción; por defecto, el menú centrado en la pantalla), `escala` (3), `fuente`, `color`, `color_elegido`, `separacion`, `atras` (lo que devuelve con escape o B, como `"Continuar"` en una pausa), `sonido_mover` y `sonido_elegir` |
-| `dialogo(paginas[, opciones])` | abre una caja de diálogo abajo de la pantalla con el texto saliendo letra a letra. `paginas` es una página o una lista; una página es un texto o un diccionario con `texto`, `nombre` (quién habla, en una pestaña encima), `retrato` (una imagen a la izquierda) y `respuestas` (textos para elegir). Aceptar (entrar, espacio, A o tocar) termina de escribir la página o pasa a la siguiente; una página que no cabe se parte sola. Opciones: `escala` (2), `fuente`, `color`, `fondo`, `borde`, `velocidad` (letras por segundo, 40), `lineas` (3), `arriba` (verdadero: la caja arriba) y `sonido` (suena con las letras) |
+| `dialogo(paginas[, opciones])` | abre una caja de diálogo abajo de la pantalla con el texto saliendo letra a letra. `paginas` es una página o una lista; una página es un texto o un diccionario con `texto`, `nombre` (quién habla, en una pestaña encima), `retrato` (una imagen a la izquierda, o `[hoja, cuadro]`: un cuadro de una hoja) y `respuestas` (textos para elegir). Aceptar (entrar, espacio, A o tocar) termina de escribir la página o pasa a la siguiente; una página que no cabe se parte sola. Opciones: `escala` (2), `fuente`, `color`, `fondo`, `borde`, `velocidad` (letras por segundo, 40), `lineas` (3), `arriba` (verdadero: la caja arriba) y `sonido` (suena con las letras) |
 | `dialogo_abierto()` · `respuesta()` · `cerrar_dialogo()` | si hay un diálogo abierto (también en el fotograma en que se cierra, para que la tecla que lo cierra no lo vuelva a abrir) · la última respuesta elegida, o `nulo` · lo cierra |
 
 El juego sigue viendo las teclas mientras hay un menú o un diálogo: lo normal es no mover al

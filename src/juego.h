@@ -1312,6 +1312,9 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_entrada", NULL, 0));
     if (hay_error) return valor_nulo();
     jg_mezclar_virtual();
+    /* los menús y los diálogos, con todo ya sumado: el mando de la pantalla también los maneja */
+    valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_entrada_ui", NULL, 0));
+    if (hay_error) return valor_nulo();
 #ifdef __ANDROID__
     /* el teclado de la pantalla, mientras el juego pida texto en cada fotograma */
     if (_jgs.texto_ahora && !_jgs.teclado_puesto && _jg.StartTextInput) { _jg.StartTextInput(); _jgs.teclado_puesto = 1; }
@@ -4789,11 +4792,23 @@ static Valor *fn_jg_direccion(Valor **a, int n) {
 }
 
 /* Los 'cuantos' números de los argumentos, donde un rectángulo puede ir en
-   una lista [x, y, ancho, alto] (como los que da caja()) */
+   una lista [x, y, ancho, alto] (como los que da caja()) o en un diccionario
+   con "x", "y", "ancho" y "alto" (lo que mueve mover_en_mapa, un cuerpo) */
+static Valor *jg_dic(Valor *d, const char *clave);
 static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, const char *forma) {
     int k = 0, ok = 1;
     for (int i = 0; i < n && ok; i++) {
         if (a[i]->tipo == VAL_NUMERO) { if (k < cuantos) v[k] = a[i]->numero; k++; continue; }
+        if (a[i]->tipo == VAL_DICCIONARIO) {
+            static const char *const C[] = {"x", "y", "ancho", "alto"};
+            for (int j = 0; ok && j < 4; j++) {
+                Valor *e = jg_dic(a[i], C[j]);
+                ok = e && e->tipo == VAL_NUMERO;
+                if (ok && k < cuantos) v[k] = e->numero;
+                k++;
+            }
+            continue;
+        }
         ok = a[i]->tipo == VAL_LISTA && (a[i]->lista.cantidad == 4 || a[i]->lista.cantidad == 3);
         for (int j = 0; ok && j < a[i]->lista.cantidad; j++) {
             ok = a[i]->lista.elementos[j]->tipo == VAL_NUMERO;
@@ -4802,8 +4817,9 @@ static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, 
         }
     }
     if (ok && k == cuantos) return 1;
-    char msg[200];
-    snprintf(msg, sizeof msg, "%s() espera %s (en números o en listas: [x, y, ancho, alto] un rectángulo y [x, y, radio] un círculo)", fn, forma);
+    char msg[400];
+    snprintf(msg, sizeof msg, "%s() espera %s (en números o en listas: [x, y, ancho, alto] un rectángulo y [x, y, radio] un círculo; "
+             "un rectángulo también puede ser un diccionario con x, y, ancho y alto)", fn, forma);
     jg_error("ErrorTipo", msg);
     return 0;
 }
