@@ -42,6 +42,20 @@ debug: $(SRC)
 	$(CC) -Wall -g -fsanitize=address -o lince_debug $(SRC) $(LDFLAGS)
 	@echo "✅ Lince debug compilado"
 
+# ── Fuzzing: los lectores con datos estropeados al azar (tests/fuzz/fuzz.c) ──
+# FUZZ_N pruebas por lector (2000 por defecto); los fallos quedan en build/fuzz-fallos/
+FUZZ_N ?= 2000
+FUZZ_SRC = $(filter-out src/main.c,$(SRC))
+fuzz: tests/fuzz/fuzz.c $(SRC)
+	@mkdir -p build && rm -rf build/fuzz-fallos
+	@$(CC) -g -O1 -w -fsanitize=address,undefined -fno-sanitize-recover=undefined -o build/fuzz-lince tests/fuzz/fuzz.c $(FUZZ_SRC) $(LDFLAGS)
+	@bash -c 'export ASAN_OPTIONS=detect_leaks=0:exitcode=99 UBSAN_OPTIONS=exitcode=99; ulimit -s 65536; f=0; \
+	  ./build/fuzz-lince json $(FUZZ_N) build/fuzz-fallos tests/fuzz/semillas/*.json tests/juego/tiled/nivel.tmj || f=1; \
+	  ./build/fuzz-lince tiled $(FUZZ_N) build/fuzz-fallos tests/juego/tiled/nivel.tmx tests/juego/tiled/tiles.tsx tests/juego/tiled/nivel.tmj || f=1; \
+	  ./build/fuzz-lince imagen $(FUZZ_N) build/fuzz-fallos tests/juego/tiled/tiles.png tests/fuzz/semillas/*.png tests/fuzz/semillas/*.bmp tests/fuzz/semillas/*.gif || f=1; \
+	  ./build/fuzz-lince ogg $(FUZZ_N) build/fuzz-fallos tests/juego/tono.ogg || f=1; \
+	  ./build/fuzz-lince lince $(FUZZ_N) build/fuzz-fallos examples/*.lince tests/lince/test_*.lince src/lince/juego.lince || f=1; exit $$f'
+
 # ── Valgrind — detectar leaks de memoria ──
 valgrind: debug
 	valgrind --leak-check=full --show-leak-kinds=all \
@@ -141,7 +155,7 @@ bench: all
 
 # Extensión de VS Code empaquetada (.vsix) en build/
 vsix:
-	@mkdir -p build
+	@mkdir -p build && rm -rf build/fuzz-fallos
 	@python3 editores/vscode/empaquetar.py build
 
 # ── Limpiar ───────────────────────────────

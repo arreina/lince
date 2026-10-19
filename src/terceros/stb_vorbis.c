@@ -949,6 +949,7 @@ static void *make_block_array(void *mem, int count, int size)
 
 static void *setup_malloc(vorb *f, int sz)
 {
+   if (sz < 0 || sz > 0x7FFFFFF0) return NULL;   // Lince: un tamaño imposible (archivo estropeado) es «sin memoria»
    sz = (sz+7) & ~7; // round up to nearest 8 for alignment of future allocs.
    f->setup_memory_required += sz;
    if (f->alloc.alloc_buffer) {
@@ -968,6 +969,7 @@ static void setup_free(vorb *f, void *p)
 
 static void *setup_temp_malloc(vorb *f, int sz)
 {
+   if (sz < 0 || sz > 0x7FFFFFF0) return NULL;   // Lince: como en setup_malloc
    sz = (sz+7) & ~7; // round up to nearest 8 for alignment of future allocs.
    if (f->alloc.alloc_buffer) {
       if (f->temp_offset - sz < f->setup_offset) return NULL;
@@ -1583,8 +1585,8 @@ static int get32_packet(vorb *f)
 {
    uint32 x;
    x = get8_packet(f);
-   x += get8_packet(f) << 8;
-   x += get8_packet(f) << 16;
+   x += (uint32) get8_packet(f) << 8;    // Lince: (uint32), al final del paquete da -1
+   x += (uint32) get8_packet(f) << 16;
    x += (uint32) get8_packet(f) << 24;
    return x;
 }
@@ -3653,16 +3655,24 @@ static int start_decoder(vorb *f)
    f->vendor = (char*)setup_malloc(f, sizeof(char) * (len+1));
    if (f->vendor == NULL)                           return error(f, VORBIS_outofmem);
    for(i=0; i < len; ++i) {
-      f->vendor[i] = get8_packet(f);
+      int c = get8_packet(f);
+      if (c == EOP) { f->vendor[i] = '\0'; return error(f, VORBIS_invalid_setup); }   // Lince: no leer pasado el paquete
+      f->vendor[i] = (char) c;
    }
    f->vendor[len] = (char)'\0';
    //user comments
    f->comment_list_length = get32_packet(f);
    f->comment_list = NULL;
+   // Lince: un número de comentarios imposible (archivo estropeado) no se cree
+   if (f->comment_list_length < 0 || f->comment_list_length > (1 << 20)) {
+      f->comment_list_length = 0;
+      return error(f, VORBIS_invalid_setup);
+   }
    if (f->comment_list_length > 0)
    {
-      f->comment_list = (char**) setup_malloc(f, sizeof(char*) * (f->comment_list_length));
-      if (f->comment_list == NULL)                  return error(f, VORBIS_outofmem);
+      f->comment_list = (char**) setup_malloc(f, (int) (sizeof(char*) * (size_t) f->comment_list_length));
+      if (f->comment_list == NULL) { f->comment_list_length = 0; return error(f, VORBIS_outofmem); }
+      memset(f->comment_list, 0, sizeof(char*) * (size_t) f->comment_list_length);   // Lince: al cerrar, nada sin poner
    }
 
    for(i=0; i < f->comment_list_length; ++i) {
@@ -3671,7 +3681,9 @@ static int start_decoder(vorb *f)
       if (f->comment_list[i] == NULL)               return error(f, VORBIS_outofmem);
 
       for(j=0; j < len; ++j) {
-         f->comment_list[i][j] = get8_packet(f);
+         int c = get8_packet(f);
+         if (c == EOP) { f->comment_list[i][j] = '\0'; return error(f, VORBIS_invalid_setup); }   // Lince
+         f->comment_list[i][j] = (char) c;
       }
       f->comment_list[i][len] = (char)'\0';
    }
@@ -5154,7 +5166,8 @@ static int8 channel_position[7][6] =
    // add (1<<23) to convert to int, then divide by 2^SHIFT, then add 0.5/2^SHIFT to round
    #define MAGIC(SHIFT) (1.5f * (1 << (23-SHIFT)) + 0.5f/(1 << SHIFT))
    #define ADDEND(SHIFT) (((150-SHIFT) << 23) + (1 << 22))
-   #define FAST_SCALED_FLOAT_TO_INT(temp,x,s) (temp.f = (x) + MAGIC(s), temp.i - ADDEND(s))
+   // Lince: la resta, sin signo (con muestras absurdas de un archivo estropeado se desbordaba)
+   #define FAST_SCALED_FLOAT_TO_INT(temp,x,s) (temp.f = (x) + MAGIC(s), (int) ((unsigned) temp.i - (unsigned) ADDEND(s)))
    #define check_endianness()
 #else
    #define FAST_SCALED_FLOAT_TO_INT(temp,x,s) ((int) ((x) * (1 << (s))))

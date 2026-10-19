@@ -68,8 +68,8 @@ Nada pendiente ahora mismo.
 - **`lince compilar` empaqueta el intérprete con el programa.** No hay un compilador a C aparte.
 - **Funciona en Linux y en Windows.** macOS no se va a soportar.
 - **No hay versión para el navegador** (WebAssembly): el autor no le ve sentido. Los juegos van al ordenador (Linux y Windows) y al móvil (Android).
-- **Bibliotecas de terceros:** stb_image, stb_vorbis y stb_truetype van tal cual en `src/terceros`. Lince no podría escribirlas con la velocidad necesaria.
-- **Los recursos descargados no entran en el repositorio:** imágenes, sonidos y fuentes con licencia ajena. Las demos que los usan viven fuera.
+- **Bibliotecas de terceros:** stb_image, stb_vorbis y stb_truetype van en `src/terceros`. Lince no podría escribirlas con la velocidad necesaria. Se tocan lo mínimo: a stb_vorbis se le arreglaron fallos con archivos estropeados que encontró `make fuzz` (cada cambio, marcado con «Lince:»).
+- **Recursos de terceros (imágenes, sonidos, fuentes) sí, si su licencia deja usarlos y repartirlos:** mejor CC0 (dominio público, como los de Kenney); con CC-BY u otras que piden citar, en un `CREDITOS.md` al lado. Cada recurso va con su licencia y de dónde viene. Lo que no tenga licencia clara no entra.
 - **Una hoja de sprites es una sola imagen con todos los fotogramas**, no un archivo por fotograma.
 - **Los sonidos realistas los pone quien hace el juego**, en archivos. Lince solo genera los de 8 bits (`juego.efecto`).
 - **Palabras reservadas que no pueden ser nombres:** entre otras, `y`, `o`, `no`, `lista`, `mi`, `caso`, `otro`, `romper` y `continuar`.

@@ -81,6 +81,11 @@ jobs:
       - name: Suites bajo AddressSanitizer
         run: make test-asan
 
+      # Los lectores (JSON, Tiled, imágenes, OGG y el de Lince) con datos
+      # estropeados al azar; en local se lanzan más con make fuzz FUZZ_N=...
+      - name: Datos estropeados (fuzzing)
+        run: make fuzz FUZZ_N=400
+
   windows:
     name: Windows
     runs-on: windows-latest

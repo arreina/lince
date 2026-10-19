@@ -1213,7 +1213,9 @@ static void jb_utf8(JsonBuf *b, unsigned c) {
 static int json_hex4(JsonLector *l, unsigned *c) {
     *c = 0;
     for (int k = 0; k < 4; k++) {
-        char h = l->s[l->i++];
+        char h = l->s[l->i];
+        if (!h) return 0;                       /* sin pasar del final */
+        l->i++;
         *c <<= 4;
         if (h >= '0' && h <= '9') *c |= (unsigned)(h - '0');
         else if (h >= 'a' && h <= 'f') *c |= (unsigned)(h - 'a' + 10);
@@ -1235,7 +1237,9 @@ static char *json_leer_texto(JsonLector *l) {
         l->i++;
         if (c == '"') return b.p;
         if (c != '\\') { jb_mas(&b, (const char *)&c, 1); continue; }
-        char e = l->s[l->i++];
+        char e = l->s[l->i];
+        if (!e) { free(b.p); return NULL; }     /* "\ al final: sin pasar del final */
+        l->i++;
         switch (e) {
             case '"': jb_txt(&b, "\""); break;
             case '\\': jb_txt(&b, "\\"); break;
@@ -1292,6 +1296,7 @@ static Valor *json_leer(JsonLector *l) {
         else for (;;) {
             json_espacios(l);
             char *clave = json_leer_texto(l);
+            if (!clave) { valor_destruir(r); r = NULL; break; }
             json_espacios(l);
             Valor *v = NULL;
             if (clave && s[l->i] == ':') { l->i++; v = json_leer(l); }
