@@ -3,7 +3,18 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
-## 0.9.0 (en preparación)
+## 0.9.0
+
+Mapas de Tiled, física sencilla, controles a gusto del jugador y un manual completo.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-0.9.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-0.9.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-0.9.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-0.9.0.vsix` |
 
 ### Mapas de Tiled
 
@@ -16,6 +27,15 @@ apartado que le toca de este archivo.
 
 - `juego.fisica`, `juego.cuerpo` y `juego.avanzar_fisica`: cuerpos con gravedad, masa, rebote y fricción que chocan entre ellos y con el mapa, plataformas y ascensores que llevan lo que tienen encima, y sensores (`juego.tocando`) para monedas y zonas. Está escrita en Lince.
 - Ejemplo nuevo: `examples/13_fisica.lince`.
+
+### Documentación
+
+- Una página nueva para el módulo `juego` ([arreina.github.io/lince/juego.html](https://arreina.github.io/lince/juego.html)), con un ejemplo para cada tema y la captura real de lo que dibuja.
+- El manual del lenguaje, completo: las funciones que ya vienen, los módulos `matematica`, `texto`, `json`, `bytes` y `bits`, y las herramientas (compilar, depurar, el REPL, paquetes y editores).
+
+### Más seguro
+
+- `make fuzz` prueba los lectores (JSON, Tiled, imágenes, OGG y el de Lince) con miles de archivos estropeados al azar, también en la CI. Encontró y se arreglaron fallos en el lector de JSON y en el de OGG, que con un archivo estropeado podía cerrar el juego.
 
 ### Controles a gusto
 
