@@ -172,9 +172,9 @@ sea jefe_despierto = falso
 funcion centro_x(val diccionario c): numero { devolver c["x"] + c["ancho"] / 2 }
 funcion centro_y(val diccionario c): numero { devolver c["y"] + c["alto"] / 2 }
 
-funcion bloquear(val numero px, val numero py, val numero ancho, val numero alto, val texto como): nulo {
-    para (f = matematica.piso(py / 16); f < matematica.techo((py + alto) / 16); f++) {
-        para (c = matematica.piso(px / 16); c < matematica.techo((px + ancho) / 16); c++) {
+funcion bloquear(val numero x, val numero y, val numero ancho, val numero alto, val texto como): nulo {
+    para (f = matematica.piso(y / 16); f < matematica.techo((y + alto) / 16); f++) {
+        para (c = matematica.piso(x / 16); c < matematica.techo((x + ancho) / 16); c++) {
             juego.poner_casilla(mapa, c, f, como)
         }
     }
@@ -185,9 +185,9 @@ funcion propiedad(val diccionario ob, val texto nombre, val cualquiera defecto):
     devolver defecto
 }
 
-funcion nuevo_enemigo(val texto tipo, val numero px, val numero py, val texto sala): diccionario {
+funcion nuevo_enemigo(val texto tipo, val numero x, val numero y, val texto sala): diccionario {
     sea d = ENEMIGOS[tipo]
-    devolver {"tipo": tipo, "x": px + (16 - d["ancho"]) / 2, "y": py + 16 - d["alto"], "ancho": d["ancho"], "alto": d["alto"],
+    devolver {"tipo": tipo, "x": x + (16 - d["ancho"]) / 2, "y": y + 16 - d["alto"], "ancho": d["ancho"], "alto": d["alto"],
               "vx": 0, "vy": 0, "vida": d["vida"], "golpe": -1, "flash": 0, "t": matematica.aleatorio() * 1.5,
               "estado": "quieto", "sala": sala, "fase": matematica.aleatorio() * 6, "inv": 0}
 }
@@ -215,57 +215,57 @@ funcion entrar_mapa(val texto nombre): nulo {
     saliendo = falso
     juego.borrar_particulas()
     para cada diccionario ob en mapa["objetos"] {
-        sea px = ob["x"]
-        sea py = ob["y"]
+        sea x = ob["x"]
+        sea y = ob["y"]
         elegir ob["tipo"] {
             caso "entrada" {
                 si partida["x"] == nulo y ob["nombre"] == partida["entrada"] {
-                    yo["x"] = px + 3
-                    yo["y"] = py + 6
+                    yo["x"] = x + 3
+                    yo["y"] = y + 6
                 }
             }
             caso "salida" { salidas.agregar(ob) }
             caso "npc" {
-                sea p = {"nombre": ob["nombre"], "x": px, "y": py, "cara": propiedad(ob, "cara", 85), "fase": px * 0.13}
-                si partida["espada"] y ob["nombre"] == "guardia" { p["x"] = px - 32 }       # se apartan
-                si partida["espada"] y ob["nombre"] == "guardia2" { p["x"] = px + 32 }
+                sea p = {"nombre": ob["nombre"], "x": x, "y": y, "cara": propiedad(ob, "cara", 85), "fase": x * 0.13}
+                si partida["espada"] y ob["nombre"] == "guardia" { p["x"] = x - 32 }       # se apartan
+                si partida["espada"] y ob["nombre"] == "guardia2" { p["x"] = x + 32 }
                 gente.agregar(p)
                 bloquear(p["x"], p["y"], 16, 16, "#")
             }
             caso "enemigo" {
                 sea sala = propiedad(ob, "sala", "")
                 si no (sala == "sala2" y partida["reja"]) {
-                    enemigos.agregar(nuevo_enemigo(ob["nombre"], px, py, sala))
+                    enemigos.agregar(nuevo_enemigo(ob["nombre"], x, y, sala))
                 }
             }
             caso "cofre" {
-                cofres.agregar({"nombre": ob["nombre"], "x": px, "y": py, "contenido": propiedad(ob, "contenido", "monedas"),
+                cofres.agregar({"nombre": ob["nombre"], "x": x, "y": y, "contenido": propiedad(ob, "contenido", "monedas"),
                                 "cantidad": propiedad(ob, "cantidad", 5), "abierto": partida["cofres"].contiene(ob["nombre"])})
-                bloquear(px, py, 16, 16, "#")
+                bloquear(x, y, 16, 16, "#")
             }
             caso "arbusto" {
-                arbustos.agregar({"x": px, "y": py})
-                bloquear(px, py, 16, 16, "#")
+                arbustos.agregar({"x": x, "y": y})
+                bloquear(x, y, 16, 16, "#")
             }
-            caso "cartel" { carteles.agregar({"x": px, "y": py, "texto": propiedad(ob, "texto", "")}) }
-            caso "guardar" { pozos.agregar({"x": px, "y": py}) }
+            caso "cartel" { carteles.agregar({"x": x, "y": y, "texto": propiedad(ob, "texto", "")}) }
+            caso "guardar" { pozos.agregar({"x": x, "y": y}) }
             caso "puerta" {
-                puerta = {"x": px, "y": py, "ancho": ob["ancho"], "alto": ob["alto"]}
-                bloquear(px, py, ob["ancho"], ob["alto"], si partida["puerta"] { "." } sino { "#" })
+                puerta = {"x": x, "y": y, "ancho": ob["ancho"], "alto": ob["alto"]}
+                bloquear(x, y, ob["ancho"], ob["alto"], si partida["puerta"] { "." } sino { "#" })
             }
             caso "reja" {
-                reja = {"x": px, "y": py, "ancho": ob["ancho"], "alto": ob["alto"], "sala": propiedad(ob, "sala", "")}
-                bloquear(px, py, ob["ancho"], ob["alto"], si partida["reja"] { "." } sino { "#" })
+                reja = {"x": x, "y": y, "ancho": ob["ancho"], "alto": ob["alto"], "sala": propiedad(ob, "sala", "")}
+                bloquear(x, y, ob["ancho"], ob["alto"], si partida["reja"] { "." } sino { "#" })
             }
             caso "jefe" {
                 si no partida["jefe"] {
-                    jefe = nuevo_enemigo("grum", px, py, "")
-                    jefe["x"] = px + 6
-                    jefe["y"] = py + 14
+                    jefe = nuevo_enemigo("grum", x, y, "")
+                    jefe["x"] = x + 6
+                    jefe["y"] = y + 14
                     jefe["estado"] = "dormido"
                 }
             }
-            caso "piedra" { piedra = {"x": px, "y": py} }
+            caso "piedra" { piedra = {"x": x, "y": y} }
         }
     }
     si partida["x"] != nulo {             # se cargó una partida guardada en un sitio
@@ -420,18 +420,18 @@ funcion atender_respuestas(): nulo {
 
 # ── Usar lo que hay delante ──────────────────────────────────────────
 funcion delante(): lista {
-    sea px = centro_x(yo)
-    sea py = centro_y(yo)
+    sea x = centro_x(yo)
+    sea y = centro_y(yo)
     elegir mira {
-        caso "arriba" { devolver [px, py - 12] }
-        caso "abajo" { devolver [px, py + 12] }
-        caso "izquierda" { devolver [px - 12, py] }
+        caso "arriba" { devolver [x, y - 12] }
+        caso "abajo" { devolver [x, y + 12] }
+        caso "izquierda" { devolver [x - 12, y] }
     }
-    devolver [px + 12, py]
+    devolver [x + 12, y]
 }
 
-funcion cerca_de(val lista punto, val numero px, val numero py, val numero ancho, val numero alto): logico {
-    devolver juego.dentro(punto[0], punto[1], [px - 3, py - 3, ancho + 6, alto + 6])
+funcion cerca_de(val lista punto, val numero x, val numero y, val numero ancho, val numero alto): logico {
+    devolver juego.dentro(punto[0], punto[1], [x - 3, y - 3, ancho + 6, alto + 6])
 }
 
 funcion usar(): logico {
@@ -549,14 +549,14 @@ funcion mover_heroe(val numero dt): nulo {
 
 # El rectángulo al que llega la espada
 funcion alcance(): lista {
-    sea px = yo["x"]
-    sea py = yo["y"]
+    sea x = yo["x"]
+    sea y = yo["y"]
     elegir mira {
-        caso "arriba" { devolver [px - 5, py - 20, 20, 18] }
-        caso "abajo" { devolver [px - 5, py + 4, 20, 18] }
-        caso "izquierda" { devolver [px - 16, py - 10, 18, 20] }
+        caso "arriba" { devolver [x - 5, y - 20, 20, 18] }
+        caso "abajo" { devolver [x - 5, y + 4, 20, 18] }
+        caso "izquierda" { devolver [x - 16, y - 10, 18, 20] }
     }
-    devolver [px + 8, py - 10, 18, 20]
+    devolver [x + 8, y - 10, 18, 20]
 }
 
 funcion herir_heroe(val numero dano, val numero desde_x, val numero desde_y): nulo {
@@ -576,10 +576,10 @@ funcion herir_heroe(val numero dano, val numero desde_x, val numero desde_y): nu
 }
 
 # ── Los enemigos ─────────────────────────────────────────────────────
-funcion soltar(val numero px, val numero py): nulo {
+funcion soltar(val numero x, val numero y): nulo {
     sea r = matematica.aleatorio()
-    si r < 0.35 { sueltos.agregar({"tipo": "moneda", "x": px, "y": py, "t": 0}) }
-    sino si r < 0.55 y partida["vida"] < partida["maximo"] { sueltos.agregar({"tipo": "corazon", "x": px, "y": py, "t": 0}) }
+    si r < 0.35 { sueltos.agregar({"tipo": "moneda", "x": x, "y": y, "t": 0}) }
+    sino si r < 0.55 y partida["vida"] < partida["maximo"] { sueltos.agregar({"tipo": "corazon", "x": x, "y": y, "t": 0}) }
 }
 
 funcion herir_enemigo(val diccionario e, val numero dano): nulo {
@@ -884,26 +884,26 @@ funcion colocar_camara(val logico de_golpe): nulo {
     si de_golpe { cam = [ox, oy] } sino { cam = [juego.acercar(cam[0], ox, 10), juego.acercar(cam[1], oy, 10)] }
 }
 
-funcion dibujar_tile(val cualquiera hoja, val numero cuadro, val numero px, val numero py, val cualquiera mas = nulo): nulo {
+funcion dibujar_tile(val cualquiera hoja, val numero cuadro, val numero x, val numero y, val cualquiera mas = nulo): nulo {
     sea op = {"cuadro": cuadro}
     si mas != nulo { para cada texto c en mas { op[c] = mas[c] } }
-    juego.dibujar(hoja, matematica.redondear(px), matematica.redondear(py), op)
+    juego.dibujar(hoja, matematica.redondear(x), matematica.redondear(y), op)
 }
 
-funcion sombra(val numero px, val numero py, val numero ancho): nulo {
-    juego.rectangulo(matematica.redondear(px - ancho / 2), matematica.redondear(py - 1), ancho, 3, [0, 0, 0, 60])
+funcion sombra(val numero x, val numero y, val numero ancho): nulo {
+    juego.rectangulo(matematica.redondear(x - ancho / 2), matematica.redondear(y - 1), ancho, 3, [0, 0, 0, 60])
 }
 
 funcion dibujar_heroe(): nulo {
     si invencible > 0 y juego.cuadro(2, 16) == 0 { devolver nulo }
-    sea px = yo["x"] - 3
-    sea py = yo["y"] - 8
+    sea x = yo["x"] - 3
+    sea y = yo["y"] - 8
     sea andando = matematica.longitud(yo["vx"], yo["vy"]) > 5
     sea bote = si andando { juego.cuadro([0, -1], 8) } sino { 0 }
     sombra(centro_x(yo), yo["y"] + yo["alto"], 10)
     # la espada, detrás si mira hacia arriba
     si ataque > 0 y mira == "arriba" { dibujar_espada() }
-    dibujar_tile(TM, HEROE, px, py + bote, {"espejo": mira == "izquierda"})
+    dibujar_tile(TM, HEROE, x, y + bote, {"espejo": mira == "izquierda"})
     si ataque > 0 y mira != "arriba" { dibujar_espada() }
 }
 
@@ -918,40 +918,40 @@ funcion dibujar_espada(): nulo {
 
 funcion dibujar_enemigo(val diccionario e): nulo {
     sea d = ENEMIGOS[e["tipo"]]
-    sea px = centro_x(e) - 8
-    sea py = e["y"] + e["alto"] - 16
+    sea x = centro_x(e) - 8
+    sea y = e["y"] + e["alto"] - 16
     sea op = {"blanco": si e["flash"] > 0 { 0.8 } sino { 0 }, "espejo": centro_x(yo) < centro_x(e)}
     si e["tipo"] == "babosa" {
         sea aplasta = si e["estado"] == "salto" { -2 } sino { matematica.seno(juego.tiempo() * 6 + e["fase"]) }
         sombra(centro_x(e), e["y"] + e["alto"], 10)
-        dibujar_tile(TM, d["cuadro"], px, py + aplasta, op)
+        dibujar_tile(TM, d["cuadro"], x, y + aplasta, op)
     } sino si e["tipo"] == "murcielago" {
         sombra(centro_x(e), e["y"] + e["alto"] + 8, 6)
-        dibujar_tile(TM, d["cuadro"], px, py + matematica.seno(juego.tiempo() * 14 + e["fase"]) * 1.5, op)
+        dibujar_tile(TM, d["cuadro"], x, y + matematica.seno(juego.tiempo() * 14 + e["fase"]) * 1.5, op)
     } sino si e["tipo"] == "fantasma" {
         op["alfa"] = 150 + matematica.seno(juego.tiempo() * 4 + e["fase"]) * 60
-        dibujar_tile(TM, d["cuadro"], px, py, op)
+        dibujar_tile(TM, d["cuadro"], x, y, op)
     } sino {
         sombra(centro_x(e), e["y"] + e["alto"], 10)
-        dibujar_tile(TM, d["cuadro"], px, py, op)
+        dibujar_tile(TM, d["cuadro"], x, y, op)
     }
 }
 
 funcion dibujar_jefe(): nulo {
     sea e = jefe
     sea op = {"blanco": si e["flash"] > 0 { 0.8 } sino { 0 }, "escala": 2, "espejo": centro_x(yo) < centro_x(e)}
-    sea px = centro_x(e) - 16
-    sea py = e["y"] + e["alto"] - 32
+    sea x = centro_x(e) - 16
+    sea y = e["y"] + e["alto"] - 32
     si e["estado"] == "dormido" {                             # duerme: zzz
-        py = py + 2
+        y = y + 2
         sea z = (juego.tiempo() * 0.8) % 1
-        juego.texto("z", px + 26 + z * 6, py - z * 14, {"fuente": LETRA, "color": [255, 255, 255, 255 * (1 - z)]})
+        juego.texto("z", x + 26 + z * 6, y - z * 14, {"fuente": LETRA, "color": [255, 255, 255, 255 * (1 - z)]})
     }
     si e["estado"] == "lanzar" {                              # avisa antes de lanzar
-        px = px + matematica.seno(juego.tiempo() * 60) * 1
+        x = x + matematica.seno(juego.tiempo() * 60) * 1
     }
     sombra(centro_x(e), e["y"] + e["alto"], 22)
-    dibujar_tile(TM, ENEMIGOS["grum"]["cuadro"], px, py, op)
+    dibujar_tile(TM, ENEMIGOS["grum"]["cuadro"], x, y, op)
 }
 
 funcion dibujar_mundo(): nulo {
@@ -1023,12 +1023,12 @@ funcion dibujar_marcador(): nulo {
     # las monedas y lo que lleva
     juego.dibujar(MONEDA, ANCHO - 40, 6)
     juego.texto("{partida["monedas"]}", ANCHO - 31, 6, {"fuente": LETRA})
-    sea px = ANCHO - 58
+    sea x = ANCHO - 58
     si partida["llave"] y no partida["puerta"] {
-        dibujar_tile(TP, LLAVE, px, 2)
-        px = px - 16
+        dibujar_tile(TP, LLAVE, x, 2)
+        x = x - 16
     }
-    si partida["espada"] { dibujar_tile(TM, ESPADA, px, 2) }
+    si partida["espada"] { dibujar_tile(TM, ESPADA, x, 2) }
     # la vida de Grum
     si jefe != nulo y jefe_despierto y no juego.dialogo_abierto() {
         sea total = ENEMIGOS["grum"]["vida"]
@@ -1048,12 +1048,12 @@ funcion dibujar_marcador(): nulo {
 
 funcion dibujar_obtenido(): nulo {
     sea ob = obtenido
-    sea px = yo["x"] - 3
-    sea py = yo["y"] - 8
+    sea x = yo["x"] - 3
+    sea y = yo["y"] - 8
     juego.camara(matematica.redondear(cam[0]), matematica.redondear(cam[1]))
     sea sube = matematica.minimo(1, ob["t"] * 4) * 6
-    sea cx = px + 8
-    sea cy = py - 6 - sube
+    sea cx = x + 8
+    sea cy = y - 6 - sube
     juego.circulo(cx, cy, 10 + matematica.seno(juego.tiempo() * 6) * 2, [255, 255, 200, 60])
     si ob["hoja"] != nulo { dibujar_tile(ob["hoja"], ob["cuadro"], cx - 8, cy - 8) }
     sino si ob["cuadro"] == 0 { juego.dibujar(CORAZON, cx - 3, cy - 3, {"escala": 1}) }
@@ -1139,12 +1139,12 @@ funcion portada(): nulo {
     juego.camara()
     juego.cubrir([10, 14, 30, 150])
     # el título
-    sea py = 26 + matematica.seno(t * 1.5) * 2
-    juego.texto("LA PIEDRA", ANCHO / 2 + 2, py + 2, {"fuente": GRANDE, "alinear": "centro", "color": [20, 10, 20]})
-    juego.texto("LA PIEDRA", ANCHO / 2, py, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]})
-    juego.texto("DEL LINCE", ANCHO / 2 + 2, py + 22, {"fuente": GRANDE, "alinear": "centro", "color": [20, 10, 20]})
-    juego.texto("DEL LINCE", ANCHO / 2, py + 20, {"fuente": GRANDE, "alinear": "centro", "color": [120, 230, 170]})
-    juego.dibujar(PIEDRA, ANCHO / 2, py + 52, {"centrado": verdadero, "escala": 2})
+    sea y = 26 + matematica.seno(t * 1.5) * 2
+    juego.texto("LA PIEDRA", ANCHO / 2 + 2, y + 2, {"fuente": GRANDE, "alinear": "centro", "color": [20, 10, 20]})
+    juego.texto("LA PIEDRA", ANCHO / 2, y, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]})
+    juego.texto("DEL LINCE", ANCHO / 2 + 2, y + 22, {"fuente": GRANDE, "alinear": "centro", "color": [20, 10, 20]})
+    juego.texto("DEL LINCE", ANCHO / 2, y + 20, {"fuente": GRANDE, "alinear": "centro", "color": [120, 230, 170]})
+    juego.dibujar(PIEDRA, ANCHO / 2, y + 52, {"centrado": verdadero, "escala": 2})
     si terminado { juego.texto("TERMINADO", ANCHO - 6, ALTO - 12, {"fuente": LETRA, "alinear": "derecha", "color": [255, 220, 120]}) }
     juego.texto("Hecho con Lince", 6, ALTO - 12, {"fuente": LETRA, "color": [180, 180, 200]})
     sea opciones = si guardada != nulo { ["Continuar", "Nueva partida", "Controles", "Salir"] } sino { ["Nueva partida", "Controles", "Salir"] }
@@ -1236,18 +1236,18 @@ funcion final(): nulo {
     juego.dibujar_tiled(mapa, ["Suelo", "Decorado"])
     juego.camara()
     juego.cubrir([5, 8, 20, 170])
-    sea py = ALTO + 10 - t * 18
+    sea y = ALTO + 10 - t * 18
     para cada lista linea en CREDITOS {
-        si py > -20 y py < ALTO + 10 {
+        si y > -20 y y < ALTO + 10 {
             elegir linea[0] {
-                caso "grande" { juego.texto(linea[1], ANCHO / 2, py, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]}) }
-                caso "titulo" { juego.texto(linea[1], ANCHO / 2, py, {"fuente": LETRA, "alinear": "centro", "color": [120, 230, 170]}) }
-                otro { juego.texto(linea[1], ANCHO / 2, py, {"fuente": LETRA, "alinear": "centro", "color": [230, 230, 240]}) }
+                caso "grande" { juego.texto(linea[1], ANCHO / 2, y, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]}) }
+                caso "titulo" { juego.texto(linea[1], ANCHO / 2, y, {"fuente": LETRA, "alinear": "centro", "color": [120, 230, 170]}) }
+                otro { juego.texto(linea[1], ANCHO / 2, y, {"fuente": LETRA, "alinear": "centro", "color": [230, 230, 240]}) }
             }
         }
-        py = py + (si linea[0] == "grande" { 26 } sino { 12 })
+        y = y + (si linea[0] == "grande" { 26 } sino { 12 })
     }
-    si py < ALTO / 2 - 20 o (t > 2 y juego.accion_pulsada("accion")) { juego.cambiar_escena("portada", 1.5) }
+    si y < ALTO / 2 - 20 o (t > 2 y juego.accion_pulsada("accion")) { juego.cambiar_escena("portada", 1.5) }
 }
 
 # ── El bucle ─────────────────────────────────────────────────────────

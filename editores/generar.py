@@ -34,7 +34,8 @@ def palabras_clave():
 def palabras_contextuales():
     t = leer("src/lexer.c")
     bloque = re.search(r"PALABRAS_CONTEXTUALES\[\]\s*=\s*\{(.*?)\};", t, re.S).group(1)
-    return re.findall(r'"([a-z_]+)"', bloque)
+    # 'y' y 'o' también son contextuales, pero se pintan con las lógicas
+    return [w for w in re.findall(r'"([a-z_]+)"', bloque) if w not in LOGICAS]
 
 def modulos():
     t = leer("src/modulos.c")
@@ -65,7 +66,7 @@ OTRAS = ["escribir"]            # van aparte (función integrada)
 EXTRA_CONTROL = ["en"]
 
 def clasificar():
-    ks = palabras_clave()
+    ks = palabras_clave() + LOGICAS
     conocidas = set(CONTROL + DECLARACION + TIPOS + LOGICAS + LITERALES + OTRAS)
     sin = [k for k in ks if k not in conocidas]
     if sin:
@@ -217,7 +218,7 @@ def vscode_snippets():
 
 def sublime_completions():
     comps = [{"trigger": f"{p}\t{d}", "contents": "\n".join(b)} for n, p, d, b in SNIPPETS]
-    palabras = (palabras_clave() + palabras_contextuales() + ["en"] + modulos()
+    palabras = (palabras_clave() + LOGICAS + palabras_contextuales() + ["en"] + modulos()
                 + errores() + funciones_integradas())
     vistas, planas = set(), []
     for w in palabras:

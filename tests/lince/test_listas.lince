@@ -57,3 +57,13 @@ escribir(base)
 escribir([].ordenar())
 # La ordenación es estable: los equivalentes conservan su orden.
 escribir([3, 1, 3, 1].ordenar())
+
+# lista + lista: una nueva con las dos; las de antes no cambian
+sea primera = [1, 2]
+sea juntas = primera + [3, [4]]
+escribir(juntas)
+escribir(primera)
+primera += [9]
+escribir(primera)
+# a_texto de una lista o un diccionario, como escribir
+escribir(a_texto(juntas) + " | " + a_texto({"x": 1, "y": [2]}))

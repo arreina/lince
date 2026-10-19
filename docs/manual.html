@@ -148,7 +148,7 @@
 <div class="envoltorio">
 <nav id="lateral">
 <div class="grupo"><a href="#primeros-pasos" class="sec">Primeros pasos</a><a href="#primeros-pasos-0" class="sub">Hola, mundo</a><a href="#primeros-pasos-1" class="sub">Funciones que ya vienen</a><a href="#primeros-pasos-2" class="sub">Variables y constantes</a><a href="#primeros-pasos-3" class="sub">Operar y guardar: +=, -=, ++, --</a><a href="#primeros-pasos-4" class="sub">Cada nombre se define una sola vez</a><a href="#primeros-pasos-5" class="sub">Tapar un nombre en un ámbito interior</a><a href="#primeros-pasos-6" class="sub">Dónde se declaran los tipos</a><a href="#primeros-pasos-7" class="sub">Varios nombres de una vez</a></div>
-<div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">Un si que da un valor</a><a href="#control-de-flujo-2" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-3" class="sub">Romper y continuar</a><a href="#control-de-flujo-4" class="sub">Elegir / caso</a></div>
+<div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">x e y</a><a href="#control-de-flujo-2" class="sub">Un si que da un valor</a><a href="#control-de-flujo-3" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-4" class="sub">Romper y continuar</a><a href="#control-de-flujo-5" class="sub">Elegir / caso</a></div>
 <div class="grupo"><a href="#funciones" class="sec">Funciones</a><a href="#funciones-0" class="sub">Declarar y llamar</a><a href="#funciones-1" class="sub">Valores por defecto</a><a href="#funciones-2" class="sub">Lambdas y funciones como argumento</a><a href="#funciones-3" class="sub">Llamar a cualquier cosa que dé una función</a><a href="#funciones-4" class="sub">Closures</a></div>
 <div class="grupo"><a href="#listas" class="sec">Listas</a><a href="#listas-0" class="sub">Crear, modificar y consultar</a><a href="#listas-1" class="sub">Operaciones que devuelven una lista nueva</a><a href="#listas-2" class="sub">Ordenar con tu propio criterio</a></div>
 <div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a></div>
@@ -164,7 +164,7 @@
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>54 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>55 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -263,7 +263,12 @@ orco con 50 de vida
 <span class="k">si</span> nota &gt; <span class="n">5</span> <span class="k">y</span> <span class="k">no</span> (nota == <span class="n">10</span>) {
     <span class="k">escribir</span>(<span class="s">&quot;entre 6 y 9&quot;</span>)
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>aprobado
-entre 6 y 9</pre></div><span class="fuente">110_condicionales.lince</span></article><article class="ej" id="control-de-flujo-1"><h3>Un si que da un valor</h3><p class="nota">Una expresión en cada rama y <code>sino</code> obligatorio. Solo se evalúa la rama que toca.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> velocidad = -<span class="n">4</span>
+entre 6 y 9</pre></div><span class="fuente">110_condicionales.lince</span></article><article class="ej" id="control-de-flujo-1"><h3>x e y</h3><p class="nota"><code>y</code> y <code>o</code> son operadores solo entre dos valores. En cualquier otro sitio son nombres normales, así que <code>x</code> e <code>y</code> sirven para las coordenadas, como en cualquier juego.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> x = <span class="n">3</span>
+<span class="k">sea</span> <span class="k">y</span> = <span class="n">8</span>
+<span class="k">si</span> x &gt; <span class="n">0</span> <span class="k">y</span> <span class="k">y</span> &gt; <span class="n">0</span> {
+    <span class="k">y</span> = <span class="k">y</span> - <span class="n">1</span>
+    <span class="k">escribir</span>(<span class="s">&quot;arriba a la derecha, en ({x}, {y})&quot;</span>)
+}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>arriba a la derecha, en (3, 7)</pre></div><span class="fuente">112_x_e_y.lince</span></article><article class="ej" id="control-de-flujo-2"><h3>Un si que da un valor</h3><p class="nota">Una expresión en cada rama y <code>sino</code> obligatorio. Solo se evalúa la rama que toca.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> velocidad = -<span class="n">4</span>
 <span class="k">sea</span> lado = <span class="k">si</span> velocidad &lt; <span class="n">0</span> { <span class="s">&quot;izquierda&quot;</span> } <span class="k">sino</span> { <span class="s">&quot;derecha&quot;</span> }
 <span class="k">escribir</span>(lado)
 
@@ -275,7 +280,7 @@ entre 6 y 9</pre></div><span class="fuente">110_condicionales.lince</span></arti
 <span class="k">sea</span> puntos = <span class="n">1</span>
 <span class="k">escribir</span>(<span class="s">&quot;{puntos} {si puntos == 1 { &quot;</span>punto<span class="s">&quot; } sino { &quot;</span>puntos<span class="s">&quot; }}&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>izquierda
 aprobado
-1 punto</pre></div><span class="fuente">115_si_con_valor.lince</span></article><article class="ej" id="control-de-flujo-2"><h3>Las cuatro formas de repetir</h3><p class="nota"><code>para</code> clásico, <code>mientras</code>, <code>hacer/mientras</code> y <code>para cada</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
+1 punto</pre></div><span class="fuente">115_si_con_valor.lince</span></article><article class="ej" id="control-de-flujo-3"><h3>Las cuatro formas de repetir</h3><p class="nota"><code>para</code> clásico, <code>mientras</code>, <code>hacer/mientras</code> y <code>para cada</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">3</span>; i++) {
     <span class="k">escribir</span>(<span class="s">&quot;para &quot;</span> + i)
 }
 
@@ -301,7 +306,7 @@ mientras 1
 hacer 0
 hacer 1
 cada 10
-cada 20</pre></div><span class="fuente">120_bucles.lince</span></article><article class="ej" id="control-de-flujo-3"><h3>Romper y continuar</h3><p class="nota"><code>romper</code> sale del bucle; <code>continuar</code> pasa a la vuelta siguiente. Con bucles uno dentro de otro, afectan al de dentro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> enemigos = [{<span class="s">&quot;vida&quot;</span>: <span class="n">0</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">5</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">8</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">2</span>}]
+cada 20</pre></div><span class="fuente">120_bucles.lince</span></article><article class="ej" id="control-de-flujo-4"><h3>Romper y continuar</h3><p class="nota"><code>romper</code> sale del bucle; <code>continuar</code> pasa a la vuelta siguiente. Con bucles uno dentro de otro, afectan al de dentro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> enemigos = [{<span class="s">&quot;vida&quot;</span>: <span class="n">0</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">5</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">8</span>}, {<span class="s">&quot;vida&quot;</span>: <span class="n">2</span>}]
 
 <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> enemigos {
     <span class="k">si</span> e[<span class="s">&quot;vida&quot;</span>] == <span class="n">0</span> { <span class="k">continuar</span> }     <span class="c"># los muertos no cuentan</span>
@@ -320,7 +325,7 @@ vivo con 8
 0
 5
 10
-15</pre></div><span class="fuente">125_romper.lince</span></article><article class="ej" id="control-de-flujo-4"><h3>Elegir / caso</h3><p class="nota"><code>otro</code> es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
+15</pre></div><span class="fuente">125_romper.lince</span></article><article class="ej" id="control-de-flujo-5"><h3>Elegir / caso</h3><p class="nota"><code>otro</code> es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
 
 <span class="k">elegir</span> animal {
     <span class="k">caso</span> <span class="s">&quot;gato&quot;</span>  { <span class="k">escribir</span>(<span class="s">&quot;miau&quot;</span>) }
@@ -382,11 +387,13 @@ notas.agregar(<span class="n">6</span>)
 <span class="k">escribir</span>(notas.contiene(<span class="n">7</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[9, 7, 10, 6]
 4
 2
-verdadero</pre></div><span class="fuente">310_listas.lince</span></article><article class="ej" id="listas-1"><h3>Operaciones que devuelven una lista nueva</h3><p class="nota"><code>ordenar</code>, <code>invertir</code> y <code>copiar</code> no tocan la original.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> original = [<span class="n">3</span>, <span class="n">1</span>, <span class="n">2</span>]
+verdadero</pre></div><span class="fuente">310_listas.lince</span></article><article class="ej" id="listas-1"><h3>Operaciones que devuelven una lista nueva</h3><p class="nota"><code>ordenar</code>, <code>invertir</code>, <code>copiar</code> y <code>+</code> (dos listas seguidas) no tocan la original.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> original = [<span class="n">3</span>, <span class="n">1</span>, <span class="n">2</span>]
 <span class="k">escribir</span>(original.ordenar())
 <span class="k">escribir</span>(original.invertir())
+<span class="k">escribir</span>(original + [<span class="n">4</span>, <span class="n">5</span>])
 <span class="k">escribir</span>(original)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[1, 2, 3]
 [2, 1, 3]
+[3, 1, 2, 4, 5]
 [3, 1, 2]</pre></div><span class="fuente">320_listas_nuevas.lince</span></article><article class="ej" id="listas-2"><h3>Ordenar con tu propio criterio</h3><p class="nota">La función comparadora devuelve negativo, cero o positivo. La ordenación es estable.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nums = [<span class="n">3</span>, <span class="n">1</span>, <span class="n">4</span>, <span class="n">1</span>, <span class="n">5</span>]
 
 <span class="k">escribir</span>(nums.ordenar())

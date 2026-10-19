@@ -3,6 +3,17 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 0.11.0 (en preparación)
+
+### El lenguaje
+
+- **`y` y `o` ya se pueden usar como nombres.** Solo son el operador entre dos valores; en
+  cualquier otro sitio son una variable más, así que en un juego se puede escribir
+  `sea y = 10` y `si x > 0 y y > 0`. Lo que ya estaba escrito sigue igual.
+- `lista + lista` da una lista nueva con las dos seguidas (también `lista += [...]`).
+- `a_texto()` convierte también listas, diccionarios y lo demás, como lo escribe `escribir`
+  (antes daba error).
+
 ## 0.10.0
 
 Un juego completo hecho con Lince (La Piedra del Lince), la revisión del módulo `juego` antes de la 1.0 y generadores en `mapear`, `filtrar` y `reducir`.

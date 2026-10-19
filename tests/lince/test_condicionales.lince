@@ -39,3 +39,23 @@ para (i = 1; i <= 5; i++) {
         escribir("impar")
     }
 }
+
+# 'y' y 'o' como nombres: solo son operadores entre dos valores
+x = 3
+sea y = 4
+sea o = verdadero
+si x > 2 y y > 3 { escribir("y como nombre y como operador") }
+si falso o o { escribir("o también") }
+y = y + 1
+y += 1
+y++
+escribir(y)
+sea punto = {"x": x, "y": y}
+escribir(punto["y"])
+si x == 3 y
+   y == 7 { escribir("en dos líneas") }
+sea dentro = x > 0
+    y y < 10
+escribir(dentro)
+funcion mover(val numero x, val numero y): lista { devolver [x + 1, y + 1] }
+escribir(mover(x, y))

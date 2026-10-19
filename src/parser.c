@@ -626,9 +626,28 @@ static Nodo *igualdad(Parser *p) {
     return izq;
 }
 
+static int es_palabra(Parser *p, const char *w);
+
+/* 'y' y 'o' son palabras contextuales: entre dos valores son el operador; en
+   cualquier otro sitio, un nombre más (x, y). Tras un valor, 'y' es el
+   operador si está en la misma línea, o si empieza una línea pero no sigue un
+   '=', '.', '[' o '(' (así 'y = 3' en la línea siguiente es otra sentencia). */
+static int es_operador_logico(Parser *p, const char *w) {
+    if (!es_palabra(p, w) || p->pos == 0) return 0;
+    if (p->tokens[p->pos - 1].linea == actual(p)->linea) return 1;
+    switch (ver_siguiente(p)->tipo) {
+        case TOK_IGUAL: case TOK_MAS_IGUAL: case TOK_MENOS_IGUAL: case TOK_POR_IGUAL:
+        case TOK_ENTRE_IGUAL: case TOK_MODULO_IGUAL: case TOK_MAS_MAS: case TOK_MENOS_MENOS:
+        case TOK_PUNTO: case TOK_CORCHETE_IZQ: case TOK_PAREN_IZQ: case TOK_EOF:
+            return 0;
+        default:
+            return 1;
+    }
+}
+
 static Nodo *logica_y(Parser *p) {
     Nodo *izq = igualdad(p);
-    while (coincide(p, TOK_Y)) {
+    while (es_operador_logico(p, "y")) {
         consumir_cualquiera(p);
         Nodo *n = nodo_nuevo(NODO_BINARIO, p);
         strcpy(n->binario.operador, "y");
@@ -641,7 +660,7 @@ static Nodo *logica_y(Parser *p) {
 
 static Nodo *logica_o(Parser *p) {
     Nodo *izq = logica_y(p);
-    while (coincide(p, TOK_O)) {
+    while (es_operador_logico(p, "o")) {
         consumir_cualquiera(p);
         Nodo *n = nodo_nuevo(NODO_BINARIO, p);
         strcpy(n->binario.operador, "o");

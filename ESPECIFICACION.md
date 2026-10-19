@@ -47,7 +47,7 @@ Lince es un lenguaje de programación **para videojuegos, en español**, impleme
 | `intentar` / `capturar` / `finalmente` | try / catch / finally |
 | `lanzar` | throw |
 | `importar` | import |
-| `y` / `o` / `no` | and / or / not |
+| `y` / `o` / `no` | and / or / not (`y` y `o` solo entre dos valores: en cualquier otro sitio son nombres, así que `sea y = 10` vale) |
 
 ---
 
@@ -123,12 +123,25 @@ funcion f(): texto {
 
 | Operador | Significado |
 |----------|-------------|
-| `+` | suma / concatenación de texto |
+| `+` | suma / concatenación de texto o de listas (`[1, 2] + [3]`) |
 | `-` `*` `/` `%` | resta, multiplicación, división, módulo |
 | `++` `--` | incremento / decremento, como sentencia: `i++`, `mi.vidas--`, `puntos[j]++` |
 | `+=` `-=` `*=` `/=` `%=` | operar y guardar: `x += 5` es `x = x + 5` |
 | `==` `!=` `<` `>` `<=` `>=` | comparación |
 | `y` `o` `no` | lógicos |
+
+`y` y `o` son operadores solo entre dos valores; fuera de ahí son nombres normales, porque en un
+juego `x` e `y` salen en cada línea:
+
+```lince
+sea y = 10
+si x > 0 y y > 0 { y = y - 1 }          # el primer 'y' es el operador; los demás, la variable
+si vivo y
+   tiene_llave { abrir() }              # partida en dos líneas: la 'y' al final de la primera
+```
+
+Una línea que empieza por `y` u `o` sigue la condición de la anterior, salvo que detrás venga `=`,
+`+=`, `++`, `.`, `[` o `(`: entonces es la variable (`y = 3`).
 
 ---
 
@@ -219,7 +232,7 @@ escribir("Hola")           # imprime en pantalla
 leer("¿Tu nombre? ")       # lee del teclado
 
 a_numero("3.14")           # texto → número
-a_texto(42)                # número → texto
+a_texto(42)                # número → texto (una lista o un diccionario, como los escribe escribir)
 a_logico(1)                # valor → lógico
 
 argumentos()               # lista de args de línea de comandos
@@ -353,6 +366,7 @@ nums.posicion(3)        # índice, o -1 si no está
 nums.ordenar()
 nums.invertir()
 nums.copiar()
+nums + [4, 5]           # las dos seguidas, en una lista nueva
 ```
 
 `ordenar()` usa el orden natural: números por valor, textos

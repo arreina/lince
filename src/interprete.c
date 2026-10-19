@@ -1329,6 +1329,20 @@ static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
         else if (strcmp(op, "!=") == 0) resultado = valor_booleano(cmp != 0);
     }
 
+    /* Listas: lista + lista es una lista nueva con las dos seguidas (las de
+       antes no cambian; los elementos son los mismos, no copias) */
+    if (!resultado && izq->tipo == VAL_LISTA && der->tipo == VAL_LISTA && op[0] == '+' && !op[1]) {
+        Valor *l = valor_lista_crear();
+        Valor *partes[2] = {izq, der};
+        for (int k = 0; k < 2; k++)
+            for (int i = 0; i < partes[k]->lista.cantidad; i++) {
+                Valor *e = partes[k]->lista.elementos[i];
+                e->refs++;
+                lista_agregar(l, e);
+            }
+        resultado = l;
+    }
+
     /* Bytes: iguales si tienen el mismo contenido */
     if (!resultado && izq->tipo == VAL_BYTES && der->tipo == VAL_BYTES &&
         (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0)) {
@@ -4971,12 +4985,8 @@ static Valor *fn_conv_texto(Valor **a, int n) {
             return valor_texto(buf);
         case VAL_BOOLEANO: return valor_texto(v->booleano ? "verdadero" : "falso");
         case VAL_NULO:     return valor_texto("nulo");
-        default: {
-            hay_error = 1;
-            valor_error = valor_error_nuevo("ErrorTipo",
-                "texto() no puede convertir este tipo.", 0);
-            return valor_nulo();
-        }
+        default:           /* listas, diccionarios, objetos...: como los escribe escribir() */
+            return valor_texto_propio(valor_a_texto(v));
     }
 }
 

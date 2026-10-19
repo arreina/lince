@@ -1,0 +1,9 @@
+# @seccion: Control de flujo
+# @titulo: x e y
+# @nota: `y` y `o` son operadores solo entre dos valores. En cualquier otro sitio son nombres normales, así que `x` e `y` sirven para las coordenadas, como en cualquier juego.
+sea x = 3
+sea y = 8
+si x > 0 y y > 0 {
+    y = y - 1
+    escribir("arriba a la derecha, en ({x}, {y})")
+}

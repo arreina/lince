@@ -58,8 +58,6 @@ static PalabraClave PALABRAS_CLAVE[] = {
     { "numero",      TOK_TIPO_NUMERO      },
     { "texto",       TOK_TIPO_TEXTO       },
     { "logico",      TOK_TIPO_LOGICO      },
-    { "y",           TOK_Y                },
-    { "o",           TOK_O                },
     { "no",          TOK_NO               },
     { NULL,          TOK_EOF              },
 };
@@ -70,7 +68,7 @@ static PalabraClave PALABRAS_CLAVE[] = {
    servidor de lenguaje sepan resaltarlas y sugerirlas. */
 static const char *const PALABRAS_CONTEXTUALES[] = {
     "abstracta", "abstracto", "estatico", "privado", "protegido", "publico",
-    "sobrescribe", "obtener", "fijar", "es", "como", "cualquiera", "tarea", NULL,
+    "sobrescribe", "obtener", "fijar", "es", "como", "cualquiera", "tarea", "y", "o", NULL,
 };
 
 const char *lexer_palabra_clave(int i) {
