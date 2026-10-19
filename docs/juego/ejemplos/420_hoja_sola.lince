@@ -1,0 +1,18 @@
+# @seccion: Hojas de sprites
+# @titulo: Hojas desordenadas
+# @nota: Sin decir cómo partirla, `juego.hoja(ruta)` busca sola las figuras (lo separado por fondo), las agrupa en filas y las ordena, aunque midan distinto. Así sirven las hojas descargadas tal cual. Con `{"fondo": "auto"}` también quita un fondo de color.
+importar "juego"
+importar "matematica"
+
+juego.abrir("Hoja sola", 480, 270)
+fijo FIGURAS = juego.hoja("recursos/figuras.png")
+mientras juego.abierto() {
+    juego.limpiar([30, 30, 40])
+    juego.dibujar(juego.imagen("recursos/figuras.png"), 20, 20, {"escala": 2})
+    para (i = 0; i < FIGURAS["cuadros"]; i++) {
+        juego.dibujar(FIGURAS, 290 + (i % 3) * 60, 30 + matematica.piso(i / 3) * 70, {"cuadro": i})
+        juego.texto("{i}", 290 + (i % 3) * 60, 30 + matematica.piso(i / 3) * 70 + 50, 1)
+    }
+    juego.texto("{FIGURAS["cuadros"]} FIGURAS, {FIGURAS["filas"]} FILAS", 20, 230, 2)
+    juego.presentar()
+}

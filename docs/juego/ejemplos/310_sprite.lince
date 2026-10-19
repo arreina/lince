@@ -1,0 +1,21 @@
+# @seccion: Imágenes y sprites
+# @titulo: Dibujos hechos con texto
+# @nota: `juego.sprite(filas, colores)` hace una imagen sin archivos: un carácter por píxel, y cada carácter con su color (los que no están, transparentes). Sirve para empezar sin dibujos y para cosas pequeñas.
+importar "juego"
+
+juego.abrir("Sprites", 480, 270)
+fijo NAVE = juego.sprite([
+    "....X....",
+    "...XXX...",
+    "..XXOXX..",
+    ".XXXXXXX.",
+    "XX.XXX.XX",
+    "X...R...X"
+], {"X": [120, 200, 240], "O": [255, 255, 255], "R": [255, 120, 40]})
+mientras juego.abierto() {
+    juego.limpiar([10, 10, 25])
+    juego.dibujar(NAVE, 60, 100, {"escala": 4})
+    juego.dibujar(NAVE, 200, 80, {"escala": 8})
+    juego.dibujar(NAVE, 380, 110, {"escala": 4, "angulo": 180})
+    juego.presentar()
+}

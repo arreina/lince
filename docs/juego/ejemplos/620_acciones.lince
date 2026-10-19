@@ -1,0 +1,28 @@
+# @seccion: Entrada
+# @titulo: Acciones: teclado y mando a la vez
+# @nota: Una acción junta varias entradas con un nombre: teclas, botones de mando (`"mando:a"`), la palanca (`"mando:izq_x-"`), el ratón o la pantalla táctil. El juego pregunta por la acción y funciona igual con todo. `juego.direccion("izquierda", "derecha")` va de −1 a 1, gradual con la palanca.
+# @nota: Con mandos, en un móvil sale solo un mando en la pantalla táctil (ver **Móvil**), y el jugador puede cambiar las teclas (ver **Controles**).
+# @guion: 5:d:30,40:espacio:1
+# @fotogramas: 50
+importar "juego"
+
+juego.abrir("Acciones", 480, 270)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("saltar", ["espacio", "w", "mando:a"])
+sea x = 60
+sea vy = 0
+sea suelo = 200
+sea yy = suelo
+mientras juego.abierto() {
+    x = x + juego.direccion("izquierda", "derecha") * 180 * juego.dt()
+    si juego.accion_pulsada("saltar") y yy >= suelo { vy = -420 }
+    vy = vy + 1200 * juego.dt()
+    yy = yy + vy * juego.dt()
+    si yy > suelo { yy = suelo }
+    juego.limpiar([30, 35, 50])
+    juego.rectangulo(0, suelo + 30, 480, 40, [80, 140, 80])
+    juego.rectangulo(x, yy, 30, 30, [230, 140, 60])
+    juego.texto("SALTAR: {juego.acciones()["saltar"]}", 20, 20, 2)
+    juego.presentar()
+}

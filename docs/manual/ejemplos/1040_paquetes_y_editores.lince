@@ -1,0 +1,8 @@
+# @seccion: Herramientas
+# @titulo: Paquetes y editores
+# @nota: `lince instalar` descarga una librería de Lince (un repositorio git) para usarla con `importar "paquete:nombre"`. Para el editor hay una extensión de VS Code con colores, plantillas, errores y avisos al escribir, autocompletado e ir a la definición; por debajo usa `lince lsp`, que cualquier editor que hable LSP puede usar.
+# @lenguaje: terminal
+lince instalar https://github.com/usuario/paquete
+lince listar
+lince desinstalar paquete
+code --install-extension lince-language-X.Y.Z.vsix   # viene con cada versión

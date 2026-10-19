@@ -1,0 +1,17 @@
+# @seccion: Texto y letras
+# @titulo: Fuentes .ttf
+# @nota: `juego.fuente(ruta, tamaño)` carga una fuente TrueType u OpenType (aquí, Press Start 2P, con licencia libre OFL). Trae el español entero: tildes, ñ, ¿ y ¡. Con `ancho`, el texto se parte en líneas por los espacios; `juego.medir_texto()` da `[ancho, alto]`.
+importar "juego"
+
+juego.abrir("Fuentes", 480, 270)
+fijo LETRA = juego.fuente("recursos/PressStart2P-Regular.ttf", 16)
+fijo PEQUENA = juego.fuente("recursos/PressStart2P-Regular.ttf", 8)
+sea dialogo = "¿Has visto al lince? Dicen que vive en la sierra, junto al río."
+mientras juego.abierto() {
+    juego.limpiar([15, 20, 35])
+    juego.texto("¡Año de nieves!", 240, 30, {"fuente": LETRA, "alinear": "centro", "color": [255, 220, 90]})
+    juego.texto(dialogo, 40, 90, {"fuente": PEQUENA, "ancho": 400, "color": [220, 230, 240]})
+    sea medida = juego.medir_texto(dialogo, {"fuente": PEQUENA, "ancho": 400})
+    juego.contorno(34, 84, medida[0] + 12, medida[1] + 12, [90, 110, 160])
+    juego.presentar()
+}

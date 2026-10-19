@@ -1,0 +1,13 @@
+# @seccion: Primeros pasos
+# @titulo: Funciones que ya vienen
+# @nota: Sin `importar` nada: `escribir` y `leer`, `a_numero`, `a_texto` y `a_logico` para pasar de un tipo a otro, `rango` para contar, y `mapear`, `filtrar` y `reducir` para trabajar con listas. `argumentos()` da lo que se escribió detrás del programa en la terminal.
+escribir(a_numero("3.5") * 2)
+escribir(a_texto(42) + "!")
+escribir("{a_logico(0)} {a_logico("hola")}")
+
+para cada numero n en rango(1, 10, 3) { escribir(n) }
+
+sea dobles = mapear([1, 2, 3], funcion(val numero x): numero { devolver x * 2 })
+sea pares = filtrar([1, 2, 3, 4, 5, 6], funcion(val numero x): logico { devolver x % 2 == 0 })
+sea suma = reducir([1, 2, 3, 4], 0, funcion(val numero a, val numero x): numero { devolver a + x })
+escribir("{dobles} {pares} {suma}")

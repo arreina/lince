@@ -1,0 +1,11 @@
+# @seccion: Herramientas
+# @titulo: Depurar paso a paso
+# @nota: `lince depurar programa.lince` lo ejecuta parándose en cada línea: `s` entra en la siguiente (también dentro de las funciones), `n` pasa a la siguiente sin entrar, `c` sigue hasta un punto de parada (`b archivo.lince:12`), `p expresión` enseña un valor, `v` las variables, `bt` la pila de llamadas y `q` sale.
+# @lenguaje: terminal
+lince depurar programa.lince
+→ programa.lince:1   importar "juego"
+(lince-dbg) b programa.lince:12
+(lince-dbg) c
+(lince-dbg) p jugador["vida"]
+(lince-dbg) v
+(lince-dbg) n

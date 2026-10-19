@@ -1,0 +1,16 @@
+# @seccion: Funciones
+# @titulo: Llamar a cualquier cosa que dé una función
+# @nota: Una función es un valor más: se guarda en una lista, en un diccionario o en un campo, y se llama directamente desde ahí. También se puede llamar a lo que devuelve otra llamada. El `(` va en la misma línea que lo que se llama.
+sea golpes = [
+    funcion(val numero f): texto { devolver "puñetazo de " + f },
+    funcion(val numero f): texto { devolver "patada de " + f }
+]
+escribir(golpes[1](8))
+
+sea acciones = {"saltar": funcion(): texto { devolver "¡hop!" }}
+escribir(acciones["saltar"]())
+
+funcion sumador(val numero a): funcion {
+    devolver funcion(val numero b): numero { devolver a + b }
+}
+escribir(sumador(2)(3))

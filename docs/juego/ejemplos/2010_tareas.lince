@@ -1,0 +1,32 @@
+# @seccion: Tareas
+# @titulo: Esperar sin parar el juego
+# @nota: Una `tarea` se escribe como una función, pero puede `esperar(segundos)` sin parar el juego: avanza sola en cada `juego.presentar()`. Va muy bien para lo que pasa poco a poco: un parpadeo, un enemigo que patrulla, una cuenta atrás, una cinemática. `t.terminada()` dice si acabó y `t.parar()` la para.
+# @fotogramas: 75
+importar "juego"
+
+juego.abrir("Tareas", 480, 270)
+sea mensaje = ""
+sea brillo = falso
+
+tarea cuenta_atras() {
+    para cada texto t en ["3", "2", "1", "¡YA!"] {
+        mensaje = t
+        esperar(0.4)
+    }
+}
+
+tarea parpadear() {
+    mientras verdadero {
+        brillo = no brillo
+        esperar(0.15)
+    }
+}
+
+cuenta_atras()
+parpadear()
+mientras juego.abierto() {
+    juego.limpiar([20, 20, 35])
+    juego.circulo(240, 170, 30, si brillo { [255, 230, 120] } sino { [120, 90, 40] })
+    juego.texto(mensaje, 240, 60, {"escala": 6, "alinear": "centro"})
+    juego.presentar()
+}

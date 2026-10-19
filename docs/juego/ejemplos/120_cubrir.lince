@@ -1,0 +1,14 @@
+# @seccion: Dibujar
+# @titulo: Oscurecer la pantalla
+# @nota: `juego.cubrir(color)` pinta toda la ventana por encima de lo dibujado, sin moverse con la cámara: con un negro medio transparente se oscurece para una pausa, y con otro color se tiñe (agua, daño, noche).
+importar "juego"
+
+juego.abrir("Pausa", 480, 270)
+mientras juego.abierto() {
+    juego.limpiar([60, 130, 200])
+    juego.rectangulo(0, 200, 480, 70, [70, 150, 70])
+    juego.circulo(240, 170, 30, [240, 180, 70])
+    juego.cubrir([0, 0, 0, 150])
+    juego.texto("PAUSA", 240, 120, {"escala": 4, "alinear": "centro"})
+    juego.presentar()
+}

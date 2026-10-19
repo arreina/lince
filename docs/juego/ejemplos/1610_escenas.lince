@@ -1,0 +1,19 @@
+# @seccion: Escenas
+# @titulo: Portada, partida y final
+# @nota: Un juego tiene partes: la portada, la partida, la pantalla final... `juego.cambiar_escena("partida", 0.6)` pasa a otra con un fundido a negro de 0,6 segundos; `juego.escena()` dice en cuál se está y `juego.escena_nueva()` es verdadero en su primer fotograma, para prepararla. La captura es de la mitad del fundido.
+# @fotogramas: 30
+importar "juego"
+
+juego.abrir("Escenas", 480, 270)
+juego.cambiar_escena("portada")
+mientras juego.abierto() {
+    si juego.escena() == "portada" {
+        juego.limpiar([40, 30, 70])
+        juego.texto("LA PORTADA", 240, 120, {"escala": 4, "alinear": "centro"})
+        si juego.tiempo_escena() > 0.2 { juego.cambiar_escena("partida", 0.6) }
+    } sino {
+        juego.limpiar([60, 140, 80])
+        juego.texto("LA PARTIDA", 240, 120, {"escala": 4, "alinear": "centro"})
+    }
+    juego.presentar()
+}

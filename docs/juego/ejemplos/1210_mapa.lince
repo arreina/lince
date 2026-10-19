@@ -1,0 +1,31 @@
+# @seccion: Mapas
+# @titulo: Un nivel escrito con texto
+# @nota: `juego.mapa(filas, tamaño)` hace un mapa de casillas a partir de texto, un carácter por casilla. `juego.mover_en_mapa(mapa, cosa)` mueve algo según su `vx` y su `vy` sin atravesar las paredes (`"#"`, o las que se digan) y deja en `en_suelo`, `techo` y `pared` con qué chocó; la gravedad la sumas tú. `juego.dibujar_mapa` lo pinta, con un color o un tile para cada carácter.
+# @guion: 1:derecha:60
+# @fotogramas: 60
+importar "juego"
+
+juego.abrir("Mapa", 480, 270)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:izq_x+"])
+fijo NIVEL = juego.mapa([
+    "###############",
+    "#.............#",
+    "#.............#",
+    "#......====...#",
+    "#.............#",
+    "#...##........#",
+    "#...##....#...#",
+    "###############"
+], 32, {"plataformas": "="})
+sea yo = {"x": 40, "y": 100, "ancho": 20, "alto": 28, "vx": 0, "vy": 0}
+mientras juego.abierto() {
+    yo["vx"] = juego.direccion("izquierda", "derecha") * 160
+    yo["vy"] = yo["vy"] + 1000 * juego.dt()
+    juego.mover_en_mapa(NIVEL, yo)
+    juego.limpiar([30, 30, 50])
+    juego.dibujar_mapa(NIVEL, {"#": [90, 80, 120], "=": [180, 140, 80]})
+    juego.rectangulo(yo["x"], yo["y"], yo["ancho"], yo["alto"], [240, 150, 60])
+    juego.texto("EN SUELO: {yo["en_suelo"]}  PARED: {yo["pared"]}", 40, 8, 1)
+    juego.presentar()
+}

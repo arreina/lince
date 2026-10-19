@@ -119,6 +119,7 @@ test-juego: $(BIN)
 docs: $(BIN)
 	@python3 docs/generar_manual.py ./$(BIN)
 	@python3 docs/generar_tutorial.py ./$(BIN)
+	@python3 docs/generar_juego.py ./$(BIN)
 
 # Guardián: si alguien toca un ejemplo —o el lenguaje cambia de
 # comportamiento— y no regenera, esto falla. Es lo que impide que el manual
@@ -126,6 +127,7 @@ docs: $(BIN)
 docs-check: $(BIN)
 	@python3 docs/generar_manual.py ./$(BIN) --comprobar
 	@python3 docs/generar_tutorial.py ./$(BIN) --comprobar
+	@python3 docs/generar_juego.py ./$(BIN) --comprobar
 
 # ── Soporte de editores ───────────────────
 # Gramática, snippets y listas de palabras se generan del propio lenguaje

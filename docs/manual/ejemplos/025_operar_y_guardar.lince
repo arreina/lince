@@ -1,6 +1,6 @@
 # @seccion: Primeros pasos
-# @titulo: Operar y guardar: +=, -=, *=, /=, %=
-# @nota: `x += 5` es `x = x + 5`. Vale para variables, elementos de listas y diccionarios, y campos.
+# @titulo: Operar y guardar: +=, -=, ++, --
+# @nota: `x += 5` es `x = x + 5` (también `-=`, `*=`, `/=` y `%=`), y `x++` suma uno (`x--` resta uno). Valen para variables, elementos de listas y diccionarios, y campos (`mi.vidas--`).
 sea puntos = 10
 puntos += 5
 puntos *= 2
@@ -13,3 +13,8 @@ escribir(nombre)
 sea vidas = {"Ana": 3, "Luis": 3}
 vidas["Luis"] -= 1
 escribir(vidas)
+
+sea marcador = [3, 3]
+marcador[1]--
+marcador[0]++
+escribir(marcador)

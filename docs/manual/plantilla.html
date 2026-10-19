@@ -37,6 +37,10 @@
     border-radius:99px; padding:.1rem .5rem;
   }
   header .crece{flex:1}
+  .pag{font-size:.8rem; color:var(--texto2)}
+  .pag:hover, .pag.aqui{color:var(--amarillo); text-decoration:none}
+  @media (max-width:860px){ .pag{display:none} }
+
   #buscar{
     background:var(--bg3); border:1px solid var(--borde); border-radius:6px;
     color:var(--texto); padding:.4rem .7rem; font:inherit; font-size:.8rem;
@@ -83,6 +87,8 @@
   .ej{margin-bottom:2.25rem}
   .ej h3{color:var(--blanco); font-size:1rem; margin-bottom:.4rem}
   .nota{font-size:.84rem; color:var(--texto2); margin-bottom:.75rem}
+  .nota code, .intro code{color:var(--amarillo); background:var(--bg3); padding:.05rem .3rem; border-radius:4px}
+  .nota strong{color:var(--texto)}
 
   .codigo{position:relative; background:var(--bg2); border:1px solid var(--borde); border-radius:8px}
   .codigo pre{margin:0; padding:1rem 1.1rem; overflow-x:auto; font-size:.84rem; line-height:1.65}
@@ -133,6 +139,9 @@
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
   <span class="version">v0.8</span>
   <div class="crece"></div>
+  <a class="pag aqui" href="manual.html">Lenguaje</a>
+  <a class="pag" href="juego.html">Módulo juego</a>
+  <a class="pag" href="tutorial.html">Tutorial</a>
   <input id="buscar" type="search" placeholder="buscar en el manual…" aria-label="Buscar">
 </header>
 

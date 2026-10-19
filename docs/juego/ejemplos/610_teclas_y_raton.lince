@@ -1,0 +1,21 @@
+# @seccion: Entrada
+# @titulo: Teclas y ratón
+# @nota: `juego.tecla("derecha")` dice si está pulsada ahora; `juego.tecla_pulsada("espacio")`, si se ha pulsado en este fotograma (para saltar una sola vez). `juego.raton()` da `[x, y]` y `juego.clic(1)`, si se ha hecho clic con el botón izquierdo.
+# @teclas: derecha
+# @clic: 360,90
+# @fotogramas: 40
+importar "juego"
+
+juego.abrir("Entrada", 480, 270)
+sea x = 60
+sea marcas = []
+mientras juego.abierto() {
+    si juego.tecla("derecha") { x = x + 200 * juego.dt() }
+    si juego.tecla("izquierda") { x = x - 200 * juego.dt() }
+    si juego.clic(1) y marcas.longitud() < 5 { marcas.agregar(juego.raton()) }
+    juego.limpiar([30, 30, 45])
+    juego.rectangulo(x, 180, 40, 40, [230, 140, 60])
+    para cada lista m en marcas { juego.circulo(m[0], m[1], 10, [120, 200, 255]) }
+    juego.texto("RATÓN: {juego.raton()}", 20, 20, 2)
+    juego.presentar()
+}

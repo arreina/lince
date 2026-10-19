@@ -37,6 +37,10 @@
     border-radius:99px; padding:.1rem .5rem;
   }
   header .crece{flex:1}
+  .pag{font-size:.8rem; color:var(--texto2)}
+  .pag:hover, .pag.aqui{color:var(--amarillo); text-decoration:none}
+  @media (max-width:860px){ .pag{display:none} }
+
   #buscar{
     background:var(--bg3); border:1px solid var(--borde); border-radius:6px;
     color:var(--texto); padding:.4rem .7rem; font:inherit; font-size:.8rem;
@@ -144,7 +148,9 @@
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
   <span class="version">v0.8</span>
   <div class="crece"></div>
-  <a href="manual.html" style="font-size:.82rem">Manual</a>
+  <a class="pag" href="manual.html">Lenguaje</a>
+  <a class="pag" href="juego.html">Módulo juego</a>
+  <a class="pag aqui" href="tutorial.html">Tutorial</a>
 </header>
 
 <div class="envoltorio">

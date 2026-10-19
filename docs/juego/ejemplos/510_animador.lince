@@ -1,0 +1,24 @@
+# @seccion: Animador
+# @titulo: El animador
+# @nota: `juego.animador(hoja, animaciones)` lleva por ti qué animación toca, desde cuándo y qué viene después. Cada animación dice su `fila` (o sus `cuadros`), `por_segundo`, si se repite y la `siguiente`. `juego.animacion(pj, "andar")` la cambia (si ya estaba en ella, sigue por donde iba) y `juego.dibujar(pj, x, y)` dibuja el cuadro que toca.
+# @fotogramas: 50
+importar "juego"
+
+juego.abrir("Animador", 480, 270)
+fijo LINCE = juego.hoja("recursos/lince.png", 16)
+sea pj = juego.animador(LINCE, {
+    "quieto":  {"fila": 0, "por_segundo": 3},
+    "andar":   {"fila": 1, "por_segundo": 10},
+    "saltar":  {"fila": 2},
+    "zarpazo": {"fila": 3, "por_segundo": 12, "repetir": falso, "siguiente": "quieto"}
+})
+sea x = 60
+mientras juego.abierto() {
+    x = x + 80 * juego.dt()
+    juego.animacion(pj, "andar")
+    juego.limpiar([190, 220, 240])
+    juego.rectangulo(0, 200, 480, 70, [90, 160, 80])
+    juego.dibujar(pj, x, 136, {"escala": 4})
+    juego.texto("ANIMACIÓN: {pj["actual"]}", 20, 20, 2)
+    juego.presentar()
+}

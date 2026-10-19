@@ -1,0 +1,17 @@
+# @seccion: Empezar
+# @titulo: La ventana y el bucle
+# @nota: Un juego es un bucle: en cada vuelta se mira la entrada, se mueven las cosas, se dibuja todo y `juego.presentar()` lo enseña, espera al siguiente fotograma (60 por segundo) y lee el teclado, el ratón y los mandos. `juego.abierto()` pasa a falso al cerrar la ventana.
+# @nota: Al guardar el archivo con el juego en marcha, el juego sigue con el código nuevo sin perder dónde estaba (**recarga en caliente**); F5 empieza de cero.
+# @fotogramas: 40
+importar "juego"
+
+juego.abrir("Mi primer juego", 480, 270)
+sea x = 40
+
+mientras juego.abierto() {
+    x = x + 150 * juego.dt()                    # 150 píxeles por segundo, vaya a los fps que vaya
+    juego.limpiar([25, 30, 45])
+    juego.circulo(x, 135, 24, [255, 200, 60])
+    juego.texto("HOLA, LINCE", 20, 20, 3)
+    juego.presentar()
+}

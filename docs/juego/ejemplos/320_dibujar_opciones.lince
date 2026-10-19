@@ -1,0 +1,20 @@
+# @seccion: Imágenes y sprites
+# @titulo: Girar, voltear, teñir
+# @nota: `juego.dibujar(imagen, x, y, opciones)` admite `escala`, `angulo`, `espejo` (mirar al otro lado), `voltear`, `alfa`, `color` (teñir), `blanco` (el destello de cuando a alguien le dan) y `mezcla` (`"sumar"` para luces y fuego). Con `centrado`, la `x` y la `y` son el centro.
+importar "juego"
+importar "matematica"
+
+juego.abrir("Opciones", 480, 270)
+fijo LINCE = juego.hoja("recursos/lince.png", 16)
+mientras juego.abierto() {
+    juego.limpiar([40, 50, 70])
+    sea opciones = [{"escala": 4}, {"escala": 4, "espejo": verdadero}, {"escala": 4, "angulo": 30},
+                    {"escala": 4, "alfa": 110}, {"escala": 4, "color": [120, 160, 255]}, {"escala": 4, "blanco": 0.8}]
+    para (i = 0; i < 6; i++) {
+        sea op = opciones[i]
+        op["cuadro"] = 0
+        op["centrado"] = verdadero
+        juego.dibujar(LINCE, 50 + (i % 3) * 150, 80 + matematica.piso(i / 3) * 110, op)
+    }
+    juego.presentar()
+}

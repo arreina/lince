@@ -1,0 +1,18 @@
+# @seccion: Móvil
+# @titulo: Dedos, vibrar e inclinar
+# @nota: `juego.toques()` da los dedos que hay en la pantalla (en el ordenador, el botón izquierdo del ratón cuenta como un dedo). `juego.vibrar(segundos)` hace vibrar el móvil y los mandos, y `juego.inclinacion()` dice hacia dónde está inclinado el móvil (en el ordenador, `[0, 0]`). Una acción puede usar la inclinación: `"inclinacion:x-"`.
+# @nota: Para ponerlo en el móvil: `lince repartir juego.lince --android` (ver **Compartir el juego**).
+# @clic: 300,140
+# @fotogramas: 10
+importar "juego"
+
+juego.abrir("Dedos", 480, 270)
+mientras juego.abierto() {
+    juego.limpiar([25, 25, 35])
+    para cada diccionario dedo en juego.toques() {
+        juego.circulo(dedo["x"], dedo["y"], 30, [255, 255, 255, 120])
+        juego.texto("DEDO {dedo["id"]}", dedo["x"] + 36, dedo["y"] - 6, 2)
+    }
+    juego.texto("TÁCTIL: {juego.tactil()}   INCLINACIÓN: {juego.inclinacion()}", 20, 20, 1)
+    juego.presentar()
+}

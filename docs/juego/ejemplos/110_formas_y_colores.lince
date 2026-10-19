@@ -1,0 +1,18 @@
+# @seccion: Dibujar
+# @titulo: Formas y colores
+# @nota: Un color es `[rojo, verde, azul]` (de 0 a 255), con un cuarto número para la transparencia, o un texto como `"#ffc850"`. Lo que se dibuja después tapa a lo de antes.
+importar "juego"
+
+juego.abrir("Formas", 480, 270)
+mientras juego.abierto() {
+    juego.limpiar([30, 30, 40])
+    juego.rectangulo(30, 30, 120, 80, [200, 70, 70])
+    juego.contorno(180, 30, 120, 80, "#ffc850")
+    juego.circulo(400, 70, 45, [80, 160, 230])
+    juego.circulo(370, 90, 45, [255, 255, 255, 90])            # medio transparente
+    juego.linea(30, 160, 450, 160, [120, 220, 120])
+    para (i = 0; i < 8; i++) {
+        juego.rectangulo(30 + i * 55, 190, 45, 45, [30 * i, 255 - 30 * i, 160])
+    }
+    juego.presentar()
+}

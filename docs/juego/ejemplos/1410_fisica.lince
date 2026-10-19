@@ -1,0 +1,41 @@
+# @seccion: Física
+# @titulo: Cajas, pelotas y ascensores
+# @nota: `juego.fisica()` hace un mundo con gravedad (y, si se le da, un mapa con el que chocar), y `juego.cuerpo(mundo, datos)` le añade cuerpos: cajas o círculos (`radio`) con `masa`, `rebote` y `friccion`. `juego.avanzar_fisica(mundo)` lo mueve todo en cada fotograma: caen, rebotan, se empujan según su masa y se apilan.
+# @nota: Un cuerpo `fijo` no lo mueve nada; con `vx` o `vy` es una plataforma o un ascensor que lleva lo que tiene encima. Uno `sensor` no choca, solo avisa de lo que toca (`juego.tocando`), para monedas o zonas. Los cuerpos son diccionarios normales: el personaje puede ser uno más.
+# @fotogramas: 90
+importar "juego"
+
+juego.abrir("Física", 480, 270)
+fijo NIVEL = juego.mapa([
+    "###############",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "###############"
+], 30)
+sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
+para (i = 0; i < 4; i++) {
+    juego.cuerpo(mundo, {"x": 60 + i * 6, "y": 40 + i * 45, "ancho": 30, "alto": 30})       # una torre que cae
+}
+juego.cuerpo(mundo, {"x": 220, "y": 40, "radio": 12, "rebote": 0.8})
+juego.cuerpo(mundo, {"x": 280, "y": 60, "radio": 8, "rebote": 0.9, "masa": 0.5})
+juego.cuerpo(mundo, {"x": 340, "y": 190, "ancho": 70, "alto": 8, "fijo": verdadero, "vy": -40})
+juego.cuerpo(mundo, {"x": 360, "y": 150, "ancho": 24, "alto": 24})
+mientras juego.abierto() {
+    juego.avanzar_fisica(mundo)
+    juego.limpiar([25, 30, 45])
+    juego.dibujar_mapa(NIVEL, {"#": [70, 80, 110]})
+    para cada diccionario c en mundo["cuerpos"] {
+        si c.contiene("radio") {
+            juego.circulo(c["x"] + c["radio"], c["y"] + c["radio"], c["radio"], [240, 120, 90])
+        } sino {
+            juego.rectangulo(c["x"], c["y"], c["ancho"], c["alto"], si c["fijo"] { [120, 200, 140] } sino { [200, 150, 80] })
+            juego.contorno(c["x"], c["y"], c["ancho"], c["alto"], [60, 40, 20])
+        }
+    }
+    juego.presentar()
+}

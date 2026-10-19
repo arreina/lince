@@ -1,0 +1,15 @@
+# @seccion: Empezar
+# @titulo: Píxeles grandes
+# @nota: Con `{"escala": n}`, la ventana es n veces mayor y cada píxel del juego se ve como un cuadrado de n × n, como en las consolas portátiles. Todo se sigue midiendo en el tamaño pequeño (aquí 160 × 90). `juego.pantalla_completa()` lo pone a pantalla completa, escalado sin deformarse.
+importar "juego"
+
+juego.abrir("Píxeles", 160, 90, {"escala": 3})
+
+mientras juego.abierto() {
+    juego.limpiar([20, 24, 40])
+    juego.rectangulo(0, 70, 160, 20, [70, 140, 70])
+    juego.circulo(130, 20, 9, [250, 220, 100])
+    juego.rectangulo(30, 54, 10, 16, [230, 120, 60])
+    juego.texto("160 X 90", 4, 4, 1)
+    juego.presentar()
+}

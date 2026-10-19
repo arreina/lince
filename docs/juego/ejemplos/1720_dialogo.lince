@@ -1,0 +1,18 @@
+# @seccion: Menús y diálogos
+# @titulo: Diálogos
+# @nota: `juego.dialogo(páginas)` abre una caja con el texto saliendo letra a letra. Cada página puede llevar quién habla (`nombre`), un `retrato` y `respuestas` para elegir; la elegida la da `juego.respuesta()`. Aceptar termina de escribir la página o pasa a la siguiente, y las páginas largas se parten solas. Mientras `juego.dialogo_abierto()` sea verdadero, el juego no debería mover al personaje.
+# @guion: 3:espacio:1
+# @fotogramas: 20
+importar "juego"
+
+juego.abrir("Diálogo", 480, 270)
+fijo LINCE = juego.hoja("recursos/lince.png", 16)
+juego.dialogo([
+    {"nombre": "Lince", "texto": "Llevo días viendo luces raras entre los árboles, de noche."},
+    {"nombre": "Lince", "retrato": LINCE, "texto": "¿Me acompañas a ver qué son?", "respuestas": ["Claro que sí", "Mejor otro día"]}
+])
+mientras juego.abierto() {
+    juego.limpiar([46, 92, 58])
+    juego.dibujar(LINCE, 300, 90, {"escala": 4})
+    juego.presentar()
+}

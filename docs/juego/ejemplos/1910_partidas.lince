@@ -1,0 +1,15 @@
+# @seccion: Partidas guardadas
+# @titulo: Guardar y cargar
+# @nota: `juego.guardar("partida", datos)` guarda números, textos, listas y diccionarios, y `juego.cargar("partida", por_defecto)` los recupera (o da `por_defecto` si no hay nada). Van a la carpeta del usuario de cada sistema (en el móvil, la de la app), una por juego, sin pensar en rutas. Si el juego se cierra mientras guarda, lo de antes sigue entero. `juego.olvidar("partida")` lo borra.
+# @nota: Con un diccionario por defecto, lo que falte en lo guardado se toma de ahí: una opción nueva de una versión posterior del juego tiene valor desde el principio.
+# @captura: no
+importar "juego"
+
+sea opciones = juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})
+escribir("la primera vez: {opciones}")
+juego.guardar("opciones", {"musica": 0.3})
+juego.guardar("partida", {"nivel": 4, "vidas": 2, "llaves": ["roja", "azul"]})
+escribir("después: {juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})}")
+escribir("la partida: {juego.cargar("partida")}")
+juego.olvidar("partida")
+escribir("olvidada: {juego.cargar("partida")}")

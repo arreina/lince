@@ -1,0 +1,19 @@
+# @seccion: Hojas de sprites
+# @titulo: Una hoja con todos los fotogramas
+# @nota: Una hoja de sprites es una sola imagen con todos los fotogramas, una animación por fila. `juego.hoja(ruta, 16)` la parte en cuadros de 16 × 16, numerados desde 0. Con `fila`, `cuadro` cuenta dentro de esa fila, y `juego.cuadro(cuantos, por_segundo)` dice cuál toca ahora. `juego.cuadros_de(hoja, fila)` cuenta los cuadros con dibujo de una fila (en una rejilla, las celdas vacías del final no cuentan).
+# @fotogramas: 20
+importar "juego"
+
+juego.abrir("Hoja", 480, 270)
+fijo LINCE = juego.hoja("recursos/lince.png", 16)
+mientras juego.abierto() {
+    juego.limpiar([200, 225, 240])
+    juego.dibujar(LINCE, 20, 20, {"escala": 3})                  # cuadro 0
+    para (fila = 0; fila < 4; fila++) {
+        sea cuantos = juego.cuadros_de(LINCE, fila)           # los que tienen dibujo
+        sea op = {"fila": fila, "cuadro": juego.cuadro(cuantos, 6), "escala": 4}
+        juego.dibujar(LINCE, 140 + fila * 85, 120, op)
+    }
+    juego.texto("CUADROS: {LINCE["cuadros"]}  POR FILA: {LINCE["por_fila"]}", 20, 230, 2)
+    juego.presentar()
+}

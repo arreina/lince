@@ -1,0 +1,9 @@
+# @seccion: Herramientas
+# @titulo: Probar cosas sueltas: el REPL
+# @nota: `lince` sin nada abre el REPL: se escribe una línea y se ejecuta al momento, recordando lo anterior. Sirve para probar una función o ver qué da una expresión. `:ayuda` dice sus órdenes.
+# @lenguaje: terminal
+$ lince
+🐆 Lince v0.9.0 — Escribe :ayuda para ver los comandos
+>> sea vidas = 3
+>> vidas * 10
+=> 30

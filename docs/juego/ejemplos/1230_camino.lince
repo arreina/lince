@@ -1,0 +1,26 @@
+# @seccion: Mapas
+# @titulo: Buscar el camino
+# @nota: `juego.camino(mapa, [c1, f1], [c2, f2])` da el camino más corto entre dos casillas sin atravesar paredes, como lista de `[columna, fila]`: para enemigos que persiguen al jugador por un laberinto. Con un cuarto argumento verdadero también va en diagonal.
+importar "juego"
+
+juego.abrir("Camino", 480, 270)
+fijo LAB = juego.mapa([
+    "###############",
+    "#.....#.......#",
+    "#.###.#.#####.#",
+    "#.#...#.....#.#",
+    "#.#.#######.#.#",
+    "#...#.......#.#",
+    "#####.#######.#",
+    "###############"
+], 32)
+mientras juego.abierto() {
+    juego.limpiar([20, 20, 30])
+    juego.dibujar_mapa(LAB, {"#": [70, 70, 100]})
+    para cada lista c en juego.camino(LAB, [1, 1], [13, 6]) {
+        juego.circulo(c[0] * 32 + 16, c[1] * 32 + 16, 5, [255, 210, 70])
+    }
+    juego.circulo(48, 48, 12, [240, 90, 90])
+    juego.circulo(13 * 32 + 16, 6 * 32 + 16, 12, [90, 200, 120])
+    juego.presentar()
+}

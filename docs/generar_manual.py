@@ -33,8 +33,8 @@ LINCE = pathlib.Path(ARGS[0]).resolve() if ARGS else RAIZ / "lince"
 
 # Orden en que aparecen las secciones; lo que no esté aquí va al final.
 ORDEN = ["Primeros pasos", "Control de flujo", "Funciones", "Listas",
-         "Diccionarios", "Texto", "Clases", "Generadores", "Errores",
-         "Módulos y librerías"]
+         "Diccionarios", "Texto", "Clases", "Generadores", "Tareas", "Errores",
+         "Módulos y librerías", "Herramientas"]
 
 META = re.compile(r"^#\s*@(\w+):\s*(.*)$")
 
@@ -86,6 +86,14 @@ def ejecutar(ruta):
     return salida
 
 
+def formato(texto):
+    """**negrita**, `código` y [enlaces](dirección) sobre el texto ya escapado"""
+    t = html.escape(texto)
+    t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
+    t = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", r'<a href="\2">\1</a>', t)
+    return re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
+
+
 # ── Resaltado ────────────────────────────────────────────────────
 CLAVES = r"""sea|fijo|funcion|generador|producir|tarea|esperar|devolver|si|sino|para|cada|
 mientras|hacer|romper|continuar|elegir|caso|otro|clase|extiende|implementa|interfaz|
@@ -119,7 +127,8 @@ def main():
     for ruta in sorted(DIR_EJ.glob("*.lince")):
         ej = leer_ejemplo(ruta)
         if ej:
-            ej["salida"] = ejecutar(ruta)
+            # '# @lenguaje: terminal': órdenes para la terminal; se enseñan, no se ejecutan
+            ej["salida"] = "" if ej.get("lenguaje") == "terminal" else ejecutar(ruta)
             ejemplos.append(ej)
 
     secciones = {}
@@ -143,7 +152,7 @@ def main():
 
         bloques = []
         for i, ej in enumerate(secciones[sec]):
-            nota = (f'<p class="nota">{html.escape(ej["nota"])}</p>'
+            nota = (f'<p class="nota">{formato(ej["nota"])}</p>'
                     if ej.get("nota") else "")
             salida = (f'<div class="salida"><span class="etiqueta">salida '
                       f'verificada</span><pre>{html.escape(ej["salida"])}</pre></div>'
@@ -153,7 +162,7 @@ def main():
                 f'<h3>{html.escape(ej["titulo"])}</h3>{nota}'
                 f'<div class="codigo"><button class="copiar" '
                 f'aria-label="Copiar">copiar</button>'
-                f'<pre><code>{resaltar(ej["codigo"])}</code></pre></div>'
+                f'<pre><code>{html.escape(ej["codigo"]) if ej.get("lenguaje") == "terminal" else resaltar(ej["codigo"])}</code></pre></div>'
                 f'{salida}<span class="fuente">{html.escape(ej["archivo"])}</span>'
                 f'</article>')
         cuerpo.append(f'<section id="{sid}"><h2>{html.escape(sec)}</h2>'
@@ -162,7 +171,7 @@ def main():
     plantilla = (RAIZ / "docs" / "manual" / "plantilla.html").read_text(encoding="utf-8")
     pagina = (plantilla.replace("<!--NAV-->", "\n".join(nav))
                        .replace("<!--CUERPO-->", "\n".join(cuerpo))
-                       .replace("<!--CUENTA-->", str(len(ejemplos))))
+                       .replace("<!--CUENTA-->", str(sum(1 for e in ejemplos if e.get("lenguaje") != "terminal"))))
 
     if COMPROBAR:
         actual = SALIDA.read_text(encoding="utf-8") if SALIDA.exists() else None

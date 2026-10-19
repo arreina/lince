@@ -1,0 +1,22 @@
+# @seccion: Movimiento
+# @titulo: Movimiento suave
+# @nota: `juego.suavizar(desde, hasta, segundos, inicio, curva)` da el valor que toca ahora en un cambio que empezó en `inicio` (un `juego.tiempo()`): para que un menú entre desde un lado o un título caiga y rebote. Las curvas: `"lineal"`, `"suave"`, `"entrar"`, `"salir"`, `"rebote"`, `"elastico"` y `"atras"`. `juego.curva(nombre, t)` da la curva tal cual, como en esta gráfica.
+# @nota: `juego.acercar(actual, objetivo, rapidez)` da un paso hacia el objetivo, más largo cuanto más lejos: una cámara que sigue al jugador sin tirones.
+importar "juego"
+
+juego.abrir("Curvas", 480, 270)
+fijo CURVAS = ["lineal", "suave", "entrar", "salir", "rebote", "elastico", "atras"]
+mientras juego.abierto() {
+    juego.limpiar([20, 22, 32])
+    para (i = 0; i < CURVAS.longitud(); i++) {
+        sea x0 = 12 + i * 66
+        juego.contorno(x0, 60, 56, 150, [60, 60, 80])
+        para (k = 0; k <= 50; k++) {
+            sea v = juego.curva(CURVAS[i], k / 50)
+            juego.rectangulo(x0 + 3 + k, 190 - v * 110, 2, 2, [255, 200, 70])
+        }
+        juego.texto(CURVAS[i].mayusculas(), x0, 222, 1)
+    }
+    juego.texto("CURVA(NOMBRE, T)", 12, 20, 2)
+    juego.presentar()
+}

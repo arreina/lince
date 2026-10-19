@@ -1,0 +1,14 @@
+# @seccion: Módulos y librerías
+# @titulo: El módulo `json`
+# @nota: `json.parsear` convierte un texto JSON en listas y diccionarios de Lince (y da un error si no es JSON válido); `json.texto` hace lo contrario, en una línea o, con `verdadero`, en varias. Escrito dentro de un texto, cada `{` lleva delante `\` para que no se tome por un valor metido en el texto. Lo normal es leerlo de un archivo: `json.parsear(archivos.leer("nivel.json"))`.
+importar "json"
+
+sea datos = json.parsear("\{\"nombre\": \"Ñandú\", \"puntos\": [10, 25.5], \"activo\": true}")
+escribir("{datos["nombre"]} {datos["puntos"][1]} {datos["activo"]}")
+escribir(json.texto({"vidas": 3, "llaves": ["roja"]}))
+escribir(json.texto({"vidas": 3, "llaves": ["roja"]}, verdadero))
+intentar {
+    json.parsear("\{\"roto\": ")
+} capturar (error e) {
+    escribir(e.mensaje)
+}

@@ -1,0 +1,36 @@
+# @seccion: Mapas de Tiled
+# @titulo: Niveles hechos con Tiled
+# @nota: [Tiled](https://www.mapeditor.org) es el editor de mapas gratuito más usado. `juego.mapa_tiled(ruta)` lee sus mapas (`.tmx` o `.tmj`) con sus tilesets, y da un mapa de Lince normal: `mover_en_mapa`, `camino` y las demás funciones sirven igual. Lo sólido se marca en Tiled: una capa llamada **Colisiones**, o la propiedad `solido` en una capa o en un tile del tileset (o `plataforma`).
+# @nota: `juego.dibujar_tiled(mapa, capas)` lo dibuja con los tiles animados, girados y volteados, la opacidad y el paralaje de cada capa: el fondo antes del personaje y lo de delante después. Los objetos que se pusieron en Tiled (dónde empieza el jugador, las monedas) vienen en `mapa["objetos"]`.
+# @guion: 1:derecha:70
+# @fotogramas: 70
+importar "juego"
+
+juego.abrir("Tiled", 480, 240)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:izq_x+"])
+fijo NIVEL = juego.mapa_tiled("recursos/nivel.tmx")
+fijo LINCE = juego.hoja("recursos/lince.png", 16)
+sea yo = {"x": 0, "y": 0, "ancho": 14, "alto": 12, "vx": 0, "vy": 0}
+sea monedas = []
+para cada diccionario cosa en NIVEL["objetos"] {
+    si cosa["tipo"] == "jugador" {
+        yo["x"] = cosa["x"]
+        yo["y"] = cosa["y"]
+    }
+    si cosa["tipo"] == "moneda" { monedas.agregar(cosa) }
+}
+mientras juego.abierto() {
+    yo["vx"] = juego.direccion("izquierda", "derecha") * 120
+    yo["vy"] = yo["vy"] + 900 * juego.dt()
+    juego.mover_en_mapa(NIVEL, yo)
+    juego.camara(yo["x"] - 120, 0)
+    juego.dibujar_tiled(NIVEL)
+    para cada diccionario m en monedas {
+        juego.circulo(m["x"] + 8, m["y"] + 8, 5, [250, 210, 60])
+    }
+    juego.dibujar(LINCE, yo["x"] - 1, yo["y"] - 4, {"fila": 1, "cuadro": juego.cuadro(4, 10)})
+    juego.camara()
+    juego.texto("{NIVEL["propiedades"]["nombre"]}  CAPAS: {NIVEL["capas"]}", 8, 8, 1)
+    juego.presentar()
+}

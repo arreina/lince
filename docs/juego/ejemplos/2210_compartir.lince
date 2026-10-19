@@ -1,0 +1,10 @@
+# @seccion: Compartir el juego
+# @titulo: Un ejecutable, un .zip, un .apk
+# @nota: `lince compilar` hace un ejecutable con el juego dentro (el código, lo que importa y las imágenes, sonidos, fuentes y mapas que nombra), que funciona sin instalar Lince. `lince repartir` hace una carpeta y un `.zip` listos para compartir, con SDL2 dentro.
+# @nota: Para el móvil, `--android` hace el `.apk` para instalarlo y `--aab` el paquete que pide Google Play, firmados por Lince sin Java ni el SDK de Android. Cada versión nueva lleva un `--version` mayor.
+# @lenguaje: terminal
+lince compilar mi_juego.lince -o mi_juego
+lince repartir mi_juego.lince                       # mi_juego-linux.zip o mi_juego-windows.zip
+lince repartir mi_juego.lince --incluir niveles     # con una carpeta que el código no nombra
+lince repartir mi_juego.lince --android --nombre "Mi juego" --id org.tunombre.mijuego
+lince repartir mi_juego.lince --aab --version 2

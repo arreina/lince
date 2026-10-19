@@ -1,0 +1,21 @@
+# @seccion: Partículas
+# @titulo: Chispas, polvo y explosiones
+# @nota: `juego.particulas(x, y, opciones)` lanza un puñado de partículas y `juego.dibujar_particulas()` las mueve y las dibuja en cada fotograma. Opciones: `cantidad`, `color` y `color_final`, `velocidad`, `direccion` y `apertura` (en grados), `vida`, `tamaño` y `tamaño_final`, `gravedad` y `mezcla` (`"sumar"` para que brillen). Las que admiten `[mínimo, máximo]` toman un valor al azar para cada una.
+# @fotogramas: 12
+importar "juego"
+
+juego.abrir("Partículas", 480, 270)
+juego.particulas(110, 150, {"cantidad": 60, "color": [255, 220, 80], "color_final": [255, 60, 20, 0],
+                            "velocidad": [60, 220], "vida": [0.4, 0.9], "mezcla": "sumar"})
+juego.particulas(250, 200, {"cantidad": 30, "color": [200, 190, 170], "direccion": -90, "apertura": 70,
+                            "velocidad": [40, 120], "tamaño": 6, "tamaño_final": 14, "gravedad": -30})
+juego.particulas(380, 80, {"cantidad": 40, "color": [120, 200, 255], "velocidad": [80, 160],
+                           "gravedad": 500, "vida": 1})
+mientras juego.abierto() {
+    juego.limpiar([15, 15, 25])
+    juego.dibujar_particulas()
+    juego.texto("CHISPAS", 70, 240, 2)
+    juego.texto("POLVO", 215, 240, 2)
+    juego.texto("AGUA", 350, 240, 2)
+    juego.presentar()
+}

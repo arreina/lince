@@ -1,0 +1,16 @@
+# @seccion: Móvil
+# @titulo: El mando de la pantalla táctil
+# @nota: En un móvil, si alguna acción usa el mando, sale solo un mando en la pantalla como el de los juegos de móvil: a la izquierda una palanca que aparece donde se apoya el pulgar y a la derecha los botones que usan las acciones. Funciona como un mando de verdad, así que un juego hecho para teclado y mando se juega en el móvil sin cambiar nada. Se esconde si se conecta un mando por Bluetooth.
+# @nota: Aquí sale en el ordenador porque se pide con `"siempre"`. `juego.mando_tactil(falso)` lo quita, para un juego con controles propios.
+importar "juego"
+
+juego.abrir("Móvil", 480, 270)
+juego.definir_accion("saltar", ["espacio", "mando:a"])
+juego.definir_accion("zarpazo", ["z", "mando:b"])
+juego.definir_accion("izquierda", ["izquierda", "mando:izq_x-"])
+juego.mando_tactil({"siempre": verdadero})
+mientras juego.abierto() {
+    juego.limpiar([60, 110, 170])
+    juego.rectangulo(0, 200, 480, 70, [80, 150, 80])
+    juego.presentar()
+}

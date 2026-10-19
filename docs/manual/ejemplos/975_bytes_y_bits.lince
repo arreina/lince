@@ -1,0 +1,17 @@
+# @seccion: Módulos y librerías
+# @titulo: Los módulos `bytes` y `bits`
+# @nota: `bytes` es para datos binarios: leer y escribir archivos byte a byte, y enteros de 1, 2 o 4 bytes en una posición (`leer_u16`, `escribir_i32`...). Se usan como una lista de números de 0 a 255. `bits` hace las operaciones bit a bit con nombres: `ambos` (AND), `alguno` (OR), `solo_uno` (XOR), `izquierda` y `derecha` (desplazar), `hex` y `binario`.
+importar "bytes"
+importar "bits"
+
+sea b = bytes.crear(6)
+b.escribir_u16(0, 640)
+b.escribir_u32(2, 4096)
+escribir(b)
+escribir("{b.leer_u16(0)} {b.leer_u32(2)} {b.longitud()}")
+
+fijo SALTA = 0b0001
+fijo DISPARA = 0b0010
+sea estado = bits.alguno(SALTA, DISPARA)
+escribir("{bits.binario(estado, 4)} {bits.ambos(estado, DISPARA) != 0}")
+escribir("{bits.hex(255)} {bits.izquierda(1, 4)} {bits.de_hex("ff")}")

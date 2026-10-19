@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El módulo juego de Lince</title>
+<meta name="description" content="Cómo se hacen juegos con Lince: ventana, dibujo, sprites, animaciones, mandos, sonido, mapas, física, menús... Cada ejemplo se ejecuta al generar la página y su captura es real.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<style>
+  :root{
+    --morado:#6A2D72; --morado-claro:#8B3D96; --amarillo:#F1BF00; --rojo:#C60B1E;
+    --bg:#0d0d0f; --bg2:#131317; --bg3:#1a1a20; --borde:#2a2a35;
+    --texto:#d4d4d8; --texto2:#8888a0; --blanco:#f4f4f6; --verde:#4ec98a;
+    --lateral:280px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg); color:var(--texto); line-height:1.6;
+    font-family:'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--amarillo); text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ══ Cabecera ══ */
+  header{
+    position:sticky; top:0; z-index:100; height:56px;
+    background:rgba(13,13,15,.92); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--borde);
+    display:flex; align-items:center; gap:1rem; padding:0 1.25rem;
+  }
+  .logo{display:flex; align-items:center; gap:.5rem; font-weight:700; color:var(--blanco)}
+  .logo span{font-size:1.3rem}
+  .version{
+    font-size:.7rem; color:var(--amarillo); border:1px solid var(--borde);
+    border-radius:99px; padding:.1rem .5rem;
+  }
+  header .crece{flex:1}
+  .pag{font-size:.8rem; color:var(--texto2)}
+  .pag:hover, .pag.aqui{color:var(--amarillo); text-decoration:none}
+  @media (max-width:860px){ .pag{display:none} }
+
+  #buscar{
+    background:var(--bg3); border:1px solid var(--borde); border-radius:6px;
+    color:var(--texto); padding:.4rem .7rem; font:inherit; font-size:.8rem;
+    width:min(260px,38vw);
+  }
+  #buscar:focus{outline:none; border-color:var(--morado-claro)}
+  .menu{
+    display:none; background:none; border:1px solid var(--borde); border-radius:6px;
+    color:var(--texto); font:inherit; padding:.3rem .6rem; cursor:pointer;
+  }
+
+  /* ══ Disposición ══ */
+  .envoltorio{display:flex; align-items:flex-start}
+  nav{
+    position:sticky; top:56px; width:var(--lateral); flex:0 0 var(--lateral);
+    height:calc(100vh - 56px); overflow-y:auto;
+    border-right:1px solid var(--borde); padding:1.25rem 0 3rem;
+  }
+  .grupo{margin-bottom:.35rem}
+  nav a{display:block; padding:.3rem 1.25rem; font-size:.82rem; color:var(--texto2)}
+  nav a.sec{color:var(--blanco); font-weight:700; font-size:.88rem; margin-top:.6rem}
+  nav a.sub{padding-left:2rem; border-left:2px solid transparent}
+  nav a:hover{color:var(--amarillo); text-decoration:none}
+  nav a.sub.activo{color:var(--amarillo); border-left-color:var(--amarillo); background:var(--bg2)}
+  /* .grupo es el div que envuelve el enlace de sección y sus subenlaces: el
+     buscador le pone 'oculto' a él, no al enlace, así que tiene que estar
+     en esta lista o el encabezado se queda apuntando a una sección oculta. */
+  nav a.oculto, nav .grupo.oculto, .ej.oculto, section.oculto{display:none}
+
+  main{flex:1; min-width:0; padding:2rem clamp(1rem,4vw,3rem) 6rem; max-width:980px}
+  .intro{
+    border:1px solid var(--borde); border-left:3px solid var(--morado-claro);
+    background:var(--bg2); border-radius:8px; padding:1rem 1.25rem; margin-bottom:2.5rem;
+  }
+  .intro h1{font-size:1.5rem; color:var(--blanco); margin-bottom:.5rem}
+  .intro p{font-size:.86rem; color:var(--texto2)}
+  .intro strong{color:var(--texto)}
+
+  section{margin-bottom:3.5rem}
+  section h2{
+    color:var(--amarillo); font-size:1.25rem; margin-bottom:1.25rem;
+    padding-bottom:.5rem; border-bottom:1px solid var(--borde);
+  }
+  .ej{margin-bottom:2.25rem}
+  .ej h3{color:var(--blanco); font-size:1rem; margin-bottom:.4rem}
+  .nota{font-size:.84rem; color:var(--texto2); margin-bottom:.75rem}
+  .nota code, .intro code{color:var(--amarillo); background:var(--bg3); padding:.05rem .3rem; border-radius:4px}
+  .nota strong{color:var(--texto)}
+  figure{margin:.75rem 0 .25rem}
+  figure img{display:block; max-width:100%; border:1px solid var(--borde); border-radius:8px; image-rendering:pixelated}
+  figcaption{font-size:.68rem; color:#55556a; margin-top:.3rem}
+
+  .codigo{position:relative; background:var(--bg2); border:1px solid var(--borde); border-radius:8px}
+  .codigo pre{margin:0; padding:1rem 1.1rem; overflow-x:auto; font-size:.84rem; line-height:1.65}
+  .copiar{
+    position:absolute; top:.5rem; right:.5rem; z-index:2;
+    background:var(--bg3); border:1px solid var(--borde); border-radius:5px;
+    color:var(--texto2); font:inherit; font-size:.7rem; padding:.2rem .5rem;
+    cursor:pointer; opacity:0; transition:opacity .15s;
+  }
+  .codigo:hover .copiar, .copiar:focus{opacity:1}
+  .copiar:hover{color:var(--amarillo); border-color:var(--morado-claro)}
+
+  .salida{
+    margin-top:.6rem; background:#0a0f0c; border:1px solid #1d3328;
+    border-left:3px solid var(--verde); border-radius:8px; padding:.7rem 1.1rem;
+  }
+  .etiqueta{
+    display:block; font-size:.66rem; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--verde); margin-bottom:.35rem;
+  }
+  .salida pre{margin:0; font-size:.82rem; color:#cfe8da; overflow-x:auto; white-space:pre-wrap}
+  .fuente{display:block; margin-top:.4rem; font-size:.68rem; color:#55556a}
+
+  /* Resaltado */
+  .k{color:#d98cf0} .t{color:#6fb3e0} .s{color:#e6c07b}
+  .n{color:#b5e07f} .c{color:#5f6070; font-style:italic}
+
+  #sinresultados{display:none; color:var(--texto2); font-size:.88rem}
+  #sinresultados.visible{display:block}
+
+  @media (max-width:860px){
+    .envoltorio{display:block}
+    nav{
+      position:fixed; top:56px; left:0; bottom:0; width:min(300px,86vw);
+      background:var(--bg); z-index:99; transform:translateX(-102%);
+      transition:transform .2s; height:auto;
+    }
+    nav.abierta{transform:translateX(0)}
+    main{padding:1.5rem 1rem 5rem; max-width:none}
+    .menu{display:block}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="menu" id="alternar" aria-label="Menú">☰</button>
+  <a class="logo" href="index.html"><span>🐆</span> Lince</a>
+  <span class="version">v0.8</span>
+  <div class="crece"></div>
+  <a class="pag" href="manual.html">Lenguaje</a>
+  <a class="pag aqui" href="juego.html">Módulo juego</a>
+  <a class="pag" href="tutorial.html">Tutorial</a>
+  <input id="buscar" type="search" placeholder="buscar en el módulo juego…" aria-label="Buscar">
+</header>
+
+<div class="envoltorio">
+<nav id="lateral">
+<div class="grupo"><a href="#empezar" class="sec">Empezar</a><a href="#empezar-0" class="sub">La ventana y el bucle</a><a href="#empezar-1" class="sub">Píxeles grandes</a></div>
+<div class="grupo"><a href="#dibujar" class="sec">Dibujar</a><a href="#dibujar-0" class="sub">Formas y colores</a><a href="#dibujar-1" class="sub">Oscurecer la pantalla</a></div>
+<div class="grupo"><a href="#texto-y-letras" class="sec">Texto y letras</a><a href="#texto-y-letras-0" class="sub">Texto con la letra incluida</a><a href="#texto-y-letras-1" class="sub">Fuentes .ttf</a></div>
+<div class="grupo"><a href="#imagenes-y-sprites" class="sec">Imágenes y sprites</a><a href="#imagenes-y-sprites-0" class="sub">Dibujos hechos con texto</a><a href="#imagenes-y-sprites-1" class="sub">Girar, voltear, teñir</a></div>
+<div class="grupo"><a href="#hojas-de-sprites" class="sec">Hojas de sprites</a><a href="#hojas-de-sprites-0" class="sub">Una hoja con todos los fotogramas</a><a href="#hojas-de-sprites-1" class="sub">Hojas desordenadas</a><a href="#hojas-de-sprites-2" class="sub">Animaciones a partir de un dibujo</a></div>
+<div class="grupo"><a href="#animador" class="sec">Animador</a><a href="#animador-0" class="sub">El animador</a></div>
+<div class="grupo"><a href="#entrada" class="sec">Entrada</a><a href="#entrada-0" class="sub">Teclas y ratón</a><a href="#entrada-1" class="sub">Acciones: teclado y mando a la vez</a><a href="#entrada-2" class="sub">Escribir un nombre</a></div>
+<div class="grupo"><a href="#movil" class="sec">Móvil</a><a href="#movil-0" class="sub">El mando de la pantalla táctil</a><a href="#movil-1" class="sub">Dedos, vibrar e inclinar</a></div>
+<div class="grupo"><a href="#sonido" class="sec">Sonido</a><a href="#sonido-0" class="sub">Efectos sin archivos</a><a href="#sonido-1" class="sub">Sonidos y música de archivos</a></div>
+<div class="grupo"><a href="#movimiento" class="sec">Movimiento</a><a href="#movimiento-0" class="sub">Movimiento suave</a></div>
+<div class="grupo"><a href="#camara" class="sec">Cámara</a><a href="#camara-0" class="sub">Cámara y temblor</a></div>
+<div class="grupo"><a href="#choques" class="sec">Choques</a><a href="#choques-0" class="sub">¿Se tocan?</a></div>
+<div class="grupo"><a href="#mapas" class="sec">Mapas</a><a href="#mapas-0" class="sub">Un nivel escrito con texto</a><a href="#mapas-1" class="sub">Tiles y tiles animados</a><a href="#mapas-2" class="sub">Buscar el camino</a></div>
+<div class="grupo"><a href="#mapas-de-tiled" class="sec">Mapas de Tiled</a><a href="#mapas-de-tiled-0" class="sub">Niveles hechos con Tiled</a></div>
+<div class="grupo"><a href="#fisica" class="sec">Física</a><a href="#fisica-0" class="sub">Cajas, pelotas y ascensores</a></div>
+<div class="grupo"><a href="#particulas" class="sec">Partículas</a><a href="#particulas-0" class="sub">Chispas, polvo y explosiones</a></div>
+<div class="grupo"><a href="#escenas" class="sec">Escenas</a><a href="#escenas-0" class="sub">Portada, partida y final</a></div>
+<div class="grupo"><a href="#menus-y-dialogos" class="sec">Menús y diálogos</a><a href="#menus-y-dialogos-0" class="sub">Menús</a><a href="#menus-y-dialogos-1" class="sub">Diálogos</a></div>
+<div class="grupo"><a href="#controles" class="sec">Controles</a><a href="#controles-0" class="sub">Que el jugador elija sus teclas</a></div>
+<div class="grupo"><a href="#partidas-guardadas" class="sec">Partidas guardadas</a><a href="#partidas-guardadas-0" class="sub">Guardar y cargar</a></div>
+<div class="grupo"><a href="#tareas" class="sec">Tareas</a><a href="#tareas-0" class="sub">Esperar sin parar el juego</a></div>
+<div class="grupo"><a href="#peleas" class="sec">Peleas</a><a href="#peleas-0" class="sub">Golpes que se notan</a></div>
+<div class="grupo"><a href="#compartir-el-juego" class="sec">Compartir el juego</a><a href="#compartir-el-juego-0" class="sub">Un ejecutable, un .zip, un .apk</a></div>
+</nav>
+
+<main>
+  <div class="intro">
+    <h1>El módulo <code>juego</code></h1>
+    <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
+    animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
+    la física, los menús... Se usa con <code>importar "juego"</code>.</p>
+    <p>Los <strong>34 ejemplos</strong> de esta página <strong>se ejecutan al
+    generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
+    dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
+    detecta. Para la lista completa de funciones y opciones, mira la
+    <a href="https://github.com/arreina/lince/blob/main/ESPECIFICACION.md#juego">especificación</a>;
+    para empezar desde cero, el <a href="tutorial.html">tutorial</a>.</p>
+  </div>
+
+  <p id="sinresultados">Nada coincide con esa búsqueda.</p>
+
+<section id="empezar"><h2>Empezar</h2><article class="ej" id="empezar-0"><h3>La ventana y el bucle</h3><p class="nota">Un juego es un bucle: en cada vuelta se mira la entrada, se mueven las cosas, se dibuja todo y <code>juego.presentar()</code> lo enseña, espera al siguiente fotograma (60 por segundo) y lee el teclado, el ratón y los mandos. <code>juego.abierto()</code> pasa a falso al cerrar la ventana.</p><p class="nota">Al guardar el archivo con el juego en marcha, el juego sigue con el código nuevo sin perder dónde estaba (<strong>recarga en caliente</strong>); F5 empieza de cero.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Mi primer juego&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">sea</span> x = <span class="n">40</span>
+
+<span class="k">mientras</span> juego.abierto() {
+    x = x + <span class="n">150</span> * juego.dt()                    <span class="c"># 150 píxeles por segundo, vaya a los fps que vaya</span>
+    juego.limpiar([<span class="n">25</span>, <span class="n">30</span>, <span class="n">45</span>])
+    juego.circulo(x, <span class="n">135</span>, <span class="n">24</span>, [<span class="n">255</span>, <span class="n">200</span>, <span class="n">60</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;HOLA, LINCE&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, <span class="n">3</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/010_primer_juego.png" alt="Captura de «La ventana y el bucle»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/010_primer_juego.lince</span></article><article class="ej" id="empezar-1"><h3>Píxeles grandes</h3><p class="nota">Con <code>{&quot;escala&quot;: n}</code>, la ventana es n veces mayor y cada píxel del juego se ve como un cuadrado de n × n, como en las consolas portátiles. Todo se sigue midiendo en el tamaño pequeño (aquí 160 × 90). <code>juego.pantalla_completa()</code> lo pone a pantalla completa, escalado sin deformarse.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Píxeles&quot;</span>, <span class="n">160</span>, <span class="n">90</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>})
+
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">20</span>, <span class="n">24</span>, <span class="n">40</span>])
+    juego.rectangulo(<span class="n">0</span>, <span class="n">70</span>, <span class="n">160</span>, <span class="n">20</span>, [<span class="n">70</span>, <span class="n">140</span>, <span class="n">70</span>])
+    juego.circulo(<span class="n">130</span>, <span class="n">20</span>, <span class="n">9</span>, [<span class="n">250</span>, <span class="n">220</span>, <span class="n">100</span>])
+    juego.rectangulo(<span class="n">30</span>, <span class="n">54</span>, <span class="n">10</span>, <span class="n">16</span>, [<span class="n">230</span>, <span class="n">120</span>, <span class="n">60</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;160 X 90&quot;</span>, <span class="n">4</span>, <span class="n">4</span>, <span class="n">1</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/020_pixeles_grandes.png" alt="Captura de «Píxeles grandes»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/020_pixeles_grandes.lince</span></article></section>
+<section id="dibujar"><h2>Dibujar</h2><article class="ej" id="dibujar-0"><h3>Formas y colores</h3><p class="nota">Un color es <code>[rojo, verde, azul]</code> (de 0 a 255), con un cuarto número para la transparencia, o un texto como <code>&quot;#ffc850&quot;</code>. Lo que se dibuja después tapa a lo de antes.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Formas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">30</span>, <span class="n">30</span>, <span class="n">40</span>])
+    juego.rectangulo(<span class="n">30</span>, <span class="n">30</span>, <span class="n">120</span>, <span class="n">80</span>, [<span class="n">200</span>, <span class="n">70</span>, <span class="n">70</span>])
+    juego.contorno(<span class="n">180</span>, <span class="n">30</span>, <span class="n">120</span>, <span class="n">80</span>, <span class="s">&quot;#ffc850&quot;</span>)
+    juego.circulo(<span class="n">400</span>, <span class="n">70</span>, <span class="n">45</span>, [<span class="n">80</span>, <span class="n">160</span>, <span class="n">230</span>])
+    juego.circulo(<span class="n">370</span>, <span class="n">90</span>, <span class="n">45</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>, <span class="n">90</span>])            <span class="c"># medio transparente</span>
+    juego.linea(<span class="n">30</span>, <span class="n">160</span>, <span class="n">450</span>, <span class="n">160</span>, [<span class="n">120</span>, <span class="n">220</span>, <span class="n">120</span>])
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">8</span>; i++) {
+        juego.rectangulo(<span class="n">30</span> + i * <span class="n">55</span>, <span class="n">190</span>, <span class="n">45</span>, <span class="n">45</span>, [<span class="n">30</span> * i, <span class="n">255</span> - <span class="n">30</span> * i, <span class="n">160</span>])
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/110_formas_y_colores.png" alt="Captura de «Formas y colores»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/110_formas_y_colores.lince</span></article><article class="ej" id="dibujar-1"><h3>Oscurecer la pantalla</h3><p class="nota"><code>juego.cubrir(color)</code> pinta toda la ventana por encima de lo dibujado, sin moverse con la cámara: con un negro medio transparente se oscurece para una pausa, y con otro color se tiñe (agua, daño, noche).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Pausa&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">60</span>, <span class="n">130</span>, <span class="n">200</span>])
+    juego.rectangulo(<span class="n">0</span>, <span class="n">200</span>, <span class="n">480</span>, <span class="n">70</span>, [<span class="n">70</span>, <span class="n">150</span>, <span class="n">70</span>])
+    juego.circulo(<span class="n">240</span>, <span class="n">170</span>, <span class="n">30</span>, [<span class="n">240</span>, <span class="n">180</span>, <span class="n">70</span>])
+    juego.cubrir([<span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>, <span class="n">150</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;PAUSA&quot;</span>, <span class="n">240</span>, <span class="n">120</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/120_cubrir.png" alt="Captura de «Oscurecer la pantalla»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/120_cubrir.lince</span></article></section>
+<section id="texto-y-letras"><h2>Texto y letras</h2><article class="ej" id="texto-y-letras-0"><h3>Texto con la letra incluida</h3><p class="nota">Lince trae una letra de píxeles (mayúsculas, cifras, signos; las tildes y la ñ se marcan). <code>escala</code> la agranda, <code>color</code> la pinta y <code>alinear</code> (<code>&quot;centro&quot;</code> o <code>&quot;derecha&quot;</code>) cambia de qué lado cuenta la <code>x</code>. <code>juego.ancho_texto()</code> dice lo que ocupa, para centrar a mano.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Texto&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">20</span>, <span class="n">20</span>, <span class="n">30</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS: 1250&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, <span class="n">2</span>)
+    juego.<span class="t">texto</span>(<span class="s">&quot;¡NIVEL 3!&quot;</span>, <span class="n">240</span>, <span class="n">90</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">5</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">210</span>, <span class="n">60</span>]})
+    juego.<span class="t">texto</span>(<span class="s">&quot;VIDAS 3&quot;</span>, <span class="n">460</span>, <span class="n">20</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">240</span>, <span class="n">90</span>, <span class="n">90</span>]})
+    <span class="k">sea</span> ancho = juego.ancho_texto(<span class="s">&quot;PULSA ESPACIO&quot;</span>, <span class="n">2</span>)
+    juego.<span class="t">texto</span>(<span class="s">&quot;PULSA ESPACIO&quot;</span>, (<span class="n">480</span> - ancho) / <span class="n">2</span>, <span class="n">200</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/210_texto.png" alt="Captura de «Texto con la letra incluida»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/210_texto.lince</span></article><article class="ej" id="texto-y-letras-1"><h3>Fuentes .ttf</h3><p class="nota"><code>juego.fuente(ruta, tamaño)</code> carga una fuente TrueType u OpenType (aquí, Press Start 2P, con licencia libre OFL). Trae el español entero: tildes, ñ, ¿ y ¡. Con <code>ancho</code>, el texto se parte en líneas por los espacios; <code>juego.medir_texto()</code> da <code>[ancho, alto]</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Fuentes&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> LETRA = juego.fuente(<span class="s">&quot;recursos/PressStart2P-Regular.ttf&quot;</span>, <span class="n">16</span>)
+<span class="k">fijo</span> PEQUENA = juego.fuente(<span class="s">&quot;recursos/PressStart2P-Regular.ttf&quot;</span>, <span class="n">8</span>)
+<span class="k">sea</span> dialogo = <span class="s">&quot;¿Has visto al lince? Dicen que vive en la sierra, junto al río.&quot;</span>
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">15</span>, <span class="n">20</span>, <span class="n">35</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;¡Año de nieves!&quot;</span>, <span class="n">240</span>, <span class="n">30</span>, {<span class="s">&quot;fuente&quot;</span>: LETRA, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">220</span>, <span class="n">90</span>]})
+    juego.<span class="t">texto</span>(dialogo, <span class="n">40</span>, <span class="n">90</span>, {<span class="s">&quot;fuente&quot;</span>: PEQUENA, <span class="s">&quot;ancho&quot;</span>: <span class="n">400</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">220</span>, <span class="n">230</span>, <span class="n">240</span>]})
+    <span class="k">sea</span> medida = juego.medir_texto(dialogo, {<span class="s">&quot;fuente&quot;</span>: PEQUENA, <span class="s">&quot;ancho&quot;</span>: <span class="n">400</span>})
+    juego.contorno(<span class="n">34</span>, <span class="n">84</span>, medida[<span class="n">0</span>] + <span class="n">12</span>, medida[<span class="n">1</span>] + <span class="n">12</span>, [<span class="n">90</span>, <span class="n">110</span>, <span class="n">160</span>])
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/220_fuentes.png" alt="Captura de «Fuentes .ttf»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/220_fuentes.lince</span></article></section>
+<section id="imagenes-y-sprites"><h2>Imágenes y sprites</h2><article class="ej" id="imagenes-y-sprites-0"><h3>Dibujos hechos con texto</h3><p class="nota"><code>juego.sprite(filas, colores)</code> hace una imagen sin archivos: un carácter por píxel, y cada carácter con su color (los que no están, transparentes). Sirve para empezar sin dibujos y para cosas pequeñas.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Sprites&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> NAVE = juego.sprite([
+    <span class="s">&quot;....X....&quot;</span>,
+    <span class="s">&quot;...XXX...&quot;</span>,
+    <span class="s">&quot;..XXOXX..&quot;</span>,
+    <span class="s">&quot;.XXXXXXX.&quot;</span>,
+    <span class="s">&quot;XX.XXX.XX&quot;</span>,
+    <span class="s">&quot;X...R...X&quot;</span>
+], {<span class="s">&quot;X&quot;</span>: [<span class="n">120</span>, <span class="n">200</span>, <span class="n">240</span>], <span class="s">&quot;O&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>], <span class="s">&quot;R&quot;</span>: [<span class="n">255</span>, <span class="n">120</span>, <span class="n">40</span>]})
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">10</span>, <span class="n">10</span>, <span class="n">25</span>])
+    juego.dibujar(NAVE, <span class="n">60</span>, <span class="n">100</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>})
+    juego.dibujar(NAVE, <span class="n">200</span>, <span class="n">80</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">8</span>})
+    juego.dibujar(NAVE, <span class="n">380</span>, <span class="n">110</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;angulo&quot;</span>: <span class="n">180</span>})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/310_sprite.png" alt="Captura de «Dibujos hechos con texto»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/310_sprite.lince</span></article><article class="ej" id="imagenes-y-sprites-1"><h3>Girar, voltear, teñir</h3><p class="nota"><code>juego.dibujar(imagen, x, y, opciones)</code> admite <code>escala</code>, <code>angulo</code>, <code>espejo</code> (mirar al otro lado), <code>voltear</code>, <code>alfa</code>, <code>color</code> (teñir), <code>blanco</code> (el destello de cuando a alguien le dan) y <code>mezcla</code> (<code>&quot;sumar&quot;</code> para luces y fuego). Con <code>centrado</code>, la <code>x</code> y la <code>y</code> son el centro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+
+juego.abrir(<span class="s">&quot;Opciones&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">40</span>, <span class="n">50</span>, <span class="n">70</span>])
+    <span class="k">sea</span> opciones = [{<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;espejo&quot;</span>: <span class="k">verdadero</span>}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;angulo&quot;</span>: <span class="n">30</span>},
+                    {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alfa&quot;</span>: <span class="n">110</span>}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">120</span>, <span class="n">160</span>, <span class="n">255</span>]}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;blanco&quot;</span>: <span class="n">0.8</span>}]
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">6</span>; i++) {
+        <span class="k">sea</span> op = opciones[i]
+        op[<span class="s">&quot;cuadro&quot;</span>] = <span class="n">0</span>
+        op[<span class="s">&quot;centrado&quot;</span>] = <span class="k">verdadero</span>
+        juego.dibujar(LINCE, <span class="n">50</span> + (i % <span class="n">3</span>) * <span class="n">150</span>, <span class="n">80</span> + matematica.piso(i / <span class="n">3</span>) * <span class="n">110</span>, op)
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/320_dibujar_opciones.png" alt="Captura de «Girar, voltear, teñir»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/320_dibujar_opciones.lince</span></article></section>
+<section id="hojas-de-sprites"><h2>Hojas de sprites</h2><article class="ej" id="hojas-de-sprites-0"><h3>Una hoja con todos los fotogramas</h3><p class="nota">Una hoja de sprites es una sola imagen con todos los fotogramas, una animación por fila. <code>juego.hoja(ruta, 16)</code> la parte en cuadros de 16 × 16, numerados desde 0. Con <code>fila</code>, <code>cuadro</code> cuenta dentro de esa fila, y <code>juego.cuadro(cuantos, por_segundo)</code> dice cuál toca ahora. <code>juego.cuadros_de(hoja, fila)</code> cuenta los cuadros con dibujo de una fila (en una rejilla, las celdas vacías del final no cuentan).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Hoja&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">200</span>, <span class="n">225</span>, <span class="n">240</span>])
+    juego.dibujar(LINCE, <span class="n">20</span>, <span class="n">20</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>})                  <span class="c"># cuadro 0</span>
+    <span class="k">para</span> (fila = <span class="n">0</span>; fila &lt; <span class="n">4</span>; fila++) {
+        <span class="k">sea</span> cuantos = juego.cuadros_de(LINCE, fila)           <span class="c"># los que tienen dibujo</span>
+        <span class="k">sea</span> op = {<span class="s">&quot;fila&quot;</span>: fila, <span class="s">&quot;cuadro&quot;</span>: juego.cuadro(cuantos, <span class="n">6</span>), <span class="s">&quot;escala&quot;</span>: <span class="n">4</span>}
+        juego.dibujar(LINCE, <span class="n">140</span> + fila * <span class="n">85</span>, <span class="n">120</span>, op)
+    }
+    juego.<span class="t">texto</span>(<span class="s">&quot;CUADROS: {LINCE[&quot;</span>cuadros<span class="s">&quot;]}  POR FILA: {LINCE[&quot;</span>por_fila<span class="s">&quot;]}&quot;</span>, <span class="n">20</span>, <span class="n">230</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/410_hoja.png" alt="Captura de «Una hoja con todos los fotogramas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/410_hoja.lince</span></article><article class="ej" id="hojas-de-sprites-1"><h3>Hojas desordenadas</h3><p class="nota">Sin decir cómo partirla, <code>juego.hoja(ruta)</code> busca sola las figuras (lo separado por fondo), las agrupa en filas y las ordena, aunque midan distinto. Así sirven las hojas descargadas tal cual. Con <code>{&quot;fondo&quot;: &quot;auto&quot;}</code> también quita un fondo de color.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+
+juego.abrir(<span class="s">&quot;Hoja sola&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> FIGURAS = juego.hoja(<span class="s">&quot;recursos/figuras.png&quot;</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">30</span>, <span class="n">30</span>, <span class="n">40</span>])
+    juego.dibujar(juego.imagen(<span class="s">&quot;recursos/figuras.png&quot;</span>), <span class="n">20</span>, <span class="n">20</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>})
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt; FIGURAS[<span class="s">&quot;cuadros&quot;</span>]; i++) {
+        juego.dibujar(FIGURAS, <span class="n">290</span> + (i % <span class="n">3</span>) * <span class="n">60</span>, <span class="n">30</span> + matematica.piso(i / <span class="n">3</span>) * <span class="n">70</span>, {<span class="s">&quot;cuadro&quot;</span>: i})
+        juego.<span class="t">texto</span>(<span class="s">&quot;{i}&quot;</span>, <span class="n">290</span> + (i % <span class="n">3</span>) * <span class="n">60</span>, <span class="n">30</span> + matematica.piso(i / <span class="n">3</span>) * <span class="n">70</span> + <span class="n">50</span>, <span class="n">1</span>)
+    }
+    juego.<span class="t">texto</span>(<span class="s">&quot;{FIGURAS[&quot;</span>cuadros<span class="s">&quot;]} FIGURAS, {FIGURAS[&quot;</span>filas<span class="s">&quot;]} FILAS&quot;</span>, <span class="n">20</span>, <span class="n">230</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/420_hoja_sola.png" alt="Captura de «Hojas desordenadas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/420_hoja_sola.lince</span></article><article class="ej" id="hojas-de-sprites-2"><h3>Animaciones a partir de un dibujo</h3><p class="nota">Con un solo dibujo, <code>juego.animar(imagen, tipo)</code> hace los cuadros de una animación: <code>&quot;andar&quot;</code> y <code>&quot;correr&quot;</code> mueven las piernas; <code>&quot;respirar&quot;</code>, <code>&quot;saltar&quot;</code>, <code>&quot;golpe&quot;</code>, <code>&quot;morir&quot;</code>, <code>&quot;flotar&quot;</code> y <code>&quot;girar&quot;</code> mueven el dibujo entero. Da una hoja, así que se puede cambiar después por una dibujada a mano sin tocar el resto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Animar&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> DIBUJO = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+<span class="k">fijo</span> QUIETO = juego.sprite([<span class="s">&quot;..X..&quot;</span>, <span class="s">&quot;.XXX.&quot;</span>, <span class="s">&quot;XXXXX&quot;</span>, <span class="s">&quot;.X.X.&quot;</span>, <span class="s">&quot;.X.X.&quot;</span>], {<span class="s">&quot;X&quot;</span>: [<span class="n">230</span>, <span class="n">140</span>, <span class="n">60</span>]})
+<span class="k">fijo</span> TIPOS = [<span class="s">&quot;respirar&quot;</span>, <span class="s">&quot;saltar&quot;</span>, <span class="s">&quot;flotar&quot;</span>, <span class="s">&quot;girar&quot;</span>, <span class="s">&quot;morir&quot;</span>]
+<span class="k">sea</span> hojas = []
+<span class="k">para</span> <span class="k">cada</span> <span class="t">texto</span> t <span class="k">en</span> TIPOS { hojas.agregar(juego.animar(QUIETO, t)) }
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">25</span>, <span class="n">35</span>, <span class="n">50</span>])
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt; TIPOS.longitud(); i++) {
+        juego.dibujar(hojas[i], <span class="n">30</span> + i * <span class="n">90</span>, <span class="n">90</span>, {<span class="s">&quot;cuadro&quot;</span>: juego.cuadro(hojas[i][<span class="s">&quot;cuadros&quot;</span>], <span class="n">8</span>), <span class="s">&quot;escala&quot;</span>: <span class="n">8</span>})
+        juego.<span class="t">texto</span>(TIPOS[i].mayusculas(), <span class="n">30</span> + i * <span class="n">90</span>, <span class="n">190</span>, <span class="n">1</span>)
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/430_animar.png" alt="Captura de «Animaciones a partir de un dibujo»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/430_animar.lince</span></article></section>
+<section id="animador"><h2>Animador</h2><article class="ej" id="animador-0"><h3>El animador</h3><p class="nota"><code>juego.animador(hoja, animaciones)</code> lleva por ti qué animación toca, desde cuándo y qué viene después. Cada animación dice su <code>fila</code> (o sus <code>cuadros</code>), <code>por_segundo</code>, si se repite y la <code>siguiente</code>. <code>juego.animacion(pj, &quot;andar&quot;)</code> la cambia (si ya estaba en ella, sigue por donde iba) y <code>juego.dibujar(pj, x, y)</code> dibuja el cuadro que toca.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Animador&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+<span class="k">sea</span> pj = juego.animador(LINCE, {
+    <span class="s">&quot;quieto&quot;</span>:  {<span class="s">&quot;fila&quot;</span>: <span class="n">0</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">3</span>},
+    <span class="s">&quot;andar&quot;</span>:   {<span class="s">&quot;fila&quot;</span>: <span class="n">1</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">10</span>},
+    <span class="s">&quot;saltar&quot;</span>:  {<span class="s">&quot;fila&quot;</span>: <span class="n">2</span>},
+    <span class="s">&quot;zarpazo&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">3</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">12</span>, <span class="s">&quot;repetir&quot;</span>: <span class="k">falso</span>, <span class="s">&quot;siguiente&quot;</span>: <span class="s">&quot;quieto&quot;</span>}
+})
+<span class="k">sea</span> x = <span class="n">60</span>
+<span class="k">mientras</span> juego.abierto() {
+    x = x + <span class="n">80</span> * juego.dt()
+    juego.animacion(pj, <span class="s">&quot;andar&quot;</span>)
+    juego.limpiar([<span class="n">190</span>, <span class="n">220</span>, <span class="n">240</span>])
+    juego.rectangulo(<span class="n">0</span>, <span class="n">200</span>, <span class="n">480</span>, <span class="n">70</span>, [<span class="n">90</span>, <span class="n">160</span>, <span class="n">80</span>])
+    juego.dibujar(pj, x, <span class="n">136</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>})
+    juego.<span class="t">texto</span>(<span class="s">&quot;ANIMACIÓN: {pj[&quot;</span>actual<span class="s">&quot;]}&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/510_animador.png" alt="Captura de «El animador»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/510_animador.lince</span></article></section>
+<section id="entrada"><h2>Entrada</h2><article class="ej" id="entrada-0"><h3>Teclas y ratón</h3><p class="nota"><code>juego.tecla(&quot;derecha&quot;)</code> dice si está pulsada ahora; <code>juego.tecla_pulsada(&quot;espacio&quot;)</code>, si se ha pulsado en este fotograma (para saltar una sola vez). <code>juego.raton()</code> da <code>[x, y]</code> y <code>juego.clic(1)</code>, si se ha hecho clic con el botón izquierdo.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Entrada&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">sea</span> x = <span class="n">60</span>
+<span class="k">sea</span> marcas = []
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">si</span> juego.tecla(<span class="s">&quot;derecha&quot;</span>) { x = x + <span class="n">200</span> * juego.dt() }
+    <span class="k">si</span> juego.tecla(<span class="s">&quot;izquierda&quot;</span>) { x = x - <span class="n">200</span> * juego.dt() }
+    <span class="k">si</span> juego.clic(<span class="n">1</span>) <span class="k">y</span> marcas.longitud() &lt; <span class="n">5</span> { marcas.agregar(juego.raton()) }
+    juego.limpiar([<span class="n">30</span>, <span class="n">30</span>, <span class="n">45</span>])
+    juego.rectangulo(x, <span class="n">180</span>, <span class="n">40</span>, <span class="n">40</span>, [<span class="n">230</span>, <span class="n">140</span>, <span class="n">60</span>])
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">lista</span> m <span class="k">en</span> marcas { juego.circulo(m[<span class="n">0</span>], m[<span class="n">1</span>], <span class="n">10</span>, [<span class="n">120</span>, <span class="n">200</span>, <span class="n">255</span>]) }
+    juego.<span class="t">texto</span>(<span class="s">&quot;RATÓN: {juego.raton()}&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/610_teclas_y_raton.png" alt="Captura de «Teclas y ratón»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/610_teclas_y_raton.lince</span></article><article class="ej" id="entrada-1"><h3>Acciones: teclado y mando a la vez</h3><p class="nota">Una acción junta varias entradas con un nombre: teclas, botones de mando (<code>&quot;mando:a&quot;</code>), la palanca (<code>&quot;mando:izq_x-&quot;</code>), el ratón o la pantalla táctil. El juego pregunta por la acción y funciona igual con todo. <code>juego.direccion(&quot;izquierda&quot;, &quot;derecha&quot;)</code> va de −1 a 1, gradual con la palanca.</p><p class="nota">Con mandos, en un móvil sale solo un mando en la pantalla táctil (ver <strong>Móvil</strong>), y el jugador puede cambiar las teclas (ver <strong>Controles</strong>).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Acciones&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izquierda&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;d&quot;</span>, <span class="s">&quot;mando:derecha&quot;</span>, <span class="s">&quot;mando:izq_x+&quot;</span>])
+juego.definir_accion(<span class="s">&quot;saltar&quot;</span>, [<span class="s">&quot;espacio&quot;</span>, <span class="s">&quot;w&quot;</span>, <span class="s">&quot;mando:a&quot;</span>])
+<span class="k">sea</span> x = <span class="n">60</span>
+<span class="k">sea</span> vy = <span class="n">0</span>
+<span class="k">sea</span> suelo = <span class="n">200</span>
+<span class="k">sea</span> yy = suelo
+<span class="k">mientras</span> juego.abierto() {
+    x = x + juego.direccion(<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;derecha&quot;</span>) * <span class="n">180</span> * juego.dt()
+    <span class="k">si</span> juego.accion_pulsada(<span class="s">&quot;saltar&quot;</span>) <span class="k">y</span> yy &gt;= suelo { vy = -<span class="n">420</span> }
+    vy = vy + <span class="n">1200</span> * juego.dt()
+    yy = yy + vy * juego.dt()
+    <span class="k">si</span> yy &gt; suelo { yy = suelo }
+    juego.limpiar([<span class="n">30</span>, <span class="n">35</span>, <span class="n">50</span>])
+    juego.rectangulo(<span class="n">0</span>, suelo + <span class="n">30</span>, <span class="n">480</span>, <span class="n">40</span>, [<span class="n">80</span>, <span class="n">140</span>, <span class="n">80</span>])
+    juego.rectangulo(x, yy, <span class="n">30</span>, <span class="n">30</span>, [<span class="n">230</span>, <span class="n">140</span>, <span class="n">60</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;SALTAR: {juego.acciones()[&quot;</span>saltar<span class="s">&quot;]}&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/620_acciones.png" alt="Captura de «Acciones: teclado y mando a la vez»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/620_acciones.lince</span></article><article class="ej" id="entrada-2"><h3>Escribir un nombre</h3><p class="nota"><code>juego.editar(texto, máximo)</code> añade lo que se teclea (con tildes y ñ) y aplica la tecla de borrar; se llama en cada fotograma. En el móvil saca el teclado de la pantalla mientras se use.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Nombre&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">sea</span> nombre = <span class="s">&quot;&quot;</span>
+<span class="k">mientras</span> juego.abierto() {
+    nombre = juego.editar(nombre, <span class="n">12</span>)
+    juego.limpiar([<span class="n">20</span>, <span class="n">25</span>, <span class="n">40</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;¡NUEVO RÉCORD! TU NOMBRE:&quot;</span>, <span class="n">240</span>, <span class="n">90</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>})
+    juego.<span class="t">texto</span>(nombre + <span class="s">&quot;_&quot;</span>, <span class="n">240</span>, <span class="n">140</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">220</span>, <span class="n">80</span>]})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/630_escribir.png" alt="Captura de «Escribir un nombre»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/630_escribir.lince</span></article></section>
+<section id="movil"><h2>Móvil</h2><article class="ej" id="movil-0"><h3>El mando de la pantalla táctil</h3><p class="nota">En un móvil, si alguna acción usa el mando, sale solo un mando en la pantalla como el de los juegos de móvil: a la izquierda una palanca que aparece donde se apoya el pulgar y a la derecha los botones que usan las acciones. Funciona como un mando de verdad, así que un juego hecho para teclado y mando se juega en el móvil sin cambiar nada. Se esconde si se conecta un mando por Bluetooth.</p><p class="nota">Aquí sale en el ordenador porque se pide con <code>&quot;siempre&quot;</code>. <code>juego.mando_tactil(falso)</code> lo quita, para un juego con controles propios.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Móvil&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;saltar&quot;</span>, [<span class="s">&quot;espacio&quot;</span>, <span class="s">&quot;mando:a&quot;</span>])
+juego.definir_accion(<span class="s">&quot;zarpazo&quot;</span>, [<span class="s">&quot;z&quot;</span>, <span class="s">&quot;mando:b&quot;</span>])
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
+juego.mando_tactil({<span class="s">&quot;siempre&quot;</span>: <span class="k">verdadero</span>})
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">60</span>, <span class="n">110</span>, <span class="n">170</span>])
+    juego.rectangulo(<span class="n">0</span>, <span class="n">200</span>, <span class="n">480</span>, <span class="n">70</span>, [<span class="n">80</span>, <span class="n">150</span>, <span class="n">80</span>])
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/710_mando_tactil.png" alt="Captura de «El mando de la pantalla táctil»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/710_mando_tactil.lince</span></article><article class="ej" id="movil-1"><h3>Dedos, vibrar e inclinar</h3><p class="nota"><code>juego.toques()</code> da los dedos que hay en la pantalla (en el ordenador, el botón izquierdo del ratón cuenta como un dedo). <code>juego.vibrar(segundos)</code> hace vibrar el móvil y los mandos, y <code>juego.inclinacion()</code> dice hacia dónde está inclinado el móvil (en el ordenador, <code>[0, 0]</code>). Una acción puede usar la inclinación: <code>&quot;inclinacion:x-&quot;</code>.</p><p class="nota">Para ponerlo en el móvil: <code>lince repartir juego.lince --android</code> (ver <strong>Compartir el juego</strong>).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Dedos&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">35</span>])
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> dedo <span class="k">en</span> juego.toques() {
+        juego.circulo(dedo[<span class="s">&quot;x&quot;</span>], dedo[<span class="s">&quot;y&quot;</span>], <span class="n">30</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>, <span class="n">120</span>])
+        juego.<span class="t">texto</span>(<span class="s">&quot;DEDO {dedo[&quot;</span>id<span class="s">&quot;]}&quot;</span>, dedo[<span class="s">&quot;x&quot;</span>] + <span class="n">36</span>, dedo[<span class="s">&quot;y&quot;</span>] - <span class="n">6</span>, <span class="n">2</span>)
+    }
+    juego.<span class="t">texto</span>(<span class="s">&quot;TÁCTIL: {juego.tactil()}   INCLINACIÓN: {juego.inclinacion()}&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, <span class="n">1</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/720_toques.png" alt="Captura de «Dedos, vibrar e inclinar»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/720_toques.lince</span></article></section>
+<section id="sonido"><h2>Sonido</h2><article class="ej" id="sonido-0"><h3>Efectos sin archivos</h3><p class="nota"><code>juego.efecto(&quot;moneda&quot;)</code> genera y hace sonar un efecto al estilo de los juegos de 8 bits: <code>&quot;moneda&quot;</code>, <code>&quot;salto&quot;</code>, <code>&quot;disparo&quot;</code>, <code>&quot;explosion&quot;</code>, <code>&quot;golpe&quot;</code>, <code>&quot;subir&quot;</code>, <code>&quot;clic&quot;</code> o <code>&quot;perder&quot;</code>. Cada vez suena un poco distinto. <code>juego.crear_efecto()</code> lo da como sonido, para <code>juego.reproducir()</code> o para guardarlo con <code>juego.guardar_sonido()</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Sonido&quot;</span>, <span class="n">320</span>, <span class="n">180</span>)
+juego.efecto(<span class="s">&quot;moneda&quot;</span>)
+<span class="k">sea</span> salto = juego.crear_efecto(<span class="s">&quot;salto&quot;</span>, {<span class="s">&quot;tono&quot;</span>: <span class="n">1.2</span>})
+juego.reproducir(salto, {<span class="s">&quot;volumen&quot;</span>: <span class="n">0.8</span>, <span class="s">&quot;lado&quot;</span>: -<span class="n">0.5</span>})      <span class="c"># algo a la izquierda</span>
+<span class="k">escribir</span>(<span class="s">&quot;el salto dura {salto[&quot;</span>duracion<span class="s">&quot;]} s&quot;</span>)
+juego.pitido(<span class="n">440</span>, <span class="n">100</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>el salto dura 0.241338 s</pre></div><span class="fuente">docs/juego/ejemplos/810_sonido.lince</span></article><article class="ej" id="sonido-1"><h3>Sonidos y música de archivos</h3><p class="nota"><code>juego.sonido(ruta)</code> carga un <code>.wav</code> o un <code>.ogg</code>, y <code>juego.reproducir()</code> lo hace sonar (se mezclan hasta 32 a la vez), con <code>volumen</code>, <code>lado</code> (de −1, izquierda, a 1, derecha) y <code>tono</code>. <code>juego.musica(&quot;tema.ogg&quot;)</code> suena en bucle y se va leyendo poco a poco, así una canción entera apenas ocupa memoria.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">fijo</span> PASO = juego.sonido(<span class="s">&quot;paso.wav&quot;</span>)
+juego.reproducir(PASO, {<span class="s">&quot;volumen&quot;</span>: <span class="n">0.6</span>, <span class="s">&quot;tono&quot;</span>: <span class="n">0.9</span> + matematica.aleatorio() * <span class="n">0.2</span>})
+juego.musica(<span class="s">&quot;musica/bosque.ogg&quot;</span>, <span class="n">0.5</span>)          <span class="c"># en bucle</span>
+juego.musica(<span class="k">nulo</span>)                              <span class="c"># la para</span>
+juego.volumen(<span class="n">0.8</span>)                              <span class="c"># el volumen general</span></code></pre></div></article></section>
+<section id="movimiento"><h2>Movimiento</h2><article class="ej" id="movimiento-0"><h3>Movimiento suave</h3><p class="nota"><code>juego.suavizar(desde, hasta, segundos, inicio, curva)</code> da el valor que toca ahora en un cambio que empezó en <code>inicio</code> (un <code>juego.tiempo()</code>): para que un menú entre desde un lado o un título caiga y rebote. Las curvas: <code>&quot;lineal&quot;</code>, <code>&quot;suave&quot;</code>, <code>&quot;entrar&quot;</code>, <code>&quot;salir&quot;</code>, <code>&quot;rebote&quot;</code>, <code>&quot;elastico&quot;</code> y <code>&quot;atras&quot;</code>. <code>juego.curva(nombre, t)</code> da la curva tal cual, como en esta gráfica.</p><p class="nota"><code>juego.acercar(actual, objetivo, rapidez)</code> da un paso hacia el objetivo, más largo cuanto más lejos: una cámara que sigue al jugador sin tirones.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Curvas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> CURVAS = [<span class="s">&quot;lineal&quot;</span>, <span class="s">&quot;suave&quot;</span>, <span class="s">&quot;entrar&quot;</span>, <span class="s">&quot;salir&quot;</span>, <span class="s">&quot;rebote&quot;</span>, <span class="s">&quot;elastico&quot;</span>, <span class="s">&quot;atras&quot;</span>]
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">20</span>, <span class="n">22</span>, <span class="n">32</span>])
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt; CURVAS.longitud(); i++) {
+        <span class="k">sea</span> x0 = <span class="n">12</span> + i * <span class="n">66</span>
+        juego.contorno(x0, <span class="n">60</span>, <span class="n">56</span>, <span class="n">150</span>, [<span class="n">60</span>, <span class="n">60</span>, <span class="n">80</span>])
+        <span class="k">para</span> (k = <span class="n">0</span>; k &lt;= <span class="n">50</span>; k++) {
+            <span class="k">sea</span> v = juego.curva(CURVAS[i], k / <span class="n">50</span>)
+            juego.rectangulo(x0 + <span class="n">3</span> + k, <span class="n">190</span> - v * <span class="n">110</span>, <span class="n">2</span>, <span class="n">2</span>, [<span class="n">255</span>, <span class="n">200</span>, <span class="n">70</span>])
+        }
+        juego.<span class="t">texto</span>(CURVAS[i].mayusculas(), x0, <span class="n">222</span>, <span class="n">1</span>)
+    }
+    juego.<span class="t">texto</span>(<span class="s">&quot;CURVA(NOMBRE, T)&quot;</span>, <span class="n">12</span>, <span class="n">20</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/910_suavizar.png" alt="Captura de «Movimiento suave»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/910_suavizar.lince</span></article></section>
+<section id="camara"><h2>Cámara</h2><article class="ej" id="camara-0"><h3>Cámara y temblor</h3><p class="nota"><code>juego.camara(x, y)</code> desplaza todo lo que se dibuja después, para mundos más grandes que la pantalla; <code>juego.camara()</code> vuelve a (0, 0), para el marcador. <code>juego.temblor(fuerza, segundos)</code> sacude la pantalla, para un golpe o una explosión, y el marcador no tiembla.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+
+juego.abrir(<span class="s">&quot;Cámara&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">sea</span> jugador = <span class="n">300</span>
+<span class="k">sea</span> cam = <span class="n">0</span>
+<span class="k">mientras</span> juego.abierto() {
+    jugador = jugador + <span class="n">250</span> * juego.dt()
+    cam = juego.acercar(cam, jugador - <span class="n">240</span>, <span class="n">6</span>)                  <span class="c"># la cámara va detrás, sin tirones</span>
+    juego.limpiar([<span class="n">150</span>, <span class="n">200</span>, <span class="n">240</span>])
+    juego.camara(cam, <span class="n">0</span>)
+    <span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">40</span>; i++) {                                   <span class="c"># el mundo</span>
+        juego.rectangulo(i * <span class="n">120</span>, <span class="n">200</span>, <span class="n">110</span>, <span class="n">70</span>, [<span class="n">90</span>, <span class="n">150</span> + (i % <span class="n">2</span>) * <span class="n">20</span>, <span class="n">80</span>])
+        juego.circulo(i * <span class="n">120</span> + <span class="n">60</span>, <span class="n">170</span>, <span class="n">18</span>, [<span class="n">60</span>, <span class="n">120</span>, <span class="n">60</span>])
+    }
+    juego.rectangulo(jugador, <span class="n">170</span>, <span class="n">30</span>, <span class="n">30</span>, [<span class="n">230</span>, <span class="n">140</span>, <span class="n">60</span>])
+    juego.camara()                                                <span class="c"># el marcador, quieto</span>
+    juego.<span class="t">texto</span>(<span class="s">&quot;CÁMARA X: {matematica.redondear(cam)}&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1010_camara.png" alt="Captura de «Cámara y temblor»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1010_camara.lince</span></article></section>
+<section id="choques"><h2>Choques</h2><article class="ej" id="choques-0"><h3>¿Se tocan?</h3><p class="nota"><code>juego.colision(x1, y1, an1, al1, x2, y2, an2, al2)</code> dice si se solapan dos rectángulos; <code>juego.colision_circulos</code> y <code>juego.colision_circulo_rect</code>, lo mismo con círculos; <code>juego.dentro(px, py, x, y, an, al)</code>, si un punto (un clic) está dentro de un rectángulo (un botón).</p><p class="nota"><code>juego.caja(cosa, x, y)</code> da el rectángulo de lo que se ve de verdad al dibujar una imagen, una hoja o un animador, sin el hueco transparente de alrededor: para que los choques sean justos.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Choques&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">35</span>])
+    <span class="k">sea</span> toca = juego.colision(<span class="n">60</span>, <span class="n">60</span>, <span class="n">100</span>, <span class="n">60</span>, <span class="n">130</span>, <span class="n">90</span>, <span class="n">80</span>, <span class="n">80</span>)
+    juego.rectangulo(<span class="n">60</span>, <span class="n">60</span>, <span class="n">100</span>, <span class="n">60</span>, [<span class="n">230</span>, <span class="n">100</span>, <span class="n">90</span>, <span class="n">200</span>])
+    juego.rectangulo(<span class="n">130</span>, <span class="n">90</span>, <span class="n">80</span>, <span class="n">80</span>, [<span class="n">90</span>, <span class="n">160</span>, <span class="n">230</span>, <span class="n">200</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;COLISIÓN: {toca}&quot;</span>, <span class="n">60</span>, <span class="n">190</span>, <span class="n">2</span>)
+    juego.dibujar(LINCE, <span class="n">300</span>, <span class="n">60</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">6</span>})
+    <span class="k">sea</span> c = juego.caja(LINCE, <span class="n">300</span>, <span class="n">60</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">6</span>})
+    juego.contorno(<span class="n">300</span>, <span class="n">60</span>, <span class="n">96</span>, <span class="n">96</span>, [<span class="n">90</span>, <span class="n">90</span>, <span class="n">110</span>])                <span class="c"># la celda entera</span>
+    juego.contorno(c[<span class="n">0</span>], c[<span class="n">1</span>], c[<span class="n">2</span>], c[<span class="n">3</span>], [<span class="n">255</span>, <span class="n">220</span>, <span class="n">80</span>])        <span class="c"># lo que se ve</span>
+    juego.<span class="t">texto</span>(<span class="s">&quot;CAJA: {c}&quot;</span>, <span class="n">300</span>, <span class="n">190</span>, <span class="n">1</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1110_choques.png" alt="Captura de «¿Se tocan?»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1110_choques.lince</span></article></section>
+<section id="mapas"><h2>Mapas</h2><article class="ej" id="mapas-0"><h3>Un nivel escrito con texto</h3><p class="nota"><code>juego.mapa(filas, tamaño)</code> hace un mapa de casillas a partir de texto, un carácter por casilla. <code>juego.mover_en_mapa(mapa, cosa)</code> mueve algo según su <code>vx</code> y su <code>vy</code> sin atravesar las paredes (<code>&quot;#&quot;</code>, o las que se digan) y deja en <code>en_suelo</code>, <code>techo</code> y <code>pared</code> con qué chocó; la gravedad la sumas tú. <code>juego.dibujar_mapa</code> lo pinta, con un color o un tile para cada carácter.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Mapa&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;d&quot;</span>, <span class="s">&quot;mando:izq_x+&quot;</span>])
+<span class="k">fijo</span> NIVEL = juego.mapa([
+    <span class="s">&quot;###############&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#......====...#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#...##........#&quot;</span>,
+    <span class="s">&quot;#...##....#...#&quot;</span>,
+    <span class="s">&quot;###############&quot;</span>
+], <span class="n">32</span>, {<span class="s">&quot;plataformas&quot;</span>: <span class="s">&quot;=&quot;</span>})
+<span class="k">sea</span> yo = {<span class="s">&quot;x&quot;</span>: <span class="n">40</span>, <span class="s">&quot;y&quot;</span>: <span class="n">100</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">20</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">28</span>, <span class="s">&quot;vx&quot;</span>: <span class="n">0</span>, <span class="s">&quot;vy&quot;</span>: <span class="n">0</span>}
+<span class="k">mientras</span> juego.abierto() {
+    yo[<span class="s">&quot;vx&quot;</span>] = juego.direccion(<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;derecha&quot;</span>) * <span class="n">160</span>
+    yo[<span class="s">&quot;vy&quot;</span>] = yo[<span class="s">&quot;vy&quot;</span>] + <span class="n">1000</span> * juego.dt()
+    juego.mover_en_mapa(NIVEL, yo)
+    juego.limpiar([<span class="n">30</span>, <span class="n">30</span>, <span class="n">50</span>])
+    juego.dibujar_mapa(NIVEL, {<span class="s">&quot;#&quot;</span>: [<span class="n">90</span>, <span class="n">80</span>, <span class="n">120</span>], <span class="s">&quot;=&quot;</span>: [<span class="n">180</span>, <span class="n">140</span>, <span class="n">80</span>]})
+    juego.rectangulo(yo[<span class="s">&quot;x&quot;</span>], yo[<span class="s">&quot;y&quot;</span>], yo[<span class="s">&quot;ancho&quot;</span>], yo[<span class="s">&quot;alto&quot;</span>], [<span class="n">240</span>, <span class="n">150</span>, <span class="n">60</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;EN SUELO: {yo[&quot;</span>en_suelo<span class="s">&quot;]}  PARED: {yo[&quot;</span>pared<span class="s">&quot;]}&quot;</span>, <span class="n">40</span>, <span class="n">8</span>, <span class="n">1</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1210_mapa.png" alt="Captura de «Un nivel escrito con texto»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1210_mapa.lince</span></article><article class="ej" id="mapas-1"><h3>Tiles y tiles animados</h3><p class="nota">Lo normal es pintar el nivel con una hoja de tiles: a cada carácter, <code>[hoja, cuadro]</code>, o <code>[hoja, [cuadros], segundos]</code> para uno animado (el agua, las monedas). Los tiles se ajustan al tamaño de la casilla. <code>juego.casilla</code> y <code>juego.poner_casilla</code> leen y cambian una casilla (coger una moneda, abrir una puerta), y <code>juego.buscar_en_mapa</code> dice dónde están.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Tiles&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> TILES = juego.hoja(<span class="s">&quot;recursos/tiles.png&quot;</span>, <span class="n">16</span>)
+<span class="k">fijo</span> NIVEL = juego.mapa([
+    <span class="s">&quot;...............&quot;</span>,
+    <span class="s">&quot;..c.......c....&quot;</span>,
+    <span class="s">&quot;...............&quot;</span>,
+    <span class="s">&quot;......$$$......&quot;</span>,
+    <span class="s">&quot;....-----..x...&quot;</span>,
+    <span class="s">&quot;............xx.&quot;</span>,
+    <span class="s">&quot;hhhhhh~~~hhhhhh&quot;</span>,
+    <span class="s">&quot;tttttt~~~tttttt&quot;</span>
+], <span class="n">32</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">120</span>, <span class="n">190</span>, <span class="n">240</span>])
+    juego.dibujar_mapa(NIVEL, {
+        <span class="s">&quot;h&quot;</span>: [TILES, <span class="n">0</span>], <span class="s">&quot;t&quot;</span>: [TILES, <span class="n">1</span>], <span class="s">&quot;x&quot;</span>: [TILES, <span class="n">5</span>], <span class="s">&quot;-&quot;</span>: [TILES, <span class="n">12</span>], <span class="s">&quot;c&quot;</span>: [TILES, <span class="n">10</span>],
+        <span class="s">&quot;~&quot;</span>: [TILES, [<span class="n">3</span>, <span class="n">4</span>], <span class="n">0.4</span>],                 <span class="c"># agua: dos cuadros</span>
+        <span class="s">&quot;$&quot;</span>: [TILES, [<span class="n">6</span>, <span class="n">7</span>, <span class="n">8</span>, <span class="n">9</span>], <span class="n">0.12</span>]           <span class="c"># monedas que giran</span>
+    })
+    juego.<span class="t">texto</span>(<span class="s">&quot;MONEDAS: {juego.buscar_en_mapa(NIVEL, &quot;</span>$<span class="s">&quot;).longitud()}&quot;</span>, <span class="n">10</span>, <span class="n">8</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1220_tiles.png" alt="Captura de «Tiles y tiles animados»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1220_tiles.lince</span></article><article class="ej" id="mapas-2"><h3>Buscar el camino</h3><p class="nota"><code>juego.camino(mapa, [c1, f1], [c2, f2])</code> da el camino más corto entre dos casillas sin atravesar paredes, como lista de <code>[columna, fila]</code>: para enemigos que persiguen al jugador por un laberinto. Con un cuarto argumento verdadero también va en diagonal.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Camino&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> LAB = juego.mapa([
+    <span class="s">&quot;###############&quot;</span>,
+    <span class="s">&quot;#.....#.......#&quot;</span>,
+    <span class="s">&quot;#.###.#.#####.#&quot;</span>,
+    <span class="s">&quot;#.#...#.....#.#&quot;</span>,
+    <span class="s">&quot;#.#.#######.#.#&quot;</span>,
+    <span class="s">&quot;#...#.......#.#&quot;</span>,
+    <span class="s">&quot;#####.#######.#&quot;</span>,
+    <span class="s">&quot;###############&quot;</span>
+], <span class="n">32</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">20</span>, <span class="n">20</span>, <span class="n">30</span>])
+    juego.dibujar_mapa(LAB, {<span class="s">&quot;#&quot;</span>: [<span class="n">70</span>, <span class="n">70</span>, <span class="n">100</span>]})
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">lista</span> c <span class="k">en</span> juego.camino(LAB, [<span class="n">1</span>, <span class="n">1</span>], [<span class="n">13</span>, <span class="n">6</span>]) {
+        juego.circulo(c[<span class="n">0</span>] * <span class="n">32</span> + <span class="n">16</span>, c[<span class="n">1</span>] * <span class="n">32</span> + <span class="n">16</span>, <span class="n">5</span>, [<span class="n">255</span>, <span class="n">210</span>, <span class="n">70</span>])
+    }
+    juego.circulo(<span class="n">48</span>, <span class="n">48</span>, <span class="n">12</span>, [<span class="n">240</span>, <span class="n">90</span>, <span class="n">90</span>])
+    juego.circulo(<span class="n">13</span> * <span class="n">32</span> + <span class="n">16</span>, <span class="n">6</span> * <span class="n">32</span> + <span class="n">16</span>, <span class="n">12</span>, [<span class="n">90</span>, <span class="n">200</span>, <span class="n">120</span>])
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1230_camino.png" alt="Captura de «Buscar el camino»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1230_camino.lince</span></article></section>
+<section id="mapas-de-tiled"><h2>Mapas de Tiled</h2><article class="ej" id="mapas-de-tiled-0"><h3>Niveles hechos con Tiled</h3><p class="nota"><a href="https://www.mapeditor.org">Tiled</a> es el editor de mapas gratuito más usado. <code>juego.mapa_tiled(ruta)</code> lee sus mapas (<code>.tmx</code> o <code>.tmj</code>) con sus tilesets, y da un mapa de Lince normal: <code>mover_en_mapa</code>, <code>camino</code> y las demás funciones sirven igual. Lo sólido se marca en Tiled: una capa llamada <strong>Colisiones</strong>, o la propiedad <code>solido</code> en una capa o en un tile del tileset (o <code>plataforma</code>).</p><p class="nota"><code>juego.dibujar_tiled(mapa, capas)</code> lo dibuja con los tiles animados, girados y volteados, la opacidad y el paralaje de cada capa: el fondo antes del personaje y lo de delante después. Los objetos que se pusieron en Tiled (dónde empieza el jugador, las monedas) vienen en <code>mapa[&quot;objetos&quot;]</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Tiled&quot;</span>, <span class="n">480</span>, <span class="n">240</span>)
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;d&quot;</span>, <span class="s">&quot;mando:izq_x+&quot;</span>])
+<span class="k">fijo</span> NIVEL = juego.mapa_tiled(<span class="s">&quot;recursos/nivel.tmx&quot;</span>)
+<span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+<span class="k">sea</span> yo = {<span class="s">&quot;x&quot;</span>: <span class="n">0</span>, <span class="s">&quot;y&quot;</span>: <span class="n">0</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">14</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">12</span>, <span class="s">&quot;vx&quot;</span>: <span class="n">0</span>, <span class="s">&quot;vy&quot;</span>: <span class="n">0</span>}
+<span class="k">sea</span> monedas = []
+<span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> cosa <span class="k">en</span> NIVEL[<span class="s">&quot;objetos&quot;</span>] {
+    <span class="k">si</span> cosa[<span class="s">&quot;tipo&quot;</span>] == <span class="s">&quot;jugador&quot;</span> {
+        yo[<span class="s">&quot;x&quot;</span>] = cosa[<span class="s">&quot;x&quot;</span>]
+        yo[<span class="s">&quot;y&quot;</span>] = cosa[<span class="s">&quot;y&quot;</span>]
+    }
+    <span class="k">si</span> cosa[<span class="s">&quot;tipo&quot;</span>] == <span class="s">&quot;moneda&quot;</span> { monedas.agregar(cosa) }
+}
+<span class="k">mientras</span> juego.abierto() {
+    yo[<span class="s">&quot;vx&quot;</span>] = juego.direccion(<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;derecha&quot;</span>) * <span class="n">120</span>
+    yo[<span class="s">&quot;vy&quot;</span>] = yo[<span class="s">&quot;vy&quot;</span>] + <span class="n">900</span> * juego.dt()
+    juego.mover_en_mapa(NIVEL, yo)
+    juego.camara(yo[<span class="s">&quot;x&quot;</span>] - <span class="n">120</span>, <span class="n">0</span>)
+    juego.dibujar_tiled(NIVEL)
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> m <span class="k">en</span> monedas {
+        juego.circulo(m[<span class="s">&quot;x&quot;</span>] + <span class="n">8</span>, m[<span class="s">&quot;y&quot;</span>] + <span class="n">8</span>, <span class="n">5</span>, [<span class="n">250</span>, <span class="n">210</span>, <span class="n">60</span>])
+    }
+    juego.dibujar(LINCE, yo[<span class="s">&quot;x&quot;</span>] - <span class="n">1</span>, yo[<span class="s">&quot;y&quot;</span>] - <span class="n">4</span>, {<span class="s">&quot;fila&quot;</span>: <span class="n">1</span>, <span class="s">&quot;cuadro&quot;</span>: juego.cuadro(<span class="n">4</span>, <span class="n">10</span>)})
+    juego.camara()
+    juego.<span class="t">texto</span>(<span class="s">&quot;{NIVEL[&quot;</span>propiedades<span class="s">&quot;][&quot;</span>nombre<span class="s">&quot;]}  CAPAS: {NIVEL[&quot;</span>capas<span class="s">&quot;]}&quot;</span>, <span class="n">8</span>, <span class="n">8</span>, <span class="n">1</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1310_tiled.png" alt="Captura de «Niveles hechos con Tiled»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1310_tiled.lince</span></article></section>
+<section id="fisica"><h2>Física</h2><article class="ej" id="fisica-0"><h3>Cajas, pelotas y ascensores</h3><p class="nota"><code>juego.fisica()</code> hace un mundo con gravedad (y, si se le da, un mapa con el que chocar), y <code>juego.cuerpo(mundo, datos)</code> le añade cuerpos: cajas o círculos (<code>radio</code>) con <code>masa</code>, <code>rebote</code> y <code>friccion</code>. <code>juego.avanzar_fisica(mundo)</code> lo mueve todo en cada fotograma: caen, rebotan, se empujan según su masa y se apilan.</p><p class="nota">Un cuerpo <code>fijo</code> no lo mueve nada; con <code>vx</code> o <code>vy</code> es una plataforma o un ascensor que lleva lo que tiene encima. Uno <code>sensor</code> no choca, solo avisa de lo que toca (<code>juego.tocando</code>), para monedas o zonas. Los cuerpos son diccionarios normales: el personaje puede ser uno más.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Física&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> NIVEL = juego.mapa([
+    <span class="s">&quot;###############&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;#.............#&quot;</span>,
+    <span class="s">&quot;###############&quot;</span>
+], <span class="n">30</span>)
+<span class="k">sea</span> mundo = juego.fisica({<span class="s">&quot;gravedad&quot;</span>: <span class="n">900</span>, <span class="s">&quot;mapa&quot;</span>: NIVEL})
+<span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">4</span>; i++) {
+    juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">60</span> + i * <span class="n">6</span>, <span class="s">&quot;y&quot;</span>: <span class="n">40</span> + i * <span class="n">45</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">30</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">30</span>})       <span class="c"># una torre que cae</span>
+}
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">220</span>, <span class="s">&quot;y&quot;</span>: <span class="n">40</span>, <span class="s">&quot;radio&quot;</span>: <span class="n">12</span>, <span class="s">&quot;rebote&quot;</span>: <span class="n">0.8</span>})
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">280</span>, <span class="s">&quot;y&quot;</span>: <span class="n">60</span>, <span class="s">&quot;radio&quot;</span>: <span class="n">8</span>, <span class="s">&quot;rebote&quot;</span>: <span class="n">0.9</span>, <span class="s">&quot;masa&quot;</span>: <span class="n">0.5</span>})
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">340</span>, <span class="s">&quot;y&quot;</span>: <span class="n">190</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">70</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">8</span>, <span class="s">&quot;fijo&quot;</span>: <span class="k">verdadero</span>, <span class="s">&quot;vy&quot;</span>: -<span class="n">40</span>})
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">360</span>, <span class="s">&quot;y&quot;</span>: <span class="n">150</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">24</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">24</span>})
+<span class="k">mientras</span> juego.abierto() {
+    juego.avanzar_fisica(mundo)
+    juego.limpiar([<span class="n">25</span>, <span class="n">30</span>, <span class="n">45</span>])
+    juego.dibujar_mapa(NIVEL, {<span class="s">&quot;#&quot;</span>: [<span class="n">70</span>, <span class="n">80</span>, <span class="n">110</span>]})
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> c <span class="k">en</span> mundo[<span class="s">&quot;cuerpos&quot;</span>] {
+        <span class="k">si</span> c.contiene(<span class="s">&quot;radio&quot;</span>) {
+            juego.circulo(c[<span class="s">&quot;x&quot;</span>] + c[<span class="s">&quot;radio&quot;</span>], c[<span class="s">&quot;y&quot;</span>] + c[<span class="s">&quot;radio&quot;</span>], c[<span class="s">&quot;radio&quot;</span>], [<span class="n">240</span>, <span class="n">120</span>, <span class="n">90</span>])
+        } <span class="k">sino</span> {
+            juego.rectangulo(c[<span class="s">&quot;x&quot;</span>], c[<span class="s">&quot;y&quot;</span>], c[<span class="s">&quot;ancho&quot;</span>], c[<span class="s">&quot;alto&quot;</span>], <span class="k">si</span> c[<span class="s">&quot;fijo&quot;</span>] { [<span class="n">120</span>, <span class="n">200</span>, <span class="n">140</span>] } <span class="k">sino</span> { [<span class="n">200</span>, <span class="n">150</span>, <span class="n">80</span>] })
+            juego.contorno(c[<span class="s">&quot;x&quot;</span>], c[<span class="s">&quot;y&quot;</span>], c[<span class="s">&quot;ancho&quot;</span>], c[<span class="s">&quot;alto&quot;</span>], [<span class="n">60</span>, <span class="n">40</span>, <span class="n">20</span>])
+        }
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1410_fisica.png" alt="Captura de «Cajas, pelotas y ascensores»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1410_fisica.lince</span></article></section>
+<section id="particulas"><h2>Partículas</h2><article class="ej" id="particulas-0"><h3>Chispas, polvo y explosiones</h3><p class="nota"><code>juego.particulas(x, y, opciones)</code> lanza un puñado de partículas y <code>juego.dibujar_particulas()</code> las mueve y las dibuja en cada fotograma. Opciones: <code>cantidad</code>, <code>color</code> y <code>color_final</code>, <code>velocidad</code>, <code>direccion</code> y <code>apertura</code> (en grados), <code>vida</code>, <code>tamaño</code> y <code>tamaño_final</code>, <code>gravedad</code> y <code>mezcla</code> (<code>&quot;sumar&quot;</code> para que brillen). Las que admiten <code>[mínimo, máximo]</code> toman un valor al azar para cada una.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Partículas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.particulas(<span class="n">110</span>, <span class="n">150</span>, {<span class="s">&quot;cantidad&quot;</span>: <span class="n">60</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">220</span>, <span class="n">80</span>], <span class="s">&quot;color_final&quot;</span>: [<span class="n">255</span>, <span class="n">60</span>, <span class="n">20</span>, <span class="n">0</span>],
+                            <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">220</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.4</span>, <span class="n">0.9</span>], <span class="s">&quot;mezcla&quot;</span>: <span class="s">&quot;sumar&quot;</span>})
+juego.particulas(<span class="n">250</span>, <span class="n">200</span>, {<span class="s">&quot;cantidad&quot;</span>: <span class="n">30</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">200</span>, <span class="n">190</span>, <span class="n">170</span>], <span class="s">&quot;direccion&quot;</span>: -<span class="n">90</span>, <span class="s">&quot;apertura&quot;</span>: <span class="n">70</span>,
+                            <span class="s">&quot;velocidad&quot;</span>: [<span class="n">40</span>, <span class="n">120</span>], <span class="s">&quot;tamaño&quot;</span>: <span class="n">6</span>, <span class="s">&quot;tamaño_final&quot;</span>: <span class="n">14</span>, <span class="s">&quot;gravedad&quot;</span>: -<span class="n">30</span>})
+juego.particulas(<span class="n">380</span>, <span class="n">80</span>, {<span class="s">&quot;cantidad&quot;</span>: <span class="n">40</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">120</span>, <span class="n">200</span>, <span class="n">255</span>], <span class="s">&quot;velocidad&quot;</span>: [<span class="n">80</span>, <span class="n">160</span>],
+                           <span class="s">&quot;gravedad&quot;</span>: <span class="n">500</span>, <span class="s">&quot;vida&quot;</span>: <span class="n">1</span>})
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">15</span>, <span class="n">15</span>, <span class="n">25</span>])
+    juego.dibujar_particulas()
+    juego.<span class="t">texto</span>(<span class="s">&quot;CHISPAS&quot;</span>, <span class="n">70</span>, <span class="n">240</span>, <span class="n">2</span>)
+    juego.<span class="t">texto</span>(<span class="s">&quot;POLVO&quot;</span>, <span class="n">215</span>, <span class="n">240</span>, <span class="n">2</span>)
+    juego.<span class="t">texto</span>(<span class="s">&quot;AGUA&quot;</span>, <span class="n">350</span>, <span class="n">240</span>, <span class="n">2</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1510_particulas.png" alt="Captura de «Chispas, polvo y explosiones»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1510_particulas.lince</span></article></section>
+<section id="escenas"><h2>Escenas</h2><article class="ej" id="escenas-0"><h3>Portada, partida y final</h3><p class="nota">Un juego tiene partes: la portada, la partida, la pantalla final... <code>juego.cambiar_escena(&quot;partida&quot;, 0.6)</code> pasa a otra con un fundido a negro de 0,6 segundos; <code>juego.escena()</code> dice en cuál se está y <code>juego.escena_nueva()</code> es verdadero en su primer fotograma, para prepararla. La captura es de la mitad del fundido.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Escenas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.cambiar_escena(<span class="s">&quot;portada&quot;</span>)
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">si</span> juego.escena() == <span class="s">&quot;portada&quot;</span> {
+        juego.limpiar([<span class="n">40</span>, <span class="n">30</span>, <span class="n">70</span>])
+        juego.<span class="t">texto</span>(<span class="s">&quot;LA PORTADA&quot;</span>, <span class="n">240</span>, <span class="n">120</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>})
+        <span class="k">si</span> juego.tiempo_escena() &gt; <span class="n">0.2</span> { juego.cambiar_escena(<span class="s">&quot;partida&quot;</span>, <span class="n">0.6</span>) }
+    } <span class="k">sino</span> {
+        juego.limpiar([<span class="n">60</span>, <span class="n">140</span>, <span class="n">80</span>])
+        juego.<span class="t">texto</span>(<span class="s">&quot;LA PARTIDA&quot;</span>, <span class="n">240</span>, <span class="n">120</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>})
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1610_escenas.png" alt="Captura de «Portada, partida y final»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1610_escenas.lince</span></article></section>
+<section id="menus-y-dialogos"><h2>Menús y diálogos</h2><article class="ej" id="menus-y-dialogos-0"><h3>Menús</h3><p class="nota"><code>juego.menu(opciones)</code> dibuja un menú y devuelve la opción elegida en el fotograma en que se elige (si no, <code>nulo</code>). Se llama en cada fotograma mientras se vea, y se maneja igual con teclado (flechas o WASD, entrar), mando (cruceta o palanca, A) o ratón y dedo. Con <code>&quot;atras&quot;</code>, escape o B devuelven esa opción: lo que hace falta en una pausa.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Menú&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">45</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;AVENTURA EN EL CLARO&quot;</span>, <span class="n">240</span>, <span class="n">50</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">200</span>, <span class="n">90</span>]})
+    <span class="k">sea</span> eleccion = juego.menu([<span class="s">&quot;Jugar&quot;</span>, <span class="s">&quot;Opciones&quot;</span>, <span class="s">&quot;Controles&quot;</span>, <span class="s">&quot;Salir&quot;</span>], {<span class="s">&quot;y&quot;</span>: <span class="n">120</span>})
+    <span class="k">si</span> eleccion == <span class="s">&quot;Salir&quot;</span> { juego.salir() }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1710_menu.png" alt="Captura de «Menús»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1710_menu.lince</span></article><article class="ej" id="menus-y-dialogos-1"><h3>Diálogos</h3><p class="nota"><code>juego.dialogo(páginas)</code> abre una caja con el texto saliendo letra a letra. Cada página puede llevar quién habla (<code>nombre</code>), un <code>retrato</code> y <code>respuestas</code> para elegir; la elegida la da <code>juego.respuesta()</code>. Aceptar termina de escribir la página o pasa a la siguiente, y las páginas largas se parten solas. Mientras <code>juego.dialogo_abierto()</code> sea verdadero, el juego no debería mover al personaje.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Diálogo&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+juego.dialogo([
+    {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Lince&quot;</span>, <span class="s">&quot;texto&quot;</span>: <span class="s">&quot;Llevo días viendo luces raras entre los árboles, de noche.&quot;</span>},
+    {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Lince&quot;</span>, <span class="s">&quot;retrato&quot;</span>: LINCE, <span class="s">&quot;texto&quot;</span>: <span class="s">&quot;¿Me acompañas a ver qué son?&quot;</span>, <span class="s">&quot;respuestas&quot;</span>: [<span class="s">&quot;Claro que sí&quot;</span>, <span class="s">&quot;Mejor otro día&quot;</span>]}
+])
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">46</span>, <span class="n">92</span>, <span class="n">58</span>])
+    juego.dibujar(LINCE, <span class="n">300</span>, <span class="n">90</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1720_dialogo.png" alt="Captura de «Diálogos»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1720_dialogo.lince</span></article></section>
+<section id="controles"><h2>Controles</h2><article class="ej" id="controles-0"><h3>Que el jugador elija sus teclas</h3><p class="nota"><code>juego.menu_controles()</code> enseña cada acción con sus teclas y sus botones, y deja cambiarlos: se elige una y se pulsa lo nuevo. Si otra acción ya lo usaba, se intercambian. Lo cambiado <strong>se guarda solo</strong> y se aplica sola la próxima vez que el juego defina esa acción, sin hacer nada más. Devuelve <code>&quot;volver&quot;</code> al salir. <code>juego.restablecer_controles()</code> vuelve a los del juego.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Controles&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;d&quot;</span>, <span class="s">&quot;mando:izq_x+&quot;</span>])
+juego.definir_accion(<span class="s">&quot;saltar&quot;</span>, [<span class="s">&quot;espacio&quot;</span>, <span class="s">&quot;mando:a&quot;</span>])
+juego.definir_accion(<span class="s">&quot;disparar&quot;</span>, [<span class="s">&quot;z&quot;</span>, <span class="s">&quot;mando:x&quot;</span>])
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">20</span>, <span class="n">22</span>, <span class="n">36</span>])
+    <span class="k">si</span> juego.menu_controles({<span class="s">&quot;nombres&quot;</span>: {<span class="s">&quot;izquierda&quot;</span>: <span class="s">&quot;Izquierda&quot;</span>, <span class="s">&quot;derecha&quot;</span>: <span class="s">&quot;Derecha&quot;</span>, <span class="s">&quot;saltar&quot;</span>: <span class="s">&quot;Saltar&quot;</span>, <span class="s">&quot;disparar&quot;</span>: <span class="s">&quot;Disparar&quot;</span>}}) == <span class="s">&quot;volver&quot;</span> {
+        juego.salir()
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1810_controles.png" alt="Captura de «Que el jugador elija sus teclas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1810_controles.lince</span></article></section>
+<section id="partidas-guardadas"><h2>Partidas guardadas</h2><article class="ej" id="partidas-guardadas-0"><h3>Guardar y cargar</h3><p class="nota"><code>juego.guardar(&quot;partida&quot;, datos)</code> guarda números, textos, listas y diccionarios, y <code>juego.cargar(&quot;partida&quot;, por_defecto)</code> los recupera (o da <code>por_defecto</code> si no hay nada). Van a la carpeta del usuario de cada sistema (en el móvil, la de la app), una por juego, sin pensar en rutas. Si el juego se cierra mientras guarda, lo de antes sigue entero. <code>juego.olvidar(&quot;partida&quot;)</code> lo borra.</p><p class="nota">Con un diccionario por defecto, lo que falte en lo guardado se toma de ahí: una opción nueva de una versión posterior del juego tiene valor desde el principio.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+<span class="k">sea</span> opciones = juego.cargar(<span class="s">&quot;opciones&quot;</span>, {<span class="s">&quot;musica&quot;</span>: <span class="n">0.8</span>, <span class="s">&quot;idioma&quot;</span>: <span class="s">&quot;es&quot;</span>})
+<span class="k">escribir</span>(<span class="s">&quot;la primera vez: {opciones}&quot;</span>)
+juego.guardar(<span class="s">&quot;opciones&quot;</span>, {<span class="s">&quot;musica&quot;</span>: <span class="n">0.3</span>})
+juego.guardar(<span class="s">&quot;partida&quot;</span>, {<span class="s">&quot;nivel&quot;</span>: <span class="n">4</span>, <span class="s">&quot;vidas&quot;</span>: <span class="n">2</span>, <span class="s">&quot;llaves&quot;</span>: [<span class="s">&quot;roja&quot;</span>, <span class="s">&quot;azul&quot;</span>]})
+<span class="k">escribir</span>(<span class="s">&quot;después: {juego.cargar(&quot;</span>opciones<span class="s">&quot;, {&quot;</span>musica<span class="s">&quot;: 0.8, &quot;</span>idioma<span class="s">&quot;: &quot;</span>es<span class="s">&quot;})}&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;la partida: {juego.cargar(&quot;</span>partida<span class="s">&quot;)}&quot;</span>)
+juego.olvidar(<span class="s">&quot;partida&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;olvidada: {juego.cargar(&quot;</span>partida<span class="s">&quot;)}&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>la primera vez: {&quot;musica&quot;: 0.8, &quot;idioma&quot;: es}
+después: {&quot;musica&quot;: 0.3, &quot;idioma&quot;: es}
+la partida: {&quot;nivel&quot;: 4, &quot;vidas&quot;: 2, &quot;llaves&quot;: [&quot;roja&quot;, &quot;azul&quot;]}
+olvidada: nulo</pre></div><span class="fuente">docs/juego/ejemplos/1910_partidas.lince</span></article></section>
+<section id="tareas"><h2>Tareas</h2><article class="ej" id="tareas-0"><h3>Esperar sin parar el juego</h3><p class="nota">Una <code>tarea</code> se escribe como una función, pero puede <code>esperar(segundos)</code> sin parar el juego: avanza sola en cada <code>juego.presentar()</code>. Va muy bien para lo que pasa poco a poco: un parpadeo, un enemigo que patrulla, una cuenta atrás, una cinemática. <code>t.terminada()</code> dice si acabó y <code>t.parar()</code> la para.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Tareas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">sea</span> mensaje = <span class="s">&quot;&quot;</span>
+<span class="k">sea</span> brillo = <span class="k">falso</span>
+
+<span class="k">tarea</span> cuenta_atras() {
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">texto</span> t <span class="k">en</span> [<span class="s">&quot;3&quot;</span>, <span class="s">&quot;2&quot;</span>, <span class="s">&quot;1&quot;</span>, <span class="s">&quot;¡YA!&quot;</span>] {
+        mensaje = t
+        <span class="k">esperar</span>(<span class="n">0.4</span>)
+    }
+}
+
+<span class="k">tarea</span> parpadear() {
+    <span class="k">mientras</span> <span class="k">verdadero</span> {
+        brillo = <span class="k">no</span> brillo
+        <span class="k">esperar</span>(<span class="n">0.15</span>)
+    }
+}
+
+cuenta_atras()
+parpadear()
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">20</span>, <span class="n">20</span>, <span class="n">35</span>])
+    juego.circulo(<span class="n">240</span>, <span class="n">170</span>, <span class="n">30</span>, <span class="k">si</span> brillo { [<span class="n">255</span>, <span class="n">230</span>, <span class="n">120</span>] } <span class="k">sino</span> { [<span class="n">120</span>, <span class="n">90</span>, <span class="n">40</span>] })
+    juego.<span class="t">texto</span>(mensaje, <span class="n">240</span>, <span class="n">60</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">6</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/2010_tareas.png" alt="Captura de «Esperar sin parar el juego»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/2010_tareas.lince</span></article></section>
+<section id="peleas"><h2>Peleas</h2><article class="ej" id="peleas-0"><h3>Golpes que se notan</h3><p class="nota">Para juegos de lucha, cada animación del animador puede decir con qué golpea cada cuadro (<code>&quot;golpes&quot;</code>: <code>[cuadro, x, y, ancho, alto]</code>), y <code>juego.golpe(pj, x, y)</code> da esa caja colocada donde se dibuja, o <code>nulo</code> si en ese cuadro no golpea. Con <code>&quot;cancelar&quot;</code>, desde ese cuadro se puede encadenar otro golpe, y <code>juego.libre(pj)</code> dice si ya se puede.</p><p class="nota">Lo que hace que un golpe pese: <code>juego.congelar(0.05)</code> (un parón de unas centésimas), <code>juego.temblor(3)</code> y el destello <code>blanco</code> en quien lo recibe. Además, <code>juego.combo([&quot;abajo&quot;, &quot;derecha&quot;, &quot;zarpazo&quot;])</code> reconoce combinaciones, <code>juego.mantenida()</code> los golpes cargados y <code>juego.pulsaciones()</code> machacar un botón.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Peleas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;zarpazo&quot;</span>, [<span class="s">&quot;z&quot;</span>, <span class="s">&quot;mando:x&quot;</span>])
+<span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
+<span class="k">sea</span> pj = juego.animador(LINCE, {
+    <span class="s">&quot;quieto&quot;</span>:  {<span class="s">&quot;fila&quot;</span>: <span class="n">0</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">3</span>},
+    <span class="s">&quot;zarpazo&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">3</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">12</span>, <span class="s">&quot;repetir&quot;</span>: <span class="k">falso</span>, <span class="s">&quot;siguiente&quot;</span>: <span class="s">&quot;quieto&quot;</span>,
+                <span class="s">&quot;golpes&quot;</span>: [[<span class="n">1</span>, <span class="n">13</span>, <span class="n">8</span>, <span class="n">3</span>, <span class="n">4</span>], [<span class="n">2</span>, <span class="n">13</span>, <span class="n">8</span>, <span class="n">3</span>, <span class="n">4</span>]], <span class="s">&quot;cancelar&quot;</span>: <span class="n">2</span>}
+})
+<span class="k">sea</span> destello = -<span class="n">1</span>
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">si</span> juego.libre(pj) <span class="k">y</span> juego.accion_pulsada(<span class="s">&quot;zarpazo&quot;</span>) { juego.animacion(pj, <span class="s">&quot;zarpazo&quot;</span>, <span class="k">verdadero</span>) }
+    <span class="k">sea</span> g = juego.golpe(pj, <span class="n">150</span>, <span class="n">120</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">5</span>})
+    <span class="k">sea</span> enemigo = [<span class="n">222</span>, <span class="n">130</span>, <span class="n">50</span>, <span class="n">70</span>]
+    <span class="k">si</span> g != <span class="k">nulo</span> <span class="k">y</span> juego.colision(g, enemigo) <span class="k">y</span> destello &lt; <span class="n">0</span> {
+        destello = juego.tiempo()
+        juego.congelar(<span class="n">0.05</span>)
+        juego.temblor(<span class="n">3</span>)
+        juego.particulas(<span class="n">224</span>, <span class="n">165</span>, {<span class="s">&quot;cantidad&quot;</span>: <span class="n">20</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">240</span>, <span class="n">150</span>], <span class="s">&quot;mezcla&quot;</span>: <span class="s">&quot;sumar&quot;</span>})
+    }
+    juego.limpiar([<span class="n">45</span>, <span class="n">35</span>, <span class="n">60</span>])
+    juego.dibujar(pj, <span class="n">150</span>, <span class="n">120</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">5</span>})
+    <span class="k">sea</span> blanco = <span class="k">si</span> destello &gt;= <span class="n">0</span> { <span class="n">1</span> - (juego.tiempo() - destello) * <span class="n">4</span> } <span class="k">sino</span> { <span class="n">0</span> }
+    juego.rectangulo(enemigo[<span class="n">0</span>], enemigo[<span class="n">1</span>], enemigo[<span class="n">2</span>], enemigo[<span class="n">3</span>], [<span class="n">120</span>, <span class="n">160</span>, <span class="n">220</span>])
+    <span class="k">si</span> blanco &gt; <span class="n">0</span> { juego.rectangulo(enemigo[<span class="n">0</span>], enemigo[<span class="n">1</span>], enemigo[<span class="n">2</span>], enemigo[<span class="n">3</span>], [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>, blanco * <span class="n">255</span>]) }
+    <span class="k">si</span> g != <span class="k">nulo</span> { juego.contorno(g[<span class="n">0</span>], g[<span class="n">1</span>], g[<span class="n">2</span>], g[<span class="n">3</span>], [<span class="n">255</span>, <span class="n">80</span>, <span class="n">80</span>]) }
+    juego.dibujar_particulas()
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/2110_peleas.png" alt="Captura de «Golpes que se notan»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/2110_peleas.lince</span></article></section>
+<section id="compartir-el-juego"><h2>Compartir el juego</h2><article class="ej" id="compartir-el-juego-0"><h3>Un ejecutable, un .zip, un .apk</h3><p class="nota"><code>lince compilar</code> hace un ejecutable con el juego dentro (el código, lo que importa y las imágenes, sonidos, fuentes y mapas que nombra), que funciona sin instalar Lince. <code>lince repartir</code> hace una carpeta y un <code>.zip</code> listos para compartir, con SDL2 dentro.</p><p class="nota">Para el móvil, <code>--android</code> hace el <code>.apk</code> para instalarlo y <code>--aab</code> el paquete que pide Google Play, firmados por Lince sin Java ni el SDK de Android. Cada versión nueva lleva un <code>--version</code> mayor.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince compilar mi_juego.lince -o mi_juego
+lince repartir mi_juego.lince                       # mi_juego-linux.zip o mi_juego-windows.zip
+lince repartir mi_juego.lince --incluir niveles     # con una carpeta que el código no nombra
+lince repartir mi_juego.lince --android --nombre &quot;Mi juego&quot; --id org.tunombre.mijuego
+lince repartir mi_juego.lince --aab --version 2</code></pre></div></article></section>
+</main>
+</div>
+
+<script>
+// ── Copiar al portapapeles ────────────────────────────────────
+document.querySelectorAll('.copiar').forEach(function (boton) {
+  boton.addEventListener('click', function () {
+    var codigo = boton.parentElement.querySelector('code').innerText;
+    navigator.clipboard.writeText(codigo).then(function () {
+      boton.textContent = 'copiado';
+      setTimeout(function () { boton.textContent = 'copiar'; }, 1200);
+    }, function () {
+      boton.textContent = 'no se pudo';
+      setTimeout(function () { boton.textContent = 'copiar'; }, 1200);
+    });
+  });
+});
+
+// ── Buscador ──────────────────────────────────────────────────
+var buscar = document.getElementById('buscar');
+var sin = document.getElementById('sinresultados');
+
+buscar.addEventListener('input', function () {
+  var q = buscar.value.trim().toLowerCase();
+  var visibles = 0;
+
+  document.querySelectorAll('main section').forEach(function (sec) {
+    var algunoVisible = false;
+    sec.querySelectorAll('.ej').forEach(function (ej) {
+      var coincide = !q || ej.innerText.toLowerCase().indexOf(q) !== -1;
+      ej.classList.toggle('oculto', !coincide);
+      if (coincide) { algunoVisible = true; visibles++; }
+    });
+    sec.classList.toggle('oculto', !algunoVisible);
+    var enlace = document.querySelector('nav a[href="#' + sec.id + '"]');
+    if (enlace) enlace.parentElement.classList.toggle('oculto', !algunoVisible);
+  });
+
+  // Los subenlaces siguen a su ejemplo
+  document.querySelectorAll('nav a.sub').forEach(function (a) {
+    var destino = document.querySelector(a.getAttribute('href'));
+    a.classList.toggle('oculto', destino ? destino.classList.contains('oculto') : false);
+  });
+
+  sin.classList.toggle('visible', visibles === 0);
+});
+
+// ── Resaltar en el índice el ejemplo que se está leyendo ──────
+var observador = new IntersectionObserver(function (entradas) {
+  entradas.forEach(function (entrada) {
+    if (!entrada.isIntersecting) return;
+    document.querySelectorAll('nav a.sub.activo').forEach(function (a) {
+      a.classList.remove('activo');
+    });
+    var a = document.querySelector('nav a[href="#' + entrada.target.id + '"]');
+    if (a) a.classList.add('activo');
+  });
+}, { rootMargin: '-80px 0px -70% 0px' });
+document.querySelectorAll('.ej').forEach(function (ej) { observador.observe(ej); });
+
+// ── Menú lateral en pantallas estrechas ───────────────────────
+var lateral = document.getElementById('lateral');
+document.getElementById('alternar').addEventListener('click', function () {
+  lateral.classList.toggle('abierta');
+});
+lateral.addEventListener('click', function (ev) {
+  if (ev.target.tagName === 'A') lateral.classList.remove('abierta');
+});
+</script>
+</body>
+</html>

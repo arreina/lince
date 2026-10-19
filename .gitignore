@@ -24,3 +24,4 @@ lince.exe
 # Android: la plantilla y los .apk que se generan
 *.apk
 *.idsig
+__pycache__/

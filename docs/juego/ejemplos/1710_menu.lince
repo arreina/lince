@@ -1,0 +1,15 @@
+# @seccion: Menús y diálogos
+# @titulo: Menús
+# @nota: `juego.menu(opciones)` dibuja un menú y devuelve la opción elegida en el fotograma en que se elige (si no, `nulo`). Se llama en cada fotograma mientras se vea, y se maneja igual con teclado (flechas o WASD, entrar), mando (cruceta o palanca, A) o ratón y dedo. Con `"atras"`, escape o B devuelven esa opción: lo que hace falta en una pausa.
+# @teclas: abajo
+# @fotogramas: 3
+importar "juego"
+
+juego.abrir("Menú", 480, 270)
+mientras juego.abierto() {
+    juego.limpiar([25, 25, 45])
+    juego.texto("AVENTURA EN EL CLARO", 240, 50, {"escala": 3, "alinear": "centro", "color": [255, 200, 90]})
+    sea eleccion = juego.menu(["Jugar", "Opciones", "Controles", "Salir"], {"y": 120})
+    si eleccion == "Salir" { juego.salir() }
+    juego.presentar()
+}

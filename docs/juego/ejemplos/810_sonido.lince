@@ -1,0 +1,12 @@
+# @seccion: Sonido
+# @titulo: Efectos sin archivos
+# @nota: `juego.efecto("moneda")` genera y hace sonar un efecto al estilo de los juegos de 8 bits: `"moneda"`, `"salto"`, `"disparo"`, `"explosion"`, `"golpe"`, `"subir"`, `"clic"` o `"perder"`. Cada vez suena un poco distinto. `juego.crear_efecto()` lo da como sonido, para `juego.reproducir()` o para guardarlo con `juego.guardar_sonido()`.
+# @captura: no
+importar "juego"
+
+juego.abrir("Sonido", 320, 180)
+juego.efecto("moneda")
+sea salto = juego.crear_efecto("salto", {"tono": 1.2})
+juego.reproducir(salto, {"volumen": 0.8, "lado": -0.5})      # algo a la izquierda
+escribir("el salto dura {salto["duracion"]} s")
+juego.pitido(440, 100)

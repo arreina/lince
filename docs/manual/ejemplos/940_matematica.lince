@@ -1,0 +1,12 @@
+# @seccion: Módulos y librerías
+# @titulo: El módulo `matematica`
+# @nota: Redondeos, raíces, potencias, trigonometría (en radianes), máximos y mínimos, números al azar y las constantes `PI`, `E` y `TAU`. `aleatorio()` da un número entre 0 y 1; `aleatorio(1, 6)`, un entero entre los dos (un dado).
+importar "matematica"
+
+escribir("{matematica.piso(3.9)} {matematica.techo(3.1)} {matematica.redondear(2.5)}")
+escribir("{matematica.raiz(144)} {matematica.potencia(2, 10)} {matematica.abs(-7)}")
+escribir("{matematica.maximo(3, 9)} {matematica.minimo(3, 9)}")
+escribir(matematica.redondear(matematica.seno(matematica.PI / 2)))
+escribir("{matematica.factorial(5)} {matematica.combinaciones(5, 2)}")
+sea dado = matematica.aleatorio(1, 6)
+escribir(dado >= 1 y dado <= 6)

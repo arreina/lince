@@ -23,11 +23,11 @@ La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10,
 - [ ] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
 - [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad, y un juego subido a Google Play.
 - [ ] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta.
-- [ ] **El manual lo cubre todo**, también el módulo `juego` (ahora solo está en la especificación).
+- [x] **El manual lo cubre todo:** el del lenguaje (con los módulos `matematica`, `texto`, `json`, `bytes` y `bits` y las herramientas) y una página para el módulo `juego` (`docs/juego.html`) con un ejemplo y su captura real para cada tema. La lista completa de funciones y opciones sigue en la especificación.
 
 ## Lenguaje
 
-Nada pendiente ahora mismo: lo que vaya saliendo se apunta aquí.
+- [ ] `mapear`, `filtrar` y `reducir` solo aceptan listas: que acepten también generadores (`filtrar(rango(10), ...)`). Salió escribiendo el manual.
 
 ## Biblioteca de juego en Lince
 

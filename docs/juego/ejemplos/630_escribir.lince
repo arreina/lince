@@ -1,0 +1,16 @@
+# @seccion: Entrada
+# @titulo: Escribir un nombre
+# @nota: `juego.editar(texto, máximo)` añade lo que se teclea (con tildes y ñ) y aplica la tecla de borrar; se llama en cada fotograma. En el móvil saca el teclado de la pantalla mientras se use.
+# @escribe: Ñandú
+# @fotogramas: 20
+importar "juego"
+
+juego.abrir("Nombre", 480, 270)
+sea nombre = ""
+mientras juego.abierto() {
+    nombre = juego.editar(nombre, 12)
+    juego.limpiar([20, 25, 40])
+    juego.texto("¡NUEVO RÉCORD! TU NOMBRE:", 240, 90, {"escala": 2, "alinear": "centro"})
+    juego.texto(nombre + "_", 240, 140, {"escala": 4, "alinear": "centro", "color": [255, 220, 80]})
+    juego.presentar()
+}

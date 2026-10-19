@@ -24,7 +24,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from generar_manual import resaltar  # mismo resaltado que el manual
+from generar_manual import resaltar, formato  # mismo resaltado y formato que el manual
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 DIR_PASOS = RAIZ / "docs" / "tutorial" / "pasos"
@@ -74,13 +74,6 @@ def ejecutar(paso, ruta, captura=None):
     if r.returncode != 0:
         sys.exit(f"❌ {ruta.name} termina con código {r.returncode}. Un paso del "
                  f"tutorial tiene que funcionar.\n" + (r.stdout + r.stderr)[-1500:])
-
-
-def formato(texto):
-    """**negrita** y `código` sobre el texto ya escapado"""
-    t = html.escape(texto)
-    t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
-    return re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
 
 
 def codigo_marcado(actual, anterior):

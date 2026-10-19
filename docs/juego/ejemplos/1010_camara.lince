@@ -1,0 +1,24 @@
+# @seccion: Cámara
+# @titulo: Cámara y temblor
+# @nota: `juego.camara(x, y)` desplaza todo lo que se dibuja después, para mundos más grandes que la pantalla; `juego.camara()` vuelve a (0, 0), para el marcador. `juego.temblor(fuerza, segundos)` sacude la pantalla, para un golpe o una explosión, y el marcador no tiembla.
+# @fotogramas: 40
+importar "juego"
+importar "matematica"
+
+juego.abrir("Cámara", 480, 270)
+sea jugador = 300
+sea cam = 0
+mientras juego.abierto() {
+    jugador = jugador + 250 * juego.dt()
+    cam = juego.acercar(cam, jugador - 240, 6)                  # la cámara va detrás, sin tirones
+    juego.limpiar([150, 200, 240])
+    juego.camara(cam, 0)
+    para (i = 0; i < 40; i++) {                                   # el mundo
+        juego.rectangulo(i * 120, 200, 110, 70, [90, 150 + (i % 2) * 20, 80])
+        juego.circulo(i * 120 + 60, 170, 18, [60, 120, 60])
+    }
+    juego.rectangulo(jugador, 170, 30, 30, [230, 140, 60])
+    juego.camara()                                                # el marcador, quieto
+    juego.texto("CÁMARA X: {matematica.redondear(cam)}", 20, 20, 2)
+    juego.presentar()
+}

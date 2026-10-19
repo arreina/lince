@@ -1,0 +1,24 @@
+# @seccion: Generadores
+# @titulo: Un generador guardado sigue por donde iba
+# @nota: Guardado en una variable, un generador recuerda dónde se quedó: el siguiente `para cada` continúa tras el `romper`. Los valores se calculan cuando se piden, así que `rango()` sirve aunque sea enorme.
+generador turnos(): texto {
+    mientras verdadero {
+        producir "Ana"
+        producir "Luis"
+        producir "Marta"
+    }
+}
+
+sea quien = turnos()
+para cada texto t en quien {
+    escribir("ronda 1: " + t)
+    si t == "Luis" { romper }
+}
+para cada texto t en quien {
+    escribir("ronda 2: " + t)
+    si t == "Ana" { romper }
+}
+para cada numero n en rango(1000000000) {
+    si n == 3 { romper }
+    escribir(n)
+}

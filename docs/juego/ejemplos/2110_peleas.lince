@@ -1,0 +1,36 @@
+# @seccion: Peleas
+# @titulo: Golpes que se notan
+# @nota: Para juegos de lucha, cada animación del animador puede decir con qué golpea cada cuadro (`"golpes"`: `[cuadro, x, y, ancho, alto]`), y `juego.golpe(pj, x, y)` da esa caja colocada donde se dibuja, o `nulo` si en ese cuadro no golpea. Con `"cancelar"`, desde ese cuadro se puede encadenar otro golpe, y `juego.libre(pj)` dice si ya se puede.
+# @nota: Lo que hace que un golpe pese: `juego.congelar(0.05)` (un parón de unas centésimas), `juego.temblor(3)` y el destello `blanco` en quien lo recibe. Además, `juego.combo(["abajo", "derecha", "zarpazo"])` reconoce combinaciones, `juego.mantenida()` los golpes cargados y `juego.pulsaciones()` machacar un botón.
+# @guion: 5:z:1
+# @fotogramas: 13
+importar "juego"
+
+juego.abrir("Peleas", 480, 270)
+juego.definir_accion("zarpazo", ["z", "mando:x"])
+fijo LINCE = juego.hoja("recursos/lince.png", 16)
+sea pj = juego.animador(LINCE, {
+    "quieto":  {"fila": 0, "por_segundo": 3},
+    "zarpazo": {"fila": 3, "por_segundo": 12, "repetir": falso, "siguiente": "quieto",
+                "golpes": [[1, 13, 8, 3, 4], [2, 13, 8, 3, 4]], "cancelar": 2}
+})
+sea destello = -1
+mientras juego.abierto() {
+    si juego.libre(pj) y juego.accion_pulsada("zarpazo") { juego.animacion(pj, "zarpazo", verdadero) }
+    sea g = juego.golpe(pj, 150, 120, {"escala": 5})
+    sea enemigo = [222, 130, 50, 70]
+    si g != nulo y juego.colision(g, enemigo) y destello < 0 {
+        destello = juego.tiempo()
+        juego.congelar(0.05)
+        juego.temblor(3)
+        juego.particulas(224, 165, {"cantidad": 20, "color": [255, 240, 150], "mezcla": "sumar"})
+    }
+    juego.limpiar([45, 35, 60])
+    juego.dibujar(pj, 150, 120, {"escala": 5})
+    sea blanco = si destello >= 0 { 1 - (juego.tiempo() - destello) * 4 } sino { 0 }
+    juego.rectangulo(enemigo[0], enemigo[1], enemigo[2], enemigo[3], [120, 160, 220])
+    si blanco > 0 { juego.rectangulo(enemigo[0], enemigo[1], enemigo[2], enemigo[3], [255, 255, 255, blanco * 255]) }
+    si g != nulo { juego.contorno(g[0], g[1], g[2], g[3], [255, 80, 80]) }
+    juego.dibujar_particulas()
+    juego.presentar()
+}
