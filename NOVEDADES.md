@@ -3,7 +3,18 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
-## 0.10.0 (en preparación)
+## 0.10.0
+
+Un juego completo hecho con Lince (La Piedra del Lince), la revisión del módulo `juego` antes de la 1.0 y generadores en `mapear`, `filtrar` y `reducir`.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-0.10.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-0.10.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-0.10.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-0.10.0.vsix` |
 
 ### El lenguaje
 

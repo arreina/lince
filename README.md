@@ -9,7 +9,7 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.9-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-0.10-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-31%2F31-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows-6A2D72.svg)]()
 
