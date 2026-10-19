@@ -17,7 +17,10 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- enableOnBackInvokedCallback="false": desde Android 16, sin esto «atrás»
+         no le llega al juego (el sistema cierra la app) -->
     <application android:label="@NOMBRE@"
+        android:enableOnBackInvokedCallback="false"
         android:icon="@drawable/icono"
         android:allowBackup="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen"

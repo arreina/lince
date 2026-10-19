@@ -951,7 +951,8 @@ funcion menu(val cualquiera textos, val cualquiera opciones = nulo): cualquiera 
 # dialogo_abierto() sea verdadero, el juego no debería mover al personaje:
 #   si no juego.dialogo_abierto() { ...mover... }
 # Opciones: escala (2), fuente, color, fondo, borde, velocidad (letras por
-# segundo, 40), lineas (3), arriba (verdadero: arriba de la pantalla) y sonido
+# segundo, 40), lineas (3), arriba (verdadero: arriba de la pantalla; si no se
+# dice, va arriba solo mientras se vea el mando de la pantalla táctil) y sonido
 # (suena con las letras). Una página que no cabe en las líneas se parte sola.
 sea _dl = nulo               # el diálogo abierto, o nulo
 sea _dl_cerrando = falso     # se cerró con la entrada de este fotograma
@@ -1058,7 +1059,8 @@ funcion _dl_siguiente(): nulo {
 funcion _dl_caja(): diccionario {
     sea trozo = _dl["trozos"][_dl["pagina"]]
     sea md = _dl_medidas(_dl["opciones"], trozo["retrato"] != nulo, trozo["lineas"].longitud() + trozo["respuestas"].longitud())
-    sea arriba = si _de(_dl["opciones"], "arriba", falso) { md["margen"] + md["alto_letra"] * 1.5 } sino { juego.alto() - md["margen"] - md["alto"] }
+    # sin decir nada, abajo; pero con el mando de la pantalla a la vista, arriba, que abajo lo tapan los botones
+    sea arriba = si _de(_dl["opciones"], "arriba", _mt_puesto) { md["margen"] + md["alto_letra"] * 1.5 } sino { juego.alto() - md["margen"] - md["alto"] }
     md["x"] = md["margen"]
     md["y"] = arriba
     md["ancho"] = juego.ancho() - md["margen"] * 2

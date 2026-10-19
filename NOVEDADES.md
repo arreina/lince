@@ -14,6 +14,16 @@ apartado que le toca de este archivo.
 - `a_texto()` convierte también listas, diccionarios y lo demás, como lo escribe `escribir`
   (antes daba error).
 
+### En el móvil
+
+Salió probando La Piedra del Lince en el emulador de Android 16:
+
+- **El botón «atrás» cuenta como Esc**: abre la pausa, vuelve en un menú o sale, según lo que
+  haga el juego con Esc (antes cerraba el juego siempre). Y desde Android 16 ni siquiera le
+  llegaba al juego: el sistema cerraba la app.
+- Mientras se ve el mando de la pantalla, los diálogos van arriba, porque abajo los tapaban
+  la palanca y los botones (si el juego dice `arriba`, manda lo que diga).
+
 ## 0.10.0
 
 Un juego completo hecho con Lince (La Piedra del Lince), la revisión del módulo `juego` antes de la 1.0 y generadores en `mapear`, `filtrar` y `reducir`.

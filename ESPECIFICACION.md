@@ -1598,7 +1598,7 @@ si juego.respuesta() == "Sí" { ... }
 | Función | Qué hace |
 |---|---|
 | `menu(textos[, opciones])` | dibuja los textos para elegir, uno debajo de otro, y devuelve el elegido en el fotograma en que se elige; si no, `nulo`. Se llama en cada fotograma mientras se vea, y vuelve a la primera opción si deja de verse un rato. Opciones: `x`, `y` (el centro de la primera opción; por defecto, el menú centrado en la pantalla), `escala` (3), `fuente`, `color`, `color_elegido`, `separacion`, `atras` (lo que devuelve con escape o B, como `"Continuar"` en una pausa), `sonido_mover` y `sonido_elegir` |
-| `dialogo(paginas[, opciones])` | abre una caja de diálogo abajo de la pantalla con el texto saliendo letra a letra. `paginas` es una página o una lista; una página es un texto o un diccionario con `texto`, `nombre` (quién habla, en una pestaña encima), `retrato` (una imagen a la izquierda, o `[hoja, cuadro]`: un cuadro de una hoja) y `respuestas` (textos para elegir). Aceptar (entrar, espacio, A o tocar) termina de escribir la página o pasa a la siguiente; una página que no cabe se parte sola. Opciones: `escala` (2), `fuente`, `color`, `fondo`, `borde`, `velocidad` (letras por segundo, 40), `lineas` (3), `arriba` (verdadero: la caja arriba) y `sonido` (suena con las letras) |
+| `dialogo(paginas[, opciones])` | abre una caja de diálogo abajo de la pantalla con el texto saliendo letra a letra. `paginas` es una página o una lista; una página es un texto o un diccionario con `texto`, `nombre` (quién habla, en una pestaña encima), `retrato` (una imagen a la izquierda, o `[hoja, cuadro]`: un cuadro de una hoja) y `respuestas` (textos para elegir). Aceptar (entrar, espacio, A o tocar) termina de escribir la página o pasa a la siguiente; una página que no cabe se parte sola. Opciones: `escala` (2), `fuente`, `color`, `fondo`, `borde`, `velocidad` (letras por segundo, 40), `lineas` (3), `arriba` (verdadero: la caja arriba; si no se dice, va arriba solo mientras se ve el mando de la pantalla táctil, que abajo la taparía) y `sonido` (suena con las letras) |
 | `dialogo_abierto()` · `respuesta()` · `cerrar_dialogo()` | si hay un diálogo abierto (también en el fotograma en que se cierra, para que la tecla que lo cierra no lo vuelva a abrir) · la última respuesta elegida, o `nulo` · lo cierra |
 
 El juego sigue viendo las teclas mientras hay un menú o un diálogo: lo normal es no mover al
@@ -1868,7 +1868,8 @@ vez en `~/.lince/android-llave.txt` (guárdala: las actualizaciones de un juego 
 firmadas con la misma). Ver [`android/LEEME.md`](android/LEEME.md); allí está también
 `android/construir.sh`, que hace el `.apk` o la plantilla con Java, el SDK y el NDK de Android. En el móvil el juego ocupa la pantalla
 (de lado si es más ancho que alto), se controla con `toques()` y con botones `"pantalla:..."`
-en las acciones, el botón «atrás» lo cierra y lo que escribe va a su carpeta privada.
+en las acciones, el botón «atrás» cuenta como Esc (abre la pausa, vuelve en un menú o sale, según
+lo que haga el juego con Esc) y lo que escribe va a su carpeta privada.
 `examples/11_movil.lince` sirve para probarlo.
 
 `lince repartir juego.lince --aab [--nombre ...] [--id ...] [--version N]` hace en su lugar el `.aab`

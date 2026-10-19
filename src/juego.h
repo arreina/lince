@@ -270,6 +270,7 @@ static struct {
     int nacciones;
     int reabrir;                         /* recarga en caliente: abrir() reutiliza la ventana */
     int recargado;                       /* el programa se recargó conservando sus variables */
+    int atras;                           /* en el móvil: se pulsó «atrás» (cuenta como Esc un fotograma) */
     FILE *audio_prueba;                  /* LINCE_JUEGO_AUDIO: el sonido de cada fotograma, a un .wav */
     long audio_bytes;
     JgParticula part[JG_PARTICULAS];
@@ -690,7 +691,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     _jgs.volumen = 1;
     _jgs.voz_musica = 0;
     _jgs.t_inicio = jg_ahora();
-    _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.zoom = (int)z; _jgs.cierre = 0;
+    _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.zoom = (int)z; _jgs.cierre = 0; _jgs.atras = 0;
     _jgs.limite = 0; _jgs.total = 0; _jgs.npulsar = 0; _jgs.hay_clic = 0;
     const char *e = getenv("LINCE_JUEGO_FOTOGRAMAS");
     if (e && atol(e) > 0) _jgs.limite = atol(e);
@@ -1258,8 +1259,8 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
             size_t l = strnlen(t, 32);
             if (_jgs.nescrito + (int)l < JG_ESCRITO) { memcpy(_jgs.escrito + _jgs.nescrito, t, l); _jgs.nescrito += (int)l; }
 #ifdef __ANDROID__
-        } else if (tipo == 0x300 && *(int *)(ev + 16) == 270) {     /* el botón «atrás» del móvil: salir */
-            _jgs.cierre = 1;
+        } else if (tipo == 0x300 && *(int *)(ev + 16) == 270) {     /* el botón «atrás» del móvil: */
+            _jgs.atras = 1;                                         /* es Esc (pausa, volver, salir) */
 #endif
         } else if (tipo == 0x300 && *(int *)(ev + 16) == 42) {      /* «borrar», también al repetir */
             if (_jgs.nescrito + 1 < JG_ESCRITO) _jgs.escrito[_jgs.nescrito++] = '\b';
@@ -1270,6 +1271,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     const unsigned char *k = _jg.KeyboardState(&nt);
     if (nt > 512) nt = 512;
     memcpy(_jgs.teclas, k, (size_t)nt);
+    if (_jgs.atras) { _jgs.teclas[41] = 1; _jgs.atras = 0; }      /* «atrás» del móvil = Esc */
     _jgs.raton = _jg.MouseState(&_jgs.rx, &_jgs.ry);
     if (_jg.WindowToLogical) {                 /* con pantalla completa la ventana se escala */
         float lx, ly;
