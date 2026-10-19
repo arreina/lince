@@ -68,35 +68,35 @@ mientras juego.abierto() {
         si by < 8 {
             by = 8
             vy = -vy
-            juego.pitido(300, 40)
+            juego.pitido(300, 0.04)
         }
         si by > ALTO - 8 {
             by = ALTO - 8
             vy = -vy
-            juego.pitido(300, 40)
+            juego.pitido(300, 0.04)
         }
 
         si vx < 0 y juego.colision(bx - 8, by - 8, 16, 16, 30, y1, PALA_W, PALA_H) {
             bx = 30 + PALA_W + 8
             vx = -vx * 1.06
             vy = vy + ((by - (y1 + PALA_H / 2)) / (PALA_H / 2)) * 160
-            juego.pitido(520, 60)
+            juego.pitido(520, 0.06)
         }
         si vx > 0 y juego.colision(bx - 8, by - 8, 16, 16, ANCHO - 30 - PALA_W, y2, PALA_W, PALA_H) {
             bx = ANCHO - 30 - PALA_W - 8
             vx = -vx * 1.06
             vy = vy + ((by - (y2 + PALA_H / 2)) / (PALA_H / 2)) * 160
-            juego.pitido(520, 60)
+            juego.pitido(520, 0.06)
         }
         si bx < -10 {
             puntos2 = puntos2 + 1
             en_juego = falso
-            juego.pitido(150, 250)
+            juego.pitido(150, 0.25)
         }
         si bx > ANCHO + 10 {
             puntos1 = puntos1 + 1
             en_juego = falso
-            juego.pitido(150, 250)
+            juego.pitido(150, 0.25)
         }
     }
 

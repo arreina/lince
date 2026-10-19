@@ -162,7 +162,7 @@ for l in "circulos: verdadero falso" "circulo_rect: verdadero falso" "dentro: ve
          "cuadro: 0 5 1" "escena nueva tras presentar: falso" "cambio diferido: menu" "fin en el fotograma 20" "vivas: 30, al final: 0"; do
     grep -qxF "$l" salida7.txt && ok "$l" || mal "falta la línea: $l"
 done
-grep -qF "opción desconocida 'cantida'" salida7.txt && ok "opción de partículas mal escrita" || mal "falta el error de opción desconocida"
+grep -qF "no conozco la opción 'cantida'" salida7.txt && ok "opción de partículas mal escrita" || mal "falta el error de opción desconocida"
 grep -q "^escena: partida verdadero" salida7.txt && ok "escena: partida verdadero" || mal "falta la línea: escena: partida"
 # ── Sexta parte: mapas de casillas (plataformas y vista cenital) y caminos ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=5 timeout 20 "$LINCE" "$DIR/prueba5.lince" > salida8.txt 2>&1
@@ -213,7 +213,7 @@ for l in "mismo sonido: verdadero" "otra semilla: verdadero" "largo: 2" "wav: ve
     grep -qxF "$l" salida10.txt && ok "efecto: $l" || mal "falta la línea: $l"
 done
 grep -qF "no conozco el efecto 'trompeta'" salida10.txt && ok "efecto: tipo desconocido" || mal "falta el error de efecto desconocido"
-grep -qF "opción desconocida 'volumne'" salida10.txt && ok "efecto: opción mal escrita" || mal "falta el error de opción de efecto"
+grep -qF "no conozco la opción 'volumne'" salida10.txt && ok "efecto: opción mal escrita" || mal "falta el error de opción de efecto"
 python3 -c "import sys; sys.exit(open('a.wav','rb').read() != open('b.wav','rb').read())" && ok "efecto: la misma semilla da el mismo .wav" || mal "la misma semilla da sonidos distintos"
 # Sin pantalla, un error con la ventana abierta termina en vez de esperar el arreglo
 printf 'importar "juego"\njuego.abrir("x", 10, 10)\nfalla()\n' > falla.lince
@@ -471,7 +471,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 LINCE_JUEG
 for l in 'acciones: {"saltar": ["espacio", "mando:a"]}' "saltos: 5, con boton(): 5" "palanca: 0" "eje limitado: 1"; do
     grep -qxF "$l" salida21.txt && ok "mando táctil: $l" || mal "falta la línea: $l"
 done
-grep -qF 'no conozco '"'"'boton'"'" salida21.txt && grep -qF '"botones" es una lista' salida21.txt && ok "mando táctil: errores de opciones" || mal "faltan los errores de mando_tactil"
+grep -qF 'no conozco la opción '"'"'boton'"'" salida21.txt && grep -qF '"botones" es una lista' salida21.txt && ok "mando táctil: errores de opciones" || mal "faltan los errores de mando_tactil"
 grep -q "no debería" salida21.txt && mal "mando táctil: se pulsó B" || ok "mando táctil: B no se pulsa"
 # ── Vibrar e inclinar (en el ordenador: sin vibrador ni acelerómetro) ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=5 timeout 20 "$LINCE" "$DIR/prueba17.lince" > salida22.txt 2>&1
@@ -496,8 +496,8 @@ done
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100 \
     LINCE_JUEGO_GUION=5:abajo:1,10:entrar:1,20:espacio:1,30:espacio:1,40:abajo:1,45:abajo:1,50:entrar:1,60:escape:1 \
     timeout 30 "$LINCE" "$DIR/prueba19.lince" > salida24.txt 2>&1
-for l in "menu: Opciones" "respuesta: Luego" "pausa: Continuar" 'error: menu() espera una lista de opciones, como ["Jugar", "Salir"]' \
-         "error: menu(): no conozco 'colr' (hay x, y, escala, fuente, color, color_elegido, separacion, atras, sonido_mover, sonido_elegir)" \
+for l in "menu: Opciones" "respuesta: Luego" "pausa: Continuar" 'error: menu() espera una lista de textos, como ["Jugar", "Salir"]' \
+         'error: menu(): no conozco la opción '"'"'colr'"'"' (hay "x", "y", "escala", "fuente", "color", "color_elegido", "separacion", "atras", "sonido_mover" y "sonido_elegir")' \
          'error: dialogo(): cada página es un texto o un diccionario con "texto"'; do
     grep -qxF "$l" salida24.txt && ok "menús y diálogos: $l" || mal "falta la línea: $l"
 done

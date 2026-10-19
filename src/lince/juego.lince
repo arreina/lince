@@ -17,14 +17,14 @@ importar "texto"
 # ── Comprobaciones con el mismo mensaje en todas las funciones ──
 
 funcion _segundos(val numero s, val texto fn): nulo {
-    si s < 0 o s > 10 { lanzar Error("{fn}(): los segundos van de 0 a 10") }
+    si s < 0 o s > 10 { lanzar ErrorArgumento("{fn}(): los segundos van de 0 a 10") }
 }
 
 # El estado de una acción definida con juego.definir_accion
 funcion _accion(val cualquiera a, val texto fn): diccionario {
     si no (a es texto) { lanzar ErrorTipo("{fn}() espera el nombre de una acción") }
     sea estado = juego.estado_accion(a)
-    si estado == nulo { lanzar Error("{fn}(): la acción '{a}' no está definida (usa juego.definir_accion)") }
+    si estado == nulo { lanzar ErrorArgumento("{fn}(): la acción '{a}' no está definida (usa juego.definir_accion)") }
     devolver estado
 }
 
@@ -79,7 +79,7 @@ funcion pulsaciones(val cualquiera accion, val numero segundos = 0.5): numero {
 # adelante y golpe: al pulsar adelante, atrás ya se ha soltado).
 funcion mantenida(val cualquiera accion, val numero margen = 0): numero {
     sea estado = _accion(accion, "mantenida")
-    si margen < 0 o margen > 10 { lanzar Error("mantenida(): el margen va de 0 a 10 segundos") }
+    si margen < 0 o margen > 10 { lanzar ErrorArgumento("mantenida(): el margen va de 0 a 10 segundos") }
     si estado["pulsada"] { devolver estado["mantenida"] }
     sea hace = estado["soltada_hace"]
     si margen > 0 y hace >= 0 y hace <= margen + 0.000000001 { devolver estado["duro"] }
@@ -98,7 +98,7 @@ fijo _CURVAS = ["lineal", "suave", "entrar", "salir", "rebote", "elastico", "atr
 funcion _nombre_curva(val cualquiera c, val texto fn): texto {
     si c == nulo { devolver "suave" }
     si c es texto y _CURVAS.contiene(c) { devolver c }
-    lanzar Error(fn + "(): la curva es \"lineal\", \"suave\", \"entrar\", \"salir\", \"rebote\", \"elastico\" o \"atras\"")
+    lanzar ErrorArgumento(fn + "(): la curva es \"lineal\", \"suave\", \"entrar\", \"salir\", \"rebote\", \"elastico\" o \"atras\"")
 }
 
 funcion _al_cubo(val numero v): numero { devolver v * v * v }
@@ -172,7 +172,7 @@ funcion suavizar(val cualquiera desde, val cualquiera hasta, val numero segundos
 # el juego a los fotogramas que vaya. Para una cámara que sigue al jugador,
 # una barra de vida que baja...
 funcion acercar(val cualquiera actual, val cualquiera objetivo, val numero rapidez): cualquiera {
-    si rapidez < 0 { lanzar Error("acercar(): la rapidez no es negativa") }
+    si rapidez < 0 { lanzar ErrorArgumento("acercar(): la rapidez no es negativa") }
     devolver _interpolar(actual, objetivo, 1 - matematica.potencia(matematica.E, -rapidez * juego.dt()), "acercar")
 }
 
@@ -198,7 +198,7 @@ funcion _poner_escena(val texto nombre): nulo {
 
 # cambiar_escena(nombre[, fundido]): fundido en segundos (0 = de golpe)
 funcion cambiar_escena(val cualquiera nombre, val cualquiera fundido = 0): nulo {
-    si no juego.abierto() { lanzar Error("la ventana no está abierta: llama a juego.abrir() primero") }
+    si no juego.abierto() { lanzar ErrorJuego("la ventana no está abierta: llama a juego.abrir() primero") }
     si no (nombre es texto) { lanzar ErrorTipo("cambiar_escena() espera (nombre[, segundos de fundido])") }
     si no (fundido es numero) { lanzar ErrorTipo("cambiar_escena(): el argumento 2 debe ser un número") }
     si _escena == "" y fundido <= 0 {        # la primera escena empieza ya
@@ -349,11 +349,11 @@ funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera
         }
         para cada texto c en cfg {
             si no _OPCIONES_ANIMACION.contiene(c) {
-                lanzar Error("animador(): en \"{nombre}\", no conozco '{c}' (hay \"fila\", \"cuadros\", \"por_segundo\", " +
+                lanzar ErrorArgumento("animador(): en \"{nombre}\", no conozco '{c}' (hay \"fila\", \"cuadros\", \"por_segundo\", " +
                              "\"repetir\", \"siguiente\", \"pisadas\", \"golpes\", \"cancelar\" y \"hoja\")")
             }
             sea mal = _opcion_mala(nombre, c, cfg[c], hc, animaciones)
-            si mal != nulo { lanzar Error(mal) }
+            si mal != nulo { lanzar ErrorArgumento(mal) }
         }
         si cfg.contiene("cuadros") {
             sea fila = si cfg.contiene("fila") { cfg["fila"] } sino { -1 }
@@ -361,7 +361,7 @@ funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera
             para cada numero q en cfg["cuadros"] {
                 si q < 0 o q >= limite o q != matematica.piso(q) {
                     sea dentro = si fila >= 0 { " (contando dentro de su fila)" } sino { "" }
-                    lanzar Error("animador(): en \"{nombre}\", los cuadros van de 0 a {limite - 1}{dentro}")
+                    lanzar ErrorArgumento("animador(): en \"{nombre}\", los cuadros van de 0 a {limite - 1}{dentro}")
                 }
             }
         }
@@ -373,7 +373,7 @@ funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera
     }
     si inicial != nulo {
         si no (inicial es texto) o no animaciones.contiene(inicial) {
-            lanzar Error("animador(): la animación inicial es el nombre de una de las animaciones")
+            lanzar ErrorArgumento("animador(): la animación inicial es el nombre de una de las animaciones")
         }
         primera = inicial
     }
@@ -436,7 +436,7 @@ funcion animacion(val cualquiera pj, val cualquiera nombre, val cualquiera desde
             hay += "{antes} \"{otra}\""
             i++
         }
-        lanzar Error("animacion(): no hay ninguna animación '{nombre}'; hay{hay}")
+        lanzar ErrorArgumento("animacion(): no hay ninguna animación '{nombre}'; hay{hay}")
     }
     _estado(pj)                       # por si acabó una con "siguiente"
     si (desde_el_principio es logico y desde_el_principio) o pj["actual"] != nombre {
@@ -544,7 +544,7 @@ funcion pisada(val cualquiera pj): logico {
 # táctil, si alguna acción usa el mando, con los botones que usen (y la palanca
 # si usan la palanca izquierda o la cruceta). Con un mando de verdad
 # conectado (Bluetooth o cable) se esconde. Se puede ajustar o quitar:
-#   juego.mando_tactil({"botones": ["a", "b", "x", "y"], "tamano": 1.2})
+#   juego.mando_tactil({"botones": ["a", "b", "x", "y"], "tamaño": 1.2})
 #   juego.mando_tactil(falso)                      sin mando (controles propios)
 # Con "siempre": verdadero también se ve en el ordenador (y se usa con el ratón).
 
@@ -563,7 +563,7 @@ fijo _MT_MENSAJES = {
     "palanca": "\"palanca\" es verdadero o falso",
     "siempre": "\"siempre\" es verdadero o falso",
     "alfa": "\"alfa\" va de 0 (invisible) a 255",
-    "tamano": "\"tamano\" es un número mayor que 0 (1 es el tamaño normal)"
+    "tamaño": "\"tamaño\" es un número mayor que 0 (1 es el tamaño normal)"
 }
 
 funcion _mt_bien(val texto c, val cualquiera v): logico {
@@ -578,7 +578,7 @@ funcion _mt_bien(val texto c, val cualquiera v): logico {
         caso "palanca" { devolver v es logico }
         caso "siempre" { devolver v es logico }
         caso "alfa" { devolver v es numero y v >= 0 y v <= 255 }
-        caso "tamano" { devolver v es numero y v > 0 }
+        caso "tamaño" { devolver v es numero y v > 0 }
     }
     devolver falso
 }
@@ -601,9 +601,9 @@ funcion mando_tactil(val cualquiera opciones = nulo): nulo {
     }
     para cada texto c en opciones {
         si no _MT_MENSAJES.contiene(c) {
-            lanzar Error("mando_tactil(): no conozco '{c}' (hay \"botones\", \"palanca\", \"siempre\", \"alfa\" y \"tamano\")")
+            _no_conozco("mando_tactil", c, ["botones", "palanca", "siempre", "alfa", "tamaño"])
         }
-        si no _mt_bien(c, opciones[c]) { lanzar Error("mando_tactil(): " + _MT_MENSAJES[c]) }
+        si no _mt_bien(c, opciones[c]) { lanzar ErrorArgumento("mando_tactil(): " + _MT_MENSAJES[c]) }
     }
     _mt_opciones = opciones
     _mt_quitado = falso
@@ -646,7 +646,7 @@ funcion _mt_config(): cualquiera {
     si _mt_opciones != nulo y usan["botones"].longitud() == 0 y no usan["palanca"] {
         usan = {"botones": ["a", "b"], "palanca": verdadero}       # pedido a mano, sin acciones de mando
     }
-    sea cfg = {"botones": usan["botones"], "palanca": usan["palanca"], "alfa": 120, "tamano": 1, "siempre": siempre}
+    sea cfg = {"botones": usan["botones"], "palanca": usan["palanca"], "alfa": 120, "tamaño": 1, "siempre": siempre}
     para cada texto c en op { cfg[c] = op[c] }
     si cfg["botones"].longitud() == 0 y no cfg["palanca"] { devolver nulo }
     devolver cfg
@@ -656,7 +656,7 @@ funcion _mt_config(): cualquiera {
 funcion _mt_medidas(): diccionario {
     sea ancho = juego.ancho()
     sea alto = juego.alto()
-    sea u = matematica.minimo(ancho, alto) * _mt["tamano"]
+    sea u = matematica.minimo(ancho, alto) * _mt["tamaño"]
     sea radio = u * 0.16
     devolver {"ancho": ancho, "alto": alto, "radio": radio, "boton": u * 0.085,
               "casa": [u * 0.1 + radio, alto - u * 0.1 - radio], "centro": [ancho - u * 0.26, alto - u * 0.26]}
@@ -819,61 +819,73 @@ funcion _ui_atras(): logico {
     devolver juego.tecla_pulsada("escape") o juego.boton_pulsado("b") o juego.boton_pulsado("atras")
 }
 
-# ajustes[c], o 'defecto' si no está
-funcion _de(val diccionario ajustes, val texto c, val cualquiera defecto): cualquiera {
-    si ajustes.contiene(c) { devolver ajustes[c] }
+# El error de una opción mal escrita, como en las funciones de C:
+# «fn(): no conozco la opción 'x' (hay "a", "b" y "c")»
+funcion _no_conozco(val texto fn, val texto c, val lista validas): nulo {
+    sea partes = []
+    para cada texto v en validas { partes.agregar("\"" + v + "\"") }
+    sea hay = partes[0]
+    para (i = 1; i < partes.longitud(); i++) {
+        hay = hay + (si i == partes.longitud() - 1 { " y " } sino { ", " }) + partes[i]
+    }
+    lanzar ErrorArgumento("{fn}(): no conozco la opción '{c}' (hay {hay})")
+}
+
+# opciones[c], o 'defecto' si no está
+funcion _de(val diccionario opciones, val texto c, val cualquiera defecto): cualquiera {
+    si opciones.contiene(c) { devolver opciones[c] }
     devolver defecto
 }
 
-funcion _ui_sonar(val cualquiera ajustes, val texto cual): nulo {
-    si ajustes.contiene(cual) y ajustes[cual] != nulo { juego.reproducir(ajustes[cual]) }
+funcion _ui_sonar(val cualquiera opciones, val texto cual): nulo {
+    si opciones.contiene(cual) y opciones[cual] != nulo { juego.reproducir(opciones[cual]) }
 }
 
 # Las opciones de letra para texto() y ancho_texto()
-funcion _ui_letra(val diccionario ajustes, val numero escala): diccionario {
+funcion _ui_letra(val diccionario opciones, val numero escala): diccionario {
     sea r = {"escala": escala}
-    si ajustes.contiene("fuente") { r["fuente"] = ajustes["fuente"] }
+    si opciones.contiene("fuente") { r["fuente"] = opciones["fuente"] }
     devolver r
 }
 
-fijo _MENU_AJUSTES = ["x", "y", "escala", "fuente", "color", "color_elegido", "separacion", "atras",
+fijo _MENU_OPCIONES = ["x", "y", "escala", "fuente", "color", "color_elegido", "separacion", "atras",
                       "sonido_mover", "sonido_elegir"]
 
-funcion _ui_ajustes(val cualquiera ajustes, val lista validos, val texto fn): diccionario {
-    si ajustes == nulo { devolver {} }
-    si no (ajustes es diccionario) { lanzar ErrorTipo("{fn}() espera un diccionario de ajustes") }
-    para cada texto c en ajustes {
+funcion _ui_opciones(val cualquiera opciones, val lista validos, val texto fn): diccionario {
+    si opciones == nulo { devolver {} }
+    si no (opciones es diccionario) { lanzar ErrorTipo("{fn}() espera un diccionario de opciones") }
+    para cada texto c en opciones {
         si no validos.contiene(c) {
-            lanzar Error("{fn}(): no conozco '{c}' (hay " + texto.unir(validos, ", ") + ")")
+            _no_conozco(fn, c, validos)
         }
     }
-    devolver ajustes
+    devolver opciones
 }
 
-# menu(opciones[, ajustes]): dibuja un menú con esas opciones (textos), una
-# debajo de otra, y devuelve la elegida en el fotograma en que se elige (si
+# menu(textos[, opciones]): dibuja un menú con esos textos para elegir, uno
+# debajo de otro, y devuelve el elegido en el fotograma en que se elige (si
 # no, nulo). Se llama en cada fotograma mientras se vea:
 #   sea eleccion = juego.menu(["Jugar", "Opciones", "Salir"])
 #   si eleccion == "Jugar" { juego.cambiar_escena("partida", 0.6) }
-# Ajustes: x, y (el centro de la primera opción; por defecto, el centro de la
+# Opciones: x, y (el centro de la primera opción; por defecto, el centro de la
 # pantalla), escala (3), fuente, color, color_elegido, separacion, atras (lo
 # que devuelve con escape o B: "Continuar" en una pausa), sonido_mover y
 # sonido_elegir. Vuelve a la primera opción si deja de verse un rato.
-funcion menu(val cualquiera opciones, val cualquiera ajustes = nulo): cualquiera {
-    si no (opciones es lista) o opciones.longitud() == 0 {
-        lanzar ErrorTipo("menu() espera una lista de opciones, como [\"Jugar\", \"Salir\"]")
+funcion menu(val cualquiera textos, val cualquiera opciones = nulo): cualquiera {
+    si no (textos es lista) o textos.longitud() == 0 {
+        lanzar ErrorTipo("menu() espera una lista de textos, como [\"Jugar\", \"Salir\"]")
     }
-    para cada cualquiera op en opciones {
+    para cada cualquiera op en textos {
         si no (op es texto) { lanzar ErrorTipo("menu(): cada opción es un texto") }
     }
-    sea aj = _ui_ajustes(ajustes, _MENU_AJUSTES, "menu")
+    sea aj = _ui_opciones(opciones, _MENU_OPCIONES, "menu")
     sea escala = _de(aj, "escala", 3)
     sea letra = _ui_letra(aj, escala)
     sea alto = juego.medir_texto("Ay", letra)[1]
     sea paso = alto + _de(aj, "separacion", alto * 0.6)
     sea cx = _de(aj, "x", juego.ancho() / 2)
-    sea cy = _de(aj, "y", juego.alto() / 2 - paso * (opciones.longitud() - 1) / 2)
-    sea clave = texto.unir(opciones, "|")
+    sea cy = _de(aj, "y", juego.alto() / 2 - paso * (textos.longitud() - 1) / 2)
+    sea clave = texto.unir(textos, "|")
     sea ahora = juego.tiempo_real()
     si no _menus.contiene(clave) o ahora - _menus[clave]["visto"] > 0.25 {
         _menus[clave] = {"elegida": 0, "visto": ahora}
@@ -881,14 +893,14 @@ funcion menu(val cualquiera opciones, val cualquiera ajustes = nulo): cualquiera
     sea m = _menus[clave]
     m["visto"] = ahora
     sea antes = m["elegida"]
-    sea total = opciones.longitud()
+    sea total = textos.longitud()
     m["elegida"] = (m["elegida"] + _ui_paso + total) % total
     # el ratón o el dedo: señalar elige, tocar acepta
     sea r = juego.raton()
     sea mov = juego.movimiento_raton()
     sea tocada = -1
     para (i = 0; i < total; i++) {
-        sea ancho = juego.ancho_texto(opciones[i], letra)
+        sea ancho = juego.ancho_texto(textos[i], letra)
         sea arriba = cy + i * paso - paso * 0.2
         si r[0] >= cx - ancho / 2 - alto y r[0] <= cx + ancho / 2 + alto y r[1] >= arriba y r[1] < arriba + paso {
             si mov[0] != 0 o mov[1] != 0 o juego.clic(1) { m["elegida"] = i }
@@ -903,20 +915,20 @@ funcion menu(val cualquiera opciones, val cualquiera ajustes = nulo): cualquiera
         sea elegida = i == m["elegida"]
         sea y_op = cy + i * paso
         si elegida {
-            sea ancho = juego.ancho_texto(opciones[i], letra)
+            sea ancho = juego.ancho_texto(textos[i], letra)
             juego.rectangulo(cx - ancho / 2 - alto * 0.6, y_op - alto * 0.3, ancho + alto * 1.2, alto * 1.6, [255, 255, 255, 40])
         }
         sea color = si elegida { _de(aj, "color_elegido", [255, 220, 80]) } sino { _de(aj, "color", [210, 210, 220]) }
         sea t = {"alinear": "centro", "color": color}
         para cada texto c en letra { t[c] = letra[c] }
-        juego.texto(opciones[i], cx, y_op, t)
+        juego.texto(textos[i], cx, y_op, t)
     }
     juego.camara(camara[0], camara[1])
     # elegir
     si tocada >= 0 o _ui_aceptar() {
         _ui_sonar(aj, "sonido_elegir")
         _menus.eliminar(clave)
-        devolver opciones[m["elegida"]]
+        devolver textos[m["elegida"]]
     }
     si aj.contiene("atras") y _ui_atras() {
         _menus.eliminar(clave)
@@ -925,7 +937,7 @@ funcion menu(val cualquiera opciones, val cualquiera ajustes = nulo): cualquiera
     devolver nulo
 }
 
-# dialogo(paginas[, ajustes]): una caja de diálogo abajo de la pantalla, con el
+# dialogo(paginas[, opciones]): una caja de diálogo abajo de la pantalla, con el
 # texto saliendo letra a letra, como en las aventuras y los RPG. 'paginas' es
 # una página o una lista; cada página, un texto o un diccionario con "texto",
 # "nombre" (quién habla), "retrato" (una imagen) y "respuestas" (una lista de
@@ -933,14 +945,14 @@ funcion menu(val cualquiera opciones, val cualquiera ajustes = nulo): cualquiera
 # A o tocar) termina de escribir la página o pasa a la siguiente. Mientras
 # dialogo_abierto() sea verdadero, el juego no debería mover al personaje:
 #   si no juego.dialogo_abierto() { ...mover... }
-# Ajustes: escala (2), fuente, color, fondo, borde, velocidad (letras por
+# Opciones: escala (2), fuente, color, fondo, borde, velocidad (letras por
 # segundo, 40), lineas (3), arriba (verdadero: arriba de la pantalla) y sonido
 # (suena con las letras). Una página que no cabe en las líneas se parte sola.
 sea _dl = nulo               # el diálogo abierto, o nulo
 sea _dl_cerrando = falso     # se cerró con la entrada de este fotograma
 sea _dl_respuesta = nulo
 
-fijo _DIALOGO_AJUSTES = ["escala", "fuente", "color", "fondo", "borde", "velocidad", "lineas", "arriba", "sonido"]
+fijo _DIALOGO_OPCIONES = ["escala", "fuente", "color", "fondo", "borde", "velocidad", "lineas", "arriba", "sonido"]
 fijo _PAGINA_CAMPOS = ["texto", "nombre", "retrato", "respuestas"]
 
 # Un texto partido en líneas que no pasen de 'ancho'
@@ -977,8 +989,8 @@ funcion _dl_medidas(val diccionario aj, val logico con_retrato, val numero filas
               "ancho_texto": juego.ancho() - margen * 2 - relleno * 2 - (si con_retrato { retrato + relleno } sino { 0 })}
 }
 
-funcion dialogo(val cualquiera paginas, val cualquiera ajustes = nulo): nulo {
-    sea aj = _ui_ajustes(ajustes, _DIALOGO_AJUSTES, "dialogo")
+funcion dialogo(val cualquiera paginas, val cualquiera opciones = nulo): nulo {
+    sea aj = _ui_opciones(opciones, _DIALOGO_OPCIONES, "dialogo")
     si paginas es texto o paginas es diccionario { paginas = [paginas] }
     si no (paginas es lista) o paginas.longitud() == 0 {
         lanzar ErrorTipo("dialogo() espera un texto, una página (\{\"nombre\": ..., \"texto\": ...}) o una lista de páginas")
@@ -992,7 +1004,7 @@ funcion dialogo(val cualquiera paginas, val cualquiera ajustes = nulo): nulo {
         }
         para cada texto c en p {
             si no _PAGINA_CAMPOS.contiene(c) {
-                lanzar Error("dialogo(): una página no tiene '{c}' (tiene \"texto\", \"nombre\", \"retrato\" y \"respuestas\")")
+                lanzar ErrorArgumento("dialogo(): una página no tiene '{c}' (tiene \"texto\", \"nombre\", \"retrato\" y \"respuestas\")")
             }
         }
         sea respuestas = _de(p, "respuestas", [])
@@ -1013,7 +1025,7 @@ funcion dialogo(val cualquiera paginas, val cualquiera ajustes = nulo): nulo {
             i = i + matematica.maximo(cuantas, 1)
         }
     }
-    _dl = {"trozos": trozos, "ajustes": aj, "pagina": 0, "letras": 0, "elegida": 0, "desde": juego.tiempo_real()}
+    _dl = {"trozos": trozos, "opciones": aj, "pagina": 0, "letras": 0, "elegida": 0, "desde": juego.tiempo_real()}
     _dl_respuesta = nulo
 }
 
@@ -1040,8 +1052,8 @@ funcion _dl_siguiente(): nulo {
 # Dónde va la caja y cada respuesta
 funcion _dl_caja(): diccionario {
     sea trozo = _dl["trozos"][_dl["pagina"]]
-    sea md = _dl_medidas(_dl["ajustes"], trozo["retrato"] != nulo, trozo["lineas"].longitud() + trozo["respuestas"].longitud())
-    sea arriba = si _de(_dl["ajustes"], "arriba", falso) { md["margen"] + md["alto_letra"] * 1.5 } sino { juego.alto() - md["margen"] - md["alto"] }
+    sea md = _dl_medidas(_dl["opciones"], trozo["retrato"] != nulo, trozo["lineas"].longitud() + trozo["respuestas"].longitud())
+    sea arriba = si _de(_dl["opciones"], "arriba", falso) { md["margen"] + md["alto_letra"] * 1.5 } sino { juego.alto() - md["margen"] - md["alto"] }
     md["x"] = md["margen"]
     md["y"] = arriba
     md["ancho"] = juego.ancho() - md["margen"] * 2
@@ -1057,10 +1069,10 @@ funcion _dl_entrada(): nulo {
     sea trozo = _dl["trozos"][_dl["pagina"]]
     sea total = _dl_total(trozo)
     sea antes = matematica.piso(_dl["letras"])
-    _dl["letras"] = matematica.minimo(total, _dl["letras"] + _de(_dl["ajustes"], "velocidad", 40) * (ahora - _dl["desde"]))
+    _dl["letras"] = matematica.minimo(total, _dl["letras"] + _de(_dl["opciones"], "velocidad", 40) * (ahora - _dl["desde"]))
     _dl["desde"] = ahora
-    si _dl["ajustes"].contiene("sonido") y matematica.piso(_dl["letras"]) != antes y antes % 2 == 0 {
-        juego.reproducir(_dl["ajustes"]["sonido"])
+    si _dl["opciones"].contiene("sonido") y matematica.piso(_dl["letras"]) != antes y antes % 2 == 0 {
+        juego.reproducir(_dl["opciones"]["sonido"])
     }
     sea acabada = _dl["letras"] >= total
     sea respuestas = trozo["respuestas"]
@@ -1095,7 +1107,7 @@ funcion _dl_entrada(): nulo {
 # En _presentar: la caja, encima de lo del juego
 funcion _dibujar_dialogo(): nulo {
     si _dl == nulo { devolver nulo }
-    sea aj = _dl["ajustes"]
+    sea aj = _dl["opciones"]
     sea trozo = _dl["trozos"][_dl["pagina"]]
     sea md = _dl_caja()
     sea camara = juego.posicion_camara()
@@ -1173,7 +1185,7 @@ fijo _FISICA_OPCIONES = ["gravedad", "mapa", "pasos"]
 sea _cuerpos_creados = 0
 
 funcion fisica(val cualquiera opciones = nulo): diccionario {
-    sea op = _ui_ajustes(opciones, _FISICA_OPCIONES, "fisica")
+    sea op = _ui_opciones(opciones, _FISICA_OPCIONES, "fisica")
     sea g = _de(op, "gravedad", 900)
     si g es numero { g = [0, g] }
     si no (g es lista) o g.longitud() != 2 { lanzar ErrorTipo("fisica(): \"gravedad\" es un número (hacia abajo) o [x, y]") }
@@ -1210,7 +1222,7 @@ funcion cuerpo(val cualquiera mundo, val cualquiera datos): diccionario {
     si no datos.contiene("gravedad") { datos["gravedad"] = 1 }
     si no datos.contiene("fijo") { datos["fijo"] = falso }
     si no datos.contiene("sensor") { datos["sensor"] = falso }
-    si datos["masa"] <= 0 { lanzar Error("cuerpo(): la masa tiene que ser mayor que 0") }
+    si datos["masa"] <= 0 { lanzar ErrorArgumento("cuerpo(): la masa tiene que ser mayor que 0") }
     _cuerpos_creados = _cuerpos_creados + 1
     datos["id_fisica"] = _cuerpos_creados
     datos["en_suelo"] = falso
@@ -1492,20 +1504,20 @@ funcion _ver_entradas(val lista entradas, val lista clases): texto {
     devolver si partes.longitud() == 0 { "-" } sino { texto.unir(partes, " / ") }
 }
 
-fijo _CONTROLES_AJUSTES = ["acciones", "nombres", "escala", "fuente", "color", "color_elegido"]
+fijo _CONTROLES_OPCIONES = ["acciones", "nombres", "escala", "fuente", "color", "color_elegido"]
 
-# menu_controles([ajustes]): la pantalla de los controles. Se llama en cada
+# menu_controles([opciones]): la pantalla de los controles. Se llama en cada
 # fotograma mientras se vea; devuelve "volver" cuando el jugador sale (con
-# Volver, escape o B). Ajustes: acciones (cuáles y en qué orden; todas por
+# Volver, escape o B). Opciones: acciones (cuáles y en qué orden; todas por
 # defecto), nombres ({acción: cómo se enseña}), escala (2), fuente, color y
 # color_elegido.
-funcion menu_controles(val cualquiera ajustes = nulo): cualquiera {
-    sea aj = _ui_ajustes(ajustes, _CONTROLES_AJUSTES, "menu_controles")
+funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
+    sea aj = _ui_opciones(opciones, _CONTROLES_OPCIONES, "menu_controles")
     sea todas = juego.acciones()
     sea nombres = []
     si aj.contiene("acciones") {
         para cada texto a en aj["acciones"] {
-            si no todas.contiene(a) { lanzar Error("menu_controles(): no hay ninguna acción '{a}'") }
+            si no todas.contiene(a) { lanzar ErrorArgumento("menu_controles(): no hay ninguna acción '{a}'") }
             nombres.agregar(a)
         }
     } sino {

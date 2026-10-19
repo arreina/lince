@@ -1,8 +1,8 @@
 # @seccion: Módulos y librerías
 # @titulo: El módulo `tiempo`
-# @nota: `tiempo` da la hora y permite esperar (en milisegundos). En un juego se usa poco: el tiempo de cada fotograma lo da `juego.dt()`.
+# @nota: `tiempo` da la hora y permite esperar (en segundos). En un juego se usa poco: el tiempo de cada fotograma lo da `juego.dt()`.
 importar "tiempo"
 
 sea inicio = tiempo.ahora()
-tiempo.esperar(20)
+tiempo.esperar(0.02)
 escribir(tiempo.ahora() - inicio >= 0)

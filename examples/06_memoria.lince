@@ -49,7 +49,7 @@ funcion nueva_ronda(): nulo {
 funcion encender(val numero n): nulo {
     encendido = n
     reloj = 0.35
-    juego.pitido(TONOS[n], 300)
+    juego.pitido(TONOS[n], 0.3)
 }
 
 juego.abrir("Memoria", ANCHO, ALTO)
@@ -93,7 +93,7 @@ mientras juego.abierto() {
                     }
                 } sino {
                     estado = "fallo"
-                    juego.pitido(110, 500)
+                    juego.pitido(110, 0.5)
                 }
             }
         }

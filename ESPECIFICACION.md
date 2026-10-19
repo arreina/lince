@@ -920,6 +920,8 @@ matematica.factorial(5)       # 120
 matematica.combinaciones(5,2) # 10
 matematica.aleatorio()        # 0.0 .. 1.0
 matematica.aleatorio(1, 10)   # entero entre 1 y 10
+matematica.grados(matematica.PI)  # 180 (juego mide los ángulos en grados)
+matematica.radianes(90)       # 1.5707... (seno y coseno van en radianes)
 matematica.PI                 # 3.14159...
 matematica.E                  # 2.71828...
 matematica.TAU                # 6.28318...
@@ -955,7 +957,7 @@ archivos.listar("carpeta")        # lista de nombres
 tiempo.ahora()     # segundos desde 1970, con decimales (sirve para medir tiempos)
 tiempo.fecha()     # "2025-01-15"
 tiempo.hora()      # "14:30:00"
-tiempo.esperar(500) # pausa 500ms
+tiempo.esperar(0.5) # para el programa medio segundo (en un juego, mejor una tarea con esperar())
 ```
 
 ### `sistema`
@@ -1013,6 +1015,16 @@ trabaja píxel a píxel. Lo que no lo necesita está escrito en Lince, en
 cuadro toca). Para quien lo usa no hay
 diferencia; quien quiera una versión distinta puede leerla y copiarla. Un error dentro de una de
 esas funciones se cuenta en la línea del programa que la llamó.
+
+Reglas de todo el módulo:
+
+- **Los tiempos, en segundos** (`0.5` es medio segundo), y los ángulos en grados.
+- **Las opciones van en un diccionario**, y una opción mal escrita es un error que dice cuáles
+  hay: `dibujar(): no conozco la opción 'escla' (hay "escala", "ancho"...)`.
+- **Los errores:** `ErrorTipo` si un argumento no es del tipo que toca, `ErrorArgumento` si su
+  valor (o una opción) no vale, y `ErrorJuego` si falla algo de fuera: la ventana sin abrir,
+  un archivo que no está o no se puede escribir, sin SDL2... `capturar (error e)` los
+  captura todos.
 
 El bucle lo escribes tú:
 
@@ -1096,10 +1108,10 @@ minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del j
 | Función | Qué hace |
 |---|---|
 | `tecla(nombre)` · `tecla_pulsada(n)` · `tecla_soltada(n)` | mantenida / pulsada en este fotograma / soltada en este fotograma |
-| `raton()` · `boton_raton(n)` · `clic(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · giro de la rueda |
-| `mandos()` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4) · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
+| `raton()` · `boton_raton(n)` · `clic(n)` · `boton_raton_soltado(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · soltado en este fotograma · giro de la rueda |
+| `mandos()` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `boton_soltado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4) · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
 | `cursor(visible)` · `capturar_raton(si)` · `movimiento_raton()` | muestra u oculta la flecha · encierra y oculta el ratón para apuntar (devuelve si se pudo) · `[dx, dy]` movido desde el fotograma anterior |
-| `mando_tactil([opciones])` · `mando_tactil(falso)` | el mando de la pantalla táctil, como el de los juegos de móvil: a la izquierda una palanca que aparece donde se apoya el pulgar, y a la derecha los botones. **Sale solo** en un móvil (o con pantalla táctil) si alguna acción usa el mando, con los botones que usan (`"mando:a"`, `"mando:x"`...; `inicio` va arriba) y la palanca si usan la palanca izquierda o la cruceta; **se esconde** mientras haya un mando de verdad conectado (por Bluetooth o cable) y vuelve si se desconecta. Funciona como un mando de verdad (se suma al mando 1), así que un juego hecho para teclado y mando se juega en el móvil sin cambiar nada; la palanca también hace de cruceta. `mando_tactil(opciones)` lo ajusta: `botones`, `palanca`, `alfa` (120), `tamano` (1) y `siempre` (verdadero: también en el ordenador, con el ratón, y aunque haya mando); `mando_tactil(falso)` lo quita, para un juego con controles propios. Se dibuja encima de todo, sin moverse con la cámara. Está escrito en Lince |
+| `mando_tactil([opciones])` · `mando_tactil(falso)` | el mando de la pantalla táctil, como el de los juegos de móvil: a la izquierda una palanca que aparece donde se apoya el pulgar, y a la derecha los botones. **Sale solo** en un móvil (o con pantalla táctil) si alguna acción usa el mando, con los botones que usan (`"mando:a"`, `"mando:x"`...; `inicio` va arriba) y la palanca si usan la palanca izquierda o la cruceta; **se esconde** mientras haya un mando de verdad conectado (por Bluetooth o cable) y vuelve si se desconecta. Funciona como un mando de verdad (se suma al mando 1), así que un juego hecho para teclado y mando se juega en el móvil sin cambiar nada; la palanca también hace de cruceta. `mando_tactil(opciones)` lo ajusta: `botones`, `palanca`, `alfa` (120), `tamaño` (1) y `siempre` (verdadero: también en el ordenador, con el ratón, y aunque haya mando); `mando_tactil(falso)` lo quita, para un juego con controles propios. Se dibuja encima de todo, sin moverse con la cámara. Está escrito en Lince |
 | `vibrar(segundos[, fuerza])` | hace vibrar el móvil y los mandos conectados (fuerza de 0 a 1): un golpe, una explosión. Donde no se puede, no hace nada |
 | `inclinacion()` | `[x, y]` de -1 a 1: hacia dónde rodaría una bola sobre la pantalla del móvil (x a la derecha, y hacia abajo), según cómo se incline; `[0, 0]` sin acelerómetro (en el ordenador) |
 | `acciones()` | `{nombre: [entradas]}`: las acciones definidas, con sus entradas como se escribieron (para enseñar los controles en un menú) |
@@ -1135,7 +1147,7 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | `detener([voz])` | para esa voz o, sin argumento, todo |
 | `musica(ruta o sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para. Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
 | `volumen([v])` | volumen general de 0 a 1 |
-| `pitido(frecuencia, ms[, volumen])` | tono sencillo, sin archivos |
+| `pitido(frecuencia, segundos[, volumen])` | tono sencillo, sin archivos: `pitido(440, 0.1)` |
 | `efecto(tipo[, opciones])` | genera y hace sonar un efecto al estilo de los juegos de 8 bits, sin archivos: `"moneda"`, `"salto"`, `"disparo"`, `"explosion"`, `"golpe"`, `"subir"`, `"clic"` o `"perder"`. Cada vez suena un poco distinto. Opciones: `volumen` (0,5), `tono` y `largo` (multiplican la frecuencia y la duración: `{"tono": 1.5}` más agudo) y `semilla` (siempre el mismo sonido) |
 | `crear_efecto(tipo[, opciones])` | el efecto como sonido, para `reproducir()` o `guardar_sonido()`; sin `semilla` usa la 1 |
 | `guardar_sonido(sonido, ruta)` | guarda un sonido como `.wav` |
@@ -1149,8 +1161,9 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | `dentro(px, py, x, y, w, h)` | ¿está el punto dentro del rectángulo? (botones, clics) |
 | `caja(cosa, x, y[, opciones])` | el rectángulo `[x, y, ancho, alto]` de lo que se ve de verdad al dibujar `cosa` (una imagen, una hoja o un animador) con esas mismas `x`, `y` y opciones, sin el hueco transparente de alrededor (ver abajo) |
 
-En `colision`, `colision_circulo_rect` y `dentro`, cada rectángulo puede ir en cuatro números o en una
-lista `[x, y, ancho, alto]`, como las que da `caja()`.
+En `colision`, `colision_circulos`, `colision_circulo_rect` y `dentro`, cada rectángulo puede ir en cuatro
+números o en una lista `[x, y, ancho, alto]`, como las que da `caja()`, y cada círculo en tres o en
+`[x, y, radio]`.
 | `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
 
 **Movimiento suave.** Para que las cosas no aparezcan de golpe: un menú que entra desde un lado,
@@ -1569,8 +1582,8 @@ si juego.respuesta() == "Sí" { ... }
 
 | Función | Qué hace |
 |---|---|
-| `menu(opciones[, ajustes])` | dibuja las opciones (textos) una debajo de otra y devuelve la elegida en el fotograma en que se elige; si no, `nulo`. Se llama en cada fotograma mientras se vea, y vuelve a la primera opción si deja de verse un rato. Ajustes: `x`, `y` (el centro de la primera opción; por defecto, el menú centrado en la pantalla), `escala` (3), `fuente`, `color`, `color_elegido`, `separacion`, `atras` (lo que devuelve con escape o B, como `"Continuar"` en una pausa), `sonido_mover` y `sonido_elegir` |
-| `dialogo(paginas[, ajustes])` | abre una caja de diálogo abajo de la pantalla con el texto saliendo letra a letra. `paginas` es una página o una lista; una página es un texto o un diccionario con `texto`, `nombre` (quién habla, en una pestaña encima), `retrato` (una imagen a la izquierda) y `respuestas` (textos para elegir). Aceptar (entrar, espacio, A o tocar) termina de escribir la página o pasa a la siguiente; una página que no cabe se parte sola. Ajustes: `escala` (2), `fuente`, `color`, `fondo`, `borde`, `velocidad` (letras por segundo, 40), `lineas` (3), `arriba` (verdadero: la caja arriba) y `sonido` (suena con las letras) |
+| `menu(textos[, opciones])` | dibuja los textos para elegir, uno debajo de otro, y devuelve el elegido en el fotograma en que se elige; si no, `nulo`. Se llama en cada fotograma mientras se vea, y vuelve a la primera opción si deja de verse un rato. Opciones: `x`, `y` (el centro de la primera opción; por defecto, el menú centrado en la pantalla), `escala` (3), `fuente`, `color`, `color_elegido`, `separacion`, `atras` (lo que devuelve con escape o B, como `"Continuar"` en una pausa), `sonido_mover` y `sonido_elegir` |
+| `dialogo(paginas[, opciones])` | abre una caja de diálogo abajo de la pantalla con el texto saliendo letra a letra. `paginas` es una página o una lista; una página es un texto o un diccionario con `texto`, `nombre` (quién habla, en una pestaña encima), `retrato` (una imagen a la izquierda) y `respuestas` (textos para elegir). Aceptar (entrar, espacio, A o tocar) termina de escribir la página o pasa a la siguiente; una página que no cabe se parte sola. Opciones: `escala` (2), `fuente`, `color`, `fondo`, `borde`, `velocidad` (letras por segundo, 40), `lineas` (3), `arriba` (verdadero: la caja arriba) y `sonido` (suena con las letras) |
 | `dialogo_abierto()` · `respuesta()` · `cerrar_dialogo()` | si hay un diálogo abierto (también en el fotograma en que se cierra, para que la tecla que lo cierra no lo vuelva a abrir) · la última respuesta elegida, o `nulo` · lo cierra |
 
 El juego sigue viendo las teclas mientras hay un menú o un diálogo: lo normal es no mover al
@@ -1585,7 +1598,7 @@ si juego.menu_controles() == "volver" { ...salir de las opciones... }
 
 | Función | Qué hace |
 |---|---|
-| `menu_controles([ajustes])` | enseña cada acción con sus teclas y sus botones; se elige una y se pulsa lo nuevo (Esc deja como estaba). Una tecla nueva sustituye a las teclas que tenía la acción, un botón de mando a sus botones y una dirección de la palanca a sus direcciones; si otra acción ya la usaba, se intercambian. Lo cambiado **se guarda solo** y se aplica solo la próxima vez que el juego defina esa acción con `definir_accion`, sin hacer nada más. Tiene «Restablecer» y «Volver»; devuelve `"volver"` al salir (también con Esc o B). Ajustes: `acciones` (cuáles y en qué orden), `nombres` (`{acción: cómo se enseña}`), `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
+| `menu_controles([opciones])` | enseña cada acción con sus teclas y sus botones; se elige una y se pulsa lo nuevo (Esc deja como estaba). Una tecla nueva sustituye a las teclas que tenía la acción, un botón de mando a sus botones y una dirección de la palanca a sus direcciones; si otra acción ya la usaba, se intercambian. Lo cambiado **se guarda solo** y se aplica solo la próxima vez que el juego defina esa acción con `definir_accion`, sin hacer nada más. Tiene «Restablecer» y «Volver»; devuelve `"volver"` al salir (también con Esc o B). Opciones: `acciones` (cuáles y en qué orden), `nombres` (`{acción: cómo se enseña}`), `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
 | `restablecer_controles()` | vuelven los controles que definió el juego |
 | `entrada_pulsada()` | lo que se acaba de pulsar (tecla, botón del ratón, botón o dirección de la palanca de un mando), escrito como en `definir_accion` (`"espacio"`, `"mando:a"`, `"mando:izq_x-"`), o `nulo`: para hacer un menú de controles propio |
 

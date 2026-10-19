@@ -86,7 +86,7 @@ funcion comprobar_fin(): nulo {
         fin = "empate"
         empates = empates + 1
     }
-    si fin != "" { juego.pitido(300, 200) }
+    si fin != "" { juego.pitido(300, 0.2) }
 }
 
 funcion reiniciar(): nulo {
@@ -110,7 +110,7 @@ mientras juego.abierto() {
             sea fila = matematica.piso((pos[1] - ORIGEN_Y) / CASILLA)
             si col >= 0 y col < 3 y fila >= 0 y fila < 3 y tablero[fila * 3 + col] == 0 {
                 tablero[fila * 3 + col] = 1
-                juego.pitido(520, 60)
+                juego.pitido(520, 0.06)
                 comprobar_fin()
                 turno = 2
                 pausa = 0.4
@@ -120,7 +120,7 @@ mientras juego.abierto() {
         pausa = pausa - dt
         si pausa <= 0 {
             tablero[mejor_jugada()] = 2
-            juego.pitido(390, 60)
+            juego.pitido(390, 0.06)
             comprobar_fin()
             turno = 1
         }

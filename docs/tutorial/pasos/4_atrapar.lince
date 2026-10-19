@@ -60,7 +60,7 @@ mientras juego.abierto() {
         si juego.colision(x - 24, ALTO - 60, 48, 40, e["x"] - 10, e["y"] - 10, 20, 20) {
             e["cogida"] = verdadero
             puntos = puntos + 1
-            juego.pitido(880, 60, 0.2)
+            juego.pitido(880, 0.06, 0.2)
             juego.particulas(e["x"], e["y"], {"cantidad": 20, "color": [255, 215, 80],
                                               "velocidad": [60, 200], "vida": [0.3, 0.6]})
         }

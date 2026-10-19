@@ -338,7 +338,7 @@
 <span class="linea nueva">        <span class="k">si</span> juego.colision(x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>, e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>) {</span>
 <span class="linea nueva">            e[<span class="s">&quot;cogida&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea nueva">            puntos = puntos + <span class="n">1</span></span>
-<span class="linea nueva">            juego.pitido(<span class="n">880</span>, <span class="n">60</span>, <span class="n">0.2</span>)</span>
+<span class="linea nueva">            juego.pitido(<span class="n">880</span>, <span class="n">0.06</span>, <span class="n">0.2</span>)</span>
 <span class="linea nueva">            juego.particulas(e[<span class="s">&quot;x&quot;</span>], e[<span class="s">&quot;y&quot;</span>], {<span class="s">&quot;cantidad&quot;</span>: <span class="n">20</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">215</span>, <span class="n">80</span>],</span>
 <span class="linea nueva">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">200</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.3</span>, <span class="n">0.6</span>]})</span>
 <span class="linea nueva">        }</span>
@@ -418,7 +418,7 @@
 <span class="linea">        <span class="k">si</span> juego.colision(x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>, e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>) {</span>
 <span class="linea">            e[<span class="s">&quot;cogida&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea">            puntos = puntos + <span class="n">1</span></span>
-<span class="linea">            juego.pitido(<span class="n">880</span>, <span class="n">60</span>, <span class="n">0.2</span>)</span>
+<span class="linea">            juego.pitido(<span class="n">880</span>, <span class="n">0.06</span>, <span class="n">0.2</span>)</span>
 <span class="linea">            juego.particulas(e[<span class="s">&quot;x&quot;</span>], e[<span class="s">&quot;y&quot;</span>], {<span class="s">&quot;cantidad&quot;</span>: <span class="n">20</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">215</span>, <span class="n">80</span>],</span>
 <span class="linea">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">200</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.3</span>, <span class="n">0.6</span>]})</span>
 <span class="linea">        }</span>
@@ -439,7 +439,7 @@
 <span class="linea nueva">        <span class="k">si</span> vidas &gt; <span class="n">0</span> <span class="k">y</span> juego.colision_circulo_rect(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], <span class="n">14</span>, x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>) {</span>
 <span class="linea nueva">            r[<span class="s">&quot;choca&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea nueva">            vidas = vidas - <span class="n">1</span></span>
-<span class="linea nueva">            juego.pitido(<span class="n">110</span>, <span class="n">250</span>)</span>
+<span class="linea nueva">            juego.pitido(<span class="n">110</span>, <span class="n">0.25</span>)</span>
 <span class="linea nueva">            juego.particulas(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], {<span class="s">&quot;cantidad&quot;</span>: <span class="n">30</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">150</span>, <span class="n">140</span>, <span class="n">150</span>],</span>
 <span class="linea nueva">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">80</span>, <span class="n">260</span>], <span class="s">&quot;gravedad&quot;</span>: <span class="n">500</span>})</span>
 <span class="linea nueva">        }</span>
@@ -538,7 +538,7 @@
 <span class="linea">        <span class="k">si</span> juego.colision(x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>, e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>) {</span>
 <span class="linea">            e[<span class="s">&quot;cogida&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea">            puntos = puntos + <span class="n">1</span></span>
-<span class="linea">            juego.pitido(<span class="n">880</span>, <span class="n">60</span>, <span class="n">0.2</span>)</span>
+<span class="linea">            juego.pitido(<span class="n">880</span>, <span class="n">0.06</span>, <span class="n">0.2</span>)</span>
 <span class="linea">            juego.particulas(e[<span class="s">&quot;x&quot;</span>], e[<span class="s">&quot;y&quot;</span>], {<span class="s">&quot;cantidad&quot;</span>: <span class="n">20</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">215</span>, <span class="n">80</span>],</span>
 <span class="linea">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">200</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.3</span>, <span class="n">0.6</span>]})</span>
 <span class="linea">        }</span>
@@ -559,7 +559,7 @@
 <span class="linea nueva">        <span class="k">si</span> juego.colision_circulo_rect(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], <span class="n">14</span>, x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>) {</span>
 <span class="linea">            r[<span class="s">&quot;choca&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea">            vidas = vidas - <span class="n">1</span></span>
-<span class="linea">            juego.pitido(<span class="n">110</span>, <span class="n">250</span>)</span>
+<span class="linea">            juego.pitido(<span class="n">110</span>, <span class="n">0.25</span>)</span>
 <span class="linea">            juego.particulas(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], {<span class="s">&quot;cantidad&quot;</span>: <span class="n">30</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">150</span>, <span class="n">140</span>, <span class="n">150</span>],</span>
 <span class="linea">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">80</span>, <span class="n">260</span>], <span class="s">&quot;gravedad&quot;</span>: <span class="n">500</span>})</span>
 <span class="linea">        }</span>

@@ -54,7 +54,7 @@ funcion reiniciar(): nulo {
 
 funcion morir(): nulo {
     vivo = falso
-    juego.pitido(120, 350)
+    juego.pitido(120, 0.35)
     si puntos > record {
         record = puntos
         guardar_record()
@@ -78,7 +78,7 @@ mientras juego.abierto() {
         } sino {
             empezado = verdadero
             vy = SALTO
-            juego.pitido(520, 40)
+            juego.pitido(520, 0.04)
         }
     }
 
@@ -99,7 +99,7 @@ mientras juego.abierto() {
             si no t["pasado"] y t["x"] + TUBO_ANCHO < 90 {
                 t["pasado"] = verdadero
                 puntos = puntos + 1
-                juego.pitido(880, 60)
+                juego.pitido(880, 0.06)
             }
         }
         # los tubos que salieron por la izquierda se descartan

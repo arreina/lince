@@ -66,7 +66,7 @@ mientras juego.abierto() {
         si juego.colision(x - 24, ALTO - 60, 48, 40, e["x"] - 10, e["y"] - 10, 20, 20) {
             e["cogida"] = verdadero
             puntos = puntos + 1
-            juego.pitido(880, 60, 0.2)
+            juego.pitido(880, 0.06, 0.2)
             juego.particulas(e["x"], e["y"], {"cantidad": 20, "color": [255, 215, 80],
                                               "velocidad": [60, 200], "vida": [0.3, 0.6]})
         }
@@ -87,7 +87,7 @@ mientras juego.abierto() {
         si vidas > 0 y juego.colision_circulo_rect(r["x"], r["y"], 14, x - 24, ALTO - 60, 48, 40) {
             r["choca"] = verdadero
             vidas = vidas - 1
-            juego.pitido(110, 250)
+            juego.pitido(110, 0.25)
             juego.particulas(r["x"], r["y"], {"cantidad": 30, "color": [150, 140, 150],
                                               "velocidad": [80, 260], "gravedad": 500})
         }

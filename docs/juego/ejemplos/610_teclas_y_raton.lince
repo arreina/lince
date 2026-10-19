@@ -1,6 +1,6 @@
 # @seccion: Entrada
 # @titulo: Teclas y ratón
-# @nota: `juego.tecla("derecha")` dice si está pulsada ahora; `juego.tecla_pulsada("espacio")`, si se ha pulsado en este fotograma (para saltar una sola vez). `juego.raton()` da `[x, y]` y `juego.clic(1)`, si se ha hecho clic con el botón izquierdo.
+# @nota: `juego.tecla("derecha")` dice si está pulsada ahora; `juego.tecla_pulsada("espacio")`, si se ha pulsado en este fotograma (para saltar una sola vez), y `juego.tecla_soltada()`, si se ha soltado. Igual con los botones del mando (`boton`, `boton_pulsado`, `boton_soltado`). `juego.raton()` da `[x, y]` y `juego.clic(1)`, si se ha hecho clic con el botón izquierdo (`juego.boton_raton(1)` si está pulsado, y `juego.boton_raton_soltado(1)` si se acaba de soltar).
 # @teclas: derecha
 # @clic: 360,90
 # @fotogramas: 40

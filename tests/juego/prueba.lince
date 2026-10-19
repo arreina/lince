@@ -4,7 +4,7 @@ importar "juego"
 intentar {
     juego.limpiar()
     escribir("MAL: no falló")
-} capturar (Error e) {
+} capturar (ErrorJuego e) {
     escribir("error sin ventana: ok")
 }
 
@@ -28,7 +28,7 @@ escribir("raton: " + a_texto(juego.raton().longitud()))
 intentar {
     juego.tecla("noexiste_xyz")
     escribir("MAL: tecla desconocida aceptada")
-} capturar (Error e) {
+} capturar (ErrorArgumento e) {
     escribir("tecla desconocida: ok")
 }
 intentar {
@@ -37,7 +37,7 @@ intentar {
 } capturar (ErrorTipo e) {
     escribir("color inválido: ok")
 }
-juego.pitido(440, 50)
+juego.pitido(440, 0.05)
 juego.salir()
 escribir("abierto tras salir: " + a_texto(juego.abierto()))
 juego.cerrar()

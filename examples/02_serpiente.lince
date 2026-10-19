@@ -65,14 +65,14 @@ funcion avanzar(): nulo {
             escribiendo = verdadero
             nombre = ""
         }
-        juego.pitido(120, 400)
+        juego.pitido(120, 0.4)
         devolver nulo
     }
     cuerpo.insertar(0, [c, f])
     si c == comida[0] y f == comida[1] {
         puntos = puntos + 1
         comida = nueva_comida()
-        juego.pitido(700, 60)
+        juego.pitido(700, 0.06)
     } sino {
         cuerpo.eliminar(cuerpo.longitud() - 1)
     }

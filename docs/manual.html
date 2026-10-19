@@ -796,19 +796,21 @@ esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span>
 m</pre></div><span class="fuente">930_como.lince</span></article><article class="ej" id="modulos-y-librerias-3"><h3>Clases de una librería con `como`</h3><p class="nota">Las clases de la librería se instancian por el alias: <code>figuras.Cuadrado(3)</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;./lib_figuras&quot;</span> <span class="k">como</span> figuras
 
 <span class="k">sea</span> c = figuras.Cuadrado(<span class="n">3</span>)
-<span class="k">escribir</span>(c.area())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>9</pre></div><span class="fuente">935_clases_con_como.lince</span></article><article class="ej" id="modulos-y-librerias-4"><h3>El módulo `matematica`</h3><p class="nota">Redondeos, raíces, potencias, trigonometría (en radianes), máximos y mínimos, números al azar y las constantes <code>PI</code>, <code>E</code> y <code>TAU</code>. <code>aleatorio()</code> da un número entre 0 y 1; <code>aleatorio(1, 6)</code>, un entero entre los dos (un dado).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+<span class="k">escribir</span>(c.area())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>9</pre></div><span class="fuente">935_clases_con_como.lince</span></article><article class="ej" id="modulos-y-librerias-4"><h3>El módulo `matematica`</h3><p class="nota">Redondeos, raíces, potencias, trigonometría (en radianes), máximos y mínimos, números al azar y las constantes <code>PI</code>, <code>E</code> y <code>TAU</code>. <code>grados</code> y <code>radianes</code> pasan de unos a otros (el módulo <code>juego</code> mide los ángulos en grados), y para juegos hay <code>distancia</code>, <code>angulo</code>, <code>limitar</code>, <code>interpolar</code> y más. <code>aleatorio()</code> da un número entre 0 y 1; <code>aleatorio(1, 6)</code>, un entero entre los dos (un dado).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
 
 <span class="k">escribir</span>(<span class="s">&quot;{matematica.piso(3.9)} {matematica.techo(3.1)} {matematica.redondear(2.5)}&quot;</span>)
 <span class="k">escribir</span>(<span class="s">&quot;{matematica.raiz(144)} {matematica.potencia(2, 10)} {matematica.abs(-7)}&quot;</span>)
 <span class="k">escribir</span>(<span class="s">&quot;{matematica.maximo(3, 9)} {matematica.minimo(3, 9)}&quot;</span>)
 <span class="k">escribir</span>(matematica.redondear(matematica.seno(matematica.PI / <span class="n">2</span>)))
 <span class="k">escribir</span>(<span class="s">&quot;{matematica.factorial(5)} {matematica.combinaciones(5, 2)}&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;{matematica.grados(matematica.PI)} {matematica.distancia(0, 0, 3, 4)} {matematica.limitar(15, 0, 10)}&quot;</span>)
 <span class="k">sea</span> dado = matematica.aleatorio(<span class="n">1</span>, <span class="n">6</span>)
 <span class="k">escribir</span>(dado &gt;= <span class="n">1</span> <span class="k">y</span> dado &lt;= <span class="n">6</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>3 4 3
 12 1024 7
 9 3
 1
 120 10
+180 5 10
 verdadero</pre></div><span class="fuente">940_matematica.lince</span></article><article class="ej" id="modulos-y-librerias-5"><h3>El módulo `texto`</h3><p class="nota">Lo que se hace con textos y no es un método: partirlos por un separador, unir una lista, darles la vuelta y buscar dónde aparece algo (−1 si no está).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
 
 <span class="k">sea</span> partes = <span class="t">texto</span>.dividir(<span class="s">&quot;rojo,verde,azul&quot;</span>, <span class="s">&quot;,&quot;</span>)
@@ -832,10 +834,10 @@ archivos.eliminar(ruta)
 <span class="k">escribir</span>(sistema.ejecutar(<span class="s">&quot;echo desde el sistema&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>hola mundo
 verdadero
 falso
-desde el sistema</pre></div><span class="fuente">950_archivos_y_sistema.lince</span></article><article class="ej" id="modulos-y-librerias-7"><h3>El módulo `tiempo`</h3><p class="nota"><code>tiempo</code> da la hora y permite esperar (en milisegundos). En un juego se usa poco: el tiempo de cada fotograma lo da <code>juego.dt()</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tiempo&quot;</span>
+desde el sistema</pre></div><span class="fuente">950_archivos_y_sistema.lince</span></article><article class="ej" id="modulos-y-librerias-7"><h3>El módulo `tiempo`</h3><p class="nota"><code>tiempo</code> da la hora y permite esperar (en segundos). En un juego se usa poco: el tiempo de cada fotograma lo da <code>juego.dt()</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;tiempo&quot;</span>
 
 <span class="k">sea</span> inicio = tiempo.ahora()
-tiempo.<span class="k">esperar</span>(<span class="n">20</span>)
+tiempo.<span class="k">esperar</span>(<span class="n">0.02</span>)
 <span class="k">escribir</span>(tiempo.ahora() - inicio &gt;= <span class="n">0</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero</pre></div><span class="fuente">960_tiempo.lince</span></article><article class="ej" id="modulos-y-librerias-8"><h3>El módulo `json`</h3><p class="nota"><code>json.parsear</code> convierte un texto JSON en listas y diccionarios de Lince (y da un error si no es JSON válido); <code>json.texto</code> hace lo contrario, en una línea o, con <code>verdadero</code>, en varias. Escrito dentro de un texto, cada <code>{</code> lleva delante <code>\</code> para que no se tome por un valor metido en el texto. Lo normal es leerlo de un archivo: <code>json.parsear(archivos.leer(&quot;nivel.json&quot;))</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;json&quot;</span>
 
 <span class="k">sea</span> datos = json.parsear(<span class="s">&quot;\{\&quot;</span>nombre\<span class="s">&quot;: \&quot;</span>Ñandú\<span class="s">&quot;, \&quot;</span>puntos\<span class="s">&quot;: [10, 25.5], \&quot;</span>activo\<span class="s">&quot;: true}&quot;</span>)

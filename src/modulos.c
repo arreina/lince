@@ -863,10 +863,16 @@ static Valor *fn_tpo_ahora(Valor **a, int n) {
 #endif
 }
 
+/* tiempo.esperar(segundos): para el programa ese tiempo (en un juego, mejor
+   una tarea con esperar(), que no lo para) */
 static Valor *fn_tpo_esperar(Valor **a, int n) {
     (void)n;
-    if (a[0]->tipo != VAL_NUMERO) return valor_nulo();
-    lince_esperar_ms((int)a[0]->numero);
+    if (a[0]->tipo != VAL_NUMERO || a[0]->numero < 0 || !isfinite(a[0]->numero)) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorArgumento", "tiempo.esperar() espera los segundos (0.5 es medio segundo)", 0);
+        return valor_nulo();
+    }
+    lince_esperar_ms((int)(a[0]->numero * 1000 + 0.5));
     return valor_nulo();
 }
 

@@ -100,7 +100,7 @@ mientras juego.abierto() {
                 sea dist = (bola_x - (pala_x + PALA_ANCHO / 2)) / (PALA_ANCHO / 2)
                 vx = dist * 280
                 vy = -matematica.abs(vy) * 1.02
-                juego.pitido(440, 40)
+                juego.pitido(440, 0.04)
             }
 
             # ladrillos: al tocar uno, se rompe y la bola rebota
@@ -109,14 +109,14 @@ mientras juego.abierto() {
                     l["vivo"] = falso
                     vy = -vy
                     puntos = puntos + 10 * (5 - l["fila"])
-                    juego.pitido(600 + l["fila"] * 80, 40)
+                    juego.pitido(600 + l["fila"] * 80, 0.04)
                 }
             }
 
             si bola_y > ALTO {
                 vidas = vidas - 1
                 pegada = verdadero
-                juego.pitido(130, 300)
+                juego.pitido(130, 0.3)
                 si vidas == 0 { estado = "perdido" }
             }
             si quedan() == 0 { estado = "ganado" }

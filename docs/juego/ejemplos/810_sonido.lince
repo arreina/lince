@@ -9,4 +9,4 @@ juego.efecto("moneda")
 sea salto = juego.crear_efecto("salto", {"tono": 1.2})
 juego.reproducir(salto, {"volumen": 0.8, "lado": -0.5})      # algo a la izquierda
 escribir("el salto dura {salto["duracion"]} s")
-juego.pitido(440, 100)
+juego.pitido(440, 0.1)

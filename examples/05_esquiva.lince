@@ -114,11 +114,11 @@ mientras juego.abierto() {
                 conservar = falso
                 si objeto es Estrella {
                     puntos = puntos + 10
-                    juego.pitido(880, 70)
+                    juego.pitido(880, 0.07)
                 } sino si parpadeo == 0 {
                     vidas = vidas - 1
                     parpadeo = 1.2
-                    juego.pitido(110, 300)
+                    juego.pitido(110, 0.3)
                 }
             }
             si conservar { quedan.agregar(objeto) }

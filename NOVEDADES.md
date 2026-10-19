@@ -9,6 +9,21 @@ apartado que le toca de este archivo.
 
 - `mapear`, `filtrar` y `reducir` aceptan también generadores (`filtrar(rango(10), ...)`) y bytes.
 
+### Revisión del módulo `juego` antes de la 1.0
+
+Cambios que pueden obligar a tocar un juego:
+
+- `juego.pitido(frecuencia, segundos)` y `tiempo.esperar(segundos)` van en **segundos**, como todo lo demás (antes, milisegundos): `pitido(440, 100)` pasa a `pitido(440, 0.1)`.
+- El tamaño del mando táctil es `"tamaño"` (antes `"tamano"`), como en las partículas, que ya no aceptan `"tamano"`.
+- **Toda opción mal escrita da error**, también en `dibujar`, `caja` y `mapa`, que antes la ignoraban, y siempre con el mismo mensaje: `no conozco la opción 'x' (hay ...)`.
+- **Los errores del módulo, con su tipo:** `ErrorTipo`, `ErrorArgumento` (un valor o una opción que no valen) y `ErrorJuego` (la ventana sin abrir, un archivo...). Si capturabas `Error`, captura `error` (todos) o el tipo concreto.
+- Los menús, diálogos y controles hablan de «opciones», como el resto: `menu(textos[, opciones])`.
+
+Cosas nuevas:
+
+- `juego.boton_soltado()` (mando) y `juego.boton_raton_soltado()`, como `tecla_soltada()`.
+- `colision_circulos` y `colision_circulo_rect` aceptan círculos como `[x, y, radio]`.
+
 ## 0.9.0
 
 Mapas de Tiled, física sencilla, controles a gusto del jugador y un manual completo.

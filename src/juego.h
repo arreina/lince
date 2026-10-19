@@ -350,6 +350,26 @@ static Valor *jg_error(const char *tipo, const char *msg) {
     return valor_nulo();
 }
 
+/* ¿Son todas las claves de 'op' de 'validas' (lista acabada en NULL)? Si no,
+   el error de siempre: «fn(): no conozco la opción 'x' (hay "a", "b" y "c")» */
+static int jg_opciones_validas(Valor *op, const char *fn, const char *const *validas) {
+    if (!op || op->tipo != VAL_DICCIONARIO) return 1;
+    for (int j = 0; j < op->diccionario.cantidad; j++) {
+        const char *c = op->diccionario.claves[j];
+        int bien = 0;
+        for (int k = 0; validas[k] && !bien; k++) bien = !strcmp(c, validas[k]);
+        if (bien) continue;
+        char msg[700];
+        int l = snprintf(msg, sizeof msg, "%s(): no conozco la opción '%s' (hay ", fn, c);
+        for (int k = 0; validas[k] && l < (int)sizeof msg - 40; k++)
+            l += snprintf(msg + l, sizeof msg - (size_t)l, "%s\"%s\"", k == 0 ? "" : validas[k + 1] ? ", " : " y ", validas[k]);
+        snprintf(msg + l, sizeof msg - (size_t)l, ")");
+        jg_error("ErrorArgumento", msg);
+        return 0;
+    }
+    return 1;
+}
+
 /* La cámara con la que se dibuja: la del juego más el temblor */
 static void jg_cam_aplicar(void) {
     _jgs.cam_x = _jgs.cu_x + (_jgs.cam_quieta ? 0 : _jgs.tem_x);
@@ -505,7 +525,7 @@ malo:
     return 0;
 }
 
-#define JG_ABIERTA() do { if (!_jgs.abierta) return jg_error("Error", "la ventana no está abierta: llama a juego.abrir() primero"); } while (0)
+#define JG_ABIERTA() do { if (!_jgs.abierta) return jg_error("ErrorJuego", "la ventana no está abierta: llama a juego.abrir() primero"); } while (0)
 
 static void jg_pintar(const unsigned char c[4]) {
     _jg.SetBlend(_jgs.render, c[3] < 255 ? 1 : 0);
@@ -590,9 +610,11 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     if (n > 2 && !jg_num(a, n, 2, &h, "abrir")) return valor_nulo();
     if (n > 3 && a[3]->tipo != VAL_DICCIONARIO && a[3]->tipo != VAL_NULO)
         return jg_error("ErrorTipo", "abrir(): las opciones van en un diccionario, por ejemplo {\"escala\": 3}");
+    static const char *const VA[] = {"escala", NULL};
+    if (n > 3 && !jg_opciones_validas(a[3], "abrir", VA)) return valor_nulo();
     if (n > 3 && jg_opcion(a[3], "escala", &z) && (z < 1 || z > 16 || z != floor(z)))
-        return jg_error("Error", "abrir(): \"escala\" es un número entero de 1 a 16");
-    if (w < 1 || h < 1 || w > 16384 || h > 16384) return jg_error("Error", "abrir(): tamaño de ventana no válido");
+        return jg_error("ErrorArgumento", "abrir(): \"escala\" es un número entero de 1 a 16");
+    if (w < 1 || h < 1 || w > 16384 || h > 16384) return jg_error("ErrorArgumento", "abrir(): tamaño de ventana no válido");
     if (_jgs.abierta && _jgs.reabrir) {          /* programa recargado: la ventana sigue */
         _jgs.reabrir = 0;
         _jg.SetTitle(_jgs.ventana, a[0]->texto);
@@ -610,7 +632,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         _jgs.cierre = 0;
         return valor_nulo();
     }
-    if (_jgs.abierta) return jg_error("Error", "la ventana ya está abierta");
+    if (_jgs.abierta) return jg_error("ErrorJuego", "la ventana ya está abierta");
     if (!jg_cargar())
         return jg_error("ErrorJuego", "no se encuentra SDL2: instálala (por ejemplo 'sudo apt install libsdl2-2.0-0')");
 #ifdef __ANDROID__
@@ -984,7 +1006,7 @@ static Valor *jg_tecla(Valor **a, int n, int modo, const char *fn) {
     if (c < 0) {
         char msg[160];
         snprintf(msg, sizeof(msg), "%s(): tecla desconocida '%s'", fn, a[0]->texto);
-        return jg_error("Error", msg);
+        return jg_error("ErrorArgumento", msg);
     }
     int ahora = _jgs.teclas[c], antes = _jgs.previas[c];
     return valor_booleano(modo == 0 ? ahora : modo == 1 ? (ahora && !antes) : (!ahora && antes));
@@ -1095,8 +1117,8 @@ static Valor *fn_jg_vibrar(Valor **a, int n) {
     double s, f = 1;
     if (!jg_num(a, n, 0, &s, "vibrar")) return valor_nulo();
     if (n > 1 && !jg_num(a, n, 1, &f, "vibrar")) return valor_nulo();
-    if (s < 0 || s > 10) return jg_error("Error", "vibrar(): los segundos van de 0 a 10");
-    if (f < 0 || f > 1) return jg_error("Error", "vibrar(): la fuerza va de 0 a 1");
+    if (s < 0 || s > 10) return jg_error("ErrorArgumento", "vibrar(): los segundos van de 0 a 10");
+    if (f < 0 || f > 1) return jg_error("ErrorArgumento", "vibrar(): la fuerza va de 0 a 1");
     unsigned ms = (unsigned)(s * 1000 + 0.5);
     unsigned short fuerza = (unsigned short)(f * 65535);
     for (int i = 0; i < JG_MANDOS && _jg.Rumble; i++)
@@ -1152,12 +1174,14 @@ static Valor *fn_jg_tactil(Valor **a, int n) {
 static Valor *jg_boton(Valor **a, int n, int solo_pulso) {
     double b = 1;
     if (n > 0 && !jg_num(a, n, 0, &b, "boton_raton")) return valor_nulo();
-    if (b < 1 || b > 5) return jg_error("Error", "boton_raton(): el botón debe ser 1 a 5");
+    if (b < 1 || b > 5) return jg_error("ErrorArgumento", "boton_raton(): el botón debe ser 1 a 5");
     unsigned m = 1u << ((int)b - 1);
-    return valor_booleano(solo_pulso ? ((_jgs.raton & m) && !(_jgs.raton_prev & m)) : (_jgs.raton & m) != 0);
+    int ahora = (_jgs.raton & m) != 0, antes = (_jgs.raton_prev & m) != 0;
+    return valor_booleano(solo_pulso == 1 ? (ahora && !antes) : solo_pulso == 2 ? (!ahora && antes) : ahora);
 }
 static Valor *fn_jg_boton_raton(Valor **a, int n)          { return jg_boton(a, n, 0); }
 static Valor *fn_jg_boton_raton_pulsado(Valor **a, int n)  { return jg_boton(a, n, 1); }
+static Valor *fn_jg_boton_raton_soltado(Valor **a, int n)  { return jg_boton(a, n, 2); }
 
 static Valor *fn_jg_rueda(Valor **a, int n) { (void)a; (void)n; return valor_numero(_jgs.rueda); }
 
@@ -1668,9 +1692,11 @@ static float jg_volumen_arg(Valor **a, int n, int i, float defecto) {
 /* pitido(frecuencia, milisegundos[, volumen]): onda cuadrada suavizada, no bloquea */
 static Valor *fn_jg_pitido(Valor **a, int n) {
     JG_ABIERTA();
-    double f, ms;
-    if (!jg_num(a, n, 0, &f, "pitido") || !jg_num(a, n, 1, &ms, "pitido")) return valor_nulo();
-    if (f < 20 || f > 20000 || ms <= 0 || ms > 5000) return jg_error("Error", "pitido(): frecuencia 20-20000 Hz y duración hasta 5000 ms");
+    double f, seg;
+    if (!jg_num(a, n, 0, &f, "pitido") || !jg_num(a, n, 1, &seg, "pitido")) return valor_nulo();
+    if (f < 20 || f > 20000 || seg <= 0 || seg > 5)
+        return jg_error("ErrorArgumento", "pitido(): la frecuencia va de 20 a 20000 Hz y la duración, en segundos, hasta 5 (por ejemplo, pitido(440, 0.1))");
+    double ms = seg * 1000;
     float vol = jg_volumen_arg(a, n, 2, 0.25f);
     int total = (int)(JG_FRECUENCIA * ms / 1000);
     if (total < 2) return valor_nulo();
@@ -1836,21 +1862,15 @@ static Valor *fn_jg_reproducir(Valor **a, int n) {
     if (!s) return valor_nulo();
     if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
         Valor *op = a[1];
-        for (int j = 0; j < op->diccionario.cantidad; j++) {
-            const char *c = op->diccionario.claves[j];
-            if (strcmp(c, "volumen") && strcmp(c, "bucle") && strcmp(c, "lado") && strcmp(c, "tono")) {
-                char msg[200];
-                snprintf(msg, sizeof msg, "reproducir(): no conozco la opción '%s' (hay \"volumen\", \"bucle\", \"lado\" y \"tono\")", c);
-                return jg_error("Error", msg);
-            }
-        }
+        static const char *const V[] = {"volumen", "bucle", "lado", "tono", NULL};
+        if (!jg_opciones_validas(op, "reproducir", V)) return valor_nulo();
         double vol = 1, lado = 0, tono = 1, b = 0;
         jg_opcion(op, "volumen", &vol); jg_opcion(op, "lado", &lado); jg_opcion(op, "tono", &tono);
         Valor *vb = jg_opcion_valor(op, "bucle");
         if (vb) { if (vb->tipo != VAL_BOOLEANO) return jg_error("ErrorTipo", "reproducir(): \"bucle\" es verdadero o falso"); b = vb->booleano; }
-        if (vol < 0 || vol > 1) return jg_error("Error", "reproducir(): \"volumen\" va de 0 a 1");
-        if (lado < -1 || lado > 1) return jg_error("Error", "reproducir(): \"lado\" va de -1 (izquierda) a 1 (derecha)");
-        if (tono < 0.25 || tono > 4) return jg_error("Error", "reproducir(): \"tono\" va de 0.25 a 4 (1 es el normal)");
+        if (vol < 0 || vol > 1) return jg_error("ErrorArgumento", "reproducir(): \"volumen\" va de 0 a 1");
+        if (lado < -1 || lado > 1) return jg_error("ErrorArgumento", "reproducir(): \"lado\" va de -1 (izquierda) a 1 (derecha)");
+        if (tono < 0.25 || tono > 4) return jg_error("ErrorArgumento", "reproducir(): \"tono\" va de 0.25 a 4 (1 es el normal)");
         int id = jg_sonar(s->datos, s->muestras, (float)vol, (int)b, NULL);
         if (id > 0) {
             _jg.LockAudio(_jgs.audio);
@@ -2295,19 +2315,13 @@ static Valor *fn_jg_imagen(Valor **a, int n) {
     char msg[300];
     if (a[1]->tipo != VAL_DICCIONARIO)
         return jg_error("ErrorTipo", "imagen(): las opciones van en un diccionario, por ejemplo {\"fondo\": \"auto\"}");
-    for (int j = 0; j < a[1]->diccionario.cantidad; j++) {
-        const char *c = a[1]->diccionario.claves[j];
-        if (strcmp(c, "fondo") && strcmp(c, "escala") && strcmp(c, "colores")) {
-            snprintf(msg, sizeof msg, "imagen(): no conozco la opción '%s' (hay \"fondo\", \"escala\" y \"colores\")", c);
-            valor_destruir(img);
-            return jg_error("Error", msg);
-        }
-    }
+    static const char *const V[] = {"fondo", "escala", "colores", NULL};
+    if (!jg_opciones_validas(a[1], "imagen", V)) { valor_destruir(img); return valor_nulo(); }
     JgPreparar p;
     memset(&p, 0, sizeof p);
     if (!jg_leer_preparar(a[1], &p, "imagen", msg, sizeof msg)) {
         valor_destruir(img);
-        return hay_error ? valor_nulo() : jg_error("Error", msg);
+        return hay_error ? valor_nulo() : jg_error("ErrorArgumento", msg);
     }
     int k = jg_id_de(img, "imagen");
     valor_destruir(img);
@@ -2331,7 +2345,7 @@ static Valor *fn_jg_sprite(Valor **a, int n) {
         int l = (int)strlen(f->texto);
         if (l > ancho) ancho = l;
     }
-    if (ancho == 0 || ancho > 4096 || alto > 4096) return jg_error("Error", "sprite(): tamaño no válido");
+    if (ancho == 0 || ancho > 4096 || alto > 4096) return jg_error("ErrorArgumento", "sprite(): tamaño no válido");
     /* paleta: un color por carácter ASCII */
     unsigned char pal[128][4];
     memset(pal, 0, sizeof pal);
@@ -2357,7 +2371,7 @@ static Valor *fn_jg_sprite(Valor **a, int n) {
     for (int i = 0; i < _jgs.nimagenes; i++)
         if (strcmp(_jgs.imagenes[i].ruta, nombre) == 0) return jg_imagen_valor(i);
     unsigned *px = calloc((size_t)ancho * alto, 4);
-    if (!px) return jg_error("Error", "sin memoria");
+    if (!px) return jg_error("ErrorArgumento", "sin memoria");
     for (int y = 0; y < alto; y++) {
         const unsigned char *t = (const unsigned char *)a[0]->lista.elementos[y]->texto;
         for (int x = 0; t[x]; x++) {
@@ -2367,7 +2381,7 @@ static Valor *fn_jg_sprite(Valor **a, int n) {
         }
     }
     unsigned char *rgba = malloc((size_t)ancho * alto * 4);        /* copia para animar() y guardar_imagen() */
-    if (!rgba) { free(px); return jg_error("Error", "sin memoria"); }
+    if (!rgba) { free(px); return jg_error("ErrorArgumento", "sin memoria"); }
     for (int i = 0; i < ancho * alto; i++) {
         rgba[i * 4] = (unsigned char)(px[i] >> 16); rgba[i * 4 + 1] = (unsigned char)(px[i] >> 8);
         rgba[i * 4 + 2] = (unsigned char)px[i]; rgba[i * 4 + 3] = (unsigned char)(px[i] >> 24);
@@ -2951,7 +2965,7 @@ static Valor *fn_jg_pisadas(Valor **a, int n) {
         if (fila >= h->nf) {
             char msg[120];
             snprintf(msg, sizeof msg, "pisadas(): la hoja no tiene fila %d (tiene %d)", fila, h->nf);
-            return jg_error("Error", msg);
+            return jg_error("ErrorArgumento", msg);
         }
     }
     int cuantos = fila >= 0 ? h->por_fila[fila] : h->total;
@@ -2966,11 +2980,11 @@ static Valor *fn_jg_pisadas(Valor **a, int n) {
     } else if (n > 2 && a[2]->tipo != VAL_NULO)
         return jg_error("ErrorTipo", "pisadas(): los cuadros son una lista de números, o cuántos");
     int *cuadros = malloc(sizeof(int) * (size_t)cuantos);
-    if (!cuadros) return jg_error("Error", "sin memoria");
+    if (!cuadros) return jg_error("ErrorArgumento", "sin memoria");
     for (int i = 0; i < cuantos; i++) cuadros[i] = lista ? (int)lista->lista.elementos[i]->numero : i;
     const char *pisa = jg_pisadas_de(h, fila, cuadros, cuantos);
     free(cuadros);
-    if (!pisa) return jg_error("Error", "sin memoria");
+    if (!pisa) return jg_error("ErrorArgumento", "sin memoria");
     Valor *l = valor_lista_crear();
     for (int i = 0; i < cuantos; i++) if (pisa[i]) lista_agregar(l, valor_numero(i));
     return l;
@@ -3027,12 +3041,12 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
             }
             int de_cuenta = !strcmp(c, "columnas") || !strcmp(c, "filas");
             if (strcmp(c, "separacion") && strcmp(c, "margen") && !de_cuenta) {
-                snprintf(msg, sizeof msg, "hoja(): no conozco la opción '%s' (hay \"columnas\", \"filas\", "
-                         "\"separacion\", \"margen\", \"quitar\", \"fondo\", \"escala\" y \"colores\")", c);
-                return jg_error("Error", msg);
+                static const char *const V[] = {"columnas", "filas", "separacion", "margen", "quitar", "fondo", "escala", "colores", NULL};
+                jg_opciones_validas(op, "hoja", V);
+                return valor_nulo();
             }
             if (de_cuenta && r.modo == JG_HOJA_TAMANO)
-                return jg_error("Error", "hoja(): di el tamaño de los cuadros o cuántos hay (\"columnas\", \"filas\"), no las dos cosas");
+                return jg_error("ErrorArgumento", "hoja(): di el tamaño de los cuadros o cuántos hay (\"columnas\", \"filas\"), no las dos cosas");
             if (v->tipo != VAL_NUMERO) {
                 snprintf(msg, sizeof msg, "hoja(): \"%s\" es un número", c);
                 return jg_error("ErrorTipo", msg);
@@ -3046,7 +3060,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
             if (columnas == 0) columnas = 1;
             if (filas == 0) filas = 1;
             if (columnas < 1 || filas < 1 || columnas > 4096 || filas > 4096)
-                return jg_error("Error", "hoja(): \"columnas\" y \"filas\" son al menos 1");
+                return jg_error("ErrorArgumento", "hoja(): \"columnas\" y \"filas\" son al menos 1");
             r.modo = JG_HOJA_CUENTA;
             r.columnas = (int)columnas; r.filas = (int)filas;
         }
@@ -3059,7 +3073,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
         r.quitar = NULL; r.nquitar = 0;
     } else {
         r.prep.modo = r.modo == JG_HOJA_SOLA ? 1 : 0;     /* al dividirla sola, el fondo se quita solo */
-        if (!jg_leer_preparar(op, &r.prep, "hoja", msg, sizeof msg)) return hay_error ? valor_nulo() : jg_error("Error", msg);
+        if (!jg_leer_preparar(op, &r.prep, "hoja", msg, sizeof msg)) return hay_error ? valor_nulo() : jg_error("ErrorArgumento", msg);
     }
     /* los cuadros que se quitan, en la numeración de la hoja sin quitar nada */
     int *lista = NULL, nlista = 0;
@@ -3069,14 +3083,14 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
         if (solo_quitar) {
             quedaban = malloc(sizeof(int) * (total_antes > 0 ? total_antes : 1));
             char *fuera = calloc((size_t)(total_antes > 0 ? total_antes : 1), 1);
-            if (!quedaban || !fuera) { free(quedaban); free(fuera); return jg_error("Error", "sin memoria"); }
+            if (!quedaban || !fuera) { free(quedaban); free(fuera); return jg_error("ErrorArgumento", "sin memoria"); }
             for (int q = 0; q < otra->nquitar; q++) if (otra->quitar[q] < total_antes) fuera[otra->quitar[q]] = 1;
             for (int c = 0, m = 0; c < total_antes; c++) if (!fuera[c]) quedaban[m++] = c;
             free(fuera);
         }
         int cuenta = (solo_quitar ? otra->nquitar : 0) + quitar->lista.cantidad;
         lista = malloc(sizeof(int) * (cuenta > 0 ? cuenta : 1));
-        if (!lista) { free(quedaban); return jg_error("Error", "sin memoria"); }
+        if (!lista) { free(quedaban); return jg_error("ErrorArgumento", "sin memoria"); }
         if (solo_quitar) for (int q = 0; q < otra->nquitar; q++) lista[nlista++] = otra->quitar[q];
         int maximo = solo_quitar ? otra->total : -1;
         for (int q = 0; q < quitar->lista.cantidad; q++) {
@@ -3085,7 +3099,7 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
                 if (maximo >= 0) snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número de 0 a %d", maximo - 1);
                 else snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número desde 0");
                 free(lista); free(quedaban);
-                return jg_error("Error", msg);
+                return jg_error("ErrorArgumento", msg);
             }
             lista[nlista++] = solo_quitar ? quedaban[(int)e->numero] : (int)e->numero;
         }
@@ -3103,14 +3117,14 @@ static Valor *fn_jg_hoja(Valor **a, int n) {
     if (hi < 0) {
         char m2[460];
         snprintf(m2, sizeof m2, "hoja(): %s", msg);
-        return jg_error("Error", m2);
+        return jg_error("ErrorArgumento", m2);
     }
     /* un cuadro de "quitar" que no existe: se avisa (la primera vez se calculó con él) */
     JgHoja *h = &_jg_hojas[hi];
     for (int q = 0; q < h->nquitar && !solo_quitar; q++)
         if (h->quitar[q] >= h->total + h->nquitar) {
             snprintf(msg, sizeof msg, "hoja(): en \"quitar\", cada cuadro es un número de 0 a %d", h->total + h->nquitar - 1);
-            return jg_error("Error", msg);
+            return jg_error("ErrorArgumento", msg);
         }
     return jg_hoja_valor(hi);
 }
@@ -3351,7 +3365,7 @@ static Valor *jg_animacion_valor(int k) {
     r.base = k; r.modo = JG_HOJA_TAMANO; r.g.cw = cw; r.g.ch = im->alto; r.prep.escala = 1;
     char msg[300];
     int hi = jg_hoja_obtener(&r, msg, sizeof msg);
-    if (hi < 0) return jg_error("Error", msg);
+    if (hi < 0) return jg_error("ErrorArgumento", msg);
     Valor *d = jg_hoja_valor(hi);
     Valor *rel = valor_lista_crear();
     lista_agregar(rel, valor_numero((cw - o->ancho) / 2));
@@ -3425,7 +3439,7 @@ static Valor *fn_jg_animar(Valor **a, int n) {
     if (!valido) {
         snprintf(msg, sizeof msg, "animar(): no conozco la animación '%s'; hay respirar, andar, correr, saltar, "
                  "golpe, morir, flotar y girar", a[1]->texto);
-        return jg_error("Error", msg);
+        return jg_error("ErrorArgumento", msg);
     }
     snprintf(r.tipo, sizeof r.tipo, "%s", a[1]->texto);
     r.cuadros = !strcmp(r.tipo, "golpe") ? 4 : !strcmp(r.tipo, "correr") || !strcmp(r.tipo, "saltar") ? 6 : 8;
@@ -3438,13 +3452,13 @@ static Valor *fn_jg_animar(Valor **a, int n) {
             Valor *v = op->diccionario.valores[j];
             if (strcmp(c, "cuadros") && strcmp(c, "intensidad") && strcmp(c, "piernas") && strcmp(c, "centro") &&
                 strcmp(c, "vista")) {
-                snprintf(msg, sizeof msg, "animar(): no conozco la opción '%s' (hay \"cuadros\", \"intensidad\", "
-                         "\"vista\", \"piernas\" y \"centro\")", c);
-                return jg_error("Error", msg);
+                static const char *const V[] = {"cuadros", "intensidad", "vista", "piernas", "centro", NULL};
+                jg_opciones_validas(op, "animar", V);
+                return valor_nulo();
             }
             if (!strcmp(c, "vista")) {
                 if (v->tipo != VAL_TEXTO || (strcmp(v->texto, "lado") && strcmp(v->texto, "frente")))
-                    return jg_error("Error", "animar(): \"vista\" es \"lado\" (de perfil) o \"frente\"");
+                    return jg_error("ErrorArgumento", "animar(): \"vista\" es \"lado\" (de perfil) o \"frente\"");
                 r.frente = !strcmp(v->texto, "frente");
                 continue;
             }
@@ -3455,21 +3469,21 @@ static Valor *fn_jg_animar(Valor **a, int n) {
         }
         double v;
         if (jg_opcion(op, "cuadros", &v)) {
-            if (v < 1 || v > 64) return jg_error("Error", "animar(): \"cuadros\" va de 1 a 64");
+            if (v < 1 || v > 64) return jg_error("ErrorArgumento", "animar(): \"cuadros\" va de 1 a 64");
             r.cuadros = (int)v;
         }
         if (jg_opcion(op, "intensidad", &v)) {
-            if (v <= 0 || v > 10) return jg_error("Error", "animar(): \"intensidad\" es mayor que 0 (1 es lo normal)");
+            if (v <= 0 || v > 10) return jg_error("ErrorArgumento", "animar(): \"intensidad\" es mayor que 0 (1 es lo normal)");
             r.intensidad = v;
         }
         if (jg_opcion(op, "piernas", &v)) {
             if (v < 2 || v >= _jgs.imagenes[src].alto)
-                return jg_error("Error", "animar(): \"piernas\" es cuántas filas de abajo son las piernas (al menos 2)");
+                return jg_error("ErrorArgumento", "animar(): \"piernas\" es cuántas filas de abajo son las piernas (al menos 2)");
             r.piernas = (int)v;
         }
         if (jg_opcion(op, "centro", &v)) {
             if (v < 0 || v >= _jgs.imagenes[src].ancho)
-                return jg_error("Error", "animar(): \"centro\" es la columna que separa las dos piernas");
+                return jg_error("ErrorArgumento", "animar(): \"centro\" es la columna que separa las dos piernas");
             r.centro = (int)v;
         }
     }
@@ -3484,7 +3498,7 @@ static Valor *fn_jg_animar(Valor **a, int n) {
     int cw, ch;
     unsigned char *hoja = jg_generar_animacion(px, _jgs.imagenes[src].ancho, _jgs.imagenes[src].alto, &r, &cw, &ch, msg, sizeof msg);
     free(px);
-    if (!hoja) return jg_error("Error", msg);
+    if (!hoja) return jg_error("ErrorArgumento", msg);
     int k = jg_nueva_imagen(nombre, hoja, cw * r.cuadros, ch);
     if (k < 0) return jg_error("ErrorJuego", "animar(): no se pudo crear la hoja (¿demasiadas imágenes?)");
     _jgs.imagenes[k].origen = src;
@@ -3501,12 +3515,12 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
         return jg_error("ErrorTipo", "guardar_imagen() espera (imagen, ruta del .png)");
     size_t l = strlen(a[1]->texto);
     if (l < 4 || (strcmp(a[1]->texto + l - 4, ".png") && strcmp(a[1]->texto + l - 4, ".PNG")))
-        return jg_error("Error", "guardar_imagen(): la ruta debe acabar en .png");
+        return jg_error("ErrorArgumento", "guardar_imagen(): la ruta debe acabar en .png");
     unsigned char *px = jg_pixeles(k);
     if (!px) return jg_error("ErrorJuego", "guardar_imagen(): no se pudieron leer los píxeles de la imagen");
     int ok = imagen_guardar_png(a[1]->texto, px, _jgs.imagenes[k].ancho, _jgs.imagenes[k].alto);
     free(px);
-    if (!ok) return jg_error("Error", "guardar_imagen(): no se pudo escribir el archivo");
+    if (!ok) return jg_error("ErrorJuego", "guardar_imagen(): no se pudo escribir el archivo");
     return valor_nulo();
 }
 
@@ -3548,7 +3562,7 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     if (es_animador) {
         int ok = jg_cuadro_animador(a[0], &hoja, &anim_fila, &anim_cuadro);
         if (ok < 0) return valor_nulo();
-        if (!ok) return jg_error("Error", "dibujar(): el animador no tiene una animación que se pueda dibujar");
+        if (!ok) return jg_error("ErrorArgumento", "dibujar(): el animador no tiene una animación que se pueda dibujar");
     } else if (n > 0) hoja = jg_hoja_de(a[0]);
     int k = hoja ? hoja->imagen : n > 0 ? jg_id_de(a[0], "imagen") : -1;
     if (k < 0 || k >= _jgs.nimagenes) return jg_error("ErrorTipo", "dibujar() espera una imagen cargada con juego.imagen()");
@@ -3557,6 +3571,9 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     Valor *op = n > 3 ? a[3] : NULL;
     if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
         return jg_error("ErrorTipo", "dibujar(): las opciones van en un diccionario, por ejemplo {\"escala\": 2}");
+    static const char *const VD[] = {"escala", "ancho", "alto", "angulo", "espejo", "voltear", "centrado", "alfa", "color",
+                                     "blanco", "mezcla", "recorte", "cuadro", "celda", "fila", NULL};
+    if (!jg_opciones_validas(op, "dibujar", VD)) return valor_nulo();
     JgImagen *img = &_jgs.imagenes[k];
     JgRect src = {0, 0, img->ancho, img->alto};
     Valor *rec = jg_opcion_valor(op, "recorte");
@@ -3566,7 +3583,7 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     int fila = jg_opcion(op, "fila", &fv) ? (int)floor(fv) : -1;
     int ox = 0, oy = 0, cw = 0, ch = 0, es_hoja = 0;
     if (fila < -1 || (fila == -1 && jg_opcion(op, "fila", &fv)))
-        return jg_error("Error", "dibujar(): \"fila\" empieza en 0");
+        return jg_error("ErrorArgumento", "dibujar(): \"fila\" empieza en 0");
     if (rec) {
         if (rec->tipo != VAL_LISTA || rec->lista.cantidad != 4) return jg_error("ErrorTipo", "dibujar(): 'recorte' es [x, y, ancho, alto]");
         int *dst[4] = {&src.x, &src.y, &src.w, &src.h};
@@ -3579,7 +3596,7 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
             celda->lista.elementos[0]->tipo != VAL_NUMERO || celda->lista.elementos[1]->tipo != VAL_NUMERO)
             return jg_error("ErrorTipo", "dibujar(): 'celda' es [ancho, alto] de cada cuadro");
         JgRejilla g = {(int)celda->lista.elementos[0]->numero, (int)celda->lista.elementos[1]->numero, 0, 0};
-        if (g.cw < 1 || g.ch < 1) return jg_error("Error", "dibujar(): la celda debe medir al menos 1×1");
+        if (g.cw < 1 || g.ch < 1) return jg_error("ErrorArgumento", "dibujar(): la celda debe medir al menos 1×1");
         src = jg_rejilla_rect(img, &g, (int)floor(cuadro));
     } else if (hoja) {                              /* una hoja: ya sabe dónde está cada cuadro */
         char msg[200];
@@ -3588,14 +3605,14 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
         if (i < 0) {
             char m2[260];
             snprintf(m2, sizeof m2, "dibujar(): %s", msg);
-            return jg_error("Error", m2);
+            return jg_error("ErrorArgumento", m2);
         }
         es_hoja = 1;
         cw = hoja->cw; ch = hoja->ch;
         if (es_animador) jg_dic_poner(a[0], "cuadro", valor_numero(i));
     }
     if (fila >= 0 && es_hoja != 1)
-        return jg_error("Error", "dibujar(): \"fila\" es para hojas de juego.hoja() (cada fila, una animación)");
+        return jg_error("ErrorArgumento", "dibujar(): \"fila\" es para hojas de juego.hoja() (cada fila, una animación)");
     if (es_hoja != 1) { cw = src.w; ch = src.h; }
     double escala = 1, fx, fy, angulo = 0, v;
     jg_opcion(op, "escala", &escala);
@@ -3616,14 +3633,14 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     jg_opcion(op, "blanco", &blanco);
     if (alfa < 0) alfa = 0;
     if (alfa > 255) alfa = 255;
-    if (blanco < 0 || blanco > 1) return jg_error("Error", "dibujar(): \"blanco\" va de 0 (nada) a 1 (todo blanco)");
+    if (blanco < 0 || blanco > 1) return jg_error("ErrorArgumento", "dibujar(): \"blanco\" va de 0 (nada) a 1 (todo blanco)");
     int mezcla = 1;                                 /* SDL_BLENDMODE_BLEND */
     Valor *mz = jg_opcion_valor(op, "mezcla");
     if (mz) {
         if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "normal")) mezcla = 1;
         else if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "sumar")) mezcla = 2;
         else if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "multiplicar")) mezcla = 4;
-        else return jg_error("Error", "dibujar(): \"mezcla\" es \"normal\", \"sumar\" (brillos, energía) o \"multiplicar\" (sombras)");
+        else return jg_error("ErrorArgumento", "dibujar(): \"mezcla\" es \"normal\", \"sumar\" (brillos, energía) o \"multiplicar\" (sombras)");
     }
     unsigned char tinte[4] = {255, 255, 255, 255};
     Valor *col = jg_opcion_valor(op, "color");
@@ -3685,15 +3702,18 @@ static Valor *fn_jg_caja(Valor **a, int n) {
     Valor *op = n > 3 ? a[3] : NULL;
     if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
         return jg_error("ErrorTipo", "caja(): las opciones van en un diccionario, como en dibujar()");
+    static const char *const VC[] = {"escala", "ancho", "alto", "angulo", "espejo", "voltear", "centrado", "alfa", "color",
+                                     "blanco", "mezcla", "recorte", "cuadro", "celda", "fila", "margen", "trozo", NULL};
+    if (!jg_opciones_validas(op, "caja", VC)) return valor_nulo();
     double v;
     if (es_animador) {
         int ok = jg_cuadro_animador(a[0], &hoja, &fila, &cuadro);
         if (ok < 0) return valor_nulo();
-        if (!ok) return jg_error("Error", "caja(): el animador no tiene ninguna animación puesta");
+        if (!ok) return jg_error("ErrorArgumento", "caja(): el animador no tiene ninguna animación puesta");
     } else if (n > 0 && (hoja = jg_hoja_de(a[0])) != NULL) {
         if (jg_opcion(op, "cuadro", &v)) cuadro = (int)floor(v);
         if (jg_opcion(op, "fila", &v)) {
-            if (v < 0) return jg_error("Error", "caja(): \"fila\" empieza en 0");
+            if (v < 0) return jg_error("ErrorArgumento", "caja(): \"fila\" empieza en 0");
             fila = (int)floor(v);
         }
     }
@@ -3712,7 +3732,7 @@ static Valor *fn_jg_caja(Valor **a, int n) {
         if (i < 0) {
             char m2[260];
             snprintf(m2, sizeof m2, "caja(): %s", msg);
-            return jg_error("Error", m2);
+            return jg_error("ErrorArgumento", m2);
         }
         c = hoja->caja[i];
         cw = hoja->cw; ch = hoja->ch;
@@ -3885,13 +3905,8 @@ static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
     JgFuente *f = NULL;
     int es_fuente = op && valor_diccionario_buscar(op, "fuente") >= 0 && op->diccionario.valores[valor_diccionario_buscar(op, "fuente")]->tipo == VAL_NUMERO;
     if (op && !es_fuente) {                     /* unas opciones (no una fuente pasada tal cual) */
-        for (int j = 0; j < op->diccionario.cantidad; j++) {
-            const char *c = op->diccionario.claves[j];
-            if (strcmp(c, "fuente") && strcmp(c, "escala") && strcmp(c, "color") && strcmp(c, "alinear") && strcmp(c, "ancho")) {
-                snprintf(msg, sizeof msg, "%s(): no conozco la opción '%s' (hay \"fuente\", \"escala\", \"color\", \"alinear\" y \"ancho\")", fn, c);
-                return jg_error("Error", msg);
-            }
-        }
+        static const char *const V[] = {"fuente", "escala", "color", "alinear", "ancho", NULL};
+        if (!jg_opciones_validas(op, fn, V)) return valor_nulo();
     }
     if (op && valor_diccionario_buscar(op, "fuente") >= 0) {
         f = jg_fuente_de(op);
@@ -3902,7 +3917,7 @@ static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
     }
     double e = f ? 1 : 2, ancho = 0, v;
     if (jg_opcion(op, "escala", &v)) e = v;
-    if (e <= 0) { snprintf(msg, sizeof msg, "%s(): \"escala\" es mayor que 0", fn); return jg_error("Error", msg); }
+    if (e <= 0) { snprintf(msg, sizeof msg, "%s(): \"escala\" es mayor que 0", fn); return jg_error("ErrorArgumento", msg); }
     if (!f) e = e < 1 ? 1 : e > 64 ? 64 : (int)e;        /* la de Lince va en píxeles enteros */
     jg_opcion(op, "ancho", &ancho);
     int alinear = 0;
@@ -3911,7 +3926,7 @@ static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
         if (al->tipo == VAL_TEXTO && !strcmp(al->texto, "izquierda")) alinear = 0;
         else if (al->tipo == VAL_TEXTO && !strcmp(al->texto, "centro")) alinear = 1;
         else if (al->tipo == VAL_TEXTO && !strcmp(al->texto, "derecha")) alinear = 2;
-        else { snprintf(msg, sizeof msg, "%s(): \"alinear\" es \"izquierda\", \"centro\" o \"derecha\"", fn); return jg_error("Error", msg); }
+        else { snprintf(msg, sizeof msg, "%s(): \"alinear\" es \"izquierda\", \"centro\" o \"derecha\"", fn); return jg_error("ErrorArgumento", msg); }
     }
     enum { MAXL = 512 };
     const unsigned char *ini[MAXL], *fin[MAXL];
@@ -4061,7 +4076,7 @@ static Valor *fn_jg_fuente(Valor **a, int n) {
         if (n < 2 || a[1]->tipo != VAL_NUMERO)
             return jg_error("ErrorTipo", "fuente() espera (ruta de la fuente, tamaño en píxeles), por ejemplo (\"letra.ttf\", 24)");
         double tam = a[1]->numero;
-        if (tam < 4 || tam > 400) return jg_error("Error", "fuente(): el tamaño va de 4 a 400 píxeles");
+        if (tam < 4 || tam > 400) return jg_error("ErrorArgumento", "fuente(): el tamaño va de 4 a 400 píxeles");
         snprintf(clave, sizeof clave, "ttf|%s|%g", a[0]->texto, tam);
         for (int i = 0; i < _jg_nfuentes; i++) if (!strcmp(_jg_fuentes[i].clave, clave)) return jg_fuente_valor(i);
         size_t largo = 0;
@@ -4102,32 +4117,27 @@ static Valor *fn_jg_fuente(Valor **a, int n) {
         Valor *op = n > 2 ? a[2] : NULL;
         if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
             return jg_error("ErrorTipo", "fuente(): las opciones van en un diccionario, por ejemplo {\"celda\": [8, 8]}");
-        for (int j = 0; op && op->tipo == VAL_DICCIONARIO && j < op->diccionario.cantidad; j++) {
-            const char *c = op->diccionario.claves[j];
-            if (strcmp(c, "celda") && strcmp(c, "separacion") && strcmp(c, "espacio")) {
-                snprintf(msg, sizeof msg, "fuente(): no conozco la opción '%s' (hay \"celda\", \"separacion\" y \"espacio\")", c);
-                return jg_error("Error", msg);
-            }
-        }
+        static const char *const V[] = {"celda", "separacion", "espacio", NULL};
+        if (!jg_opciones_validas(op, "fuente", V)) return valor_nulo();
         int cw = 0, ch = 0, espacio = -1;
         double v, sep;
         Valor *celda = jg_opcion_valor(op, "celda");
         if (celda) {
             if (celda->tipo != VAL_LISTA || celda->lista.cantidad != 2 || celda->lista.elementos[0]->tipo != VAL_NUMERO ||
                 celda->lista.elementos[1]->tipo != VAL_NUMERO || celda->lista.elementos[0]->numero < 1 || celda->lista.elementos[1]->numero < 1)
-                return jg_error("Error", "fuente(): \"celda\" es [ancho, alto] de cada letra");
+                return jg_error("ErrorArgumento", "fuente(): \"celda\" es [ancho, alto] de cada letra");
             cw = (int)celda->lista.elementos[0]->numero; ch = (int)celda->lista.elementos[1]->numero;
         }
         sep = cw > 0 ? 0 : 1;
         if (jg_opcion(op, "separacion", &v)) sep = v;
         if (jg_opcion(op, "espacio", &v)) espacio = (int)v;
-        if (sep < 0 || sep > 100) return jg_error("Error", "fuente(): \"separacion\" va de 0 a 100 píxeles");
+        if (sep < 0 || sep > 100) return jg_error("ErrorArgumento", "fuente(): \"separacion\" va de 0 a 100 píxeles");
         snprintf(clave, sizeof clave, "img|%d|%d|%d|%g|%d|%.1000s", k, cw, ch, sep, espacio, a[1]->texto);
         for (int i = 0; i < _jg_nfuentes; i++) if (!strcmp(_jg_fuentes[i].clave, clave)) return jg_fuente_valor(i);
         if (!jg_fuente_imagen(k, a[1]->texto, cw, ch, (int)sep, espacio, &f, msg, sizeof msg)) {
             char m2[460];
             snprintf(m2, sizeof m2, "fuente(): %s", msg);
-            return jg_error("Error", m2);
+            return jg_error("ErrorArgumento", m2);
         }
     }
     int i = jg_fuente_nueva(clave, &f);
@@ -4164,7 +4174,7 @@ static Valor *fn_jg_temblor(Valor **a, int n) {
     double f, s = 0.3;
     if (!jg_num(a, n, 0, &f, "temblor")) return valor_nulo();
     if (n > 1 && !jg_num(a, n, 1, &s, "temblor")) return valor_nulo();
-    if (f < 0 || s < 0) return jg_error("Error", "temblor(): la fuerza y los segundos no pueden ser negativos");
+    if (f < 0 || s < 0) return jg_error("ErrorArgumento", "temblor(): la fuerza y los segundos no pueden ser negativos");
     double real = jg_reloj_real(), queda = 0;
     if (_jgs.tem_dur > 0 && real < _jgs.tem_desde + _jgs.tem_dur)
         queda = _jgs.tem_fuerza * (1 - (real - _jgs.tem_desde) / _jgs.tem_dur);
@@ -4179,7 +4189,7 @@ static Valor *fn_jg_congelar(Valor **a, int n) {
     JG_ABIERTA();
     double s;
     if (!jg_num(a, n, 0, &s, "congelar")) return valor_nulo();
-    if (s < 0 || s > 10) return jg_error("Error", "congelar(): los segundos van de 0 a 10");
+    if (s < 0 || s > 10) return jg_error("ErrorArgumento", "congelar(): los segundos van de 0 a 10");
     if (!_jgs.reloj_propio) { _jgs.reloj = jg_reloj_real(); _jgs.reloj_propio = 1; }
     double hasta = jg_reloj_real() + s;
     if (hasta > _jgs.congelar_hasta) _jgs.congelar_hasta = hasta;
@@ -4193,7 +4203,7 @@ static Valor *fn_jg_velocidad(Valor **a, int n) {
     if (n > 0) {
         double v;
         if (!jg_num(a, n, 0, &v, "velocidad")) return valor_nulo();
-        if (v < 0 || v > 10) return jg_error("Error", "velocidad(): va de 0 (parado) a 10 (1 es lo normal)");
+        if (v < 0 || v > 10) return jg_error("ErrorArgumento", "velocidad(): va de 0 (parado) a 10 (1 es lo normal)");
         if (!_jgs.reloj_propio) { _jgs.reloj = jg_reloj_real(); _jgs.reloj_propio = 1; }
         _jgs.velocidad = v;
     }
@@ -4285,14 +4295,14 @@ static Valor *fn_jg_mando_virtual(Valor **a, int n) {
         Valor *v = a[0]->lista.elementos[i];
         int b = -1;
         for (int k = 0; v->tipo == VAL_TEXTO && k < JG_BOTONES; k++) if (strcmp(v->texto, JG_NOMBRES_BOTON[k]) == 0) b = k;
-        if (b < 0) return jg_error("Error", "mando_virtual(): botón desconocido (a, b, x, y, lb, rb, inicio, atras, guia, arriba, abajo, izquierda, derecha, stick_izq, stick_der)");
+        if (b < 0) return jg_error("ErrorArgumento", "mando_virtual(): botón desconocido (a, b, x, y, lb, rb, inicio, atras, guia, arriba, abajo, izquierda, derecha, stick_izq, stick_der)");
         botones[b] = 1;
     }
     for (int i = 0; i < a[1]->diccionario.cantidad; i++) {
         int e = -1;
         for (int k = 0; k < JG_EJES; k++) if (strcmp(a[1]->diccionario.claves[i], JG_NOMBRES_EJE[k]) == 0) e = k;
         Valor *v = a[1]->diccionario.valores[i];
-        if (e < 0 || v->tipo != VAL_NUMERO) return jg_error("Error", "mando_virtual(): los ejes son izq_x, izq_y, der_x, der_y, lt y rt, con un número");
+        if (e < 0 || v->tipo != VAL_NUMERO) return jg_error("ErrorArgumento", "mando_virtual(): los ejes son izq_x, izq_y, der_x, der_y, lt y rt, con un número");
         float f = (float)v->numero, min = e >= 4 ? 0 : -1;
         ejes[e] = f < min ? min : f > 1 ? 1 : f;
     }
@@ -4338,15 +4348,16 @@ static Valor *jg_boton_mando(Valor **a, int n, int pulso, const char *fn) {
     if (b < 0) {
         char msg[300];
         snprintf(msg, sizeof msg, "%s(): botón desconocido '%s' (a, b, x, y, lb, rb, inicio, atras, guia, arriba, abajo, izquierda, derecha, stick_izq, stick_der)", fn, a[0]->texto);
-        return jg_error("Error", msg);
+        return jg_error("ErrorArgumento", msg);
     }
     int m = jg_mando_arg(a, n, 1);
     if (m < 0) return valor_booleano(0);
     int ahora = _jgs.botones[m][b], antes = _jgs.botones_prev[m][b];
-    return valor_booleano(pulso ? (ahora && !antes) : ahora);
+    return valor_booleano(pulso == 1 ? (ahora && !antes) : pulso == 2 ? (!ahora && antes) : ahora);
 }
 static Valor *fn_jg_boton(Valor **a, int n)         { return jg_boton_mando(a, n, 0, "boton"); }
 static Valor *fn_jg_boton_pulsado(Valor **a, int n) { return jg_boton_mando(a, n, 1, "boton_pulsado"); }
+static Valor *fn_jg_boton_soltado(Valor **a, int n) { return jg_boton_mando(a, n, 2, "boton_soltado"); }
 
 /* eje(nombre[, mando]): izq_x, izq_y, der_x, der_y (-1..1), lt, rt (0..1); zona muerta 0,15 */
 static Valor *fn_jg_eje(Valor **a, int n) {
@@ -4354,7 +4365,7 @@ static Valor *fn_jg_eje(Valor **a, int n) {
     int e = -1;
     if (n > 0 && a[0]->tipo == VAL_TEXTO)
         for (int i = 0; i < JG_EJES; i++) if (strcmp(a[0]->texto, JG_NOMBRES_EJE[i]) == 0) { e = i; break; }
-    if (e < 0) return jg_error("Error", "eje() espera \"izq_x\", \"izq_y\", \"der_x\", \"der_y\", \"lt\" o \"rt\"");
+    if (e < 0) return jg_error("ErrorArgumento", "eje() espera \"izq_x\", \"izq_y\", \"der_x\", \"der_y\", \"lt\" o \"rt\"");
     int m = jg_mando_arg(a, n, 1);
     if (m < 0) return valor_numero(0);
     return valor_numero(_jgs.ejes[m][e]);
@@ -4540,7 +4551,7 @@ static Valor *fn_jg_definir_accion(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_LISTA)
         return jg_error("ErrorTipo", "definir_accion() espera (nombre, lista de entradas), por ejemplo (\"saltar\", [\"espacio\", \"mando:a\"])");
-    if (a[1]->lista.cantidad > JG_ENTRADAS) return jg_error("Error", "definir_accion(): como mucho 16 entradas por acción");
+    if (a[1]->lista.cantidad > JG_ENTRADAS) return jg_error("ErrorArgumento", "definir_accion(): como mucho 16 entradas por acción");
     /* si el jugador cambió los controles de esta acción (menu_controles), los suyos */
     a[0]->refs++;
     a[1]->refs++;
@@ -4554,7 +4565,7 @@ static Valor *fn_jg_definir_accion(Valor **a, int n) {
 }
 
 static Valor *jg_definir(const char *nombre_accion, Valor *entradas) {
-    if (entradas->lista.cantidad > JG_ENTRADAS) return jg_error("Error", "definir_accion(): como mucho 16 entradas por acción");
+    if (entradas->lista.cantidad > JG_ENTRADAS) return jg_error("ErrorArgumento", "definir_accion(): como mucho 16 entradas por acción");
     JgAccion nueva = {0};
     for (int i = 0; i < entradas->lista.cantidad; i++) {
         Valor *v = entradas->lista.elementos[i];
@@ -4564,14 +4575,14 @@ static Valor *jg_definir(const char *nombre_accion, Valor *entradas) {
             char m2[400];
             snprintf(m2, sizeof m2, "definir_accion(\"%s\"): %s", nombre_accion, msg);
             for (int k = 0; k < nueva.n; k++) free(nueva.textos[k]);
-            return jg_error("Error", m2);
+            return jg_error("ErrorArgumento", m2);
         }
         nueva.textos[nueva.n] = strdup(v->texto);
         nueva.n++;
     }
     JgAccion *acc = jg_buscar_accion(nombre_accion);
     if (!acc) {
-        if (_jgs.nacciones == JG_ACCIONES) return jg_error("Error", "definir_accion(): como mucho 64 acciones");
+        if (_jgs.nacciones == JG_ACCIONES) return jg_error("ErrorArgumento", "definir_accion(): como mucho 64 acciones");
         acc = &_jgs.acciones[_jgs.nacciones++];
         acc->nombre = strdup(nombre_accion);
         acc->desde = acc->soltada = -1; acc->duro = 0;
@@ -4658,7 +4669,7 @@ static JgAccion *jg_accion_arg(Valor **a, int n, int i, const char *fn) {
     JgAccion *acc = jg_buscar_accion(a[i]->texto);
     if (!acc) {
         snprintf(msg, sizeof msg, "%s(): la acción '%s' no está definida (usa juego.definir_accion)", fn, a[i]->texto);
-        jg_error("Error", msg);
+        jg_error("ErrorArgumento", msg);
     }
     return acc;
 }
@@ -4783,8 +4794,8 @@ static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, 
     int k = 0, ok = 1;
     for (int i = 0; i < n && ok; i++) {
         if (a[i]->tipo == VAL_NUMERO) { if (k < cuantos) v[k] = a[i]->numero; k++; continue; }
-        ok = a[i]->tipo == VAL_LISTA && a[i]->lista.cantidad == 4;
-        for (int j = 0; ok && j < 4; j++) {
+        ok = a[i]->tipo == VAL_LISTA && (a[i]->lista.cantidad == 4 || a[i]->lista.cantidad == 3);
+        for (int j = 0; ok && j < a[i]->lista.cantidad; j++) {
             ok = a[i]->lista.elementos[j]->tipo == VAL_NUMERO;
             if (ok && k < cuantos) v[k] = a[i]->lista.elementos[j]->numero;
             k++;
@@ -4792,7 +4803,7 @@ static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, 
     }
     if (ok && k == cuantos) return 1;
     char msg[200];
-    snprintf(msg, sizeof msg, "%s() espera %s (cada rectángulo, en números o en una lista [x, y, ancho, alto])", fn, forma);
+    snprintf(msg, sizeof msg, "%s() espera %s (en números o en listas: [x, y, ancho, alto] un rectángulo y [x, y, radio] un círculo)", fn, forma);
     jg_error("ErrorTipo", msg);
     return 0;
 }
@@ -4811,7 +4822,7 @@ static Valor *fn_jg_colision(Valor **a, int n) {
 /* colision_circulos(x1, y1, r1, x2, y2, r2): ¿se tocan los dos círculos? */
 static Valor *fn_jg_colision_circulos(Valor **a, int n) {
     double v[6];
-    for (int i = 0; i < 6; i++) if (!jg_num(a, n, i, &v[i], "colision_circulos")) return valor_nulo();
+    if (!jg_numeros(a, n, v, 6, "colision_circulos", "(x1, y1, radio1, x2, y2, radio2)")) return valor_nulo();
     double dx = v[3] - v[0], dy = v[4] - v[1], r = v[2] + v[5];
     return valor_booleano(dx * dx + dy * dy < r * r);
 }
@@ -4847,7 +4858,7 @@ static Valor *fn_jg_cuadro(Valor **a, int n) {
     if (n > 2 && !jg_num(a, n, 2, &desde, "cuadro")) return valor_nulo();
     int repetir = !(n > 3 && a[3]->tipo == VAL_BOOLEANO && !a[3]->booleano);
     int total = a[0]->tipo == VAL_LISTA ? a[0]->lista.cantidad : (int)a[0]->numero;
-    if (total < 1) return jg_error("Error", "cuadro(): hace falta al menos un cuadro");
+    if (total < 1) return jg_error("ErrorArgumento", "cuadro(): hace falta al menos un cuadro");
     double t = jg_reloj() - desde;
     long k = t > 0 ? (long)floor(t * fps + 1e-9) : 0;
     if (repetir) k %= total;
@@ -4864,7 +4875,7 @@ static Valor *fn_jg_cuadro(Valor **a, int n) {
    las mueve y las dibuja (llámala cada fotograma, donde quieras que salgan). */
 static const char *const JG_OPC_PART[] = {
     "cantidad", "color", "color_final", "velocidad", "direccion", "apertura", "vida",
-    "tamaño", "tamano", "tamaño_final", "tamano_final", "gravedad", "mezcla", NULL };
+    "tamaño", "tamaño_final", "gravedad", "mezcla", NULL };
 
 /* Número u [mínimo, máximo] (al azar entre los dos) */
 static int jg_rango(Valor *op, const char *clave, double *min, double *max) {
@@ -4896,12 +4907,7 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
             const char *k = op->diccionario.claves[i];
             int bien = 0;
             for (int j = 0; JG_OPC_PART[j]; j++) if (strcmp(k, JG_OPC_PART[j]) == 0) bien = 1;
-            if (!bien) {
-                char msg[400];
-                snprintf(msg, sizeof msg, "particulas(): opción desconocida '%s'. Las opciones son: cantidad, color, "
-                         "color_final, velocidad, direccion, apertura, vida, tamaño, tamaño_final, gravedad y mezcla", k);
-                return jg_error("Error", msg);
-            }
+            if (!bien) { jg_opciones_validas(op, "particulas", JG_OPC_PART); return valor_nulo(); }
         }
     }
     double cantidad = 20, v0 = 60, v1 = 180, dir = 0, apertura = 360, vida0 = 0.4, vida1 = 0.8;
@@ -4910,10 +4916,10 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
     jg_opcion(op, "direccion", &dir);
     jg_opcion(op, "apertura", &apertura);
     if (!jg_rango(op, "velocidad", &v0, &v1) || !jg_rango(op, "vida", &vida0, &vida1) ||
-        !jg_rango(op, "tamano", &tam0, &tam1) || !jg_rango(op, "tamaño", &tam0, &tam1) ||
+        !jg_rango(op, "tamaño", &tam0, &tam1) ||
         !jg_rango(op, "gravedad", &grav0, &grav1)) return valor_nulo();
     double fin0 = -1, fin1 = -1;
-    if (!jg_rango(op, "tamano_final", &fin0, &fin1) || !jg_rango(op, "tamaño_final", &fin0, &fin1)) return valor_nulo();
+    if (!jg_rango(op, "tamaño_final", &fin0, &fin1)) return valor_nulo();
     unsigned char c[4], c_fin[4];
     Valor *vc = jg_opcion_valor(op, "color"), *vf = jg_opcion_valor(op, "color_final");
     Valor *arg[1];
@@ -4928,7 +4934,7 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
         if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "sumar")) mezcla = 2;
         else if (mz->tipo == VAL_TEXTO && !strcmp(mz->texto, "multiplicar")) mezcla = 4;
         else if (mz->tipo != VAL_TEXTO || strcmp(mz->texto, "normal"))
-            return jg_error("Error", "particulas(): \"mezcla\" es \"normal\", \"sumar\" (chispas y energía que brillan) o \"multiplicar\" (humo que oscurece)");
+            return jg_error("ErrorArgumento", "particulas(): \"mezcla\" es \"normal\", \"sumar\" (chispas y energía que brillan) o \"multiplicar\" (humo que oscurece)");
     }
     int cuantas = cantidad < 0 ? 0 : cantidad > JG_PARTICULAS ? JG_PARTICULAS : (int)cantidad;
     for (int i = 0; i < cuantas; i++) {
@@ -5123,8 +5129,8 @@ static short *jg_efecto_args(Valor **a, int n, const char *fn, int *muestras, fl
         for (int i = 0; i < op->diccionario.cantidad; i++) {
             const char *k = op->diccionario.claves[i];
             if (strcmp(k, "volumen") && strcmp(k, "semilla") && strcmp(k, "tono") && strcmp(k, "largo")) {
-                snprintf(msg, sizeof msg, "%s(): opción desconocida '%s'. Las opciones son: volumen, tono, largo y semilla", fn, k);
-                jg_error("Error", msg);
+                static const char *const V[] = {"volumen", "tono", "largo", "semilla", NULL};
+                jg_opciones_validas(op, fn, V);
                 return NULL;
             }
         }
@@ -5135,7 +5141,7 @@ static short *jg_efecto_args(Valor **a, int n, const char *fn, int *muestras, fl
     jg_opcion(op, "volumen", &v);
     if (tono <= 0.05 || tono > 20 || largo <= 0.05 || largo > 10) {
         snprintf(msg, sizeof msg, "%s(): 'tono' y 'largo' multiplican la frecuencia y la duración: usa valores como 0.5, 1 o 2", fn);
-        jg_error("Error", msg);
+        jg_error("ErrorArgumento", msg);
         return NULL;
     }
     *vol = (float)(v < 0 ? 0 : v > 1 ? 1 : v);
@@ -5145,7 +5151,7 @@ static short *jg_efecto_args(Valor **a, int n, const char *fn, int *muestras, fl
     JgSintesis p;
     if (!jg_preparar_efecto(a[0]->texto, &p)) {
         snprintf(msg, sizeof msg, "%s(): no conozco el efecto '%s'. Hay: moneda, salto, disparo, explosion, golpe, subir, clic y perder", fn, a[0]->texto);
-        jg_error("Error", msg);
+        jg_error("ErrorArgumento", msg);
         return NULL;
     }
     if (clave) snprintf(clave, max, "<efecto %s %g %g %g>", a[0]->texto, semilla, tono, largo);
@@ -5195,7 +5201,7 @@ static Valor *fn_jg_guardar_sonido(Valor **a, int n) {
     if (!so) return valor_nulo();
     if (n < 2 || a[1]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "guardar_sonido() espera (sonido, ruta del .wav)");
     FILE *f = fopen(a[1]->texto, "wb");
-    if (!f) return jg_error("Error", "guardar_sonido(): no se pudo crear el archivo");
+    if (!f) return jg_error("ErrorJuego", "guardar_sonido(): no se pudo crear el archivo");
     unsigned datos = (unsigned)so->muestras * JG_CANALES * 2;
     unsigned char cab[44];
     memcpy(cab, "RIFF", 4);
@@ -5212,7 +5218,7 @@ static Valor *fn_jg_guardar_sonido(Valor **a, int n) {
         ok = fwrite(m, 1, 2, f) == 2;
     }
     ok = fclose(f) == 0 && ok;
-    if (!ok) return jg_error("Error", "guardar_sonido(): no se pudo escribir el archivo");
+    if (!ok) return jg_error("ErrorJuego", "guardar_sonido(): no se pudo escribir el archivo");
     return valor_nulo();
 }
 
@@ -5299,7 +5305,7 @@ static int jg_ruta_guardado(Valor **a, int n, const char *fn, char *ruta, size_t
     if (!jg_carpeta_guardado(carpeta, sizeof carpeta, crear)) {
         char m[160];
         snprintf(m, sizeof m, "%s(): no se pudo crear la carpeta de las partidas guardadas", fn);
-        jg_error("Error", m);
+        jg_error("ErrorJuego", m);
         return 0;
     }
     snprintf(ruta, max, "%s/%s.json", carpeta, t);
@@ -5330,7 +5336,7 @@ static Valor *fn_jg_guardar(Valor **a, int n) {
 #else
     if (ok) ok = rename(temporal, ruta) == 0;
 #endif
-    if (!ok) { remove(temporal); return jg_error("Error", "guardar(): no se pudo escribir la partida"); }
+    if (!ok) { remove(temporal); return jg_error("ErrorJuego", "guardar(): no se pudo escribir la partida"); }
     return valor_booleano(1);
 }
 
@@ -5383,7 +5389,7 @@ static Valor *fn_jg_olvidar(Valor **a, int n) {
 static Valor *fn_jg_carpeta_guardado(Valor **a, int n) {
     (void)a; (void)n;
     char carpeta[900];
-    if (!jg_carpeta_guardado(carpeta, sizeof carpeta, 1)) return jg_error("Error", "carpeta_guardado(): no se pudo crear la carpeta de las partidas guardadas");
+    if (!jg_carpeta_guardado(carpeta, sizeof carpeta, 1)) return jg_error("ErrorJuego", "carpeta_guardado(): no se pudo crear la carpeta de las partidas guardadas");
     return valor_texto(carpeta);
 }
 
@@ -5429,8 +5435,10 @@ static Valor *fn_jg_mapa(Valor **a, int n) {
         return jg_error("ErrorTipo", "mapa() espera (lista de filas de texto, tamaño de casilla[, opciones])");
     double tam;
     if (!jg_num(a, n, 1, &tam, "mapa")) return valor_nulo();
-    if (tam <= 0) return jg_error("Error", "mapa(): el tamaño de casilla tiene que ser mayor que 0");
+    if (tam <= 0) return jg_error("ErrorArgumento", "mapa(): el tamaño de casilla tiene que ser mayor que 0");
     Valor *op = n > 2 && a[2]->tipo == VAL_DICCIONARIO ? a[2] : NULL;
+    static const char *const VM[] = {"solidos", "plataformas", "bordes", NULL};
+    if (!jg_opciones_validas(op, "mapa", VM)) return valor_nulo();
     int filas = a[0]->lista.cantidad, cols = 0;
     for (int f = 0; f < filas; f++) {
         Valor *v = a[0]->lista.elementos[f];
@@ -5439,12 +5447,12 @@ static Valor *fn_jg_mapa(Valor **a, int n) {
             if (*t >= 128) {
                 char msg[160];
                 snprintf(msg, sizeof msg, "mapa(): la fila %d tiene un carácter que no es ASCII; usa letras sin tilde, cifras o signos", f + 1);
-                return jg_error("Error", msg);
+                return jg_error("ErrorArgumento", msg);
             }
         int l = (int)strlen(v->texto);
         if (l > cols) cols = l;
     }
-    if (cols == 0 || (long)cols * filas > 16 * 1024 * 1024) return jg_error("Error", "mapa(): tamaño no válido");
+    if (cols == 0 || (long)cols * filas > 16 * 1024 * 1024) return jg_error("ErrorArgumento", "mapa(): tamaño no válido");
     int k = -1;
     for (int i = 0; i < _jgs.nmapas; i++) if (!_jgs.mapas[i].celdas) { k = i; break; }
     if (k < 0) {
@@ -5471,7 +5479,7 @@ static Valor *fn_jg_mapa(Valor **a, int n) {
         if (strcmp(v->texto, "todos") == 0) m->bordes = 2;
         else if (strcmp(v->texto, "ninguno") == 0) m->bordes = 0;
         else if (strcmp(v->texto, "lados") != 0) { free(m->celdas); m->celdas = NULL;
-            return jg_error("Error", "mapa(): \"bordes\" es \"lados\", \"todos\" o \"ninguno\""); }
+            return jg_error("ErrorArgumento", "mapa(): \"bordes\" es \"lados\", \"todos\" o \"ninguno\""); }
     }
     Valor *d = valor_diccionario_crear();
     valor_diccionario_agregar(d, "mapa", valor_numero(k));
@@ -5589,7 +5597,7 @@ static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
     double x = jg_num_dic(d, "x", 0, &falta), y = jg_num_dic(d, "y", 0, &falta);
     double w = jg_num_dic(d, "ancho", 0, &falta), h = jg_num_dic(d, "alto", 0, &falta);
     if (falta || w <= 0 || h <= 0)
-        return jg_error("Error", "mover_en_mapa(): la cosa necesita números en \"x\", \"y\", \"ancho\" y \"alto\"");
+        return jg_error("ErrorArgumento", "mover_en_mapa(): la cosa necesita números en \"x\", \"y\", \"ancho\" y \"alto\"");
     double vx = jg_num_dic(d, "vx", 0, NULL), vy = jg_num_dic(d, "vy", 0, NULL);
     double dt = _jgs.dt;
     if (n > 2 && !jg_num(a, n, 2, &dt, "mover_en_mapa")) return valor_nulo();
@@ -5842,15 +5850,8 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa_tiled() espera la ruta de un mapa de Tiled (.tmx o .tmj)");
     Valor *op = n > 1 && a[1]->tipo == VAL_DICCIONARIO ? a[1] : NULL;
     if (n > 1 && !op && a[1]->tipo != VAL_NULO) return jg_error("ErrorTipo", "mapa_tiled(): las opciones van en un diccionario");
-    if (op)
-        for (int i = 0; i < op->diccionario.cantidad; i++) {
-            const char *c = op->diccionario.claves[i];
-            if (strcmp(c, "solidos") && strcmp(c, "plataformas") && strcmp(c, "bordes")) {
-                char m[200];
-                snprintf(m, sizeof m, "mapa_tiled(): no conozco la opción '%s' (hay \"solidos\", \"plataformas\" y \"bordes\")", c);
-                return jg_error("Error", m);
-            }
-        }
+    static const char *const VT[] = {"solidos", "plataformas", "bordes", NULL};
+    if (!jg_opciones_validas(op, "mapa_tiled", VT)) return valor_nulo();
     char error[600], msg[800];
     Valor *m = tiled_leer(a[0]->texto, error, sizeof error);
     if (!m) { snprintf(msg, sizeof msg, "mapa_tiled(): %s", error); return jg_error("ErrorJuego", msg); }
@@ -6181,7 +6182,7 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
         if (!hecho) {
             char m[300];
             snprintf(m, sizeof m, "dibujar_tiled(): el mapa no tiene la capa '%s' (mira mapa[\"capas\"])", nv->texto);
-            return jg_error("Error", m);
+            return jg_error("ErrorArgumento", m);
         }
     }
     return valor_nulo();
@@ -6294,6 +6295,8 @@ static void cargar_juego(Entorno *entorno) {
         {"raton",           fn_jg_raton,            0},
         {"boton_raton",     fn_jg_boton_raton,     -1},
         {"clic",            fn_jg_boton_raton_pulsado, -1},
+        {"boton_raton_soltado", fn_jg_boton_raton_soltado, -1},
+        {"boton_soltado",   fn_jg_boton_soltado,   -1},
         {"rueda",           fn_jg_rueda,            0},
         {"presentar",       fn_jg_presentar,        0},
         {"captura",         fn_jg_captura,          1},
@@ -6341,7 +6344,7 @@ static void cargar_juego(Entorno *entorno) {
         {"accion_soltada",  fn_jg_accion_soltada,   1},
         {"direccion",       fn_jg_direccion,        2},
         {"recargado",       fn_jg_recargado,        0},
-        {"colision_circulos", fn_jg_colision_circulos, 6},
+        {"colision_circulos", fn_jg_colision_circulos, -1},
         {"colision_circulo_rect", fn_jg_colision_circulo_rect, -1},
         {"dentro",          fn_jg_dentro,          -1},
         {"cuadro",          fn_jg_cuadro,          -1},
