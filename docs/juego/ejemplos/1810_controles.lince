@@ -1,6 +1,6 @@
 # @seccion: Controles
 # @titulo: Que el jugador elija sus teclas
-# @nota: `juego.menu_controles()` enseña cada acción con sus teclas y sus botones, y deja cambiarlos: se elige una y se pulsa lo nuevo. Si otra acción ya lo usaba, se intercambian. Lo cambiado **se guarda solo** y se aplica sola la próxima vez que el juego defina esa acción, sin hacer nada más. Devuelve `"volver"` al salir. `juego.restablecer_controles()` vuelve a los del juego.
+# @nota: `juego.menu_controles()` enseña cada acción con sus teclas y sus botones, y deja cambiarlos: se elige una y se pulsa lo nuevo. Si otra acción ya lo usaba, se intercambian. Lo cambiado **se guarda solo** y se aplica solo la próxima vez que el juego defina esa acción, sin hacer nada más. Devuelve `"volver"` al salir. `juego.restablecer_controles()` vuelve a los del juego.
 # @fotogramas: 3
 importar "juego"
 

@@ -2,6 +2,9 @@
 # @titulo: Sonidos y música de archivos
 # @nota: `juego.sonido(ruta)` carga un `.wav` o un `.ogg`, y `juego.reproducir()` lo hace sonar (se mezclan hasta 32 a la vez), con `volumen`, `lado` (de −1, izquierda, a 1, derecha) y `tono`. `juego.musica("tema.ogg")` suena en bucle y se va leyendo poco a poco, así una canción entera apenas ocupa memoria.
 # @ejecutar: no
+importar "juego"
+importar "matematica"
+
 fijo PASO = juego.sonido("paso.wav")
 juego.reproducir(PASO, {"volumen": 0.6, "tono": 0.9 + matematica.aleatorio() * 0.2})
 juego.musica("musica/bosque.ogg", 0.5)          # en bucle
