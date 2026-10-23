@@ -1,0 +1,392 @@
+# 🐆 Lince — Probar el equipo
+#
+# Para comprobar en un ordenador o un móvil de verdad que a Lince le llega todo
+# bien: el teclado (también la ñ y las tildes), el ratón, los mandos (por cable o
+# Bluetooth, hasta cuatro), el sonido y la pantalla táctil. Ver LEEME.md, con la
+# lista de lo que hay que mirar.
+#
+# Cuatro páginas: teclado y ratón, mandos, sonido, y táctil y móvil. Se
+# cambia con 1, 2, 3, 4 o Tab, con LB y RB del mando, o tocando o pinchando
+# las pestañas de arriba. Para salir, Esc dos veces seguidas (o el botón
+# «atrás» del móvil dos veces). F11: pantalla completa.
+#
+# Para jugarlo:  cd examples/probar_equipo  y  lince probar_equipo.lince
+# En el móvil:   lince repartir probar_equipo.lince --android
+importar "juego"
+importar "matematica"
+importar "texto"
+
+fijo ANCHO = 640
+fijo ALTO = 360
+
+juego.abrir("Probar el equipo", ANCHO, ALTO, {"escala": 2})
+juego.mando_tactil(falso)            # aquí se prueban los dedos tal cual, sin mando en la pantalla
+
+fijo LETRA = juego.fuente("recursos/PressStart2P-Regular.ttf", 8)
+fijo GRANDE = juego.fuente("recursos/PressStart2P-Regular.ttf", 16)
+fijo WAV = juego.sonido("recursos/moneda.wav")       # un WAV en mono a 22 050 Hz
+fijo OGG = juego.sonido("recursos/golpe.ogg")        # un OGG corto, cargado entero
+fijo MUSICA = "recursos/musica.ogg"                  # un OGG largo, que se lee mientras suena
+fijo PITIDO = juego.crear_efecto("subir", {"largo": 2, "semilla": 3})
+fijo EFECTOS = ["moneda", "salto", "disparo", "explosion", "golpe", "subir", "clic", "perder"]
+
+fijo PAGINAS = ["Teclado y ratón", "Mandos", "Sonido", "Táctil"]
+fijo BLANCO = [235, 235, 245]
+fijo GRIS = [120, 125, 145]
+fijo AMARILLO = [255, 215, 90]
+fijo VERDE = [110, 220, 130]
+fijo FONDO = [18, 20, 32]
+fijo CAJA = [32, 36, 56]
+
+sea pagina = 0
+sea registro = []          # lo último que se ha pulsado, en cualquier sitio
+sea escrito = ""           # lo tecleado (para ver la ñ y las tildes)
+sea rueda = 0
+sea esc_hace = 99          # segundos desde el último Esc (dos seguidos: salir)
+sea elegido = 0            # en la página de sonido
+sea musica_sonando = falso
+sea efecto = 0
+sea aviso = ""             # lo último que se ha hecho en la página de sonido
+sea aviso_t = 0
+
+# ── Utilidades ───────────────────────────────────────────────────────
+funcion escribe(val texto t, val numero x, val numero y, val cualquiera color = nulo): nulo {
+    juego.texto(t, x, y, {"fuente": LETRA, "color": si color == nulo { BLANCO } sino { color }})
+}
+
+funcion caja(val numero x, val numero y, val numero ancho, val numero alto, val cualquiera borde = nulo): nulo {
+    juego.rectangulo(x, y, ancho, alto, CAJA)
+    juego.contorno(x, y, ancho, alto, si borde == nulo { [60, 66, 96] } sino { borde })
+}
+
+# ¿se ha pinchado o tocado este rectángulo en este fotograma?
+funcion tocado(val numero x, val numero y, val numero ancho, val numero alto): logico {
+    si juego.clic(1) y juego.dentro(juego.raton(), [x, y, ancho, alto]) { devolver verdadero }
+    para cada diccionario t en juego.toques() {
+        si t["nuevo"] y juego.dentro(t["x"], t["y"], x, y, ancho, alto) { devolver verdadero }
+    }
+    devolver falso
+}
+
+funcion boton(val texto t, val numero x, val numero y, val numero ancho): logico {
+    sea encima = juego.dentro(juego.raton(), [x, y, ancho, 22])
+    caja(x, y, ancho, 22, si encima { AMARILLO } sino { nulo })
+    juego.texto(t, x + ancho / 2, y + 7, {"fuente": LETRA, "alinear": "centro", "color": si encima { AMARILLO } sino { BLANCO }})
+    devolver tocado(x, y, ancho, 22)
+}
+
+funcion apuntar(val texto t): nulo {
+    registro.insertar(0, t)
+    si registro.longitud() > 14 { registro.eliminar(14) }
+}
+
+# ── Lo que vale en todas las páginas ─────────────────────────────────
+funcion comun(val numero dt): nulo {
+    sea e = juego.entrada_pulsada()
+    si e != nulo { apuntar(e) }
+    escrito = juego.editar(escrito, 34)                # lo tecleado, con «borrar» aplicado
+    rueda = rueda + juego.rueda()
+    # cambiar de página
+    para (i = 0; i < 4; i++) {
+        si juego.tecla_pulsada(a_texto(i + 1)) { pagina = i }
+    }
+    si juego.tecla_pulsada("tab") o juego.boton_pulsado("rb") { pagina = (pagina + 1) % 4 }
+    si juego.boton_pulsado("lb") { pagina = (pagina + 3) % 4 }
+    para (i = 0; i < 4; i++) {
+        si tocado(8 + i * 142, 6, 136, 22) { pagina = i }
+    }
+    si juego.tecla_pulsada("f11") { juego.pantalla_completa() }
+    # salir: Esc dos veces seguidas
+    esc_hace = esc_hace + dt
+    si juego.tecla_pulsada("escape") {
+        si esc_hace < 0.6 { juego.salir() }
+        esc_hace = 0
+    }
+}
+
+funcion dibujar_comun(): nulo {
+    juego.limpiar(FONDO)
+    para (i = 0; i < 4; i++) {
+        sea x = 8 + i * 142
+        sea activa = i == pagina
+        juego.rectangulo(x, 6, 136, 22, si activa { [60, 70, 120] } sino { CAJA })
+        juego.texto("{i + 1} {PAGINAS[i]}", x + 68, 13, {"fuente": LETRA, "alinear": "centro", "color": si activa { AMARILLO } sino { GRIS }})
+    }
+    sea ultimo = si registro.longitud() > 0 { registro[0] } sino { "-" }
+    escribe("Lo último: {ultimo}", 8, ALTO - 14, VERDE)
+    sea ayuda = si esc_hace < 0.6 { "Pulsa Esc otra vez para salir" } sino { "Esc dos veces: salir · F11: pantalla completa" }
+    juego.texto(ayuda, ANCHO - 8, ALTO - 14, {"fuente": LETRA, "alinear": "derecha", "color": GRIS})
+    juego.texto("{matematica.redondear(juego.fps())} fps", ANCHO - 8, 13, {"fuente": LETRA, "alinear": "derecha", "color": GRIS})
+}
+
+# ── 1. Teclado y ratón ───────────────────────────────────────────────
+fijo FILAS_TECLADO = [
+    ["escape", "f1", "f2", "f3", "f4", "f5", "f6"],
+    ["f7", "f8", "f9", "f10", "f11", "f12"],
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "borrar"],
+    ["tab", "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "entrar"],
+    ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+    ["mayus", "z", "x", "c", "v", "b", "n", "m", "arriba"],
+    ["ctrl", "alt", "espacio", "izquierda", "abajo", "derecha"]
+]
+fijo NOMBRE_CORTO = {"escape": "ESC", "borrar": "<-", "entrar": "ENTRAR", "mayus": "MAYUS", "ctrl": "CTRL",
+                     "alt": "ALT", "espacio": "ESPACIO", "tab": "TAB", "arriba": "^", "abajo": "v",
+                     "izquierda": "<", "derecha": ">"}
+
+funcion pagina_teclado(): nulo {
+    escribe("Las teclas se encienden mientras están pulsadas.", 8, 40, GRIS)
+    para (f = 0; f < FILAS_TECLADO.longitud(); f++) {
+        sea x = 8 + f * 6
+        para cada texto t en FILAS_TECLADO[f] {
+            sea nombre = si NOMBRE_CORTO.contiene(t) { NOMBRE_CORTO[t] } sino { t.mayusculas() }
+            sea ancho = matematica.maximo(20, juego.ancho_texto(nombre, {"fuente": LETRA}) + 8)
+            sea abajo = juego.tecla(t)
+            juego.rectangulo(x, 54 + f * 24, ancho, 20, si abajo { [70, 160, 90] } sino { CAJA })
+            juego.texto(nombre, x + ancho / 2, 60 + f * 24, {"fuente": LETRA, "alinear": "centro", "color": si abajo { [255, 255, 255] } sino { GRIS }})
+            x = x + ancho + 4
+        }
+    }
+    # escribir
+    caja(8, 226, 380, 36)
+    escribe("Escribe aquí (prueba la ñ y las tildes):", 14, 231, GRIS)
+    sea cursor = si (juego.tiempo_real() * 2) % 2 < 1 { "_" } sino { "" }
+    escribe(escrito + cursor, 14, 247, AMARILLO)
+    # lo último que se ha pulsado
+    caja(8, 266, 380, 74)
+    escribe("Lo último que ha llegado (teclado, ratón o mando):", 14, 271, GRIS)
+    para (i = 0; i < matematica.minimo(6, registro.longitud()); i++) {
+        escribe(registro[i], 14 + (i % 2) * 186, 287 + matematica.piso(i / 2) * 14, si i == 0 { VERDE } sino { BLANCO })
+    }
+    # el ratón
+    caja(396, 40, 236, 300)
+    escribe("Ratón", 404, 48, AMARILLO)
+    sea r = juego.raton()
+    sea m = juego.movimiento_raton()
+    escribe("Posición: {matematica.redondear(r[0])}, {matematica.redondear(r[1])}", 404, 66)
+    escribe("Movimiento: {m[0]}, {m[1]}", 404, 82)
+    escribe("Rueda: {rueda}", 404, 98)
+    sea nombres = ["izquierdo", "central", "derecho"]
+    para (b = 1; b <= 3; b++) {
+        sea abajo = juego.boton_raton(b)
+        juego.rectangulo(404 + (b - 1) * 74, 118, 70, 40, si abajo { [70, 160, 90] } sino { [24, 26, 40] })
+        juego.texto(nombres[b - 1], 404 + (b - 1) * 74 + 35, 134, {"fuente": LETRA, "alinear": "centro", "color": si abajo { [255, 255, 255] } sino { GRIS }})
+    }
+    escribe("Mueve el ratón por aquí:", 404, 170, GRIS)
+    juego.rectangulo(404, 184, 220, 148, [24, 26, 40])
+    si juego.dentro(r, [404, 184, 220, 148]) {
+        juego.linea(404, r[1], 624, r[1], [90, 100, 150])
+        juego.linea(r[0], 184, r[0], 332, [90, 100, 150])
+        juego.circulo(r[0], r[1], 4, AMARILLO)
+    }
+}
+
+# ── 2. Mandos ────────────────────────────────────────────────────────
+funcion boton_mando(val texto nombre, val numero m, val numero x, val numero y, val numero radio, val lista color, val texto letra): nulo {
+    sea abajo = juego.boton(nombre, m)
+    juego.circulo(x, y, radio, si abajo { color } sino { [44, 48, 72] })
+    juego.texto(letra, x, y - 3, {"fuente": LETRA, "alinear": "centro", "color": si abajo { [20, 20, 30] } sino { GRIS }})
+}
+
+funcion palanca(val numero x, val numero y, val numero ex, val numero ey, val logico pulsada): nulo {
+    juego.circulo(x, y, 20, si pulsada { [70, 160, 90] } sino { [44, 48, 72] })
+    juego.circulo(x + ex * 15, y + ey * 15, 7, AMARILLO)
+}
+
+funcion dibujar_mando(val numero m, val numero ox, val numero oy): nulo {
+    caja(ox, oy, 304, 146)
+    escribe("Mando {m}", ox + 8, oy + 8, AMARILLO)
+    # gatillos y botones de arriba
+    para cada lista g en [["lt", ox + 8], ["rt", ox + 286]] {
+        sea v = juego.eje(g[0], m)
+        juego.rectangulo(g[1], oy + 26, 10, 60, [24, 26, 40])
+        juego.rectangulo(g[1], oy + 26 + 60 * (1 - v), 10, 60 * v, [70, 160, 90])
+        juego.texto(g[0].mayusculas(), g[1] + 5, oy + 90, {"fuente": LETRA, "alinear": "centro", "color": GRIS})
+    }
+    juego.rectangulo(ox + 26, oy + 24, 70, 10, si juego.boton("lb", m) { [70, 160, 90] } sino { [44, 48, 72] })
+    juego.rectangulo(ox + 208, oy + 24, 70, 10, si juego.boton("rb", m) { [70, 160, 90] } sino { [44, 48, 72] })
+    # palancas
+    palanca(ox + 60, oy + 66, juego.eje("izq_x", m), juego.eje("izq_y", m), juego.boton("stick_izq", m))
+    palanca(ox + 196, oy + 108, juego.eje("der_x", m), juego.eje("der_y", m), juego.boton("stick_der", m))
+    # cruceta
+    sea cx = ox + 104
+    sea cy = oy + 108
+    para cada lista d en [["arriba", 0, -1], ["abajo", 0, 1], ["izquierda", -1, 0], ["derecha", 1, 0]] {
+        juego.rectangulo(cx + d[1] * 13 - 6, cy + d[2] * 13 - 6, 12, 12, si juego.boton(d[0], m) { [70, 160, 90] } sino { [44, 48, 72] })
+    }
+    # A, B, X, Y
+    boton_mando("a", m, ox + 248, oy + 84, 9, [110, 220, 130], "A")
+    boton_mando("b", m, ox + 268, oy + 64, 9, [240, 100, 100], "B")
+    boton_mando("x", m, ox + 228, oy + 64, 9, [100, 150, 250], "X")
+    boton_mando("y", m, ox + 248, oy + 44, 9, [250, 210, 80], "Y")
+    # atrás, guía, inicio
+    boton_mando("atras", m, ox + 128, oy + 60, 6, BLANCO, "")
+    boton_mando("guia", m, ox + 152, oy + 52, 7, BLANCO, "")
+    boton_mando("inicio", m, ox + 176, oy + 60, 6, BLANCO, "")
+    juego.texto("atrás guía inicio", ox + 152, oy + 72, {"fuente": LETRA, "alinear": "centro", "color": GRIS})
+}
+
+funcion pagina_mandos(): nulo {
+    sea n = juego.mandos()
+    si n == 0 {
+        caja(120, 120, 400, 70)
+        juego.texto("No hay ningún mando conectado.", ANCHO / 2, 136, {"fuente": LETRA, "alinear": "centro"})
+        juego.texto("Conecta uno por cable o por Bluetooth:", ANCHO / 2, 154, {"fuente": LETRA, "alinear": "centro", "color": GRIS})
+        juego.texto("sale aquí solo, sin reiniciar.", ANCHO / 2, 168, {"fuente": LETRA, "alinear": "centro", "color": GRIS})
+    }
+    para (m = 1; m <= matematica.minimo(n, 4); m++) {
+        dibujar_mando(m, 8 + ((m - 1) % 2) * 316, 40 + matematica.piso((m - 1) / 2) * 154)
+    }
+    si n > 0 y n < 3 {
+        escribe("Mandos conectados: {n}. Las palancas y los gatillos", 8, 210, GRIS)
+        escribe("tienen que volver al centro y a cero al soltarlos.", 8, 224, GRIS)
+    }
+    si boton("Vibrar (V)", ANCHO - 168, ALTO - 48, 160) o juego.tecla_pulsada("v") o juego.boton_pulsado("y") {
+        juego.vibrar(0.6, 1)
+        apuntar("vibrar")
+    }
+}
+
+# ── 3. Sonido ────────────────────────────────────────────────────────
+fijo OPCIONES_SONIDO = [
+    "Un WAV de un archivo (mono, 22 050 Hz)",
+    "Un OGG corto de un archivo",
+    "Música OGG que se lee mientras suena",
+    "Por la izquierda",
+    "Por la derecha",
+    "Más agudo",
+    "Más grave",
+    "Efectos generados, uno tras otro",
+    "Dieciséis sonidos a la vez",
+    "Volumen general: más",
+    "Volumen general: menos"
+]
+
+funcion hacer_sonido(val numero i): nulo {
+    elegir i {
+        caso 0 {
+            juego.reproducir(WAV)
+            aviso = "WAV: tiene que sonar una moneda, igual por los dos lados"
+        }
+        caso 1 {
+            juego.reproducir(OGG)
+            aviso = "OGG: tiene que sonar un golpe"
+        }
+        caso 2 {
+            musica_sonando = no musica_sonando
+            juego.musica(si musica_sonando { MUSICA } sino { nulo }, 0.6)
+            aviso = si musica_sonando { "Música: tiene que sonar sin cortes (25 s, en bucle)" } sino { "Música parada" }
+        }
+        caso 3 {
+            juego.reproducir(PITIDO, {"lado": -1})
+            aviso = "Tiene que sonar solo por la IZQUIERDA"
+        }
+        caso 4 {
+            juego.reproducir(PITIDO, {"lado": 1})
+            aviso = "Tiene que sonar solo por la DERECHA"
+        }
+        caso 5 {
+            juego.reproducir(PITIDO, {"tono": 2})
+            aviso = "Una octava más aguda y el doble de rápida"
+        }
+        caso 6 {
+            juego.reproducir(PITIDO, {"tono": 0.5})
+            aviso = "Una octava más grave y la mitad de rápida"
+        }
+        caso 7 {
+            juego.efecto(EFECTOS[efecto])
+            aviso = "Efecto: {EFECTOS[efecto]}"
+            efecto = (efecto + 1) % EFECTOS.longitud()
+        }
+        caso 8 {
+            para (k = 0; k < 16; k++) { juego.reproducir(WAV, {"tono": 0.5 + k * 0.1, "volumen": 0.4}) }
+            aviso = "Dieciséis monedas mezcladas, sin chasquidos"
+        }
+        caso 9 { juego.volumen(matematica.minimo(1, juego.volumen() + 0.1)) }
+        caso 10 { juego.volumen(matematica.maximo(0, juego.volumen() - 0.1)) }
+    }
+    si i >= 9 { aviso = "Volumen general: {matematica.redondear(juego.volumen() * 100)} %" }
+    aviso_t = 4
+}
+
+funcion pagina_sonido(val numero dt): nulo {
+    escribe("Elige con las flechas o la cruceta y pulsa entrar o A,", 8, 40, GRIS)
+    escribe("o pincha o toca una línea.", 8, 54, GRIS)
+    sea n = OPCIONES_SONIDO.longitud()
+    si juego.tecla_pulsada("abajo") o juego.boton_pulsado("abajo") { elegido = (elegido + 1) % n }
+    si juego.tecla_pulsada("arriba") o juego.boton_pulsado("arriba") { elegido = (elegido + n - 1) % n }
+    sea pedido = -1
+    si juego.tecla_pulsada("entrar") o juego.tecla_pulsada("espacio") o juego.boton_pulsado("a") { pedido = elegido }
+    para (i = 0; i < n; i++) {
+        sea y = 72 + i * 20
+        sea activa = i == elegido
+        juego.rectangulo(8, y, 400, 18, si activa { [60, 70, 120] } sino { CAJA })
+        sea marca = si i == 2 y musica_sonando { "  (sonando)" } sino { "" }
+        escribe(OPCIONES_SONIDO[i] + marca, 16, y + 5, si activa { AMARILLO } sino { BLANCO })
+        si tocado(8, y, 400, 18) {
+            elegido = i
+            pedido = i
+        }
+    }
+    si pedido >= 0 { hacer_sonido(pedido) }
+    caja(416, 72, 216, 216)
+    escribe("Qué tiene que pasar", 424, 80, AMARILLO)
+    aviso_t = matematica.maximo(0, aviso_t - dt)
+    si aviso_t > 0 {
+        sea palabras = texto.dividir(aviso, " ")
+        sea linea = ""
+        sea y = 100
+        para cada texto p en palabras {
+            si juego.ancho_texto(linea + " " + p, {"fuente": LETRA}) > 196 {
+                escribe(linea, 424, y)
+                linea = p
+                y = y + 14
+            } sino {
+                linea = si linea == "" { p } sino { linea + " " + p }
+            }
+        }
+        escribe(linea, 424, y)
+    }
+    escribe("Volumen: {matematica.redondear(juego.volumen() * 100)} %", 424, 270, GRIS)
+}
+
+# ── 4. Táctil y móvil ────────────────────────────────────────────────
+funcion pagina_tactil(): nulo {
+    sea toques = juego.toques()
+    sea hay = si juego.tactil() { "sí" } sino { "no: el ratón hace de dedo" }
+    escribe("¿Pantalla táctil? {hay}", 8, 40)
+    escribe("Toca con varios dedos a la vez.", 8, 56, GRIS)
+    juego.rectangulo(8, 72, 400, 268, [24, 26, 40])
+    para cada diccionario t en toques {
+        juego.circulo(t["x"], t["y"], 18, [70, 160, 90, 160])
+        juego.texto("{t["id"]}", t["x"], t["y"] - 3, {"fuente": LETRA, "alinear": "centro"})
+    }
+    escribe("Dedos: {toques.longitud()}", 16, 80, AMARILLO)
+    # la inclinación
+    caja(416, 40, 216, 180)
+    escribe("Inclinación", 424, 48, AMARILLO)
+    sea inc = juego.inclinacion()
+    juego.rectangulo(444, 66, 160, 120, [24, 26, 40])
+    juego.circulo(524 + inc[0] * 72, 126 + inc[1] * 52, 8, VERDE)
+    escribe("{matematica.redondear(inc[0] * 100) / 100}, {matematica.redondear(inc[1] * 100) / 100}", 424, 196, GRIS)
+    escribe("(en el ordenador, 0, 0)", 424, 208, GRIS)
+    si boton("Vibrar", 416, 232, 216) {
+        juego.vibrar(0.5, 1)
+        apuntar("vibrar")
+    }
+    si boton("Pantalla completa", 416, 262, 216) { juego.pantalla_completa() }
+    escribe("Pantalla: {juego.ancho()} x {juego.alto()}", 416, 296, GRIS)
+}
+
+# ── El bucle ─────────────────────────────────────────────────────────
+mientras juego.abierto() {
+    sea dt = juego.dt()
+    comun(dt)
+    dibujar_comun()
+    elegir pagina {
+        caso 0 { pagina_teclado() }
+        caso 1 { pagina_mandos() }
+        caso 2 { pagina_sonido(dt) }
+        otro { pagina_tactil() }
+    }
+    juego.presentar()
+}

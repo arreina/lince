@@ -21,7 +21,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10, 0.11... **Cuando la 1.0 esté terminada y probada, el lenguaje se queda ahí y se pasa a trabajar en el IDE** (lince-motor, en su propia conversación). Para llegar a ella:
 
 - [ ] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
-- [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad. Subir un juego a Google Play queda para después de la 1.0.
+- [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad. Con `examples/probar_equipo` y la lista de su `LEEME.md`. Subir un juego a Google Play queda para después de la 1.0.
 - [x] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta: `juegos/la_piedra_del_lince`. Probado con wine (Windows) y en el emulador de Android 16; falta en un móvil y un Windows de verdad.
 - [x] **El manual lo cubre todo:** el del lenguaje (con los módulos `matematica`, `texto`, `json`, `bytes` y `bits` y las herramientas) y una página para el módulo `juego` (`docs/juego.html`) con un ejemplo y su captura real para cada tema. La lista completa de funciones y opciones sigue en la especificación.
 

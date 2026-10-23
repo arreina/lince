@@ -4793,8 +4793,9 @@ static Valor *fn_jg_direccion(Valor **a, int n) {
     return valor_numero(jg_accion_fuerza(pos, 0) - jg_accion_fuerza(neg, 0));
 }
 
-/* Los 'cuantos' números de los argumentos, donde un rectángulo puede ir en
-   una lista [x, y, ancho, alto] (como los que da caja()) o en un diccionario
+/* Los 'cuantos' números de los argumentos, donde un punto puede ir en una
+   lista [x, y] (como el que da raton()), un rectángulo en una lista [x, y,
+   ancho, alto] (como los que da caja()) o en un diccionario
    con "x", "y", "ancho" y "alto" (lo que mueve mover_en_mapa, un cuerpo) */
 static Valor *jg_dic(Valor *d, const char *clave);
 static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, const char *forma) {
@@ -4811,7 +4812,7 @@ static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, 
             }
             continue;
         }
-        ok = a[i]->tipo == VAL_LISTA && (a[i]->lista.cantidad == 4 || a[i]->lista.cantidad == 3);
+        ok = a[i]->tipo == VAL_LISTA && a[i]->lista.cantidad >= 2 && a[i]->lista.cantidad <= 4;   /* punto, círculo o rectángulo */
         for (int j = 0; ok && j < a[i]->lista.cantidad; j++) {
             ok = a[i]->lista.elementos[j]->tipo == VAL_NUMERO;
             if (ok && k < cuantos) v[k] = a[i]->lista.elementos[j]->numero;
@@ -4820,7 +4821,7 @@ static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, 
     }
     if (ok && k == cuantos) return 1;
     char msg[400];
-    snprintf(msg, sizeof msg, "%s() espera %s (en números o en listas: [x, y, ancho, alto] un rectángulo y [x, y, radio] un círculo; "
+    snprintf(msg, sizeof msg, "%s() espera %s (en números o en listas: [x, y] un punto, [x, y, ancho, alto] un rectángulo y [x, y, radio] un círculo; "
              "un rectángulo también puede ser un diccionario con x, y, ancho y alto)", fn, forma);
     jg_error("ErrorTipo", msg);
     return 0;

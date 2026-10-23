@@ -49,4 +49,15 @@ if [ $? -eq 0 ] && [ -z "$salida" ] && grep -q '"mapa": *"bosque"' "$T/partidas/
 else
     echo "  ❌ juegos/la_piedra_del_lince"; echo "$salida" | head -5; fallos=$((fallos+1))
 fi
+# Probar el equipo: pasa por las cuatro páginas y toca cada sonido
+GUION="10:2:1,40:3:1"; f=60
+for i in $(seq 0 10); do GUION="$GUION,$f:entrar:1,$((f+20)):abajo:1"; f=$((f+30)); done
+GUION="$GUION,$f:4:1,$((f+20)):1:1,$((f+30)):a:5"
+salida="$(cd "$RAIZ/examples/probar_equipo" && env LINCE_JUEGO_FOTOGRAMAS=$((f+60)) LINCE_JUEGO_GUION="$GUION" \
+          LINCE_JUEGO_ESCRIBIR="Ñandú ¿qué? ¡sí!" timeout 120 "$LINCE" probar_equipo.lince 2>&1)"
+if [ $? -eq 0 ] && [ -z "$salida" ]; then
+    echo "  ✅ examples/probar_equipo"
+else
+    echo "  ❌ examples/probar_equipo"; echo "$salida" | head -5; fallos=$((fallos+1))
+fi
 [ "$fallos" -eq 0 ] && echo "✅ Minijuegos: todos se ejecutan" || exit 1

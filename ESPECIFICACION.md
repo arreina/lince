@@ -1178,7 +1178,8 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 En `colision`, `colision_circulos`, `colision_circulo_rect` y `dentro`, cada rectángulo puede ir en cuatro
 números o en una lista `[x, y, ancho, alto]`, como las que da `caja()`, o en un diccionario con
 `x`, `y`, `ancho` y `alto` (lo que mueve `mover_en_mapa`, un cuerpo de la física): `juego.colision(yo,
-enemigo)`. Cada círculo va en tres números o en `[x, y, radio]`.
+enemigo)`. Cada círculo va en tres números o en `[x, y, radio]`, y el punto de `dentro` en dos o en `[x, y]`:
+`juego.dentro(juego.raton(), boton)`.
 | `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
 
 **Movimiento suave.** Para que las cosas no aparezcan de golpe: un menú que entra desde un lado,

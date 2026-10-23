@@ -35,6 +35,16 @@ Y se reparten como un único ejecutable:
 
 Todos terminan con **Esc** (en la aventura, Esc abre la pausa, que tiene «Salir»).
 
+## Probar el equipo
+
+`probar_equipo/` no es un juego: es para comprobar en un ordenador o un móvil de verdad
+que a Lince le llega todo bien, con una página para el teclado y el ratón (también la ñ
+y las tildes al escribir), otra para los mandos (hasta cuatro, con sus palancas,
+gatillos y vibración), otra para el sonido (WAV, OGG, música, izquierda y derecha,
+volumen) y otra para la pantalla táctil y la inclinación. Su `LEEME.md` trae la lista
+de lo que hay que mirar. Se abre con `cd examples/probar_equipo` y
+`lince probar_equipo.lince`, o en el móvil con `lince repartir probar_equipo.lince --android`.
+
 ## Prueba la recarga en caliente
 
 Abre `08_plataformas.lince` con `./lince examples/08_plataformas.lince`, avanza un

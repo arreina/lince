@@ -3,6 +3,14 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 0.12.0 (en preparación)
+
+- **`examples/probar_equipo`**: un programa para comprobar en un ordenador o un móvil
+  de verdad el teclado (también la ñ y las tildes), el ratón, los mandos, el sonido y
+  la pantalla táctil, con una lista de comprobación en su `LEEME.md`.
+- `dentro()` acepta el punto como una lista `[x, y]`, como la que da `raton()`:
+  `juego.dentro(juego.raton(), boton)`.
+
 ## 0.11.0
 
 `y` y `o` como nombres (para las coordenadas de un juego), `lista + lista`, `a_texto()` de cualquier valor, y en el móvil el botón «atrás» como Esc y los diálogos lejos del mando de la pantalla.
