@@ -152,7 +152,10 @@ static int analizar_aparte(const char *texto, char *buf, size_t max) {
 static int analizar_aparte(const char *texto, char *buf, size_t max) {
     int fds[2];
     if (pipe(fds) != 0) return 0;
-    fflush(NULL);
+    /* No fflush(NULL): esperaría a que acabe de leer stdin otro hilo (el del
+       depurador del IDE) */
+    fflush(stdout);
+    fflush(stderr);
     pid_t pid = fork();
     if (pid < 0) { close(fds[0]); close(fds[1]); return 0; }
     if (pid == 0) {

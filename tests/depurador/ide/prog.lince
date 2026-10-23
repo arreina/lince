@@ -1,0 +1,8 @@
+importar "./libs/util"
+sea saludo = "hola\nadios"
+sea cuenta = 0
+mientras cuenta < 2 {
+    cuenta += 1
+    sea d = doble(cuenta)
+}
+fallar()

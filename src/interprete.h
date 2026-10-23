@@ -285,6 +285,11 @@ const char *interprete_archivo_principal(void);
 
 /* Depuración: el hook se llama antes de cada sentencia de un bloque. */
 void interprete_fijar_hook(void (*hook)(Nodo *sentencia, Entorno *e));
+/* Y este, tras una sentencia que deja un error que no captura ningún
+   'intentar': el depurador se para ahí, antes de que acabe el programa */
+void interprete_fijar_hook_error(void (*hook)(Nodo *sentencia, Entorno *e));
+/* El fichero del código que corre ahora (el de la función, si es de otro) */
+const char *interprete_archivo_en_curso(void);
 int  interprete_profundidad(void);
 /* Llamada activa 'nivel' (1 = la más externa): nombre y línea desde la que se hizo */
 int  interprete_pila(int nivel, const char **nombre, int *linea);

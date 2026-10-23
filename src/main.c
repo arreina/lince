@@ -173,13 +173,14 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    /* Depurador interactivo: 'lince depurar archivo.lince [args]' */
+    /* Depurador interactivo: 'lince depurar [--ide] archivo.lince [args]' */
     if (strcmp(cmd, "depurar") == 0) {
-        if (argc < 3) {
-            fprintf(stderr, "\n❌ Uso: lince depurar <archivo.lince> [argumentos]\n\n");
+        int ide = argc >= 3 && strcmp(argv[2], "--ide") == 0;
+        if (argc < 3 + ide) {
+            fprintf(stderr, "\n❌ Uso: lince depurar [--ide] <archivo.lince> [argumentos]\n\n");
             return 1;
         }
-        return depurador_ejecutar(argv[2], argc - 3, argv + 3);
+        return depurador_ejecutar(argv[2 + ide], argc - 3 - ide, argv + 3 + ide, ide);
     }
 
     /* Comprobar la sintaxis sin ejecutar: 'lince comprobar archivo.lince' */

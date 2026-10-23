@@ -1938,6 +1938,53 @@ Ejecuta el programa parándose en la primera línea. Comandos:
 
 Si no hay más entrada (stdin cerrado), el programa sigue hasta el final.
 
+`v n` enseña las variables del marco `n` de la pila (el 0 es donde está parado), y `bt` dice
+de qué fichero es cada marco: el depurador sigue a las funciones de los ficheros importados.
+
+### Para un IDE: `lince depurar --ide`
+
+```bash
+lince depurar --ide programa.lince [argumentos]
+```
+
+Los mismos comandos por stdin, con respuestas pensadas para un programa. Cada mensaje del
+depurador es **una línea de stdout** que empieza por `@lince ` y sigue con un objeto JSON. Lo
+que escribe el programa y los errores `❌` salen igual que siempre, en orden. No salen el
+saludo, el `(lince-dbg)` ni las líneas con `→`.
+
+Las rutas son relativas a la carpeta del programa principal, siempre con `./` y con `/`
+(`./prog.lince`, `./libs/util.lince`), también la del principal. Se compara con la ruta
+entera.
+
+Eventos:
+
+| Evento | Cuándo |
+|--------|--------|
+| `{"evento":"parado","motivo":"inicio","archivo":"./prog.lince","linea":1}` | al empezar: aquí el IDE manda sus `b` y luego `c` |
+| `"motivo":"paso"` | tras `s`, `n` u `o` |
+| `"motivo":"parada"` | en un punto de parada |
+| `"motivo":"pausa"` | tras el comando `pausa` |
+| `"motivo":"error"`, con `"mensaje"` | antes de acabar por un error que no captura ningún `intentar`; se pueden mirar las variables y la pila |
+| `{"evento":"terminado","codigo":0}` | al acabar (1 si acabó por un error) |
+
+Respuestas (una línea por comando que pide algo):
+
+| Comando | Respuesta |
+|---------|-----------|
+| `v [n]` / `g` | `{"respuesta":"variables","variables":[{"nombre":"n","tipo":"numero","valor":"1"}]}` |
+| `bt` | `{"respuesta":"pila","marcos":[{"funcion":"doble","archivo":"./libs/util.lince","linea":2},{"funcion":null,"archivo":"./prog.lince","linea":6}]}`, del más profundo al principal |
+| `p expr` | `{"respuesta":"valor","tipo":"texto","valor":"\"hola\\nadios\""}` o `{"respuesta":"valor","error":"ErrorNulo: ..."}`; vale cualquier expresión (`p a + 1`, `p [a, b]`) |
+| `b <ruta>:<línea>` | `{"respuesta":"parada","archivo":"./libs/util.lince","linea":2}` |
+| `d <ruta>:<línea>` | `{"respuesta":"quitada","archivo":"./libs/util.lince","linea":2}` |
+| un fallo | `{"respuesta":"error","mensaje":"..."}` |
+
+El `valor` está escrito como en el código, en una línea; los textos llevan comillas, `\n` y
+`\"`. Si es muy largo, se corta hacia los 200 caracteres y acaba en `…`.
+
+**Pausa:** `pausa` llega aunque el programa esté corriendo (un hilo lee stdin; no usa
+señales, que en Windows no sirven). El programa se para en la siguiente sentencia, con
+`"motivo":"pausa"`. Mientras corre, solo se atienden `pausa`, `b`, `d` y `q`.
+
 ---
 
 ## REPL interactivo

@@ -12,10 +12,10 @@ ifeq ($(OS),Windows_NT)
     BIN     = lince.exe
 else ifeq ($(UNAME),Darwin)
     BIN     = lince
-    LDFLAGS += -ldl
+    LDFLAGS += -ldl -lpthread
 else
     BIN     = lince
-    LDFLAGS += -ldl
+    LDFLAGS += -ldl -lpthread
 endif
 RM = rm -f
 
@@ -94,6 +94,7 @@ test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner_compilador.lince'
 	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/depurador/smoke.sh ./lince_debug'
+	@bash -c '$(ASAN_ENV) bash tests/depurador/ide.sh ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/juego/smoke.sh ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/juego/ejemplos.sh ./lince_debug 400'
 
@@ -150,6 +151,7 @@ bibliotecas-check:
 
 test-depurador: $(BIN)
 	@bash tests/depurador/smoke.sh ./$(BIN)
+	@bash tests/depurador/ide.sh ./$(BIN)
 
 # Medidas de rendimiento del intérprete (bench/*.lince): tiempo y memoria de cada una
 bench: all

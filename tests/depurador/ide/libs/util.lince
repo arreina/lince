@@ -1,0 +1,8 @@
+funcion doble(numero n): numero {
+    sea r = n * 2
+    devolver r
+}
+funcion fallar(): numero {
+    sea lista_x = [1, 2]
+    devolver lista_x[5]
+}

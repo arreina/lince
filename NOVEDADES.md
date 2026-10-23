@@ -19,6 +19,12 @@ apartado que le toca de este archivo.
 - **Los errores de un fichero importado dicen de cuál son**: `❌ ErrorTipo en línea 3 de
   libs/enemigos.lince: ...`, también los de sintaxis. El error capturado trae `e.archivo`.
 - Un `lanzar` sin capturar dice su línea (antes, solo el mensaje).
+- **`lince depurar --ide`**: el depurador para un IDE, con eventos y respuestas en JSON
+  (`@lince {...}`, una por línea), rutas relativas al principal, parada antes de un error
+  sin capturar y `pausa` mientras el programa corre. Detalle en `ESPECIFICACION.md`.
+- **El depurador sigue a las funciones de los ficheros importados**: paso a paso entra en
+  `libs/util.lince` y muestra su línea, `b libs/util.lince:2` para ahí, y `bt` y `v n` dicen
+  de qué fichero es cada marco (antes decía siempre el principal).
 
 ### Revisión del lenguaje antes de la 1.0
 

@@ -13,7 +13,7 @@ comprobar "paso a paso llega a la línea 6"      "→ programa.lince:6   sea tot
 comprobar "punto de parada dentro de la función" "Punto de parada en programa.lince:2" "b 2\nc\nq\n"
 comprobar "muestra las variables locales"        "a = 0"                    "b 2\nc\nv\nq\n"
 comprobar "evalúa expresiones"                   "  30"                     "b 2\nc\np a + b + 29\nq\n"
-comprobar "muestra la pila de llamadas"          "suma() llamada desde la línea 9" "b 2\nc\nbt\nq\n"
+comprobar "muestra la pila de llamadas"          "#1  (principal)  programa.lince:9" "b 2\nc\nbt\nq\n"
 salida="$(printf 'b 9\nc\nn\nq\n' | "$LINCE" depurar "$DIR/programa.lince" 2>&1)"
 if [ "$(echo "$salida" | grep -c '→ programa.lince:9')" -eq 2 ] && ! echo "$salida" | grep -q '→ programa.lince:2'; then
     echo "  ✅ 'siguiente' no entra en la función"

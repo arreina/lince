@@ -124,6 +124,9 @@ jobs:
       - name: Depurador
         run: bash tests/depurador/smoke.sh ./lince.exe
 
+      - name: Depurador para el IDE (--ide)
+        run: bash tests/depurador/ide.sh ./lince.exe
+
       - name: Juego y minijuegos (SDL2 sin pantalla)
         run: |
           bash tests/juego/smoke.sh ./lince.exe

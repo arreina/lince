@@ -96,8 +96,17 @@ static void (*_hook_sentencia)(Nodo *s, Entorno *e) = NULL;
 /* > 0 mientras corre código de una biblioteca estándar escrita en Lince: el
    depurador no se para dentro (sus líneas no son del programa) */
 static int _en_biblioteca = 0;
+/* Cuántos 'intentar' hay abiertos: con 0, un error no lo captura nadie y el
+   depurador se puede parar antes de que acabe el programa */
+static int _intentando = 0;
+static void (*_hook_error)(Nodo *s, Entorno *e) = NULL;
 
 void interprete_fijar_hook(void (*hook)(Nodo *sentencia, Entorno *e)) { _hook_sentencia = hook; }
+void interprete_fijar_hook_error(void (*hook)(Nodo *sentencia, Entorno *e)) { _hook_error = hook; }
+const char *interprete_archivo_en_curso(void) {
+    const char *a = archivo_en_curso();
+    return a ? a : _archivo_actual;
+}
 int  interprete_profundidad(void) { return profundidad; }
 const char *interprete_archivo_actual(void);
 int  interprete_pila(int nivel, const char **nombre, int *linea) {
@@ -1579,6 +1588,7 @@ struct TareaLince {
     Valor        *esto_actual;
     ClaseLince   *clase_actual;
     int           en_biblioteca;
+    int           intentando;   /* sus 'intentar' abiertos */
     int           es_generador; /* el cuerpo de un 'generador', no una tarea */
     Valor        *producido;    /* lo último que ha producido */
     char          archivo[sizeof _archivo_actual];
@@ -1625,6 +1635,7 @@ static void tarea_entrar(TareaLince *t) {
     Valor      *esto_g  = esto_actual;
     ClaseLince *clase_g = clase_actual;
     int         bib_g   = _en_biblioteca;
+    int         int_g   = _intentando;
     char        archivo_g[sizeof _archivo_actual];
     memcpy(archivo_g, _archivo_actual, sizeof archivo_g);
 
@@ -1636,6 +1647,7 @@ static void tarea_entrar(TareaLince *t) {
     esto_actual      = t->esto_actual;
     clase_actual     = t->clase_actual;
     _en_biblioteca   = t->en_biblioteca;
+    _intentando      = t->intentando;
     memcpy(_archivo_actual, t->archivo, sizeof _archivo_actual);
     const char *ejec_g = _archivo_ejec;
     _archivo_ejec    = t->f && t->f->archivo ? t->f->archivo : NULL;
@@ -1659,12 +1671,14 @@ static void tarea_entrar(TareaLince *t) {
     t->esto_actual   = esto_actual;
     t->clase_actual  = clase_actual;
     t->en_biblioteca = _en_biblioteca;
+    t->intentando    = _intentando;
     memcpy(t->archivo, _archivo_actual, sizeof t->archivo);
 
     profundidad      = base;
     esto_actual      = esto_g;
     clase_actual     = clase_g;
     _en_biblioteca   = bib_g;
+    _intentando      = int_g;
     memcpy(_archivo_actual, archivo_g, sizeof archivo_g);
     _archivo_ejec    = ejec_g;
 }
@@ -1717,6 +1731,7 @@ static TareaLince *tarea_nueva(FuncionLince *f, Entorno *fn_e, int linea) {
     t->esto_actual   = esto_actual;
     t->clase_actual  = clase_actual;
     t->en_biblioteca = _en_biblioteca;
+    t->intentando    = 0;
     t->linea         = linea;
     memcpy(t->archivo, _archivo_actual, sizeof t->archivo);
     return t;
@@ -3909,7 +3924,9 @@ static Valor *exec_padre(Nodo *n, Entorno *e) {
 static Valor *exec_intentar(Nodo *n, Entorno *e) {
     /* Ejecutar el bloque intentar */
     Entorno *e_try = entorno_crear(e);
+    _intentando++;
     valor_destruir(ejecutar(n->intentar.cuerpo, e_try));   /* ver la nota de NODO_LLAMADA */
+    _intentando--;
     entorno_destruir(e_try);
 
     /* La recarga en caliente usa un error para deshacer el programa que corre:
@@ -4535,6 +4552,8 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                 valor_destruir(ultimo);
                 if (_hook_sentencia && !_en_biblioteca) _hook_sentencia(n->bloque.sentencias[i], e);
                 ultimo = ejecutar(n->bloque.sentencias[i], e);
+                if (hay_error && _hook_error && !_en_biblioteca && !_intentando)
+                    _hook_error(n->bloque.sentencias[i], e);
             }
             return ultimo;
         }
