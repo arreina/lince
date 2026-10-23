@@ -22,6 +22,10 @@ apartado que le toca de este archivo.
 - **`lince depurar --ide`**: el depurador para un IDE, con eventos y respuestas en JSON
   (`@lince {...}`, una por línea), rutas relativas al principal, parada antes de un error
   sin capturar y `pausa` mientras el programa corre. Detalle en `ESPECIFICACION.md`.
+- **`lince depurar --ide` sale al acabar el programa**, aunque quien lo lanzó siga con la entrada abierta (antes se quedaba esperando a que la cerrara).
+- **`lince compilar` y `lince repartir`**: su cabecera sale antes del error también cuando la salida va por una tubería.
+- **Una letra con tilde ya no se parte** en el aviso «Encontré el carácter…»: `'é'`, no `'�'`.
+- **El servidor de lenguaje (LSP) subraya solo lo que falla**: los errores de sintaxis traen su columna (cuando `lince` se lanza con la variable `LINCE_COLUMNAS`, que el propio servidor pone; el mensaje en la terminal no cambia). **Ir a la definición** salta también a los archivos que se importan (`importar "./x"`, también con `como alias` y los que a su vez importan).
 - **El depurador sigue a las funciones de los ficheros importados**: paso a paso entra en
   `libs/util.lince` y muestra su línea, `b libs/util.lince:2` para ahí, y `bt` y `v n` dicen
   de qué fichero es cada marco (antes decía siempre el principal).

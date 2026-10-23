@@ -189,6 +189,7 @@ static void quitar_retornos(char *buf) {    /* en Windows stderr sale con \r\n *
     *w = '\0';
 }
 
+static int _col_error = -1, _ancho_error = 0;   /* de leer_error: dónde falló, o -1 */
 static void leer_error(char *buf, int *linea, char *mensaje, size_t max);
 
 int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max) {
@@ -201,6 +202,13 @@ int lsp_comprobar_texto(const char *texto, int *linea, char *mensaje, size_t max
 
 /* "❌ Error en línea N:\n   mensaje..." → la línea y el mensaje en una sola línea */
 static void leer_error(char *buf, int *linea, char *mensaje, size_t max) {
+    /* Si el parser dijo dónde (con LINCE_COLUMNAS), "@@columna C ANCHO" va al final */
+    _col_error = -1; _ancho_error = 0;
+    char *marca = strstr(buf, "@@columna ");
+    if (marca) {
+        sscanf(marca + 10, "%d %d", &_col_error, &_ancho_error);
+        *marca = '\0';
+    }
     /* "❌ Error en línea N:\n   mensaje\n   mensaje" */
     *linea = 1;
     const char *lp = strstr(buf, "línea ");
@@ -635,6 +643,119 @@ static char *import_con_alias(const char *texto, const char *alias) {
     return NULL;
 }
 
+/* ── Ir a la definición en los archivos importados ── */
+
+/* Quita los "." y los "x/.." de una ruta */
+static void ruta_limpia(char *ruta) {
+    char *partes[64]; int np = 0, absoluta = ruta[0] == '/';
+    char *copia = strdup(ruta);
+    for (char *t = strtok(copia, "/"); t && np < 64; t = strtok(NULL, "/")) {
+        if (!strcmp(t, ".")) continue;
+        if (!strcmp(t, "..") && np > 0 && strcmp(partes[np - 1], "..")) { np--; continue; }
+        partes[np++] = t;
+    }
+    ruta[0] = '\0';
+    size_t k = 0;
+    if (absoluta) ruta[k++] = '/';
+    for (int i = 0; i < np; i++) {
+        size_t l = strlen(partes[i]);
+        memcpy(ruta + k, partes[i], l); k += l;
+        if (i < np - 1) ruta[k++] = '/';
+    }
+    ruta[k] = '\0';
+    free(copia);
+}
+
+/* La ruta de un archivo como URI */
+static char *ruta_a_uri(const char *ruta) {
+    char *u = malloc(strlen(ruta) * 3 + 8), *o = u;
+    o += sprintf(o, "file://");
+    for (const unsigned char *c = (const unsigned char *)ruta; *c; c++) {
+        if (isalnum(*c) || strchr("/-_.~", *c)) *o++ = (char)*c;
+        else o += sprintf(o, "%%%02X", *c);
+    }
+    *o = '\0';
+    return u;
+}
+
+/* El siguiente 'importar "./x" [como alias]' de un texto (solo rutas con ./ o ../) */
+static int siguiente_import(const char **pp, char *rel, size_t max, char *alias, size_t amax) {
+    const char *p = *pp;
+    while ((p = strstr(p, "importar")) != NULL) {
+        const char *ini = p;
+        p += 8;
+        if (ini > *pp && es_ident_ch((unsigned char)ini[-1])) continue;
+        while (*p == ' ') p++;
+        if (*p != '"') continue;
+        const char *fin = strchr(p + 1, '"');
+        if (!fin) break;
+        size_t k = (size_t)(fin - (p + 1));
+        if (k >= max) continue;
+        memcpy(rel, p + 1, k); rel[k] = '\0';
+        alias[0] = '\0';
+        const char *r = fin + 1;
+        while (*r == ' ') r++;
+        if (palabra_en(r, "como")) {
+            r += 4;
+            while (*r == ' ') r++;
+            size_t a = 0;
+            while (es_ident_ch((unsigned char)r[a]) && a + 1 < amax) { alias[a] = r[a]; a++; }
+            alias[a] = '\0';
+        }
+        *pp = fin + 1;
+        if (strncmp(rel, "./", 2) != 0 && strncmp(rel, "../", 3) != 0) continue;
+        return 1;
+    }
+    return 0;
+}
+
+/* Busca 'w' entre lo que define el archivo 'ruta' y lo que éste importa sin
+   alias (que es lo que queda a la vista). Deja el archivo y la línea. */
+static int buscar_en_archivo(const char *ruta, const char *w, int nivel, char *ruta_out, size_t max, int *linea) {
+    char *texto = leer_fichero(ruta);
+    if (!texto) return 0;
+    int hallado = 0;
+    Simbolo *sim = malloc(sizeof(Simbolo) * 2048);
+    int ns = escanear_simbolos(texto, sim, 2048);
+    for (int i = 0; i < ns && !hallado; i++)
+        if (sim[i].sangria == 0 && strcmp(sim[i].nombre, w) == 0) {
+            snprintf(ruta_out, max, "%s", ruta);
+            *linea = sim[i].linea;
+            hallado = 1;
+        }
+    free(sim);
+    if (!hallado && nivel < 6) {
+        const char *p = texto;
+        char rel[512], alias[96];
+        while (!hallado && siguiente_import(&p, rel, sizeof rel, alias, sizeof alias)) {
+            if (alias[0]) continue;
+            char *r = ruta_de_import(ruta, rel);
+            ruta_limpia(r);
+            hallado = buscar_en_archivo(r, w, nivel + 1, ruta_out, max, linea);
+            free(r);
+        }
+    }
+    free(texto);
+    return hallado;
+}
+
+/* La definición de 'w' en lo que importa el documento: 'w' suelta, o tras
+   "alias." si el archivo se importó con 'como alias'. */
+static int definicion_importada(Doc *d, const char *ruta_doc, const char *w, const char *prefijo,
+                                char *ruta_out, size_t max, int *linea) {
+    const char *p = d->texto;
+    char rel[512], alias[96];
+    while (siguiente_import(&p, rel, sizeof rel, alias, sizeof alias)) {
+        if (prefijo ? (!alias[0] || strcmp(alias, prefijo) != 0) : alias[0] != '\0') continue;
+        char *r = ruta_de_import(ruta_doc, rel);
+        ruta_limpia(r);
+        int ok = buscar_en_archivo(r, w, 0, ruta_out, max, linea);
+        free(r);
+        if (ok) return 1;
+    }
+    return 0;
+}
+
 static void completar(Buf *out, Doc *d, int linea, int caracter) {
     int primero = 1;
     vistos_vaciar();
@@ -740,10 +861,12 @@ static void responder(const char *id, const char *resultado) {
     free(b.d);
 }
 
-static void diagnostico(Buf *b, int linea, int gravedad, const char *msg, int primero) {
-    buf_fmt(b, "%s{\"range\":{\"start\":{\"line\":%d,\"character\":0},"
-                "\"end\":{\"line\":%d,\"character\":1000}},\"severity\":%d,"
-                "\"source\":\"lince\",\"message\":", primero ? "" : ",", linea - 1, linea - 1, gravedad);
+/* col < 0: toda la línea */
+static void diagnostico(Buf *b, int linea, int gravedad, const char *msg, int primero, int col, int ancho) {
+    int desde = col < 0 ? 0 : col, hasta = col < 0 ? 1000 : col + (ancho < 1 ? 1 : ancho);
+    buf_fmt(b, "%s{\"range\":{\"start\":{\"line\":%d,\"character\":%d},"
+                "\"end\":{\"line\":%d,\"character\":%d}},\"severity\":%d,"
+                "\"source\":\"lince\",\"message\":", primero ? "" : ",", linea - 1, desde, linea - 1, hasta, gravedad);
     buf_json(b, msg);
     buf_str(b, "}");
 }
@@ -763,7 +886,7 @@ static void publicar_diagnosticos(const char *uri, const char *texto) {
     quitar_retornos(buf);
     if (error) {
         leer_error(buf, &linea, msg, sizeof msg);
-        diagnostico(&b, linea, 1, msg, 1);
+        diagnostico(&b, linea, 1, msg, 1, _col_error, _ancho_error);
     } else {
         /* "⚠️  Aviso en línea N: mensaje", uno por línea */
         int n = 0;
@@ -772,7 +895,7 @@ static void publicar_diagnosticos(const char *uri, const char *texto) {
             if (fin) *fin = '\0';
             const char *lp = strstr(l, "Aviso en línea ");
             const char *dp = lp ? strchr(lp, ':') : NULL;
-            if (dp) diagnostico(&b, atoi(lp + strlen("Aviso en línea ")), 2, dp + 2, n++ == 0);
+            if (dp) diagnostico(&b, atoi(lp + strlen("Aviso en línea ")), 2, dp + 2, n++ == 0, -1, 0);
             if (!fin) break;
             l = fin + 1;
         }
@@ -887,15 +1010,43 @@ static void atender(const char *msg, int *salir, int *apagado) {
             if (palabra_en_posicion(d->texto, l, c, w, sizeof(w))) {
                 Simbolo *sim = malloc(sizeof(Simbolo) * 2048);
                 int ns = escanear_simbolos(d->texto, sim, 2048);
+                int hallado = 0;
                 for (int i = 0; i < ns; i++) {
                     if (strcmp(sim[i].nombre, w) != 0) continue;
                     free(r.d); r.d = NULL; r.n = r.cap = 0;
                     buf_str(&r, "{\"uri\":"); buf_json(&r, uri);
                     buf_fmt(&r, ",\"range\":{\"start\":{\"line\":%d,\"character\":0},"
                                 "\"end\":{\"line\":%d,\"character\":1000}}}", sim[i].linea, sim[i].linea);
+                    hallado = 1;
                     break;
                 }
                 free(sim);
+                /* Si no es de este archivo, quizá es de uno que importa */
+                char *ruta_doc = hallado ? NULL : uri_a_ruta(uri);
+                if (ruta_doc) {
+                    /* ¿va tras "alias."? */
+                    char prefijo[96] = "";
+                    size_t off = offset_posicion(d->texto, l, c);
+                    size_t ini = off;
+                    while (ini > 0 && es_ident_ch((unsigned char)d->texto[ini - 1])) ini--;
+                    if (ini > 0 && d->texto[ini - 1] == '.') {
+                        size_t fin = ini - 1, a = fin;
+                        while (a > 0 && es_ident_ch((unsigned char)d->texto[a - 1])) a--;
+                        if (fin - a > 0 && fin - a < sizeof prefijo) {
+                            memcpy(prefijo, d->texto + a, fin - a); prefijo[fin - a] = '\0';
+                        }
+                    }
+                    char otra[1024]; int lin = 0;
+                    if (definicion_importada(d, ruta_doc, w, prefijo[0] ? prefijo : NULL, otra, sizeof otra, &lin)) {
+                        char *u = ruta_a_uri(otra);
+                        free(r.d); r.d = NULL; r.n = r.cap = 0;
+                        buf_str(&r, "{\"uri\":"); buf_json(&r, u);
+                        buf_fmt(&r, ",\"range\":{\"start\":{\"line\":%d,\"character\":0},"
+                                    "\"end\":{\"line\":%d,\"character\":1000}}}", lin, lin);
+                        free(u);
+                    }
+                    free(ruta_doc);
+                }
             }
         }
         if (id[0]) responder(id, r.d);
@@ -911,6 +1062,13 @@ static void atender(const char *msg, int *salir, int *apagado) {
 
 int lsp_servir(void) {
     int salir = 0, apagado = 0;
+    /* Los errores de sintaxis traen su columna (ver lince_marcar_columna); lo
+       heredan el hijo de analizar_aparte y 'lince comprobar' en Windows */
+#ifdef _WIN32
+    _putenv_s("LINCE_COLUMNAS", "1");
+#else
+    setenv("LINCE_COLUMNAS", "1", 1);
+#endif
 #ifdef _WIN32
     _setmode(_fileno(stdin), _O_BINARY);      /* sin traducir \r\n: Content-Length cuenta bytes */
     _setmode(_fileno(stdout), _O_BINARY);

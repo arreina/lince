@@ -16,6 +16,12 @@ escribir(saludar("mundo"))
 escribir(argumentos())
 lanzar Error("fallo a propósito")
 EOF
+# Con un error y la salida por una tubería, la cabecera sale antes que el error;
+# y una letra con tilde no se parte en el aviso
+printf 'sea x = 1\nsea y = \xc3\xa9\n' > "$T/malo.lince"
+orden="$("$LINCE" compilar "$T/malo.lince" -o "$T/malo" 2>&1 | grep -o "Compilador\|Encontré" | tr '\n' ' ')"
+[ "$orden" = "Compilador Encontré " ] || { echo "❌ compilar: la cabecera no sale antes del error ($orden)"; exit 1; }
+"$LINCE" compilar "$T/malo.lince" -o "$T/malo" 2>&1 | grep -q "carácter 'é'" || { echo "❌ compilar: la letra con tilde se parte en el aviso"; exit 1; }
 "$LINCE" compilar "$T/prog.lince" -o "$T/prog" > /dev/null
 mv "$T/lib" "$T/lib_oculta"          # el ejecutable lleva sus archivos dentro
 salida="$(cd / && "$T/prog" uno dos 2>&1 || true)"

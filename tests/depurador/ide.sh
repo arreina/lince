@@ -29,4 +29,15 @@ salida="$( ( echo c; sleep 0.5; echo pausa; sleep 0.4; echo p k; sleep 0.3; echo
 if echo "$salida" | grep -qF '"motivo":"pausa","archivo":"./larga.lince","linea":3}' && echo "$salida" | grep -qF '{"respuesta":"valor","tipo":"numero"'; then
     echo "  ✅ pausa con el programa corriendo"
 else echo "  ❌ pausa con el programa corriendo"; echo "$salida" | sed 's/^/      /'; fallos=$((fallos+1)); fi
+# Al acabar el programa sale, aunque quien lo lanzó siga con la entrada abierta
+if command -v mkfifo > /dev/null; then
+    fifo="$(mktemp -u)"; mkfifo "$fifo"; exec 3<>"$fifo"
+    (cd "$DIR" && "$LINCE" depurar --ide prog.lince < "$fifo" > /dev/null 2>&1) &
+    pid=$!
+    echo c >&3; sleep 0.4; echo c >&3; sleep 1
+    if kill -0 "$pid" 2> /dev/null; then
+        echo "  ❌ no sale al acabar con la entrada abierta"; kill "$pid" 2> /dev/null; fallos=$((fallos+1))
+    else echo "  ✅ sale al acabar con la entrada abierta"; fi
+    exec 3>&-; rm -f "$fifo"
+fi
 [ "$fallos" -eq 0 ] && echo "✅ Depurador (--ide): todo correcto" || { echo "❌ $fallos comprobaciones fallaron"; exit 1; }

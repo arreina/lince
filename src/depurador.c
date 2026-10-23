@@ -18,7 +18,10 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <io.h>
+#include <process.h>
 #else
+#include <unistd.h>
 #include <pthread.h>
 #endif
 
@@ -703,6 +706,14 @@ static int leer_orden(char *out, size_t max) {
     return 1;
 }
 
+/* Se acaba sin esperar al hilo que lee stdin: exit() esperaría a que acabe de
+   leer (el IDE puede dejar la entrada abierta) */
+static void salir_ya(int codigo) {
+    fflush(stdout);
+    fflush(stderr);
+    _exit(codigo);
+}
+
 static void terminar(int codigo) {
     if (_ide) {
         Buf b = {0};
@@ -789,7 +800,7 @@ static void parado(const char *motivo, const char *mensaje, const char *archivo,
         }
         if (!strcmp(cmd, "g"))  { mostrar_globales(); continue; }
         if (!strcmp(cmd, "bt")) { pila(); continue; }
-        if (!strcmp(cmd, "q") || !strcmp(cmd, "salir!")) { terminar(0); exit(0); }
+        if (!strcmp(cmd, "q") || !strcmp(cmd, "salir!")) { terminar(0); salir_ya(0); }
         if (!strcmp(cmd, "h") || !strcmp(cmd, "ayuda")) {
             if (_ide) responder_error("En el modo --ide no hay ayuda: mira ESPECIFICACION.md.");
             else ayuda();
@@ -813,7 +824,7 @@ static int ordenes_corriendo(const char *archivo) {
         if (!strcmp(cmd, "pausa")) pausa = 1;
         else if (!strcmp(cmd, "b")) poner_parada(arg, archivo);
         else if (!strcmp(cmd, "d")) quitar_parada(arg, archivo);
-        else if (!strcmp(cmd, "q") || !strcmp(cmd, "salir!")) { terminar(0); exit(0); }
+        else if (!strcmp(cmd, "q") || !strcmp(cmd, "salir!")) { terminar(0); salir_ya(0); }
         else if (!strcmp(cmd, "c") || !strcmp(cmd, "continuar")) continue;   /* ya sigue */
         else responder_error("El programa está corriendo: manda «pausa» antes.");
     }
@@ -889,6 +900,7 @@ int depurador_ejecutar(const char *archivo, int argc, char *argv[], int ide) {
     interprete_fijar_hook(NULL);
     interprete_fijar_hook_error(NULL);
     terminar(r ? 1 : 0);
+    if (_ide) salir_ya(r ? 1 : 0);
 
     interprete_destruir(interp);
     nodo_destruir(programa);

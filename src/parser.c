@@ -35,6 +35,7 @@ static Token *consumir(Parser *p, TipoToken tipo, const char *esperaba) {
             "   Revisa la sintaxis en esa línea.\n\n",
             t->linea, lince_de_archivo(), esperaba,
             t->valor ? t->valor : "fin de archivo");
+        lince_marcar_columna(t->columna, t->ancho);
         exit(1);
     }
     p->pos++;
@@ -55,6 +56,7 @@ static void error_sintaxis(Parser *p, const char *mensaje) {
         "   Encontré: '%s'\n\n",
         t->linea, lince_de_archivo(), mensaje,
         t->valor ? t->valor : "fin de archivo");
+    lince_marcar_columna(t->columna, t->ancho);
     exit(1);
 }
 
@@ -894,6 +896,7 @@ static Nodo *sent_para(Parser *p) {
                 "   Se esperaba 'en' después del nombre de variable.\n"
                 "   Ejemplo: para cada numero n en lista\n\n",
                 en->linea, lince_de_archivo());
+            lince_marcar_columna(en->columna, en->ancho);
             exit(1);
         }
 
@@ -1188,6 +1191,7 @@ static Nodo *sent_clase(Parser *p) {
                 "   ('sea' / 'fijo') y propiedades ('obtener' / 'fijar').\n"
                 "   Encontré '%s' en su lugar.\n\n",
                 actual(p)->linea, lince_de_archivo(), actual(p)->valor ? actual(p)->valor : "?");
+            lince_marcar_columna(actual(p)->columna, actual(p)->ancho);
             exit(1);
         }
     }
@@ -1252,6 +1256,7 @@ static Nodo *sent_elegir(Parser *p) {
                 "\n❌ Error en línea %d%s:\n"
                 "   Dentro de 'elegir' solo puede haber 'caso' u 'otro'.\n\n",
                 actual(p)->linea, lince_de_archivo());
+            lince_marcar_columna(actual(p)->columna, actual(p)->ancho);
             exit(1);
         }
     }

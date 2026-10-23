@@ -130,6 +130,8 @@ typedef struct {
     TipoToken  tipo;
     char      *valor;
     int        linea;
+    int        columna;     /* dónde empieza en su línea, contada en caracteres desde 0 */
+    int        ancho;       /* cuántos caracteres ocupa (en su línea) */
 } Token;
 
 /* ─────────────────────────────────────────
@@ -139,6 +141,7 @@ typedef struct {
     const char *codigo;
     int         longitud;
     int         pos;
+    int         inicio;     /* dónde empezó el token que se lee */
     int         linea;
     Token      *tokens;
     int         cantidad;
@@ -160,5 +163,9 @@ const char  *lexer_palabra_contextual(int i);
 /* Para los errores de sintaxis de un fichero importado */
 extern const char *lince_archivo_sintaxis;
 const char *lince_de_archivo(void);
+/* Si el entorno trae LINCE_COLUMNAS (lo pone el servidor de lenguaje), un error
+   de sintaxis añade una última línea "@@columna C ANCHO" para que el editor
+   subraye solo lo que falla. */
+void lince_marcar_columna(int columna, int ancho);
 
 #endif /* LINCE_LEXER_H */

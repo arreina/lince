@@ -165,6 +165,11 @@ int main(int argc, char *argv[]) {
 
     const char *cmd = argv[1];
 
+    /* Compilar y repartir cuentan lo que van haciendo y, si algo falla, lo
+       dicen por stderr: sin búfer, para que con una tubería salga en orden */
+    if (strcmp(cmd, "compilar") == 0 || strcmp(cmd, "repartir") == 0)
+        setvbuf(stdout, NULL, _IONBF, 0);
+
     /* Servidor de lenguaje para editores: 'lince lsp' */
     if (strcmp(cmd, "lsp") == 0) return lsp_servir();
 

@@ -109,6 +109,37 @@ with tempfile.TemporaryDirectory() as d_:
     r = etiquetas(recv()["result"])
     comprobar("suma" in r and "PI2" in r, "tras 'alias.' salen los nombres de la librería importada")
 
+# ── la columna del error, y ir a la definición en archivos importados ──
+with tempfile.TemporaryDirectory() as d_:
+    os.makedirs(os.path.join(d_, "libs"))
+    open(os.path.join(d_, "libs", "util.lince"), "w").write("sea PI2 = 6\nfuncion doble(val numero n): numero {\n    devolver n * 2\n}\n")
+    open(os.path.join(d_, "libs", "mas.lince"), "w").write('importar "./util"\nfuncion triple(val numero n): numero {\n    devolver n * 3\n}\n')
+    u3 = "file://" + os.path.join(d_, "main.lince")
+    t3 = 'importar "./libs/mas"\nimportar "./libs/util" como u\nsea a = triple(1)\nsea b = doble(2)\nsea c = u.doble(3)\nsea \u00f1 = 1\n'
+    send({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": u3, "text": t3}}})
+    recv()
+    def donde(linea, car):
+        return pedir(20 + linea, "textDocument/definition", {"textDocument": {"uri": u3}, "position": {"line": linea, "character": car}})
+    r = donde(2, 11)       # triple, de libs/mas
+    comprobar(r and r["uri"].endswith("/libs/mas.lince") and r["range"]["start"]["line"] == 1, "ir a la definición salta a un archivo importado")
+    r = donde(3, 11)       # doble, de libs/util, que importa libs/mas
+    comprobar(r and r["uri"].endswith("/libs/util.lince") and r["range"]["start"]["line"] == 1, "...también si lo importa el importado")
+    r = donde(4, 13)       # u.doble
+    comprobar(r and r["uri"].endswith("/libs/util.lince") and r["range"]["start"]["line"] == 1, "...y con alias (u.doble)")
+    # un error en mitad de la línea subraya solo lo que falla
+    send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
+        "textDocument": {"uri": u3}, "contentChanges": [{"text": "sea x = 1\nsea n = 5 @\n"}]}})
+    d = recv()["params"]["diagnostics"]
+    r = d[0]["range"]
+    comprobar(d and r["start"]["line"] == 1 and r["start"]["character"] == 10 and r["end"]["character"] == 11,
+              "el error de sintaxis dice su columna (%s)" % json.dumps(r))
+    send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
+        "textDocument": {"uri": u3}, "contentChanges": [{"text": "sea x = 1\nsea y = \u00e9\n"}]}})
+    d = recv()["params"]["diagnostics"]
+    r = d[0]["range"]
+    comprobar(r["start"]["line"] == 1 and r["start"]["character"] == 8 and r["end"]["character"] == 9 and "\u00e9" in d[0]["message"],
+              "una letra con tilde no se parte (%s)" % d[0]["message"])
+
 # ── cierre ordenado ──
 send({"jsonrpc": "2.0", "id": 99, "method": "shutdown"})
 recv()

@@ -197,6 +197,7 @@ Lexer *lexer_crear(const char *codigo) {
     l->codigo    = codigo;
     l->longitud  = strlen(codigo);
     l->pos       = 0;
+    l->inicio    = 0;
     l->linea     = 1;
     l->capacidad = 256;
     l->cantidad  = 0;
@@ -232,6 +233,25 @@ static char avanzar(Lexer *l) {
     return c;
 }
 
+/* Columna y ancho, en caracteres (no en bytes), del trozo [desde, hasta) */
+static void columna_de(Lexer *l, int desde, int hasta, int *col, int *ancho) {
+    if (desde > l->longitud) desde = l->longitud;
+    int ini = desde;
+    while (ini > 0 && l->codigo[ini - 1] != '\n') ini--;
+    int c = 0;
+    for (int i = ini; i < desde; i++) if (((unsigned char)l->codigo[i] & 0xC0) != 0x80) c++;
+    int w = 0;
+    for (int i = desde; i < hasta && i < l->longitud && l->codigo[i] != '\n'; i++)
+        if (((unsigned char)l->codigo[i] & 0xC0) != 0x80) w++;
+    *col = c;
+    *ancho = w;
+}
+
+void lince_marcar_columna(int columna, int ancho) {
+    if (!getenv("LINCE_COLUMNAS")) return;
+    fprintf(stderr, "@@columna %d %d\n", columna, ancho < 1 ? 1 : ancho);
+}
+
 static void agregar_token(Lexer *l, TipoToken tipo, const char *valor, int linea) {
     if (l->cantidad >= l->capacidad) {
         l->capacidad *= 2;
@@ -241,14 +261,30 @@ static void agregar_token(Lexer *l, TipoToken tipo, const char *valor, int linea
     t->tipo  = tipo;
     t->valor = valor ? strdup(valor) : NULL;
     t->linea = linea;
+    columna_de(l, l->inicio, l->pos, &t->columna, &t->ancho);
 }
 
 static void error_lexico(Lexer *l, char c) {
+    /* El carácter entero: una letra con tilde son dos o más bytes de UTF-8 y
+       no hay que partirla. 'c' ya se ha leído: empieza en pos - 1. */
+    char car[8] = { c, 0 };
+    unsigned char u = (unsigned char)c;
+    int n = u >= 0xF0 ? 4 : u >= 0xE0 ? 3 : u >= 0xC0 ? 2 : 1;
+    if (n > 1 && l->pos >= 1 && l->codigo[l->pos - 1] == c) {
+        int k = 1;
+        while (k < n && l->pos - 1 + k < l->longitud &&
+               ((unsigned char)l->codigo[l->pos - 1 + k] & 0xC0) == 0x80) { car[k] = l->codigo[l->pos - 1 + k]; k++; }
+        car[k] = '\0';
+    }
+    fflush(stdout);
     fprintf(stderr,
         "\n❌ Error en línea %d%s:\n"
-        "   Encontré el carácter '%c' y no sé qué hacer con él.\n"
+        "   Encontré el carácter '%s' y no sé qué hacer con él.\n"
         "   Revisa que no hayas escrito algo por error.\n\n",
-        l->linea, lince_de_archivo(), c);
+        l->linea, lince_de_archivo(), car);
+    int col, ancho;
+    columna_de(l, l->pos - 1, l->pos - 1 + (int)strlen(car), &col, &ancho);
+    lince_marcar_columna(col, ancho);
     exit(1);
 }
 
@@ -368,6 +404,7 @@ static void leer_hueco(Lexer *l, int linea) {
 }
 
 static void leer_texto(Lexer *l, int linea) {
+    int ini0 = l->inicio;       /* lo de entre llaves lo cambia */
     avanzar(l); /* consumir comilla inicial */
     Trozo buf = { calloc(64, 1), 0, 64 };
     int plantilla = 0;
@@ -409,6 +446,7 @@ static void leer_texto(Lexer *l, int linea) {
     }
 
     avanzar(l); /* consumir comilla final */
+    l->inicio = ini0;
     agregar_token(l, TOK_TEXTO, buf.s, linea);
     if (plantilla) agregar_token(l, TOK_PLANTILLA_FIN, "\"", l->linea);
     free(buf.s);
@@ -439,6 +477,7 @@ static int lexer_paso(Lexer *l) {
 
     int  linea = l->linea;
     char c     = actual(l);
+    l->inicio  = l->pos;
 
     if (isdigit(c)) {
         leer_numero(l, linea);
@@ -514,6 +553,7 @@ static int lexer_paso(Lexer *l) {
 Token *lexer_tokenizar(Lexer *l, int *cantidad) {
     while (lexer_paso(l)) {}
 
+    l->inicio = l->pos;
     agregar_token(l, TOK_EOF, NULL, l->linea);
     *cantidad = l->cantidad;
     return l->tokens;
