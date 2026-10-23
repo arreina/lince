@@ -27,6 +27,15 @@ La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10,
 
 ## Lenguaje
 
+**Revisión antes de congelar en la 1.0** (decidido por el autor el 2026-10-23):
+
+- [ ] `==` compara listas y diccionarios **por contenido** (también `contiene()` y `posicion()`); los objetos, como ahora (el mismo objeto o su método `igual`). Arreglar de paso `posicion()`, que hoy da por iguales todas las listas, diccionarios y objetos (`enemigos.posicion(e)` da siempre 0).
+- [ ] `ref` **que funcione**: lo que se asigna a un parámetro `ref` cambia la variable que se pasó. Hoy `val` y `ref` hacen lo mismo. Las listas y diccionarios se comparten siempre; corregir en la especificación «`val` — copia».
+- [ ] `val` **opcional** (sin poner nada = `val`).
+- [ ] En un `si`, **una lista o un diccionario vacíos cuentan como falso**, como `""`, `0` y `nulo`.
+- [x] `x % 0` da `ErrorMatematico`, como `x / 0` (antes daba `nan`).
+- Para después de la 1.0 (no rompen nada): comparar textos con `<`, `"a" * 3`, indexar un texto escrito tal cual (`"hola"[0]`), números como claves de diccionario, `a_numero(" 3 ")` con espacios.
+
 - [x] `mapear`, `filtrar` y `reducir` aceptan también generadores y bytes (salió escribiendo el manual).
 
 ## Biblioteca de juego en Lince

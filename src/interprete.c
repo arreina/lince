@@ -1308,7 +1308,16 @@ static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
                     }
                     resultado = valor_numero(a / b);
                     break;
-                case '%': resultado = valor_numero(fmod(a, b)); break;
+                case '%':
+                    if (b == 0) {                     /* como la división: un error, no nan */
+                        valor_error = valor_error_nuevo("ErrorMatematico", "Resto de dividir entre cero.", linea);
+                        hay_error = 1;
+                        valor_destruir(izq);
+                        valor_destruir(der);
+                        return valor_nulo();
+                    }
+                    resultado = valor_numero(fmod(a, b));
+                    break;
                 case '<': resultado = valor_booleano(a < b); break;
                 case '>': resultado = valor_booleano(a > b); break;
             }
