@@ -157,4 +157,8 @@ const char  *nombre_token(TipoToken tipo);
 const char  *lexer_palabra_clave(int i);
 const char  *lexer_palabra_contextual(int i);
 
+/* Para los errores de sintaxis de un fichero importado */
+extern const char *lince_archivo_sintaxis;
+const char *lince_de_archivo(void);
+
 #endif /* LINCE_LEXER_H */

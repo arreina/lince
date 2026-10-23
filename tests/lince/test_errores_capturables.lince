@@ -303,3 +303,14 @@ intentar {
 }
 
 escribir("sigo vivo")
+
+# Un error en una función de otro fichero trae ese fichero y su línea
+importar "./ayuda_falla"
+importar "texto"
+intentar {
+    fallar_aqui()
+} capturar (error e) {
+    escribir("{e.tipo} en línea {e.linea}, de ayuda_falla: {texto.termina_con(e.archivo, "ayuda_falla.lince")}")
+}
+# 'lanzar' sin capturar dice su línea; capturado, también
+intentar { lanzar Error("me rindo") } capturar (error e) { escribir("lanzado en la línea {e.linea}") }

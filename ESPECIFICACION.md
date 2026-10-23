@@ -913,7 +913,12 @@ En el REPL el error se muestra y la sesión sigue. Si hay varios errores en
 cadena, se informa del primero, que es la causa, y no de los que vienen detrás
 como consecuencia suya.
 
-El objeto error tiene: `e.mensaje`, `e.tipo`, `e.linea`
+El objeto error tiene: `e.mensaje`, `e.tipo`, `e.linea` y `e.archivo` (el fichero donde
+pasó: el de una función importada, aunque se llame desde otro). Un error sin capturar acaba el
+programa con `❌ ErrorTipo en línea 3: ...`, y si pasó en un fichero importado, con
+`❌ ErrorTipo en línea 3 de libs/enemigos.lince: ...` (también los errores de sintaxis). Lo que
+escribe `escribir` sale en el momento, en orden con los errores, aunque la salida no sea una
+terminal (un editor, un IDE, un archivo).
 
 ---
 

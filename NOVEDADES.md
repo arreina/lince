@@ -11,6 +11,15 @@ apartado que le toca de este archivo.
 - `dentro()` acepta el punto como una lista `[x, y]`, como la que da `raton()`:
   `juego.dentro(juego.raton(), boton)`.
 
+### Para los editores y el IDE
+
+- **Lo que escribe `escribir` sale en el momento**, en orden con los errores, aunque la salida
+  no sea una terminal (antes se quedaba en el búfer hasta el final cuando la leía otro
+  programa, como un IDE).
+- **Los errores de un fichero importado dicen de cuál son**: `❌ ErrorTipo en línea 3 de
+  libs/enemigos.lince: ...`, también los de sintaxis. El error capturado trae `e.archivo`.
+- Un `lanzar` sin capturar dice su línea (antes, solo el mensaje).
+
 ### Revisión del lenguaje antes de la 1.0
 
 Cosas que, una vez congelado el lenguaje, ya no se podrían cambiar:

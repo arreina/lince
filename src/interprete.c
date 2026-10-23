@@ -53,6 +53,24 @@ void interprete_fijar_archivo(const char *ruta) {
     snprintf(_archivo_actual, sizeof(_archivo_actual), "%s", ruta ? ruta : "");
 }
 
+/* Los ficheros de los que vienen las funciones, guardados una vez (no se
+   liberan: son pocos). Cada función recuerda el suyo y, mientras corre su
+   cuerpo, _archivo_ejec dice cuál es: así un error en una función de un
+   fichero importado dice de qué fichero es, aunque se llame desde otro. */
+static const char *_archivo_ejec = NULL;
+static const char *archivo_interno(const char *ruta) {
+    static char *vistos[64];
+    static int nvistos = 0;
+    if (!ruta || !ruta[0]) return NULL;
+    for (int i = 0; i < nvistos; i++) if (strcmp(vistos[i], ruta) == 0) return vistos[i];
+    if (nvistos == 64) return NULL;
+    return vistos[nvistos++] = strdup(ruta);
+}
+/* El fichero del código que corre ahora */
+static const char *archivo_en_curso(void) {
+    return _archivo_ejec ? _archivo_ejec : archivo_interno(_archivo_actual);
+}
+
 /* Directorio de 'archivo' en 'destino'. Cadena vacía si no tiene ninguno. */
 static void _directorio_de(const char *archivo, char *destino, size_t max) {
     snprintf(destino, max, "%s", archivo);
@@ -202,6 +220,7 @@ Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea) {
     e->tipo    = strdup(tipo);
     e->mensaje = strdup(mensaje);
     e->linea   = linea;
+    e->archivo = archivo_en_curso();
     Valor *v = valor_alloc();
     v->tipo  = VAL_ERROR;
     v->refs  = 1; v->es_modulo = 0;
@@ -1618,6 +1637,8 @@ static void tarea_entrar(TareaLince *t) {
     clase_actual     = t->clase_actual;
     _en_biblioteca   = t->en_biblioteca;
     memcpy(_archivo_actual, t->archivo, sizeof _archivo_actual);
+    const char *ejec_g = _archivo_ejec;
+    _archivo_ejec    = t->f && t->f->archivo ? t->f->archivo : NULL;
     _tarea_actual    = t;
     t->estado        = TAREA_CORRIENDO;
 
@@ -1645,6 +1666,7 @@ static void tarea_entrar(TareaLince *t) {
     clase_actual     = clase_g;
     _en_biblioteca   = bib_g;
     memcpy(_archivo_actual, archivo_g, sizeof archivo_g);
+    _archivo_ejec    = ejec_g;
 }
 
 /* Lo que corre en la pila de la tarea */
@@ -1732,7 +1754,13 @@ static Valor *cuerpo_de_tarea(FuncionLince *f, Entorno *fn_e) {
     return valor_nulo();
 }
 static inline Valor *ejecutar_cuerpo(FuncionLince *f, Entorno *fn_e) {
-    if (__builtin_expect(!f->es_tarea, 1)) return ejecutar(f->cuerpo, fn_e);
+    if (__builtin_expect(!f->es_tarea, 1)) {
+        const char *antes = _archivo_ejec;
+        if (f->archivo) _archivo_ejec = f->archivo;
+        Valor *r = ejecutar(f->cuerpo, fn_e);
+        _archivo_ejec = antes;
+        return r;
+    }
     return cuerpo_de_tarea(f, fn_e);
 }
 
@@ -2145,11 +2173,14 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
             }
             if (importado_ya(ruta)) { free(codigo); return valor_nulo(); }
 
+            const char *sintaxis_antes = lince_archivo_sintaxis;
+            lince_archivo_sintaxis = ruta;          /* un error de sintaxis dirá de qué fichero es */
             Lexer  *lx  = lexer_crear(codigo);
             int     cnt = 0;
             Token  *tok = lexer_tokenizar(lx, &cnt);
             Parser *pa  = parser_crear(tok, cnt);
             Nodo   *ast = parser_parsear(pa);
+            lince_archivo_sintaxis = sintaxis_antes;
             valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
             /* No destruimos el AST — las funciones definidas lo referencian */
             parser_destruir(pa);
@@ -2190,11 +2221,14 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
             char *codigo = interprete_leer_fuente(ruta);
             recarga_vigilar(ruta);
 
+            const char *sintaxis_antes = lince_archivo_sintaxis;
+            lince_archivo_sintaxis = ruta;          /* un error de sintaxis dirá de qué fichero es */
             Lexer  *lx  = lexer_crear(codigo);
             int     cnt = 0;
             Token  *tok = lexer_tokenizar(lx, &cnt);
             Parser *pa  = parser_crear(tok, cnt);
             Nodo   *ast = parser_parsear(pa);
+            lince_archivo_sintaxis = sintaxis_antes;
 
             /* Mientras corre el fichero importado, él es el fichero actual:
                así sus propios 'importar "./x"' se resuelven junto a él. */
@@ -3325,6 +3359,7 @@ static Valor *llamar_biblioteca(Valor *vf, Valor **args, int nargs, int linea) {
         strcmp(valor_error->error->tipo, ERROR_RECARGA) != 0) {
         ErrorLince *er = valor_error->error;
         er->linea = linea;
+        er->archivo = archivo_en_curso();
         size_t ln = strlen(f->nombre);
         if (strncmp(er->mensaje, f->nombre, ln) != 0 || er->mensaje[ln] != '(') {
             char *m = malloc(ln + strlen(er->mensaje) + 8);
@@ -3902,13 +3937,15 @@ static Valor *exec_intentar(Nodo *n, Entorno *e) {
                 /* Exponer el error como objeto con campos */
                 ObjetoLince *obj = calloc(1, sizeof(ObjetoLince));
                 obj->clase      = NULL;
-                obj->num_campos = 3;
+                obj->num_campos = 4;
                 obj->campos_nombres[0] = strdup("mensaje");
                 obj->campos_valores[0] = valor_texto(err->error->mensaje);
                 obj->campos_nombres[1] = strdup("tipo");
                 obj->campos_valores[1] = valor_texto(err->error->tipo);
                 obj->campos_nombres[2] = strdup("linea");
                 obj->campos_valores[2] = valor_numero(err->error->linea);
+                obj->campos_nombres[3] = strdup("archivo");
+                obj->campos_valores[3] = err->error->archivo ? valor_texto(err->error->archivo) : valor_nulo();
 
                 entorno_definir(e_cap, n->intentar.vars_captura[i],
                                 valor_objeto(obj), 0);
@@ -4090,6 +4127,7 @@ static Valor *exec_acceso(Nodo *n, Entorno *e) {
 /* Crea el FuncionLince de un método de clase a partir de su nodo. */
 static FuncionLince *metodo_desde_nodo(Nodo *mn, ClaseLince *c, Entorno *ce) {
     FuncionLince *f = calloc(1, sizeof(FuncionLince));
+    f->archivo = archivo_interno(_archivo_actual);
     f->nombre           = strdup(mn->funcion.nombre);
     f->parametros       = mn->funcion.parametros;
     f->num_parametros   = mn->funcion.num_parametros;
@@ -4485,6 +4523,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             }
             char  *s = valor_a_texto(v);
             printf("%s\n", s);
+            fflush(stdout);        /* que salga ya: si no es una terminal, se quedaba en el búfer */
             free(s);
             valor_destruir(v);
             return valor_nulo();
@@ -4543,6 +4582,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
 
         case NODO_FUNCION: {
             FuncionLince *f = calloc(1, sizeof(FuncionLince));
+            f->archivo = archivo_interno(_archivo_actual);
             f->nombre           = strdup(n->funcion.nombre);
             f->parametros       = n->funcion.parametros;
             f->num_parametros   = n->funcion.num_parametros;
@@ -4613,6 +4653,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         case NODO_GENERADOR: {
             /* Registra el generador como función especial en el entorno */
             FuncionLince *f = calloc(1, sizeof(FuncionLince));
+            f->archivo = archivo_interno(_archivo_actual);
             f->nombre           = strdup(n->generador.nombre);
             f->parametros       = n->generador.parametros;
             f->num_parametros   = n->generador.num_parametros;
@@ -4698,6 +4739,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         case NODO_LAMBDA: {
             /* Crea una función anónima y la retorna como valor */
             FuncionLince *f = calloc(1, sizeof(FuncionLince));
+            f->archivo = archivo_interno(_archivo_actual);
             f->nombre           = strdup("<lambda>");
             f->parametros       = n->lambda.parametros;
             f->num_parametros   = n->lambda.num_parametros;
@@ -4722,7 +4764,9 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
         case NODO_LANZAR: {            Valor *vobj = ejecutar(n->lanzar, e);
 
             if (vobj->tipo == VAL_ERROR) {
-                /* Ya es un error — lanzar directamente */
+                /* Ya es un error — lanzar directamente, con la línea de 'lanzar'
+                   si no trae otra (Error("...") se crea sin línea) */
+                if (vobj->error->linea <= 0) vobj->error->linea = n->linea;
                 valor_error = vobj;
             } else if (vobj->tipo == VAL_OBJETO) {
                 /* Objeto de clase propia — envolver como error */
@@ -4734,13 +4778,13 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                         break;
                     }
                 }
-                valor_error = valor_error_nuevo(tipo, msg ? msg : "sin mensaje", 0);
+                valor_error = valor_error_nuevo(tipo, msg ? msg : "sin mensaje", n->linea);
                 free(tipo);
                 if (msg) free(msg);
                 valor_destruir(vobj);
             } else {
                 char *s = valor_a_texto(vobj);
-                valor_error = valor_error_nuevo("Error", s, 0);
+                valor_error = valor_error_nuevo("Error", s, n->linea);
                 free(s);
                 valor_destruir(vobj);
             }
@@ -5088,6 +5132,7 @@ static Valor *fn_conv_logico(Valor **a, int n) {
 static void registrar_fn_nativa(Entorno *e, const char *nombre,
                                  void *fn_ptr, int num_params) {
     FuncionLince *f = calloc(1, sizeof(FuncionLince));
+    f->archivo = archivo_interno(_archivo_actual);
     f->nombre         = strdup(nombre);
     f->num_parametros = num_params;
     f->cuerpo         = (Nodo*)(uintptr_t)fn_ptr;
@@ -5164,14 +5209,17 @@ int interprete_ejecutar_recargable(Interprete *interp, Nodo *programa, char *men
         /* Con el número de línea cuando se conoce: el pilar del lenguaje es
            "errores literales", y los fallos que antes morían con su propio
            fprintf ya lo decían; no puede perderse al pasar a ser capturables. */
-        if (err->linea > 0)
-            fprintf(stderr, "\n❌ %s en línea %d: %s\n\n", err->tipo, err->linea, err->mensaje);
-        else
-            fprintf(stderr, "\n❌ %s: %s\n\n", err->tipo, err->mensaje);
-        if (mensaje && max) {
-            if (err->linea > 0) snprintf(mensaje, max, "%s en línea %d: %s", err->tipo, err->linea, err->mensaje);
-            else snprintf(mensaje, max, "%s: %s", err->tipo, err->mensaje);
+        /* "ErrorTipo en línea 3", y si fue en otro fichero (uno importado),
+           "ErrorTipo en línea 3 de libs/enemigos.lince" */
+        char donde[1200] = "";
+        if (err->linea > 0) {
+            int otro = err->archivo && strcmp(err->archivo, _archivo_principal[0] ? _archivo_principal : _archivo_actual) != 0;
+            if (otro) snprintf(donde, sizeof donde, " en línea %d de %s", err->linea, err->archivo);
+            else snprintf(donde, sizeof donde, " en línea %d", err->linea);
         }
+        fflush(stdout);
+        fprintf(stderr, "\n❌ %s%s: %s\n\n", err->tipo, donde, err->mensaje);
+        if (mensaje && max) snprintf(mensaje, max, "%s%s: %s", err->tipo, donde, err->mensaje);
     }
     valor_destruir(valor_error);
     valor_error = NULL;

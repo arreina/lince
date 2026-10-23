@@ -57,6 +57,7 @@ typedef struct {
     int                 de_biblioteca;  /* escrita en Lince dentro de un módulo estándar */
     int                 es_tarea;       /* 'tarea': llamarla la empieza y da la tarea */
     TipoDato            tipo_tarea;     /* el tipo de lo que devuelve la tarea al acabar */
+    const char         *archivo;        /* el fichero donde se escribió (para los errores) */
 } FuncionLince;
 
 enum { VIS_PUBLICO = 0, VIS_PRIVADO = 1, VIS_PROTEGIDO = 2 };
@@ -66,6 +67,7 @@ typedef struct {
     char *tipo;     /* "Error", "ErrorTipo", etc. */
     char *mensaje;
     int   linea;
+    const char *archivo;   /* el fichero donde pasó (ver archivo_interno), o NULL */
 } ErrorLince;
 
 /* Interfaz de Lince */

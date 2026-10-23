@@ -71,6 +71,16 @@ static const char *const PALABRAS_CONTEXTUALES[] = {
     "sobrescribe", "obtener", "fijar", "es", "como", "cualquiera", "tarea", "y", "o", NULL,
 };
 
+/* El fichero que se está leyendo si no es el principal (un 'importar'), para
+   que un error de sintaxis diga de dónde es: " de libs/enemigos.lince" */
+const char *lince_archivo_sintaxis = NULL;
+const char *lince_de_archivo(void) {
+    static char buf[1100];
+    if (!lince_archivo_sintaxis || !lince_archivo_sintaxis[0]) return "";
+    snprintf(buf, sizeof buf, " de %s", lince_archivo_sintaxis);
+    return buf;
+}
+
 const char *lexer_palabra_clave(int i) {
     int n = (int)(sizeof(PALABRAS_CLAVE) / sizeof(PALABRAS_CLAVE[0])) - 1;
     return (i >= 0 && i < n) ? PALABRAS_CLAVE[i].palabra : NULL;
@@ -235,10 +245,10 @@ static void agregar_token(Lexer *l, TipoToken tipo, const char *valor, int linea
 
 static void error_lexico(Lexer *l, char c) {
     fprintf(stderr,
-        "\n❌ Error en línea %d:\n"
+        "\n❌ Error en línea %d%s:\n"
         "   Encontré el carácter '%c' y no sé qué hacer con él.\n"
         "   Revisa que no hayas escrito algo por error.\n\n",
-        l->linea, c);
+        l->linea, lince_de_archivo(), c);
     exit(1);
 }
 
@@ -312,11 +322,11 @@ static void trozo_poner(Trozo *t, char c) {
 
 static void error_plantilla(int linea, const char *que) {
     fprintf(stderr,
-        "\n❌ Error en línea %d:\n"
+        "\n❌ Error en línea %d%s:\n"
         "   %s\n"
         "   Dentro de un texto, las llaves meten un valor: \"Vidas: {vidas}\".\n"
         "   Para escribir una llave tal cual, pon \\{ (por ejemplo \"\\{\\\"x\\\": 1}\").\n\n",
-        linea, que);
+        linea, lince_de_archivo(), que);
     exit(1);
 }
 
@@ -392,9 +402,9 @@ static void leer_texto(Lexer *l, int linea) {
 
     if (actual(l) == '\0') {
         fprintf(stderr,
-            "\n❌ Error en línea %d:\n"
+            "\n❌ Error en línea %d%s:\n"
             "   Abriste una cadena de texto con '\"' pero nunca la cerraste.\n"
-            "   Añade '\"' al final del texto.\n\n", linea);
+            "   Añade '\"' al final del texto.\n\n", linea, lince_de_archivo());
         exit(1);
     }
 

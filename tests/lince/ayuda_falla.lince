@@ -1,0 +1,4 @@
+# Ayuda para test_errores_capturables: una función que falla en la línea 3
+funcion fallar_aqui(): numero {
+    devolver 1 / 0
+}

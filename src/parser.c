@@ -30,10 +30,10 @@ static Token *consumir(Parser *p, TipoToken tipo, const char *esperaba) {
     Token *t = actual(p);
     if (t->tipo != tipo) {
         fprintf(stderr,
-            "\n❌ Error en línea %d:\n"
+            "\n❌ Error en línea %d%s:\n"
             "   Esperaba %s pero encontré '%s'.\n"
             "   Revisa la sintaxis en esa línea.\n\n",
-            t->linea, esperaba,
+            t->linea, lince_de_archivo(), esperaba,
             t->valor ? t->valor : "fin de archivo");
         exit(1);
     }
@@ -50,10 +50,10 @@ static Token *consumir_cualquiera(Parser *p) {
 static void error_sintaxis(Parser *p, const char *mensaje) {
     Token *t = actual(p);
     fprintf(stderr,
-        "\n❌ Error en línea %d:\n"
+        "\n❌ Error en línea %d%s:\n"
         "   %s\n"
         "   Encontré: '%s'\n\n",
-        t->linea, mensaje,
+        t->linea, lince_de_archivo(), mensaje,
         t->valor ? t->valor : "fin de archivo");
     exit(1);
 }
@@ -890,10 +890,10 @@ static Nodo *sent_para(Parser *p) {
         Token *en = consumir(p, TOK_IDENTIFICADOR, "'en'");
         if (strcmp(en->valor, "en") != 0) {
             fprintf(stderr,
-                "\n❌ Error en línea %d:\n"
+                "\n❌ Error en línea %d%s:\n"
                 "   Se esperaba 'en' después del nombre de variable.\n"
                 "   Ejemplo: para cada numero n en lista\n\n",
-                en->linea);
+                en->linea, lince_de_archivo());
             exit(1);
         }
 
@@ -1140,14 +1140,14 @@ static Nodo *sent_clase(Parser *p) {
             Token *mn = consumir(p, TOK_IDENTIFICADOR, "nombre del método");
             Nodo *m = funcion_desde_parametros(p, mn, abstracto);
             if (abstracto && m->funcion.cuerpo) {
-                fprintf(stderr, "\n❌ Error en línea %d:\n"
-                    "   El método abstracto '%s' no puede tener cuerpo.\n\n", mn->linea, mn->valor);
+                fprintf(stderr, "\n❌ Error en línea %d%s:\n"
+                    "   El método abstracto '%s' no puede tener cuerpo.\n\n", mn->linea, lince_de_archivo(), mn->valor);
                 exit(1);
             }
             if (!abstracto && !m->funcion.cuerpo) {
-                fprintf(stderr, "\n❌ Error en línea %d:\n"
+                fprintf(stderr, "\n❌ Error en línea %d%s:\n"
                     "   El método '%s' no tiene cuerpo. ¿Querías marcarlo 'abstracto'?\n\n",
-                    mn->linea, mn->valor);
+                    mn->linea, lince_de_archivo(), mn->valor);
                 exit(1);
             }
             m->funcion.vis = vis; m->funcion.estatico = estatico;
@@ -1183,11 +1183,11 @@ static Nodo *sent_clase(Parser *p) {
         } else {
             (void)linea_mod;
             fprintf(stderr,
-                "\n❌ Error en línea %d:\n"
+                "\n❌ Error en línea %d%s:\n"
                 "   Dentro de una clase solo puede haber métodos ('funcion'), campos\n"
                 "   ('sea' / 'fijo') y propiedades ('obtener' / 'fijar').\n"
                 "   Encontré '%s' en su lugar.\n\n",
-                actual(p)->linea, actual(p)->valor ? actual(p)->valor : "?");
+                actual(p)->linea, lince_de_archivo(), actual(p)->valor ? actual(p)->valor : "?");
             exit(1);
         }
     }
@@ -1249,9 +1249,9 @@ static Nodo *sent_elegir(Parser *p) {
             otro = bloque(p);
         } else {
             fprintf(stderr,
-                "\n❌ Error en línea %d:\n"
+                "\n❌ Error en línea %d%s:\n"
                 "   Dentro de 'elegir' solo puede haber 'caso' u 'otro'.\n\n",
-                actual(p)->linea);
+                actual(p)->linea, lince_de_archivo());
             exit(1);
         }
     }

@@ -36,3 +36,5 @@ instanciar-no-clase: ErrorTipo
 no-es-funcion: ErrorTipo
 operacion: ErrorTipo
 sigo vivo
+ErrorMatematico en línea 3, de ayuda_falla: verdadero
+lanzado en la línea 316
