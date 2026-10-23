@@ -416,6 +416,10 @@ static void doc_cerrar(const char *uri) {
 static char *uri_a_ruta(const char *uri) {
     if (strncmp(uri, "file://", 7) != 0) return NULL;
     const char *p = uri + 7;
+#ifdef _WIN32
+    /* file:///C:/juego/x.lince → C:/juego/x.lince (sin la barra de delante) */
+    if (p[0] == '/' && isalpha((unsigned char)p[1]) && (p[2] == ':' || p[2] == '|' || !strncmp(p + 2, "%3A", 3) || !strncmp(p + 2, "%3a", 3))) p++;
+#endif
     char *r = malloc(strlen(p) + 1), *o = r;
     for (; *p; p++) {
         if (*p == '%' && isxdigit((unsigned char)p[1]) && isxdigit((unsigned char)p[2])) {
@@ -670,7 +674,14 @@ static void ruta_limpia(char *ruta) {
 static char *ruta_a_uri(const char *ruta) {
     char *u = malloc(strlen(ruta) * 3 + 8), *o = u;
     o += sprintf(o, "file://");
+#ifdef _WIN32
+    if (isalpha((unsigned char)ruta[0]) && ruta[1] == ':') *o++ = '/';       /* file:///C:/... */
+#endif
     for (const unsigned char *c = (const unsigned char *)ruta; *c; c++) {
+#ifdef _WIN32
+        if (*c == '\\') { *o++ = '/'; continue; }
+        if (*c == ':' && c == (const unsigned char *)ruta + 1) { *o++ = ':'; continue; }
+#endif
         if (isalnum(*c) || strchr("/-_.~", *c)) *o++ = (char)*c;
         else o += sprintf(o, "%%%02X", *c);
     }

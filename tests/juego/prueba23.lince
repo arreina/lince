@@ -1,0 +1,22 @@
+# hoja(), imagen() y guardar_imagen() sin ventana (y las imágenes siguen sirviendo al abrirla)
+importar "juego"
+importar "archivos"
+
+sea h = juego.hoja("figuras.png")
+escribir("cuadros: " + a_texto(h["cuadros"]) + " por_fila: " + a_texto(h["por_fila"]))
+escribir("origen: " + a_texto(h["origen"]))
+sea q = juego.hoja(h, {"quitar": [1]})
+escribir("quitando el 1: " + a_texto(q["origen"]) + " por_fila: " + a_texto(q["por_fila"]))
+sea r = juego.hoja("figuras.png", {"columnas": 2, "filas": 2})
+escribir("rejilla: " + a_texto(r["origen"]))
+juego.guardar_imagen(q, "quitada.png")
+escribir("guardada: " + a_texto(archivos.existe("quitada.png")))
+
+sea suelta = juego.imagen("figuras.png")
+juego.abrir("sin ventana antes", 120, 80)
+mientras juego.abierto() {
+    juego.limpiar([0, 0, 255])
+    juego.dibujar(suelta, 0, 0)
+    juego.dibujar(h, 70, 10, {"cuadro": 1})
+    juego.presentar()
+}

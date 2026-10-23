@@ -549,4 +549,31 @@ for l in 'saltar: ["z", "mando:a"]' 'disparar: ["espacio", "mando:x"]' 'guardado
          'al definirla otra vez: ["z", "mando:a"]' 'restablecidos: ["espacio", "mando:a"] ["z", "mando:x"] nulo' "mando: mando:y"; do
     grep -qxF "$l" salida28.txt && ok "controles: $l" || mal "falta la línea: $l"
 done
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida5b.txt; exit 1; }
+# ── hoja() sin ventana: "origen" de cada figura, quitar, guardar; y dibujarlas al abrirla ──
+python3 - <<'PY'
+import zlib, struct
+W, H = 60, 40
+cajas = [(5, 5, 14, 20), (25, 8, 40, 22), (45, 30, 50, 35), (10, 28, 20, 38)]
+raw = b""
+for y in range(H):
+    raw += b"\0"
+    for x in range(W):
+        raw += bytes([255, 0, 0, 255]) if any(a <= x <= c and b <= y <= d for a, b, c, d in cajas) else bytes([0, 0, 0, 0])
+def trozo(t, d): c = struct.pack(">I", len(d)) + t + d; return c + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+open("figuras.png", "wb").write(b"\x89PNG\r\n\x1a\n" + trozo(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 6, 0, 0, 0))
+                              + trozo(b"IDAT", zlib.compress(raw)) + trozo(b"IEND", b""))
+PY
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=3 LINCE_JUEGO_CAPTURA=sinventana.bmp timeout 30 "$LINCE" "$DIR/prueba23.lince" > salida29.txt 2>&1
+for l in "cuadros: 4 por_fila: [2, 2]" "origen: [[5, 5, 10, 16], [25, 8, 16, 15], [10, 28, 11, 11], [45, 30, 6, 6]]" \
+         "quitando el 1: [[5, 5, 10, 16], [10, 28, 11, 11], [45, 30, 6, 6]] por_fila: [1, 2]" \
+         "rejilla: [[0, 0, 30, 20], [30, 0, 30, 20], [0, 20, 30, 20], [30, 20, 30, 20]]" "guardada: verdadero"; do
+    grep -qxF "$l" salida29.txt && ok "hoja sin ventana: $l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' && ok "hoja sin ventana: al abrir la ventana se dibujan (797 píxeles rojos)" || mal "hoja sin ventana: no se dibuja al abrir la ventana"
+import struct
+d = open("sinventana.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]; bpp = struct.unpack_from("<H", d, 28)[0] // 8
+rojos = sum(1 for i in range(off, len(d) - bpp + 1, bpp) if d[i + 2] > 200 and d[i] < 50)
+assert rojos == 797, rojos
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida5b.txt; exit 1; }

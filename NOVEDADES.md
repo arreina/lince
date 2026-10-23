@@ -3,6 +3,18 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 0.13.0 (en preparación)
+
+Lo que pidió el IDE (lince-motor) para las hojas de sprites:
+
+- **`hoja()` devuelve `"origen"`**: una lista con el `[x, y, ancho, alto]` de cada cuadro en la imagen
+  original, también con `quitar` y con `escala`. Con la hoja «sola» dice dónde estaba cada figura.
+- **`hoja()`, `imagen()` y `guardar_imagen()` funcionan sin ventana** (sin `juego.abrir()`): no hace
+  falta SDL2 ni pantalla para preparar imágenes; luego se pueden dibujar cuando se abre la ventana.
+- Documentado qué cuenta `quitar`: `"cuadros"`, `"columnas"`, `"filas"` y `"por_fila"` son los cuadros
+  que quedan; la imagen guardada conserva la rejilla entera.
+- **Windows, servidor de lenguaje:** un `file:///C:/juego/x.lince` ya no se convierte en `/C:/juego/x.lince`.
+
 ## 0.12.0
 
 La revisión del lenguaje antes de la 1.0 (igualdad por contenido, `ref` que funciona, `val` opcional, vacío es falso), `examples/probar_equipo` para probar el equipo de verdad, y lo que pedía el IDE: `lince depurar --ide`, el depurador que sigue a los ficheros importados, errores con su fichero y columna, e ir a la definición en lo importado.

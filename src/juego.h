@@ -337,6 +337,8 @@ static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *e
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
 static void jg_hojas_liberar(void);
+static void jg_texturas_pendientes(void);
+static int jg_nueva_imagen(const char *nombre, unsigned char *rgba, int ancho, int alto);
 static void jg_fuentes_liberar(void);
 static void jg_blancas_liberar(void);
 static int _jg_recargar_codigo;          /* una hoja cambió de forma: volver a ejecutar el programa */
@@ -565,7 +567,7 @@ static void jg_cerrar_todo(void) {
     for (int i = 0; i < _jgs.ntiled; i++) jg_tiled_liberar(&_jgs.tiled[i]);
     _jgs.ntiled = 0;
     for (int i = 0; i < _jgs.nimagenes; i++) {
-        _jg.DestroyTexture(_jgs.imagenes[i].tex);
+        if (_jgs.imagenes[i].tex) _jg.DestroyTexture(_jgs.imagenes[i].tex);
         free(_jgs.imagenes[i].ruta);
         free(_jgs.imagenes[i].px);
     }
@@ -672,6 +674,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         return jg_error("ErrorJuego", msg);
     }
     _jg.LogicalSize(_jgs.render, (int)w, (int)h);    /* en pantalla completa se escala */
+    jg_texturas_pendientes();                        /* las imágenes cargadas antes, sin ventana */
     memset(_jgs.teclas, 0, sizeof(_jgs.teclas));
     memset(_jgs.previas, 0, sizeof(_jgs.previas));
     memset(_jgs.botones, 0, sizeof(_jgs.botones));
@@ -1345,7 +1348,7 @@ static void jg_recargar_recursos(void) {
         char msg[600];
         void *tex;
         if (!jg_leer_textura(im->ruta, &tex, msg, sizeof msg)) continue;   /* a medio guardar: luego */
-        _jg.DestroyTexture(im->tex);
+        if (im->tex) _jg.DestroyTexture(im->tex);
         jg_poner_textura(im, tex);
         _jg.QueryTexture(tex, NULL, NULL, &im->ancho, &im->alto);
         im->mtime = m; im->tam = t;
@@ -2013,13 +2016,31 @@ static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) 
 /* Carga la imagen de la ruta a[0] tal cual (PNG, JPG, BMP, GIF o TGA);
    devuelve {"imagen", "ancho", "alto", "ruta"}. Ver fn_jg_imagen. */
 static Valor *jg_imagen_archivo(Valor **a, int n) {
-    JG_ABIERTA();
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "imagen() espera la ruta de una imagen");
     for (int i = 0; i < _jgs.nimagenes; i++)
         if (strcmp(_jgs.imagenes[i].ruta, a[0]->texto) == 0) return jg_imagen_valor(i);
     if (_jgs.nimagenes == JG_MAX_IMAGENES) return jg_error("ErrorJuego", "demasiadas imágenes cargadas");
     char msg[600];
     void *tex;
+    if (!_jgs.abierta) {
+        /* Sin ventana (para herramientas: hoja(), guardar_imagen()): solo los
+           píxeles; la textura se hace al abrirla (jg_texturas_pendientes) */
+        size_t largo = 0;
+        char *bytes = interprete_leer_bytes(a[0]->texto, &largo);
+        if (!bytes) return jg_error("ErrorJuego", (snprintf(msg, sizeof msg, "no se encuentra la imagen '%s'", a[0]->texto), msg));
+        int w = 0, h = 0;
+        const char *motivo = NULL;
+        unsigned char *px = imagen_decodificar((const unsigned char *)bytes, largo, &w, &h, &motivo);
+        free(bytes);
+        if (!px) {
+            snprintf(msg, sizeof msg, "no se pudo leer la imagen '%s' (%s); Lince lee PNG, JPG, BMP, GIF y TGA", a[0]->texto, motivo);
+            return jg_error("ErrorJuego", msg);
+        }
+        int k = jg_nueva_imagen(a[0]->texto, px, w, h);
+        if (k < 0) return jg_error("ErrorJuego", "no se pudo guardar la imagen");
+        recarga_huella(a[0]->texto, &_jgs.imagenes[k].mtime, &_jgs.imagenes[k].tam);
+        return jg_imagen_valor(k);
+    }
     if (!jg_leer_textura(a[0]->texto, &tex, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
     int k = _jgs.nimagenes++;
     memset(&_jgs.imagenes[k], 0, sizeof _jgs.imagenes[k]);
@@ -2043,8 +2064,9 @@ static void *jg_textura_rgba(const unsigned char *rgba, int ancho, int alto) {
 /* Nueva imagen hecha en memoria (sprite, animación): se queda con 'rgba'.
    Devuelve su número, o -1 (y libera 'rgba'). */
 static int jg_nueva_imagen(const char *nombre, unsigned char *rgba, int ancho, int alto) {
-    void *tex = _jgs.nimagenes < JG_MAX_IMAGENES ? jg_textura_rgba(rgba, ancho, alto) : NULL;
-    if (!tex) { free(rgba); return -1; }
+    /* sin ventana no hay textura: se hace al abrirla */
+    void *tex = _jgs.nimagenes < JG_MAX_IMAGENES && _jgs.abierta ? jg_textura_rgba(rgba, ancho, alto) : NULL;
+    if (!tex && (_jgs.abierta || _jgs.nimagenes >= JG_MAX_IMAGENES)) { free(rgba); return -1; }
     int k = _jgs.nimagenes++;
     memset(&_jgs.imagenes[k], 0, sizeof _jgs.imagenes[k]);
     jg_poner_textura(&_jgs.imagenes[k], tex);
@@ -2054,6 +2076,19 @@ static int jg_nueva_imagen(const char *nombre, unsigned char *rgba, int ancho, i
     _jgs.imagenes[k].px = rgba;
     _jgs.imagenes[k].origen = -1;
     return k;
+}
+
+/* Al abrir la ventana: las imágenes que se cargaron sin ella (solo píxeles)
+   se hacen textura. Las de archivo sueltan los píxeles, como las demás. */
+static void jg_texturas_pendientes(void) {
+    for (int i = 0; i < _jgs.nimagenes; i++) {
+        JgImagen *im = &_jgs.imagenes[i];
+        if (im->tex || !im->px) continue;
+        void *tex = jg_textura_rgba(im->px, im->ancho, im->alto);
+        if (!tex) continue;
+        jg_poner_textura(im, tex);
+        if (im->ruta[0] != '<') { free(im->px); im->px = NULL; }
+    }
 }
 
 /* Los píxeles RGBA de una imagen (copia nueva, liberar con free) */
@@ -2452,7 +2487,7 @@ static int jg_pieza_cmp_y(const void *a, const void *b) {
 }
 
 static unsigned char *jg_dividir_hoja(const unsigned char *px, int w, int h, int *cw, int *ch, int *ncuadros,
-                                      int *por_fila, int *nfilas, char *msg, size_t max) {
+                                      int *por_fila, int *nfilas, JgRect **origen, char *msg, size_t max) {
     size_t total = (size_t)w * h;
     int *etiqueta = calloc(total, sizeof(int)), *pila = malloc(total * sizeof(int));
     int cap = 256, np = 0;
@@ -2556,6 +2591,13 @@ static unsigned char *jg_dividir_hoja(const unsigned char *px, int w, int h, int
     int ancho = W * cols;
     hoja = calloc((size_t)ancho * H * nf, 4);
     if (!hoja) { free(g); snprintf(msg, max, "sin memoria"); goto fin; }
+    /* dónde estaba cada figura en la imagen de entrada */
+    *origen = malloc(sizeof(JgRect) * (size_t)ng);
+    if (!*origen) { free(g); free(hoja); hoja = NULL; snprintf(msg, max, "sin memoria"); goto fin; }
+    for (int i = 0; i < ng; i++) {
+        JgRect o = {g[i].x0, g[i].y0, g[i].x1 - g[i].x0 + 1, g[i].y1 - g[i].y0 + 1};
+        (*origen)[i] = o;
+    }
     int col = 0;
     for (int i = 0; i < ng; i++) {
         if (i > 0 && g[i].fila != g[i - 1].fila) col = 0;
@@ -2600,6 +2642,7 @@ typedef struct {
     int imagen;                 /* la imagen de la que se recortan los cuadros */
     int total, nf, cw, ch, cols, *por_fila;
     JgRect *rec;
+    JgRect *orig;               /* dónde está cada cuadro en la imagen original (sin escala ni preparar) */
     JgRect *caja;               /* lo que se ve de cada cuadro, en coordenadas de su celda (para chocar) */
     int version;
 } JgHoja;
@@ -2633,7 +2676,7 @@ static void jg_pisadas_olvidar(void);
 static void jg_hojas_liberar(void) {
     jg_pisadas_olvidar();
     for (int i = 0; i < _jg_nhojas; i++) {
-        free(_jg_hojas[i].quitar); free(_jg_hojas[i].por_fila); free(_jg_hojas[i].rec); free(_jg_hojas[i].caja);
+        free(_jg_hojas[i].quitar); free(_jg_hojas[i].por_fila); free(_jg_hojas[i].rec); free(_jg_hojas[i].orig); free(_jg_hojas[i].caja);
     }
     memset(_jg_hojas, 0, sizeof _jg_hojas);
     _jg_nhojas = 0;
@@ -2647,17 +2690,17 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
     if (fuente < 0) return 0;
     JgImagen *im = &_jgs.imagenes[fuente];
     int total = 0, nf = 0, cw = 0, ch = 0, imagen = fuente;
-    JgRect *rec = NULL;
+    JgRect *rec = NULL, *orig = NULL;
     int *pf = NULL;
     if (h->modo == JG_HOJA_SOLA) {
         static int por_fila[JG_MAX_RECORTES];
         unsigned char *px = jg_pixeles(fuente);
         if (!px) { snprintf(msg, max, "no se pudieron leer los píxeles de la imagen"); return 0; }
-        unsigned char *nueva = jg_dividir_hoja(px, im->ancho, im->alto, &cw, &ch, &total, por_fila, &nf, msg, max);
+        unsigned char *nueva = jg_dividir_hoja(px, im->ancho, im->alto, &cw, &ch, &total, por_fila, &nf, &orig, msg, max);
         free(px);
         if (!nueva) return 0;
         if (total == 1 && cw * 10 >= im->ancho * 9 && ch * 10 >= im->alto * 9) {
-            free(nueva);
+            free(nueva); free(orig);
             snprintf(msg, max, "no encuentro huecos transparentes entre los cuadros; di cuántos hay, por ejemplo "
                      "hoja(imagen, {\"columnas\": 6}), o cuánto mide cada uno: hoja(imagen, 32)");
             return 0;
@@ -2667,10 +2710,10 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
         int W = cw * cols, H = ch * nf;
         /* la imagen de la hoja: nueva, o la de antes rehecha en su sitio */
         if (h->imagen >= 0 && h->imagen != h->fuente && h->imagen < _jgs.nimagenes) {
-            void *tex = jg_textura_rgba(nueva, W, H);
-            if (!tex) { free(nueva); snprintf(msg, max, "no se pudo crear la hoja"); return 0; }
+            void *tex = _jgs.abierta ? jg_textura_rgba(nueva, W, H) : NULL;      /* sin ventana, aún sin textura */
+            if (_jgs.abierta && !tex) { free(nueva); free(orig); snprintf(msg, max, "no se pudo crear la hoja"); return 0; }
             JgImagen *hm = &_jgs.imagenes[h->imagen];
-            _jg.DestroyTexture(hm->tex);
+            if (hm->tex) _jg.DestroyTexture(hm->tex);
             free(hm->px);
             jg_poner_textura(hm, tex); hm->px = nueva; hm->ancho = W; hm->alto = H;
             imagen = h->imagen;
@@ -2678,11 +2721,11 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
             char nombre[48];
             snprintf(nombre, sizeof nombre, "<hoja %d>", hi);
             imagen = jg_nueva_imagen(nombre, nueva, W, H);
-            if (imagen < 0) { snprintf(msg, max, "no se pudo crear la hoja (¿demasiado grande? prueba con \"escala\")"); return 0; }
+            if (imagen < 0) { free(orig); snprintf(msg, max, "no se pudo crear la hoja (¿demasiado grande? prueba con \"escala\")"); return 0; }
         }
         rec = malloc(sizeof(JgRect) * total);
         pf = malloc(sizeof(int) * nf);
-        if (!rec || !pf) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+        if (!rec || !pf) { free(rec); free(pf); free(orig); snprintf(msg, max, "sin memoria"); return 0; }
         for (int f = 0, c = 0; f < nf; f++) {
             pf[f] = por_fila[f];
             for (int e = 0; e < por_fila[f]; e++, c++) { JgRect r = {e * cw, f * ch, cw, ch}; rec[c] = r; }
@@ -2709,25 +2752,32 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
         total = jg_rejilla_cuadros(im, &g, &cols);
         nf = total / cols;
         rec = malloc(sizeof(JgRect) * total);
+        orig = malloc(sizeof(JgRect) * total);
         pf = malloc(sizeof(int) * nf);
-        if (!rec || !pf) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
-        for (int i = 0; i < total; i++) rec[i] = jg_rejilla_rect(im, &g, i);
+        if (!rec || !orig || !pf) { free(rec); free(orig); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+        for (int i = 0; i < total; i++) { rec[i] = jg_rejilla_rect(im, &g, i); orig[i] = rec[i]; }
         for (int f = 0; f < nf; f++) pf[f] = cols;
         cw = g.cw; ch = g.ch;
     }
+    /* "origen" va en la imagen original: si se redujo con "escala", se deshace */
+    if (h->prep.escala > 0 && h->prep.escala < 1)
+        for (int i = 0; i < total; i++) {
+            orig[i].x = (int)lround(orig[i].x / h->prep.escala); orig[i].y = (int)lround(orig[i].y / h->prep.escala);
+            orig[i].w = (int)lround(orig[i].w / h->prep.escala); orig[i].h = (int)lround(orig[i].h / h->prep.escala);
+        }
     /* quitar: los demás se numeran seguidos; las filas vacías desaparecen */
     if (h->nquitar > 0) {
         char *fuera = calloc((size_t)total, 1);
-        if (!fuera) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+        if (!fuera) { free(rec); free(orig); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
         for (int q = 0; q < h->nquitar; q++) if (h->quitar[q] >= 0 && h->quitar[q] < total) fuera[h->quitar[q]] = 1;
         int n = 0, f2 = 0;
         for (int f = 0, c = 0; f < nf; f++) {
             int quedan = 0;
-            for (int e = 0; e < pf[f]; e++, c++) if (!fuera[c]) { rec[n++] = rec[c]; quedan++; }
+            for (int e = 0; e < pf[f]; e++, c++) if (!fuera[c]) { orig[n] = orig[c]; rec[n++] = rec[c]; quedan++; }
             if (quedan) pf[f2++] = quedan;
         }
         free(fuera);
-        if (n == 0) { free(rec); free(pf); snprintf(msg, max, "con \"quitar\" no queda ningún cuadro"); return 0; }
+        if (n == 0) { free(rec); free(orig); free(pf); snprintf(msg, max, "con \"quitar\" no queda ningún cuadro"); return 0; }
         total = n; nf = f2;
     }
     int cols = 0;
@@ -2738,7 +2788,7 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
     if (forma) _jg_recargar_codigo = 1;
     /* la caja de cada cuadro, dentro de su celda (como lo coloca jg_hoja_cuadro) */
     JgRect *caja = malloc(sizeof(JgRect) * total);
-    if (!caja) { free(rec); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
+    if (!caja) { free(rec); free(orig); free(pf); snprintf(msg, max, "sin memoria"); return 0; }
     {
         JgImagen *ci = &_jgs.imagenes[imagen];
         unsigned char *px = jg_pixeles(imagen);
@@ -2751,8 +2801,8 @@ static int jg_hoja_calcular(int hi, char *msg, size_t max) {
         }
         free(px);
     }
-    free(h->rec); free(h->por_fila); free(h->caja);
-    h->rec = rec; h->por_fila = pf; h->caja = caja;
+    free(h->rec); free(h->orig); free(h->por_fila); free(h->caja);
+    h->rec = rec; h->orig = orig; h->por_fila = pf; h->caja = caja;
     h->total = total; h->nf = nf; h->cw = cw; h->ch = ch; h->cols = cols;
     h->fuente = fuente; h->imagen = imagen;
     h->version++;
@@ -2780,7 +2830,7 @@ static int jg_hoja_obtener(const JgHoja *receta, char *msg, size_t max) {
         if (!h->quitar) { snprintf(msg, max, "sin memoria"); return -1; }
         memcpy(h->quitar, receta->quitar, sizeof(int) * receta->nquitar);
     }
-    h->imagen = -1; h->fuente = -1; h->rec = NULL; h->por_fila = NULL; h->caja = NULL; h->version = 0;
+    h->imagen = -1; h->fuente = -1; h->rec = NULL; h->orig = NULL; h->por_fila = NULL; h->caja = NULL; h->version = 0;
     if (!jg_hoja_calcular(i, msg, max)) { free(h->quitar); memset(h, 0, sizeof *h); return -1; }
     _jg_nhojas++;
     return i;
@@ -2801,6 +2851,15 @@ static Valor *jg_hoja_valor(int hi) {
     Valor *l = valor_lista_crear();
     for (int f = 0; f < h->nf; f++) lista_agregar(l, valor_numero(h->por_fila[f]));
     valor_diccionario_agregar(d, "por_fila", l);
+    /* "origen": [x, y, ancho, alto] de cada cuadro en la imagen original */
+    Valor *origen = valor_lista_crear();
+    for (int i = 0; i < h->total; i++) {
+        Valor *r = valor_lista_crear();
+        lista_agregar(r, valor_numero(h->orig[i].x)); lista_agregar(r, valor_numero(h->orig[i].y));
+        lista_agregar(r, valor_numero(h->orig[i].w)); lista_agregar(r, valor_numero(h->orig[i].h));
+        lista_agregar(origen, r);
+    }
+    valor_diccionario_agregar(d, "origen", origen);
     return d;
 }
 
@@ -3006,7 +3065,6 @@ static Valor *fn_jg_pisadas(Valor **a, int n) {
    una imagen sin transparencia (por ejemplo, un JPG con fondo blanco).
    hoja(otra_hoja, {"quitar": [...]}) quita cuadros de una hoja ya hecha. */
 static Valor *fn_jg_hoja(Valor **a, int n) {
-    JG_ABIERTA();
     char msg[400];
     JgHoja *otra = n > 0 ? jg_hoja_de(a[0]) : NULL;
     Valor *img = NULL;
@@ -3406,7 +3464,7 @@ static int jg_rehacer_imagen(int j) {
     }
     void *tex = jg_textura_rgba(px, w, h);
     if (!tex) { free(px); return 0; }
-    _jg.DestroyTexture(im->tex);
+    if (im->tex) _jg.DestroyTexture(im->tex);
     free(im->px);
     jg_poner_textura(im, tex); im->px = px; im->ancho = w; im->alto = h;
     return 1;
@@ -3514,7 +3572,6 @@ static Valor *fn_jg_animar(Valor **a, int n) {
 /* guardar_imagen(imagen, ruta): guarda una imagen (un sprite, una hoja
    generada con animar()...) como PNG, por ejemplo para retocarla en un editor */
 static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
-    JG_ABIERTA();
     int k = n > 0 ? jg_id_de(a[0], "imagen") : -1;
     if (k < 0 || k >= _jgs.nimagenes || n < 2 || a[1]->tipo != VAL_TEXTO)
         return jg_error("ErrorTipo", "guardar_imagen() espera (imagen, ruta del .png)");

@@ -1250,11 +1250,21 @@ como `imagen()`: para una hoja enorme, `hoja("explorador.jpg", {"escala": 0.15})
 imagen, así lo que es del mismo color pero está dentro del dibujo (ojos, calcetines blancos) se
 queda. Un número de cuadro fuera de rango
 da la vuelta (−1 es el último). La hoja devuelta lleva `"cuadros"`, `"celda"` (`[ancho, alto]` de
-cada cuadro), `"columnas"`, `"filas"` y `"por_fila"` (cuántos cuadros hay en cada fila).
+cada cuadro), `"columnas"`, `"filas"` y `"por_fila"` (cuántos cuadros hay en cada fila) y
+`"origen"`: una lista con el `[x, y, ancho, alto]` de cada cuadro **en la imagen original** (antes de
+quitar el fondo o reducirla con `escala`). Con la hoja «sola» dice dónde estaba cada figura que se
+encontró, y sirve para numerar las figuras sobre la imagen original y ver si se ha unido o partido alguna.
 
 Para no usar algunos cuadros (uno repetido, o unos del principio en que el personaje está
 girándose), `quitar`: los que quedan se vuelven a numerar seguidos desde 0, así el resto del juego
 no tiene que saber nada. También vale con una hoja ya hecha: `hoja(OTRA, {"quitar": [5]})`.
+`"cuadros"`, `"columnas"`, `"filas"` y `"por_fila"` cuentan los cuadros que **quedan**, pero la imagen de la
+hoja (la que guarda `guardar_imagen()`) conserva su rejilla entera, con el hueco de los cuadros quitados;
+`"celda"` es el tamaño de cada celda de esa imagen.
+
+`hoja()`, `imagen()` y `guardar_imagen()` también funcionan **sin ventana** (sin llamar a `juego.abrir()`),
+para herramientas que solo preparan imágenes: no hace falta SDL2 ni pantalla. Las imágenes cargadas así
+se pueden dibujar luego, cuando se abra la ventana.
 
 ```lince
 fijo CORRE = juego.hoja("corre.png", {"quitar": [0, 1, 2]})
