@@ -3,7 +3,18 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
-## 0.12.0 (en preparación)
+## 0.12.0
+
+La revisión del lenguaje antes de la 1.0 (igualdad por contenido, `ref` que funciona, `val` opcional, vacío es falso), `examples/probar_equipo` para probar el equipo de verdad, y lo que pedía el IDE: `lince depurar --ide`, el depurador que sigue a los ficheros importados, errores con su fichero y columna, e ir a la definición en lo importado.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-0.12.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-0.12.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-0.12.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-0.12.0.vsix` |
 
 - **`examples/probar_equipo`**: un programa para comprobar en un ordenador o un móvil
   de verdad el teclado (también la ñ y las tildes), el ratón, los mandos, el sonido y
