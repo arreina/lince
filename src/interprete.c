@@ -89,6 +89,8 @@ int  interprete_pila(int nivel, const char **nombre, int *linea) {
 }
 static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
                             Valor **args, int nargs, int linea);
+static Valor *llamar_metodo_ref(Valor *obj, ClaseLince *cls, FuncionLince *f,
+                                Valor **args, int nargs, int linea, Nodo **argn, Entorno *e);
 static FuncionLince *buscar_metodo(ClaseLince *cls, const char *nombre);
 int    hay_error     = 0;
 Valor *valor_error   = NULL;
@@ -597,6 +599,42 @@ static int iguales_enum(Valor *a, Valor *b) {
     return ta && tb && strcmp(ta, tb) == 0;
 }
 
+/* ¿Iguales, como los compara ==? Números, textos, lógicos y nulo, por su
+   valor; listas, diccionarios y bytes, por su contenido (un diccionario, sin
+   mirar el orden); un enumerado, por su nombre; lo demás (objetos, funciones,
+   tareas), si es el mismo. */
+static int valores_iguales(Valor *a, Valor *b, int prof) {
+    if (a == b) return 1;
+    if (prof > 200) return 0;                 /* una lista que se contiene a sí misma */
+    int ie = iguales_enum(a, b);
+    if (ie >= 0) return ie;
+    if (a->tipo != b->tipo) return 0;
+    switch (a->tipo) {
+        case VAL_NUMERO:   return a->numero == b->numero;
+        case VAL_TEXTO:    return strcmp(a->texto, b->texto) == 0;
+        case VAL_BOOLEANO: return !a->booleano == !b->booleano;
+        case VAL_NULO:     return 1;
+        case VAL_LISTA:
+            if (a->lista.cantidad != b->lista.cantidad) return 0;
+            for (int i = 0; i < a->lista.cantidad; i++)
+                if (!valores_iguales(a->lista.elementos[i], b->lista.elementos[i], prof + 1)) return 0;
+            return 1;
+        case VAL_DICCIONARIO:
+            if (a->diccionario.cantidad != b->diccionario.cantidad) return 0;
+            for (int i = 0; i < a->diccionario.cantidad; i++) {
+                int k = valor_diccionario_buscar(b, a->diccionario.claves[i]);
+                if (k < 0 || !valores_iguales(a->diccionario.valores[i], b->diccionario.valores[k], prof + 1)) return 0;
+            }
+            return 1;
+        case VAL_BYTES:
+            return a->bytes.cantidad == b->bytes.cantidad &&
+                   memcmp(a->bytes.datos, b->bytes.datos, (size_t)a->bytes.cantidad) == 0;
+        case VAL_OBJETO:   return a->objeto == b->objeto;
+        case VAL_FUNCION:  return a->funcion == b->funcion;
+        default:           return 0;
+    }
+}
+
 /* d[Estado.Quieto]: como clave de un diccionario cuenta su texto */
 static Valor *clave_de(Valor *idx) {
     if (idx->tipo != VAL_ENUMERADO) return idx;
@@ -717,7 +755,11 @@ static int es_verdadero(Valor *v) {
     if (!v || v->tipo == VAL_NULO)     return 0;
     if (v->tipo == VAL_BOOLEANO)       return v->booleano;
     if (v->tipo == VAL_NUMERO)         return v->numero != 0;
-    if (v->tipo == VAL_TEXTO)          return strlen(v->texto) > 0;
+    if (v->tipo == VAL_TEXTO)          return v->texto[0] != '\0';
+    /* lo vacío es falso, como el texto vacío: 'si enemigos { ... }' */
+    if (v->tipo == VAL_LISTA)          return v->lista.cantidad > 0;
+    if (v->tipo == VAL_DICCIONARIO)    return v->diccionario.cantidad > 0;
+    if (v->tipo == VAL_BYTES)          return v->bytes.cantidad > 0;
     return 1;
 }
 
@@ -1376,6 +1418,13 @@ static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
     if (!resultado && izq->tipo == VAL_TAREA && der->tipo == VAL_TAREA &&
         (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0))
         resultado = valor_booleano((izq->tarea == der->tarea) == (op[0] == '='));
+
+    /* Listas y diccionarios: iguales si tienen lo mismo */
+    if (!resultado && (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0) &&
+        (izq->tipo == VAL_LISTA || izq->tipo == VAL_DICCIONARIO || der->tipo == VAL_LISTA || der->tipo == VAL_DICCIONARIO)) {
+        int ig = valores_iguales(izq, der, 0);
+        resultado = valor_booleano(op[0] == '=' ? ig : !ig);
+    }
 
     /* Comparaciones entre lógicos. Sin esto caerían en el caso general
        de más abajo, que sólo sabe comparar nulos, y 'verdadero ==
@@ -2188,8 +2237,26 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
 
 /* Ejecuta el método 'f' de 'cls' sobre 'obj' (NULL en uno estático) con los
    argumentos ya evaluados, de los que se hace cargo. */
+/* 'ref': lo que valga cada parámetro ref al acabar pasa a la variable que se
+   le dio (sumar(ref puntos), intercambiar(ref a, ref b)). Con algo que no es
+   una variable (un número, una expresión) no hay dónde devolverlo. */
+static void devolver_refs(FuncionLince *f, Entorno *fn_e, Nodo **argn, int nargs, Entorno *e, int linea) {
+    if (hay_error || !argn) return;
+    for (int i = 0; i < nargs && i < f->num_parametros; i++) {
+        Parametro *param = &f->parametros[i];
+        if (!param->por_ref || argn[i]->tipo != NODO_IDENTIFICADOR) continue;
+        Valor *v = entorno_obtener_i(fn_e, PI(param), param->nombre, linea);
+        entorno_asignar(e, argn[i]->identificador, v, linea);
+    }
+}
+
 static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
                             Valor **args, int nargs, int linea) {
+    return llamar_metodo_ref(obj, cls, f, args, nargs, linea, NULL, NULL);
+}
+
+static Valor *llamar_metodo_ref(Valor *obj, ClaseLince *cls, FuncionLince *f,
+                                Valor **args, int nargs, int linea, Nodo **argn, Entorno *e) {
     if (nargs != f->num_parametros) {
         for (int i = 0; i < nargs; i++) valor_destruir(args[i]);
         return error_rt("ErrorArgumento", linea,
@@ -2216,6 +2283,7 @@ static Valor *llamar_metodo(Valor *obj, ClaseLince *cls, FuncionLince *f,
     esto_actual  = obj;
     clase_actual = cls;
     valor_destruir(ejecutar_cuerpo(f, fn_e));
+    devolver_refs(f, fn_e, argn, nargs, e, linea);
     Valor *retorno = tomar_retorno();
     esto_actual  = esto_anterior;
     clase_actual = cls_ant;
@@ -2850,6 +2918,7 @@ static Valor *llamar_valor(Nodo *n, Valor *vfun, Nodo **argn, int nargs_nodos, E
        este destruir se fugaban 40 bytes por llamada, que en un bucle
        de juego son 40 por función y por frame. */
     valor_destruir(ejecutar_cuerpo(f, fn_e));
+    devolver_refs(f, fn_e, argn, args_dados, e, n->linea);
     entorno_destruir(fn_e);
 
     Valor *retorno = tomar_retorno();
@@ -3369,7 +3438,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         int nargs = n->metodo.num_argumentos;
         Valor **args = malloc(sizeof(Valor*) * (nargs + 1));
         for (int j = 0; j < nargs; j++) args[j] = ejecutar(n->metodo.argumentos[j], e);
-        Valor *r = llamar_metodo(NULL, cls, f, args, nargs, n->linea);
+        Valor *r = llamar_metodo_ref(NULL, cls, f, args, nargs, n->linea, n->metodo.argumentos, e);
         free(args);
         valor_destruir(obj);
         return r;
@@ -3452,6 +3521,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         esto_actual  = obj;
         clase_actual = cls;
         valor_destruir(ejecutar_cuerpo(f, fn_e));   /* ver la nota de NODO_LLAMADA */
+        devolver_refs(f, fn_e, n->metodo.argumentos, n->metodo.num_argumentos, e, n->linea);
         Valor *retorno = tomar_retorno();
         esto_actual  = esto_anterior;
         clase_actual = cls_ant;
@@ -3515,10 +3585,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
             Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
             int encontrado = 0;
             for (int i = 0; i < obj->lista.cantidad; i++) {
-                Valor *el = obj->lista.elementos[i];
-                if (el->tipo == VAL_NUMERO && buscado->tipo == VAL_NUMERO && el->numero == buscado->numero) { encontrado = 1; break; }
-                if (el->tipo == VAL_TEXTO  && buscado->tipo == VAL_TEXTO  && strcmp(el->texto, buscado->texto) == 0) { encontrado = 1; break; }
-                if (iguales_enum(el, buscado) == 1) { encontrado = 1; break; }
+                if (valores_iguales(obj->lista.elementos[i], buscado, 0)) { encontrado = 1; break; }
             }
             valor_destruir(buscado); valor_destruir(obj);
             return valor_booleano(encontrado);
@@ -3579,7 +3646,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
             Valor *buscado = ejecutar(n->metodo.argumentos[0], e);
             int donde = -1;
             for (int i = 0; i < obj->lista.cantidad; i++) {
-                if (valor_comparar_natural(obj->lista.elementos[i], buscado) == 0) {
+                if (valores_iguales(obj->lista.elementos[i], buscado, 0)) {
                     donde = i; break;
                 }
             }

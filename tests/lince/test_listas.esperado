@@ -25,3 +25,11 @@ falso
 [1, 2]
 [1, 2, 9]
 [1, 2, 3, [4]] | {"x": 1, "y": [2]}
+verdadero
+verdadero
+verdadero
+verdadero
+1
+-1
+vacía es falso
+con algo es verdadero

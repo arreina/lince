@@ -127,7 +127,7 @@ funcion f(): texto {
 | `-` `*` `/` `%` | resta, multiplicación, división, módulo |
 | `++` `--` | incremento / decremento, como sentencia: `i++`, `mi.vidas--`, `puntos[j]++` |
 | `+=` `-=` `*=` `/=` `%=` | operar y guardar: `x += 5` es `x = x + 5` |
-| `==` `!=` `<` `>` `<=` `>=` | comparación |
+| `==` `!=` `<` `>` `<=` `>=` | comparación (`==` compara listas y diccionarios por lo que tienen: `[1, 2] == [1, 2]`; dos objetos son iguales si son el mismo, o según su método `igual`) |
 | `y` `o` `no` | lógicos |
 
 `y` y `o` son operadores solo entre dos valores; fuera de ahí son nombres normales, porque en un
@@ -143,12 +143,16 @@ si vivo y
 Una línea que empieza por `y` u `o` sigue la condición de la anterior, salvo que detrás venga `=`,
 `+=`, `++`, `.`, `[` o `(`: entonces es la variable (`y = 3`).
 
+En un `si`, un `mientras` o con `y`, `o` y `no`, cuentan como falso `falso`, `nulo`, `0`, el texto
+vacío `""` y una lista, un diccionario o unos bytes vacíos; todo lo demás cuenta como verdadero
+(`si enemigos { ... }` entra solo si queda alguno).
+
 ---
 
 ## Funciones
 
 ```lince
-funcion nombre(val|ref tipo param, ...): tipo_retorno {
+funcion nombre([val|ref] tipo param, ...): tipo_retorno {
     devolver valor
 }
 ```
@@ -213,11 +217,26 @@ da `ErrorRango`.
 
 ### Reglas
 
-- Todo parámetro indica `val` o `ref`
 - Todo parámetro tiene tipo declarado; `cualquiera` acepta un valor de cualquier tipo
-  (`val cualquiera v`, y también como tipo de retorno), y con `es` se mira cuál es
+  (`cualquiera v`, y también como tipo de retorno), y con `es` se mira cuál es
 - Toda función declara su tipo de retorno
-- `val` — copia; `ref` — referencia (los cambios afectan al original)
+- Un parámetro puede llevar delante `val` (lo normal; es lo mismo que no poner nada) o `ref`.
+  Con `val`, asignar al parámetro dentro de la función no cambia nada fuera. Con `ref`,
+  lo que valga al acabar la función pasa a la variable que se le dio:
+
+  ```lince
+  funcion intercambiar(ref numero a, ref numero b): nulo {
+      sea t = a
+      a = b
+      b = t
+  }
+  intercambiar(x, y)          # ahora x e y están cambiadas
+  ```
+
+  Si a un `ref` se le da algo que no es una variable (un número, una expresión), no hay
+  dónde devolverlo y se queda como `val`.
+- Las listas, los diccionarios y los objetos se comparten siempre, con `val` o con `ref`:
+  si la función añade algo a una lista, se ve fuera (para no tocarla, `l.copiar()`)
 - Parámetros con valor por defecto van al final
 - Recursión limitada a 500 niveles → `ErrorRecursion` capturable
 

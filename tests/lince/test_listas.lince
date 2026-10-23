@@ -67,3 +67,15 @@ primera += [9]
 escribir(primera)
 # a_texto de una lista o un diccionario, como escribir
 escribir(a_texto(juntas) + " | " + a_texto({"x": 1, "y": [2]}))
+
+# == compara listas y diccionarios por su contenido
+escribir([1, [2, 3]] == [1, [2, 3]])
+escribir([1, 2] != [2, 1])
+escribir({"a": 1, "b": 2} == {"b": 2, "a": 1})
+escribir([[1], [2]].contiene([2]))
+escribir([[1], [2]].posicion([2]))
+escribir([{"x": 1}, {"x": 2}].posicion({"x": 9}))
+# en un si, lo vacío es falso
+sea sin_nada = []
+si sin_nada { escribir("no debería") } sino { escribir("vacía es falso") }
+si {"a": 1} { escribir("con algo es verdadero") }

@@ -122,6 +122,11 @@ static int tarea_sin_nombre(Parser *p) {
     if (p->pos + 2 >= p->cantidad || p->tokens[p->pos + 1].tipo != TOK_PAREN_IZQ) return 0;
     TipoToken dentro = p->tokens[p->pos + 2].tipo;
     if (dentro == TOK_VAL || dentro == TOK_REF) return 1;
+    /* sin 'val': tarea(numero x) ... — un tipo seguido de un nombre */
+    if (p->pos + 3 < p->cantidad && p->tokens[p->pos + 3].tipo == TOK_IDENTIFICADOR &&
+        (dentro == TOK_TIPO_NUMERO || dentro == TOK_TIPO_TEXTO || dentro == TOK_TIPO_LOGICO ||
+         dentro == TOK_TIPO_LISTA || dentro == TOK_TIPO_DICCIONARIO || dentro == TOK_TIPO_NULO ||
+         dentro == TOK_LISTA || dentro == TOK_DICCIONARIO || dentro == TOK_IDENTIFICADOR)) return 1;
     if (dentro != TOK_PAREN_DER || p->pos + 3 >= p->cantidad) return 0;
     TipoToken tras = p->tokens[p->pos + 3].tipo;
     return tras == TOK_LLAVE_IZQ || tras == TOK_DOS_PUNTOS;
@@ -294,13 +299,7 @@ static Nodo *primario(Parser *p) {
                 int por_ref = 0;
                 if (coincide(p, TOK_VAL))      { consumir_cualquiera(p); por_ref = 0; }
                 else if (coincide(p, TOK_REF)) { consumir_cualquiera(p); por_ref = 1; }
-                else {
-                    fprintf(stderr,
-                        "\n❌ Error en línea %d:\n"
-                        "   Parámetro de lambda necesita 'val' o 'ref'.\n\n",
-                        actual(p)->linea);
-                    exit(1);
-                }
+                /* sin 'val' ni 'ref': val */
                 char *tipo_clase = NULL;
                 TipoDato tipo = parsear_tipo(p, &tipo_clase);
                 Token *pnom = consumir(p, TOK_IDENTIFICADOR, "nombre del parámetro");
@@ -994,14 +993,7 @@ static Nodo *funcion_desde_parametros(Parser *p, Token *nombre, int sin_cuerpo_o
             } else if (coincide(p, TOK_REF)) {
                 consumir(p, TOK_REF, "'ref'");
                 por_ref = 1;
-            } else {
-                fprintf(stderr,
-                    "\n❌ Error en línea %d:\n"
-                    "   Cada parámetro debe indicar si es 'val' o 'ref'.\n"
-                    "   Ejemplo: funcion f(val numero x, ref lista nums): nulo\n\n",
-                    actual(p)->linea);
-                exit(1);
-            }
+            }                       /* sin 'val' ni 'ref': val */
 
             /* tipo */
             char *tipo_clase = NULL;
@@ -1385,13 +1377,7 @@ static Nodo *sent_generador(Parser *p) {
             int por_ref = 0;
             if (coincide(p, TOK_VAL))      { consumir_cualquiera(p); por_ref = 0; }
             else if (coincide(p, TOK_REF)) { consumir_cualquiera(p); por_ref = 1; }
-            else {
-                fprintf(stderr,
-                    "\n❌ Error en línea %d:\n"
-                    "   Cada parámetro debe indicar si es 'val' o 'ref'.\n\n",
-                    actual(p)->linea);
-                exit(1);
-            }
+            /* sin 'val' ni 'ref': val */
             char *tipo_clase = NULL;
             TipoDato tipo = parsear_tipo(p, &tipo_clase);
             Token *pnom = consumir(p, TOK_IDENTIFICADOR, "nombre del parámetro");

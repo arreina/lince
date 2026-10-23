@@ -1,0 +1,18 @@
+# @seccion: Funciones
+# @titulo: val y ref
+# @nota: Delante de un parámetro se puede poner `val` (lo normal; da igual ponerlo o no) o `ref`. Con `ref`, lo que valga el parámetro al acabar la función pasa a la variable que se le dio. Las listas y los diccionarios se comparten siempre: si la función les añade algo, se ve fuera.
+funcion intercambiar(ref numero a, ref numero b): nulo {
+    sea t = a
+    a = b
+    b = t
+}
+funcion apuntar(lista marcas, numero tiempo): nulo {
+    marcas.agregar(tiempo)
+}
+sea x = 1
+sea y = 2
+intercambiar(x, y)
+escribir("x = {x}, y = {y}")
+sea marcas = []
+apuntar(marcas, 12.5)
+escribir(marcas)

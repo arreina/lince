@@ -85,3 +85,27 @@ escribir(otra == nada)
 escribir(nada != nada)
 escribir(funcion(): nulo { } == nada)
 escribir(golpes[1] == doble)
+
+# 'val' es opcional y 'ref' devuelve lo asignado a la variable que se pasó
+funcion intercambiar(ref numero a, ref numero b): nulo {
+    sea t = a
+    a = b
+    b = t
+}
+sea p1 = 1
+sea p2 = 2
+intercambiar(p1, p2)
+escribir("{p1} {p2}")
+funcion sumar_a(ref numero puntos, numero cuanto): nulo { puntos += cuanto }
+sea marcador = 10
+sumar_a(marcador, 5)
+escribir(marcador)
+sumar_a(3, 1)
+clase Hucha {
+    funcion sacar(ref numero saldo, numero cuanto): nulo { saldo -= cuanto }
+}
+sea saldo = 100
+Hucha().sacar(saldo, 30)
+escribir(saldo)
+funcion sin_val(numero x, lista l): numero { devolver x + l.longitud() }
+escribir(sin_val(1, [1, 2]))

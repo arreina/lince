@@ -59,3 +59,4 @@ sea dentro = x > 0
 escribir(dentro)
 funcion mover(val numero x, val numero y): lista { devolver [x + 1, y + 1] }
 escribir(mover(x, y))
+intentar { escribir(5 % 0) } capturar (error e) { escribir(e.tipo) }

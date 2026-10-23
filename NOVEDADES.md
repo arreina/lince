@@ -11,6 +11,21 @@ apartado que le toca de este archivo.
 - `dentro()` acepta el punto como una lista `[x, y]`, como la que da `raton()`:
   `juego.dentro(juego.raton(), boton)`.
 
+### Revisión del lenguaje antes de la 1.0
+
+Cosas que, una vez congelado el lenguaje, ya no se podrían cambiar:
+
+- **`==` compara listas y diccionarios por lo que tienen**: `[1, 2] == [1, 2]` es verdadero
+  (antes, falso: una lista ni siquiera era igual a sí misma). `contiene()` y `posicion()`
+  también. **Arreglado:** `posicion()` daba por iguales todas las listas, diccionarios y
+  objetos, así que `enemigos.posicion(e)` daba siempre 0.
+- **`ref` funciona**: lo que valga el parámetro al acabar la función pasa a la variable que
+  se le dio (`intercambiar(ref a, ref b)`). Antes `ref` hacía lo mismo que `val`.
+- **`val` es opcional**: `funcion doble(numero x)` es lo mismo que `funcion doble(val numero x)`.
+- En un `si`, **una lista, un diccionario o unos bytes vacíos cuentan como falso**, como `""`
+  y `0` (antes, verdadero).
+- **Arreglado:** `x % 0` da `ErrorMatematico`, como `x / 0` (antes daba `nan`).
+
 ## 0.11.0
 
 `y` y `o` como nombres (para las coordenadas de un juego), `lista + lista`, `a_texto()` de cualquier valor, y en el móvil el botón «atrás» como Esc y los diálogos lejos del mando de la pantalla.
