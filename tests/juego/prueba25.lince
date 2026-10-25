@@ -1,0 +1,7 @@
+# LINCE_JUEGO_GRABAR_GUION: apunta las teclas con el formato de LINCE_JUEGO_GUION
+importar "juego"
+juego.abrir("grabar", 100, 60)
+mientras juego.abierto() {
+    juego.limpiar([0, 0, 0])
+    juego.presentar()
+}

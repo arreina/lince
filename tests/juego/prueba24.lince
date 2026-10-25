@@ -1,0 +1,13 @@
+# LINCE_JUEGO_ESCENA: el juego empieza en otra escena, sin tocar su código
+importar "juego"
+juego.abrir("escenas", 100, 60)
+juego.cambiar_escena("portada")
+sea veces = 0
+mientras juego.abierto() {
+    si juego.escena_nueva() { escribir("entra en " + juego.escena()) }
+    si juego.escena() == "portada" y veces == 3 { juego.cambiar_escena("partida") }
+    veces += 1
+    juego.limpiar([0, 0, 0])
+    juego.presentar()
+}
+escribir("acaba en " + juego.escena())

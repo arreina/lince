@@ -13,6 +13,7 @@
 
 importar "matematica"
 importar "texto"
+importar "sistema"
 
 # ── Comprobaciones con el mismo mensaje en todas las funciones ──
 
@@ -190,6 +191,20 @@ sea _fundido = 0             # segundos que dura el fundido
 sea _fase = 0                # 0: sin fundido; 1: oscurece; 2: aclara
 sea _desde_fase = 0          # juego.tiempo_real() al empezar la fase
 
+# LINCE_JUEGO_ESCENA=nombre (para probar una escena sin recorrer el juego): el
+# juego empieza en esa escena, como si lo primero que hace fuera
+# cambiar_escena("nombre") sin fundido; la primera cambiar_escena() del programa
+# (la suya, que lleva a la escena de siempre) se salta
+sea _forzada = sistema.entorno("LINCE_JUEGO_ESCENA", "")
+
+funcion _aplicar_forzada(): nulo {
+    si _forzada != "" {
+        sea nombre = _forzada
+        _forzada = ""
+        _poner_escena(nombre)
+    }
+}
+
 funcion _poner_escena(val texto nombre): nulo {
     _escena = nombre
     _nueva = verdadero
@@ -201,6 +216,10 @@ funcion cambiar_escena(val cualquiera nombre, val cualquiera fundido = 0): nulo 
     si no juego.abierto() { lanzar ErrorJuego("la ventana no está abierta: llama a juego.abrir() primero") }
     si no (nombre es texto) { lanzar ErrorTipo("cambiar_escena() espera (nombre[, segundos de fundido])") }
     si no (fundido es numero) { lanzar ErrorTipo("cambiar_escena(): el argumento 2 debe ser un número") }
+    si _forzada != "" y _escena == "" {      # LINCE_JUEGO_ESCENA: se empieza en la que se pidió
+        _aplicar_forzada()
+        devolver nulo
+    }
     si _escena == "" y fundido <= 0 {        # la primera escena empieza ya
         _poner_escena(nombre)
         devolver nulo
@@ -213,13 +232,23 @@ funcion cambiar_escena(val cualquiera nombre, val cualquiera fundido = 0): nulo 
     }
 }
 
-funcion escena(): texto { devolver _escena }
-funcion escena_nueva(): logico { devolver _nueva }
-funcion tiempo_escena(): numero { devolver juego.tiempo() - _desde }
+funcion escena(): texto {
+    _aplicar_forzada()
+    devolver _escena
+}
+funcion escena_nueva(): logico {
+    _aplicar_forzada()
+    devolver _nueva
+}
+funcion tiempo_escena(): numero {
+    _aplicar_forzada()
+    devolver juego.tiempo() - _desde
+}
 
 # En cada presentar(), después de las tareas: la caja de diálogo, el fundido
 # de las escenas y, encima de todo, el mando de la pantalla táctil
 funcion _presentar(): nulo {
+    _aplicar_forzada()
     _dibujar_dialogo()
     _fundido_escenas()
     _dibujar_mando()

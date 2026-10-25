@@ -3,6 +3,22 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.1.0
+
+Dos variables de entorno nuevas para el IDE (lince-motor); no cambian nada de lo que ya hay:
+
+- **`LINCE_JUEGO_ESCENA=nombre`**: el juego empieza en esa escena, como si lo primero que hiciera fuera `juego.cambiar_escena("nombre")` sin fundido (la primera `cambiar_escena()` del programa se salta). Para probar una escena sin recorrer el juego.
+- **`LINCE_JUEGO_GRABAR_GUION=ruta.txt`**: apunta las teclas que se pulsan mientras se juega, con el formato de `LINCE_JUEGO_GUION`, para volver a reproducirlas.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.1.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.1.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.1.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.1.0.vsix` |
+
 ## 1.0.0
 
 **Lince 1.0: el lenguaje queda congelado.** Desde esta versión, lo que escribas hoy seguirá funcionando: el lenguaje solo se amplía (cosas nuevas que no rompen nada) y los fallos se arreglan. La 1.0 es el compromiso de estabilidad, después de revisar el lenguaje (igualdad por contenido, `ref` que funciona, `val` opcional, vacío es falso), de escribir el manual y la especificación completos, de hacer un juego entero con Lince (`juegos/la_piedra_del_lince`) y de probar el sonido, el teclado, el ratón y los mandos en equipos reales (Linux y Android; Windows se probó con wine y en la CI, aún no en un equipo real).

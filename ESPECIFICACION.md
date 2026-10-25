@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.0
+# 🐆 Lince — Especificación del Lenguaje v1.1
 
 ## Filosofía
 
@@ -1753,6 +1753,15 @@ probar combos); `LINCE_JUEGO_ESCRIBIR=texto` teclea
 (`<` borra); `LINCE_JUEGO_CAPTURA=ruta.bmp` guarda el último fotograma y
 `LINCE_JUEGO_FOTOS=carpeta` todos; `LINCE_JUEGO_AUDIO=ruta.wav` guarda el sonido sincronizado con
 esos fotogramas (para hacer un vídeo con sonido) y `LINCE_JUEGO_SEMILLA=n` hace las partidas repetibles.
+
+Dos más, que sirven también con ventana de verdad (para un editor o IDE): `LINCE_JUEGO_ESCENA=nombre`
+hace que el juego **empiece en esa escena**, como si lo primero que hiciera fuera
+`juego.cambiar_escena("nombre")` sin fundido: la primera `cambiar_escena()` del propio programa (la que
+lleva a la escena de siempre) se salta, y las demás van como siempre; así se prueba una escena sin
+recorrer el juego. Y `LINCE_JUEGO_GRABAR_GUION=ruta.txt` **apunta las teclas que se pulsan mientras se
+juega**, con el mismo formato de `LINCE_JUEGO_GUION` (`10:espacio:5,30:derecha:20`, una línea): lo
+grabado se reproduce tal cual con `LINCE_JUEGO_GUION="$(cat ruta.txt)"`. Esc y F5 no se apuntan; el
+archivo se reescribe cada vez que se suelta una tecla y al cerrar.
 
 ### `bytes`
 

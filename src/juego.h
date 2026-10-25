@@ -234,6 +234,8 @@ static struct {
        LINCE_JUEGO_FOTOS=carpeta todos (00000.bmp, 00001.bmp...);
        LINCE_JUEGO_GUION=30:derecha:20,50:z mantiene derecha desde el
        fotograma 30 durante 20 y pulsa z en el 50 (para probar combos);
+       LINCE_JUEGO_GRABAR_GUION=ruta.txt escribe, mientras se juega, las teclas
+       pulsadas con el formato de LINCE_JUEGO_GUION (se puede volver a reproducir);
        LINCE_JUEGO_SEMILLA=n fija la semilla de matematica.aleatorio() y
        LINCE_JUEGO_AUDIO=ruta.wav guarda el sonido (1/60 s por fotograma, a la par
        que LINCE_JUEGO_FOTOS: sirve para hacer un vídeo con sonido). */
@@ -336,6 +338,8 @@ static void jg_aviso_error(const char *msg, int pantalla);
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
 static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
+static void jg_grabar_guion(int cerrando);
+static void jg_grabar_guion_empezar(void);
 static void jg_hojas_liberar(void);
 static void jg_texturas_pendientes(void);
 static int jg_nueva_imagen(const char *nombre, unsigned char *rgba, int ancho, int alto);
@@ -579,6 +583,7 @@ static void jg_cerrar_todo(void) {
     if (_jgs.render) _jg.DestroyRenderer(_jgs.render);
     if (_jgs.ventana) _jg.DestroyWindow(_jgs.ventana);
     _jgs.render = _jgs.ventana = NULL;
+    if (_jgs.abierta) jg_grabar_guion(1);
     if (_jgs.abierta) _jg.Quit();
     _jgs.abierta = 0;
     _jgs.vibrador = _jgs.acelerometro = NULL;         /* SDL_Quit los ha cerrado */
@@ -723,6 +728,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
             _jgs.guion[_jgs.nguion++].tecla = c;
         }
     }
+    jg_grabar_guion_empezar();
     free(_jgs.escribir_prueba);
     _jgs.escribir_prueba = jg_entorno_utf8("LINCE_JUEGO_ESCRIBIR");
     _jgs.pide_texto = 0;
@@ -975,6 +981,91 @@ static Valor *fn_jg_ancho_texto(Valor **a, int n) {
 }
 
 /* ── Entrada ── */
+/* ── LINCE_JUEGO_GRABAR_GUION=ruta.txt ──
+   Mientras se juega, apunta las teclas que se pulsan, con el formato de
+   LINCE_JUEGO_GUION ("30:derecha:20,50:z:1": desde qué fotograma, qué tecla,
+   cuántos fotogramas), para volver a jugar lo mismo sin tocar el teclado.
+   Esc y F5 no se apuntan (cierran y reinician el programa). El archivo se
+   reescribe cada vez que se suelta una tecla, y al cerrar para las que siguen
+   pulsadas; si el guion pasa de JG_GUION_GRABADO teclas, se queda con las primeras. */
+#define JG_GUION_GRABADO 4096
+static char *_jg_grab_ruta;
+static long  _jg_grab_ini[512];
+static struct { long desde, cuantos; int tecla; } _jg_grab[JG_GUION_GRABADO];
+static int   _jg_ngrab;
+
+static int jg_nombre_tecla(int c, char *t, size_t max) {
+    static const struct { const char *n; int c; } T[] = {
+        {"arriba", 82}, {"abajo", 81}, {"izquierda", 80}, {"derecha", 79},
+        {"espacio", 44}, {"entrar", 40}, {"escape", 41}, {"borrar", 42}, {"tab", 43},
+        {"mayus", 225}, {"ctrl", 224}, {"alt", 226},
+    };
+    for (size_t i = 0; i < sizeof T / sizeof T[0]; i++) if (T[i].c == c) { snprintf(t, max, "%s", T[i].n); return 1; }
+    if (c >= 4 && c <= 29) snprintf(t, max, "%c", 'a' + (c - 4));
+    else if (c >= 30 && c <= 38) snprintf(t, max, "%c", '1' + (c - 30));
+    else if (c == 39) snprintf(t, max, "0");
+    else if (c >= 58 && c <= 69) snprintf(t, max, "f%d", c - 57);
+    else {
+        const char *sdl = _jg.ScancodeName(c);
+        if (!sdl || !sdl[0]) return 0;
+        snprintf(t, max, "%s", sdl);
+        for (char *q = t; *q; q++) *q = (char)tolower((unsigned char)*q);
+    }
+    return jg_tecla_codigo(t) == c && !strpbrk(t, ",:");          /* que se pueda volver a leer */
+}
+
+static void jg_grabar_guion_empezar(void) {
+    free(_jg_grab_ruta);
+    _jg_grab_ruta = jg_entorno_utf8("LINCE_JUEGO_GRABAR_GUION");
+    if (_jg_grab_ruta && !_jg_grab_ruta[0]) { free(_jg_grab_ruta); _jg_grab_ruta = NULL; }
+    for (int c = 0; c < 512; c++) _jg_grab_ini[c] = -1;
+    _jg_ngrab = 0;
+}
+
+static void jg_grabar_guion_escribir(void) {
+    FILE *f = fopen(_jg_grab_ruta, "w");
+    if (!f) return;
+    int orden[JG_GUION_GRABADO];                       /* por fotograma de inicio, el mismo orden que se pulsó */
+    for (int i = 0; i < _jg_ngrab; i++) orden[i] = i;
+    for (int i = 1; i < _jg_ngrab; i++)
+        for (int j = i; j > 0 && _jg_grab[orden[j]].desde < _jg_grab[orden[j - 1]].desde; j--) {
+            int t = orden[j]; orden[j] = orden[j - 1]; orden[j - 1] = t;
+        }
+    int primera = 1;
+    for (int i = 0; i < _jg_ngrab; i++) {
+        char t[64];
+        if (!jg_nombre_tecla(_jg_grab[orden[i]].tecla, t, sizeof t)) continue;
+        fprintf(f, "%s%ld:%s:%ld", primera ? "" : ",", _jg_grab[orden[i]].desde, t, _jg_grab[orden[i]].cuantos);
+        primera = 0;
+    }
+    fprintf(f, "\n");
+    fclose(f);
+}
+
+/* Cada fotograma, con las teclas de verdad ya leídas (antes de las del guion
+   de prueba); cerrando: las que siguen pulsadas se dan por soltadas */
+static void jg_grabar_guion(int cerrando) {
+    if (!_jg_grab_ruta) return;
+    int cambio = 0;
+    for (int c = 1; c < 512; c++) {
+        if (c == 41 || c == 62) continue;                   /* Esc y F5 */
+        int pulsada = !cerrando && _jgs.teclas[c];
+        if (pulsada && _jg_grab_ini[c] < 0) _jg_grab_ini[c] = _jgs.total;
+        else if (!pulsada && _jg_grab_ini[c] >= 0) {
+            long cuantos = _jgs.total - _jg_grab_ini[c];
+            if (cuantos < 1) cuantos = 1;
+            if (_jg_ngrab < JG_GUION_GRABADO) {
+                _jg_grab[_jg_ngrab].desde = _jg_grab_ini[c];
+                _jg_grab[_jg_ngrab].cuantos = cuantos;
+                _jg_grab[_jg_ngrab++].tecla = c;
+                cambio = 1;
+            }
+            _jg_grab_ini[c] = -1;
+        }
+    }
+    if (cambio) jg_grabar_guion_escribir();
+}
+
 static int jg_tecla_codigo(const char *nombre) {
     static const struct { const char *n; int c; } T[] = {
         {"arriba", 82}, {"abajo", 81}, {"izquierda", 80}, {"derecha", 79},
@@ -1310,6 +1401,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     for (int i = 0; i < _jgs.nguion; i++)
         if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos)
             _jgs.teclas[_jgs.guion[i].tecla] = 1;
+    jg_grabar_guion(0);                  /* LINCE_JUEGO_GRABAR_GUION: las teclas de este fotograma */
     jg_leer_toques();                    /* después de los clics de prueba: también cuentan como dedo */
     jg_leer_inclinacion();
     /* lo de juego.lince que mira la entrada de este fotograma (el mando de la
