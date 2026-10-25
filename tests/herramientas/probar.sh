@@ -9,23 +9,26 @@ fallos=0
 bien() { echo "  ✅ $1"; }
 mal()  { echo "  ❌ $1"; fallos=$((fallos+1)); }
 sin_r() { tr -d '\r'; }
+# igual "qué" "esperado" "obtenido" (en el Windows de la CI no hay herramienta de comparar)
+igual() {
+    if [ "$2" = "$3" ]; then bien "$1"
+    else mal "$1. Esperaba:"; echo "$2" | sed 's/^/      < /'; echo "      pero salió:"; echo "$3" | sed 's/^/      > /'; fi
+}
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 echo "🐆 Herramientas"
 
 # ── formatear ──
 "$LINCE" formatear --mostrar "$DIR/feo.lince" | sin_r > "$TMP/bonito.lince"
-if diff -q <(sin_r < "$DIR/bonito.esperado") "$TMP/bonito.lince" > /dev/null; then bien "formatear deja feo.lince como bonito.esperado"
-else mal "formatear no da bonito.esperado:"; diff <(sin_r < "$DIR/bonito.esperado") "$TMP/bonito.lince" | sed 's/^/      /'; fi
-"$LINCE" formatear --mostrar "$TMP/bonito.lince" | sin_r | diff -q - "$TMP/bonito.lince" > /dev/null \
-    && bien "formatear otra vez no cambia nada" || mal "formatear dos veces da otra cosa"
+igual "formatear deja feo.lince como bonito.esperado" "$(sin_r < "$DIR/bonito.esperado")" "$(cat "$TMP/bonito.lince")"
+igual "formatear otra vez no cambia nada" "$(cat "$TMP/bonito.lince")" "$("$LINCE" formatear --mostrar "$TMP/bonito.lince" | sin_r)"
 [ "$("$LINCE" "$DIR/feo.lince" | sin_r)" = "$("$LINCE" "$TMP/bonito.lince" | sin_r)" ] \
     && bien "el programa formateado hace lo mismo" || mal "el programa formateado hace otra cosa"
 "$LINCE" formatear --comprobar "$DIR/feo.lince" > /dev/null && mal "--comprobar no ve que feo.lince está sin formatear" \
     || bien "--comprobar sale con 1 si algo está sin formatear"
 cp "$DIR/feo.lince" "$TMP/feo.lince"
-"$LINCE" formatear "$TMP/feo.lince" > /dev/null && diff -q <(sin_r < "$TMP/feo.lince") "$TMP/bonito.lince" > /dev/null \
-    && bien "formatear cambia el archivo" || mal "formatear no cambió el archivo"
+"$LINCE" formatear "$TMP/feo.lince" > /dev/null
+igual "formatear cambia el archivo" "$(cat "$TMP/bonito.lince")" "$(sin_r < "$TMP/feo.lince")"
 printf 'sea x = (1\n' > "$TMP/roto.lince"
 if "$LINCE" formatear "$TMP/roto.lince" > /dev/null 2>&1; then mal "formatear tocó un archivo con un error de sintaxis"
 else [ "$(cat "$TMP/roto.lince")" = "sea x = (1" ] && bien "con un error de sintaxis no lo toca" || mal "cambió un archivo roto"; fi
@@ -39,16 +42,14 @@ salida="$("$LINCE" formatear --comprobar "${modelo[@]}" 2>&1)" && bien "los ejem
 
 # ── documentar ──
 "$LINCE" documentar "$DIR/libreria.lince" | sin_r > "$TMP/ayuda.md"
-diff -q <(sin_r < "$DIR/documentar.esperado") "$TMP/ayuda.md" > /dev/null && bien "documentar saca la ayuda de los comentarios" \
-    || { mal "documentar no da documentar.esperado:"; diff <(sin_r < "$DIR/documentar.esperado") "$TMP/ayuda.md" | sed 's/^/      /'; }
-"$LINCE" documentar "$DIR/libreria.lince" -o "$TMP/a.md" > /dev/null && diff -q <(sin_r < "$TMP/a.md") "$TMP/ayuda.md" > /dev/null \
-    && bien "documentar -o lo escribe en un archivo" || mal "documentar -o no escribió el archivo"
+igual "documentar saca la ayuda de los comentarios" "$(sin_r < "$DIR/documentar.esperado")" "$(cat "$TMP/ayuda.md")"
+"$LINCE" documentar "$DIR/libreria.lince" -o "$TMP/a.md" > /dev/null
+igual "documentar -o lo escribe en un archivo" "$(cat "$TMP/ayuda.md")" "$(sin_r < "$TMP/a.md")"
 
 # ── probar ──
 salida="$(cd "$DIR/proyecto" && "$LINCE" probar pruebas | sin_r)"
 codigo=$(cd "$DIR/proyecto" && "$LINCE" probar pruebas > /dev/null 2>&1; echo $?)
-[ "$salida" = "$(sin_r < "$DIR/probar.esperado")" ] && bien "probar: las pruebas y su cobertura" \
-    || { mal "probar no da probar.esperado:"; diff <(sin_r < "$DIR/probar.esperado") <(echo "$salida") | sed 's/^/      /'; }
+igual "probar: las pruebas y su cobertura" "$(sin_r < "$DIR/probar.esperado")" "$salida"
 [ "$codigo" = 1 ] && bien "probar sale con 1 si una prueba falla" || mal "probar salió con $codigo y una prueba falla"
 (cd "$DIR/proyecto" && "$LINCE" probar pruebas/prueba_cuentas.lince --sin-cobertura > /dev/null) \
     && bien "probar sale con 0 si todas pasan" || mal "probar falla con pruebas que pasan"
