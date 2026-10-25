@@ -1,0 +1,18 @@
+# @seccion: Herramientas
+# @titulo: Pruebas y cobertura
+# @nota: `lince probar` busca los archivos que se llaman `prueba_algo.lince` o `algo_prueba.lince` (en la carpeta que le digas, o en la actual y sus subcarpetas), los ejecuta uno a uno y dice cuáles fallan, con lo que escribieron. Una prueba pasa si termina bien: con el módulo `pruebas`, `pruebas.resumen()` sale con error si algo falló. Después cuenta, para el código que han usado las pruebas, qué parte de sus sentencias se ha ejecutado y qué líneas no ha probado ninguna. `--sin-cobertura` se salta la cuenta.
+# @lenguaje: terminal
+lince probar pruebas
+
+   ✅ pruebas/prueba_enemigos.lince
+   ❌ pruebas/prueba_puntos.lince
+      │     ❌ FALLO: récord
+      │        esperado: 120
+      │        obtenido: 100
+
+   1 de 2 pruebas bien
+
+   Cobertura (las sentencias que han ejecutado las pruebas):
+
+    92%  enemigos.lince   sin probar: 41-43
+    70%  puntos.lince   sin probar: 10, 16-17

@@ -1,0 +1,4 @@
+importar "pruebas"
+importar "../libs/cuentas"
+pruebas.igual("signo de 0", "cero", signo(0))
+pruebas.resumen()

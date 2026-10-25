@@ -49,16 +49,16 @@ funcion empezar(): nulo {
     yo = juego.cuerpo(mundo, {"x": 60, "y": 380, "ancho": 22, "alto": 30, "friccion": 0})
     para (i = 0; i < 3; i++) {                                  # cajas, una más pesada
         juego.cuerpo(mundo, {"x": 200 + i * 60, "y": 300, "ancho": 30, "alto": 30, "masa": si i == 2 { 4 } sino { 1 },
-                             "tipo": "caja"})
+            "tipo": "caja"})
     }
     juego.cuerpo(mundo, {"x": 400, "y": 60, "radio": 12, "rebote": 0.8, "tipo": "pelota"})
     juego.cuerpo(mundo, {"x": 460, "y": 100, "radio": 9, "rebote": 0.9, "masa": 0.5, "tipo": "pelota"})
     ascensor = juego.cuerpo(mundo, {"x": 530, "y": 440, "ancho": 70, "alto": 10, "fijo": verdadero, "vy": -60,
-                                    "tipo": "ascensor"})
+        "tipo": "ascensor"})
     monedas = []
     para cada lista sitio en [[50, 250], [360, 130], [590, 60]] {
         monedas.agregar(juego.cuerpo(mundo, {"x": sitio[0], "y": sitio[1], "radio": 8, "sensor": verdadero,
-                                             "gravedad": 0, "tipo": "moneda"}))
+            "gravedad": 0, "tipo": "moneda"}))
     }
     cogidas = 0
 }

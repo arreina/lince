@@ -1,0 +1,42 @@
+# libreria
+
+Una librería de prueba para 'lince documentar'.
+Esta cabecera va separada del código: es la ayuda del archivo.
+
+## `fijo VIDAS = 3`
+
+Cuántas vidas tiene el jugador al empezar.
+
+## `funcion doble(numero n): numero`
+
+El doble de un número.
+(Dos líneas de ayuda.)
+
+## `funcion sin_ayuda(): nulo`
+
+## `funcion distancia(numero x1, numero y1, numero x2, numero y2): numero`
+
+Distancia entre dos puntos,
+para no repetir la cuenta.
+
+## `enumeracion Dir { Izquierda, Derecha }`
+
+Hacia dónde mira.
+
+## `clase Personaje`
+
+Alguien que se mueve por la pantalla.
+
+### `sea numero vida = 100`
+
+Su vida, de 0 a 100.
+
+### `funcion crear(numero vida): nulo`
+
+### `funcion herir(numero n): nulo`
+
+Le quita vida (nunca baja de 0).
+
+### `obtener vivo(): logico`
+
+¿Sigue vivo?

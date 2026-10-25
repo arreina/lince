@@ -12,8 +12,8 @@ enumeracion Direccion {
 
 funcion animacion(val Estado e): texto {
     elegir e {
-        caso Estado.Quieto   { devolver "respirar" }
-        caso Estado.Andando  { devolver "andar" }
+        caso Estado.Quieto { devolver "respirar" }
+        caso Estado.Andando { devolver "andar" }
         caso Estado.Saltando { devolver "saltar" }
     }
     devolver ""

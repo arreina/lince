@@ -1,0 +1,19 @@
+# @seccion: Herramientas
+# @titulo: Perfil: en qué se va el tiempo
+# @nota: `lince perfil juego.lince` ejecuta el juego como siempre y, al cerrarlo, cuenta en qué se ha ido el tiempo de cada fotograma: en tu código, en las funciones de los módulos (dibujar, sonar…) y en mostrar el fotograma y esperar al siguiente. Después, las funciones que más tardan, cada una con su propio tiempo (sin el de las funciones que llama). Lo de antes del primer fotograma (abrir la ventana, cargar las imágenes) va aparte. Con un programa sin ventana, cuenta el tiempo total.
+# @lenguaje: terminal
+lince perfil juego.lince
+
+⏱️  Perfil de juego.lince
+
+   1800 fotogramas, 16,67 ms cada uno de media (60 por segundo); el más lento, 18,02 ms
+   (antes del primero, al arrancar: 240,51 ms)
+
+    14,2%      2,37 ms por fotograma  Tu código (Lince)
+    10,1%      1,68 ms por fotograma  Funciones de los módulos (dibujar, sonar…)
+    75,7%     12,62 ms por fotograma  Mostrar el fotograma y esperar al siguiente
+
+   Lo que más tarda (el tiempo de cada una, sin el de las funciones que llama):
+
+     8,9%      1,48 ms por fotograma  mover_enemigos   1800 llamadas  (juego.lince:88)
+     6,0%      1,00 ms por fotograma  juego.dibujar    54000 llamadas

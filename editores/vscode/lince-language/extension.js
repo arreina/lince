@@ -185,6 +185,26 @@ const proveedorSimbolos = {
     },
 };
 
+// La firma y la ayuda (los comentarios de encima) al pasar el ratón
+const proveedorAyuda = {
+    async provideHover(doc, pos) {
+        await alDia(doc);
+        const r = await pedir('textDocument/hover', {
+            textDocument: { uri: doc.uri.toString() }, position: { line: pos.line, character: pos.character } });
+        if (!r || !r.contents) return null;
+        return new vscode.Hover(new vscode.MarkdownString(r.contents.value));
+    },
+};
+
+// Formatear (lince formatear): con "editor.formatOnSave", al guardar
+const proveedorFormato = {
+    async provideDocumentFormattingEdits(doc) {
+        await alDia(doc);
+        const r = await pedir('textDocument/formatting', { textDocument: { uri: doc.uri.toString() } });
+        return (r || []).map((e) => vscode.TextEdit.replace(aRango(e.range), e.newText));
+    },
+};
+
 // ── activación ──────────────────────────────
 function activate(context) {
     diagnosticos = vscode.languages.createDiagnosticCollection('lince');
@@ -200,6 +220,8 @@ function activate(context) {
         vscode.languages.registerCompletionItemProvider(sel, proveedorCompletado, '.'),
         vscode.languages.registerDefinitionProvider(sel, proveedorDefinicion),
         vscode.languages.registerDocumentSymbolProvider(sel, proveedorSimbolos),
+        vscode.languages.registerHoverProvider(sel, proveedorAyuda),
+        vscode.languages.registerDocumentFormattingEditProvider(sel, proveedorFormato),
     );
     arrancar();
 }

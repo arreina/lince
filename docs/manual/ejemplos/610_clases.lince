@@ -4,7 +4,7 @@
 clase Rectangulo {
     funcion crear(val numero ancho, val numero alto): nulo {
         mi.ancho = ancho
-        mi.alto  = alto
+        mi.alto = alto
     }
     funcion area(): numero {
         devolver mi.ancho * mi.alto

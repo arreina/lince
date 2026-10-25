@@ -1,0 +1,52 @@
+# Una librería de prueba para 'lince documentar'.
+# Esta cabecera va separada del código: es la ayuda del archivo.
+
+importar "matematica"
+
+# Cuántas vidas tiene el jugador al empezar.
+fijo VIDAS = 3
+
+sea _interna = 0                # privada: no sale
+sea sin_comentario = 1          # una variable sin ayuda: no sale
+
+# El doble de un número.
+# (Dos líneas de ayuda.)
+funcion doble(numero n): numero { devolver n * 2 }
+
+# ─────────────────────────
+funcion sin_ayuda(): nulo { }
+
+funcion _ayudante(): nulo { }
+
+# Distancia entre dos puntos,
+# para no repetir la cuenta.
+funcion distancia(numero x1, numero y1,
+        numero x2, numero y2): numero {
+    devolver matematica.raiz((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1))
+}
+
+# Hacia dónde mira.
+enumeracion Dir { Izquierda, Derecha }
+
+# Alguien que se mueve por la pantalla.
+clase Personaje {
+    # Su vida, de 0 a 100.
+    sea numero vida = 100
+    sea numero _secreto = 0
+
+    funcion crear(numero vida): nulo { mi.vida = vida }
+
+    # Le quita vida (nunca baja de 0).
+    funcion herir(numero n): nulo {
+        mi.vida = matematica.maximo(0, mi.vida - n)
+    }
+
+    privado funcion _pensar(): nulo { }
+
+    # ¿Sigue vivo?
+    obtener vivo(): logico { devolver mi.vida > 0 }
+}
+
+clase _Oculta {
+    funcion nada(): nulo { }
+}

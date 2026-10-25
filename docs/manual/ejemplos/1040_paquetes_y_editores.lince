@@ -1,8 +1,10 @@
 # @seccion: Herramientas
 # @titulo: Paquetes y editores
-# @nota: `lince instalar` descarga una librería de Lince (un repositorio git) para usarla con `importar "paquete:nombre"`. Para el editor hay una extensión de VS Code con colores, plantillas, errores y avisos al escribir, autocompletado e ir a la definición; por debajo usa `lince lsp`, que cualquier editor que hable LSP puede usar.
+# @nota: `lince instalar` descarga una librería de Lince (un repositorio git) para usarla con `importar "paquete:nombre"`. Con una versión (`@v1.2`: una etiqueta, una rama o un commit) el paquete es del juego: va a su carpeta `paquetes/` y se apunta en `lince.paquetes` con su huella; `lince instalar` sin nada más baja exactamente esos en otro ordenador, y no instala uno que haya cambiado desde entonces. Para el editor hay una extensión de VS Code con colores, plantillas, errores y avisos al escribir, autocompletado, ir a la definición, la ayuda al pasar el ratón y formatear al guardar; por debajo usa `lince lsp`, que cualquier editor que hable LSP puede usar.
 # @lenguaje: terminal
 lince instalar https://github.com/usuario/paquete
+lince instalar https://github.com/usuario/paquete@v1.2   # para este juego, esa versión
+lince instalar                                          # los de lince.paquetes
 lince listar
 lince desinstalar paquete
 code --install-extension lince-language-X.Y.Z.vsix   # viene con cada versión

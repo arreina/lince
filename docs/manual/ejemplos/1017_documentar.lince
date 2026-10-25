@@ -1,0 +1,12 @@
+# @seccion: Herramientas
+# @titulo: La ayuda, en los comentarios
+# @nota: Los comentarios que van justo encima de una función, clase, método, enumeración o `fijo` son su ayuda: el editor la enseña al pasar el ratón por el nombre, y `lince documentar libreria.lince -o AYUDA.md` hace con todas una página en Markdown. Un bloque de comentarios al principio del archivo, separado del código, es la ayuda del archivo entero. Lo que empieza por `_` o es `privado` no sale.
+# Cuántas vidas hay al empezar.
+fijo VIDAS = 3
+
+# Lo que tarda en cruzar la pantalla a esa velocidad.
+funcion cruzar(numero velocidad): numero {
+    devolver 320 / velocidad
+}
+
+escribir(cruzar(80))

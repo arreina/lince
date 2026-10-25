@@ -102,6 +102,214 @@ static int _intentando = 0;
 static void (*_hook_error)(Nodo *s, Entorno *e) = NULL;
 
 void interprete_fijar_hook(void (*hook)(Nodo *sentencia, Entorno *e)) { _hook_sentencia = hook; }
+
+/* ── Cobertura (lince probar) ──
+   Con LINCE_COBERTURA=archivo, cada sentencia que se ejecuta apunta su línea;
+   al terminar, se añade al archivo una línea por fichero de código:
+   "ruta<TAB>linea,linea,…". -1: aún no se ha mirado la variable. */
+static int _cobertura = -1;
+static struct { const char *archivo; unsigned char *vista; int cap; } _cob[64];
+static int _ncob = 0;
+
+static void cobertura_guardar(void) {
+    const char *ruta = getenv("LINCE_COBERTURA");
+    FILE *f = ruta ? fopen(ruta, "ab") : NULL;
+    if (!f) return;
+    for (int i = 0; i < _ncob; i++) {
+        fprintf(f, "%s\t", _cob[i].archivo);
+        int primero = 1;
+        for (int l = 0; l < _cob[i].cap; l++)
+            if (_cob[i].vista[l]) { fprintf(f, primero ? "%d" : ",%d", l); primero = 0; }
+        fprintf(f, "\n");
+    }
+    fclose(f);
+}
+
+/* ── Perfil (lince perfil) ──
+   Cada vez que cambia lo que se está haciendo (entra o sale una función, una
+   función de un módulo, una tarea…), el tiempo desde el cambio anterior se
+   suma a lo que se hacía: a una función (su tiempo propio, sin el de las que
+   llama) y a una de tres partes: el código Lince, las funciones de los
+   módulos (dibujar, sonar…) y mostrar el fotograma y esperar al siguiente. */
+static int _perfil = 0;
+typedef struct { char nombre[96]; const char *archivo; int linea; double propio; long llamadas; } PerfilFn;
+static PerfilFn *_pf = NULL;
+static int _npf = 0, _cpf = 0;
+static int _pf_actual = 0;                 /* 0: el código de fuera de las funciones */
+static int _pf_cat = PERFIL_LINCE;
+static double _pf_cats[3], _pf_ultimo, _pf_inicio, _pf_fot_ultimo, _pf_peor, _pf_arranque = -1;
+static long _pf_fotogramas = 0;
+static char _pf_programa[512];
+
+static double perfil_ahora(void) { return corrutina_reloj(); }
+
+static void perfil_tic(void) {
+    double t = perfil_ahora();
+    double dt = t - _pf_ultimo;
+    _pf_ultimo = t;
+    _pf_cats[_pf_cat] += dt;
+    _pf[_pf_actual].propio += dt;
+}
+
+static int perfil_nuevo(const char *nombre, const char *archivo, int linea) {
+    if (_npf == _cpf) { _cpf = _cpf ? _cpf * 2 : 64; _pf = realloc(_pf, sizeof(PerfilFn) * (size_t)_cpf); }
+    PerfilFn *p = &_pf[_npf];
+    memset(p, 0, sizeof *p);
+    snprintf(p->nombre, sizeof p->nombre, "%s", nombre ? nombre : "(sin nombre)");
+    p->archivo = archivo;
+    p->linea = linea;
+    return _npf++;
+}
+
+static int perfil_de(FuncionLince *f, const char *prefijo) {
+    if (!f->perfil) {
+        char nombre[96];
+        if (f->duena && f->duena->nombre) snprintf(nombre, sizeof nombre, "%s.%s", f->duena->nombre, f->nombre ? f->nombre : "?");
+        else if (prefijo) snprintf(nombre, sizeof nombre, "%s.%s", prefijo, f->nombre ? f->nombre : "?");
+        else snprintf(nombre, sizeof nombre, "%s", f->nombre ? f->nombre : "(función sin nombre)");
+        /* la línea de su primera sentencia */
+        int linea = 0;
+        if (f->entorno_closure && f->cuerpo && f->cuerpo->tipo == NODO_BLOQUE && f->cuerpo->bloque.cantidad > 0 &&
+            f->cuerpo->bloque.sentencias[0])
+            linea = f->cuerpo->bloque.sentencias[0]->linea_ini ? f->cuerpo->bloque.sentencias[0]->linea_ini
+                                                                : f->cuerpo->bloque.sentencias[0]->linea;
+        f->perfil = perfil_nuevo(nombre, f->entorno_closure ? f->archivo : NULL, linea);
+    }
+    return f->perfil;
+}
+
+static int perfil_comparar(const void *a, const void *b) {
+    double x = ((const PerfilFn *)a)->propio, y = ((const PerfilFn *)b)->propio;
+    return x < y ? 1 : x > y ? -1 : 0;
+}
+
+static void perfil_ms(char *out, size_t max, double s) {
+    snprintf(out, max, "%.2f", s * 1000);
+    char *p = strchr(out, '.');
+    if (p) *p = ',';
+}
+static const char *perfil_pc(char *out, size_t max, double parte, double total) {
+    snprintf(out, max, "%.1f%%", 100 * parte / total);
+    char *p = strchr(out, '.');
+    if (p) *p = ',';
+    return out;
+}
+
+static void perfil_informe(void) {
+    if (!_perfil) return;
+    perfil_tic();
+    _perfil = 0;
+    double total = _pf_ultimo - _pf_inicio;
+    if (total <= 0) total = 1e-9;
+    fflush(stdout);
+    FILE *o = stderr;
+    char a[32], b[32], c[32], pc[32];
+    fprintf(o, "\n⏱️  Perfil de %s\n\n", _pf_programa);
+    const char *partes[3] = { "Tu código (Lince)", "Funciones de los módulos (dibujar, sonar…)",
+                              "Mostrar el fotograma y esperar al siguiente" };
+    if (_pf_fotogramas > 0) {
+        double por = total / (double)_pf_fotogramas;
+        perfil_ms(a, sizeof a, por);
+        perfil_ms(b, sizeof b, _pf_peor);
+        perfil_ms(c, sizeof c, _pf_arranque);
+        fprintf(o, "   %ld fotogramas, %s ms cada uno de media (%.0f por segundo); el más lento, %s ms\n"
+                   "   (antes del primero, al arrancar: %s ms)\n\n", _pf_fotogramas, a, 1.0 / por, b, c);
+        for (int i = 0; i < 3; i++) {
+            perfil_ms(a, sizeof a, _pf_cats[i] / (double)_pf_fotogramas);
+            fprintf(o, "   %6s  %8s ms por fotograma  %s\n", perfil_pc(pc, sizeof pc, _pf_cats[i], total), a, partes[i]);
+        }
+        perfil_ms(a, sizeof a, (_pf_cats[0] + _pf_cats[1]) / (double)_pf_fotogramas);
+        perfil_ms(c, sizeof c, 1.0 / 60);
+        fprintf(o, "\n   Lince y los módulos ocupan %s ms de cada fotograma (a 60 por segundo hay %s ms).\n", a, c);
+    } else {
+        perfil_ms(a, sizeof a, total);
+        fprintf(o, "   %s ms en total\n\n", a);
+        for (int i = 0; i < 2; i++) {
+            perfil_ms(a, sizeof a, _pf_cats[i]);
+            fprintf(o, "   %6s  %10s ms  %s\n", perfil_pc(pc, sizeof pc, _pf_cats[i], total), a, partes[i]);
+        }
+    }
+    /* las funciones que más tiempo se llevan, cada una con el suyo propio */
+    PerfilFn *orden = malloc(sizeof(PerfilFn) * (size_t)_npf);
+    memcpy(orden, _pf, sizeof(PerfilFn) * (size_t)_npf);
+    qsort(orden, (size_t)_npf, sizeof(PerfilFn), perfil_comparar);
+    fprintf(o, "\n   Lo que más tarda (el tiempo de cada una, sin el de las funciones que llama):\n\n");
+    for (int i = 0; i < _npf && i < 15; i++) {
+        PerfilFn *p = &orden[i];
+        if (p->propio < total * 0.001 && i > 0) break;
+        perfil_ms(a, sizeof a, _pf_fotogramas ? p->propio / (double)_pf_fotogramas : p->propio);
+        fprintf(o, "   %6s  %8s ms%s  %-28s", perfil_pc(pc, sizeof pc, p->propio, total), a,
+                _pf_fotogramas ? " por fotograma" : "", p->nombre);
+        if (p->llamadas) fprintf(o, "  %ld llamada%s", p->llamadas, p->llamadas == 1 ? "" : "s");
+        if (p->archivo && p->linea) {
+            const char *base = strrchr(p->archivo, '/');
+            fprintf(o, "  (%s:%d)", base ? base + 1 : p->archivo, p->linea);
+        }
+        fprintf(o, "\n");
+    }
+    fprintf(o, "\n");
+    free(orden);
+}
+
+void interprete_perfil_activar(const char *programa) {
+    _perfil = 1;
+    snprintf(_pf_programa, sizeof _pf_programa, "%s", programa);
+    perfil_nuevo("(fuera de las funciones)", NULL, 0);
+    _pf_inicio = _pf_ultimo = _pf_fot_ultimo = perfil_ahora();
+    atexit(perfil_informe);
+}
+
+void interprete_perfil_categoria(int cat) {
+    if (!_perfil) return;
+    perfil_tic();
+    _pf_cat = cat;
+}
+
+void interprete_perfil_fotograma(void) {
+    if (!_perfil) return;
+    if (_pf_arranque < 0) {
+        /* el primer fotograma: lo de antes (abrir la ventana, cargar…) es
+           arrancar, y no cuenta para lo que tarda cada fotograma */
+        perfil_tic();
+        _pf_arranque = _pf_ultimo - _pf_inicio;
+        _pf_inicio = _pf_fot_ultimo = _pf_ultimo;
+        memset(_pf_cats, 0, sizeof _pf_cats);
+        for (int i = 0; i < _npf; i++) { _pf[i].propio = 0; _pf[i].llamadas = 0; }
+        _pf[_pf_actual].llamadas = 1;          /* este presentar */
+        return;
+    }
+    double t = perfil_ahora();
+    if (_pf_fotogramas > 0 && t - _pf_fot_ultimo > _pf_peor) _pf_peor = t - _pf_fot_ultimo;
+    _pf_fot_ultimo = t;
+    _pf_fotogramas++;
+}
+
+static void cobertura_marcar(Nodo *s) {
+    if (_cobertura < 0) {
+        _cobertura = getenv("LINCE_COBERTURA") != NULL;
+        if (_cobertura) atexit(cobertura_guardar);
+        if (!_cobertura) return;
+    }
+    const char *a = archivo_en_curso();
+    int linea = s->linea_ini ? s->linea_ini : s->linea;
+    if (!a || linea <= 0) return;
+    int k = 0;
+    while (k < _ncob && _cob[k].archivo != a && strcmp(_cob[k].archivo, a) != 0) k++;
+    if (k == _ncob) {
+        if (_ncob == 64) return;
+        _cob[k].archivo = strdup(a);
+        _cob[k].vista = NULL;
+        _cob[k].cap = 0;
+        _ncob++;
+    }
+    if (linea >= _cob[k].cap) {
+        int cap = linea * 2 + 64;
+        _cob[k].vista = realloc(_cob[k].vista, (size_t)cap);
+        memset(_cob[k].vista + _cob[k].cap, 0, (size_t)(cap - _cob[k].cap));
+        _cob[k].cap = cap;
+    }
+    _cob[k].vista[linea] = 1;
+}
 void interprete_fijar_hook_error(void (*hook)(Nodo *sentencia, Entorno *e)) { _hook_error = hook; }
 const char *interprete_archivo_en_curso(void) {
     const char *a = archivo_en_curso();
@@ -1738,6 +1946,7 @@ enum { TAREA_NUEVA, TAREA_CORRIENDO, TAREA_ESPERANDO, TAREA_TERMINADA };
 enum { ESPERA_FOTOGRAMA, ESPERA_SEGUNDOS, ESPERA_TAREA };
 
 struct TareaLince {
+    int           perfil_fn;    /* lince perfil: la función en la que va (0: la suya) */
     Corrutina    *co;
     FuncionLince *f;
     Entorno      *fn_e;         /* sus parámetros */
@@ -1822,7 +2031,20 @@ static void tarea_entrar(TareaLince *t) {
     _tarea_actual    = t;
     t->estado        = TAREA_CORRIENDO;
 
+    int pf_antes = _pf_actual, pf_cat = _pf_cat;
+    if (_perfil) {
+        perfil_tic();
+        if (!t->perfil_fn && t->f) t->perfil_fn = perfil_de(t->f, NULL);
+        _pf_actual = t->perfil_fn;
+        _pf_cat = PERFIL_LINCE;
+    }
     corrutina_entrar(t->co);
+    if (_perfil) {
+        perfil_tic();
+        t->perfil_fn = _pf_actual;
+        _pf_actual = pf_antes;
+        _pf_cat = pf_cat;
+    }
 
     _tarea_actual = antes;
     t->niveles = profundidad - base;
@@ -1936,8 +2158,24 @@ static Valor *cuerpo_de_tarea(FuncionLince *f, Entorno *fn_e) {
     hay_retorno   = 1;
     return valor_nulo();
 }
+static Valor *ejecutar_cuerpo_perfil(FuncionLince *f, Entorno *fn_e) {
+    int antes = _pf_actual, cat = _pf_cat;
+    perfil_tic();
+    _pf_actual = perfil_de(f, NULL);
+    _pf[_pf_actual].llamadas++;
+    _pf_cat = PERFIL_LINCE;
+    const char *archivo = _archivo_ejec;
+    if (f->archivo) _archivo_ejec = f->archivo;
+    Valor *r = ejecutar(f->cuerpo, fn_e);
+    _archivo_ejec = archivo;
+    perfil_tic();
+    _pf_actual = antes;
+    _pf_cat = cat;
+    return r;
+}
 static inline Valor *ejecutar_cuerpo(FuncionLince *f, Entorno *fn_e) {
     if (__builtin_expect(!f->es_tarea, 1)) {
+        if (__builtin_expect(_perfil, 0)) return ejecutar_cuerpo_perfil(f, fn_e);
         const char *antes = _archivo_ejec;
         if (f->archivo) _archivo_ejec = f->archivo;
         Valor *r = ejecutar(f->cuerpo, fn_e);
@@ -3625,6 +3863,18 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                     /* Nativa: 'cuerpo' guarda el puntero a la función C */
                     typedef Valor *(*FnNativa)(Valor**, int);
                     FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
+                    if (__builtin_expect(_perfil, 0)) {
+                        int pf_antes = _pf_actual, pf_cat = _pf_cat;
+                        perfil_tic();
+                        _pf_actual = perfil_de(f, n->metodo.objeto && n->metodo.objeto->tipo == NODO_IDENTIFICADOR
+                                                  ? n->metodo.objeto->identificador : NULL);
+                        _pf[_pf_actual].llamadas++;
+                        _pf_cat = PERFIL_MODULOS;
+                        resultado = fn(args, nargs);
+                        perfil_tic();
+                        _pf_actual = pf_antes;
+                        _pf_cat = pf_cat;
+                    } else
                     resultado = fn(args, nargs);
                     for (int j = 0; j < nargs; j++)
                         valor_destruir(args[j]);
@@ -4767,6 +5017,7 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
             for (int i = 0; i < n->bloque.cantidad && !hay_retorno && !hay_error && !hay_salto; i++) {
                 valor_destruir(ultimo);
                 if (_hook_sentencia && !_en_biblioteca) _hook_sentencia(n->bloque.sentencias[i], e);
+                if (_cobertura && !_en_biblioteca && n->bloque.sentencias[i]) cobertura_marcar(n->bloque.sentencias[i]);
                 ultimo = ejecutar(n->bloque.sentencias[i], e);
                 if (hay_error && _hook_error && !_en_biblioteca && !_intentando)
                     _hook_error(n->bloque.sentencias[i], e);

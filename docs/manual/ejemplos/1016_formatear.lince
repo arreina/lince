@@ -1,0 +1,7 @@
+# @seccion: Herramientas
+# @titulo: Formatear
+# @nota: `lince formatear` deja el código con el estilo de Lince: sangría de 4 espacios según las llaves, un espacio alrededor de los operadores y tras las comas, `{ así }` en los bloques y `{"así": 1}` en los diccionarios, y nada de espacios al final ni más de dos líneas en blanco seguidas. No cambia los saltos de línea, los textos ni los comentarios, y antes de guardar comprueba que el programa sigue siendo el mismo. Con `--comprobar` no toca nada y sale con 1 si algún archivo no tiene el estilo; con `--mostrar` escribe el resultado en la pantalla. El editor lo hace al guardar.
+# @lenguaje: terminal
+lince formatear juego.lince
+✨ Formateado: juego.lince
+lince formatear --comprobar *.lince     # para la integración continua

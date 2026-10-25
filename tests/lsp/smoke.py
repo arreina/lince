@@ -149,6 +149,36 @@ with tempfile.TemporaryDirectory() as d_:
     comprobar(r["start"]["line"] == 1 and r["start"]["character"] == 8 and r["end"]["character"] == 9 and "\u00e9" in d[0]["message"],
               "una letra con tilde no se parte (%s)" % d[0]["message"])
 
+# ── ayuda al pasar el ratón (los comentarios de encima) y formatear ──
+with tempfile.TemporaryDirectory() as d_:
+    open(os.path.join(d_, "util.lince"), "w").write("# Lo que se tarda en cruzar la pantalla.\nfuncion cruzar(numero v): numero {\n    devolver 320 / v\n}\n")
+    u4 = "file://" + os.path.join(d_, "main.lince")
+    t4 = '# El doble de un número.\nfuncion doble(numero n): numero { devolver n * 2 }\nimportar "./util"\nescribir(doble(cruzar(2)))\n'
+    send({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": u4, "text": t4}}})
+    recv()
+    caps_h = pedir(30, "textDocument/hover", {"textDocument": {"uri": u4}, "position": {"line": 3, "character": 10}})
+    v = caps_h and caps_h["contents"]["value"]
+    comprobar(v and "funcion doble(numero n): numero" in v and "El doble de un número." in v,
+              "hover: la firma y la ayuda de los comentarios (%r)" % v)
+    caps_h = pedir(31, "textDocument/hover", {"textDocument": {"uri": u4}, "position": {"line": 3, "character": 17}})
+    v = caps_h and caps_h["contents"]["value"]
+    comprobar(v and "cruzar" in v and "cruzar la pantalla" in v, "hover: también de lo que viene de otro archivo")
+    comprobar(pedir(32, "textDocument/hover", {"textDocument": {"uri": u4}, "position": {"line": 2, "character": 2}}) is None,
+              "hover: nada sobre una palabra sin ayuda")
+    feo = "sea x=1\nsi x>0{escribir( x )}\n"
+    send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
+        "textDocument": {"uri": u4}, "contentChanges": [{"text": feo}]}})
+    recv()
+    r = pedir(33, "textDocument/formatting", {"textDocument": {"uri": u4}, "options": {"tabSize": 4, "insertSpaces": True}})
+    comprobar(len(r) == 1 and r[0]["newText"] == "sea x = 1\nsi x > 0 { escribir(x) }\n" and r[0]["range"]["start"] == {"line": 0, "character": 0},
+              "formatting: el documento con el estilo de Lince")
+    send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
+        "textDocument": {"uri": u4}, "contentChanges": [{"text": "sea x = (1\n"}]}})
+    recv()
+    comprobar(pedir(34, "textDocument/formatting", {"textDocument": {"uri": u4}}) == [],
+              "formatting: con un error de sintaxis no cambia nada")
+comprobar(caps.get("hoverProvider") and caps.get("documentFormattingProvider"), "initialize anuncia hover y formatting")
+
 # ── cierre ordenado ──
 send({"jsonrpc": "2.0", "id": 99, "method": "shutdown"})
 recv()

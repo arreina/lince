@@ -1,0 +1,9 @@
+# Un programa pequeño para 'lince perfil' (sin ventana)
+funcion triple(numero n): numero {
+    sea total = 0
+    para cada numero i en rango(3) { total += n }
+    devolver total
+}
+sea suma = 0
+para cada numero k en rango(3) { suma += triple(k) }
+escribir(suma)

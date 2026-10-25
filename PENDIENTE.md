@@ -59,12 +59,18 @@ siempre, que es el que ya usa el editor.
 - [x] El alias de `importar ... como` vale también como tipo: `x es geo.Punto`, `extiende geo.Punto`,
   `implementa geo.Forma`, parámetros y variables.
 
-### 1.4 — Herramientas
-- [ ] `lince formatear` (estilo único; el IDE lo usa al guardar).
-- [ ] `lince documentar`: ayuda sacada de los comentarios de cada función (el IDE la enseña al pasar el ratón).
-- [ ] Cobertura en `lince probar`.
-- [ ] `lince perfil`: dónde se va el tiempo de cada fotograma (Lince frente a dibujar).
-- [ ] Paquetes con versión fija y archivo que las guarda.
+### 1.4 — Herramientas (publicada)
+`lince probar` no existía: se hizo entero (las pruebas son los archivos `prueba_*.lince` y
+`*_prueba.lince`), con la cobertura dentro.
+- [x] `lince formatear` (estilo único; el editor formatea igual y la extensión de VS Code lo hace
+  al guardar). Comprueba token a token que el programa no cambia (`src/formatear.c`).
+- [x] `lince documentar`: la ayuda sacada de los comentarios de encima de cada cosa; el editor la
+  enseña al pasar el ratón (`src/documentar.c`, `textDocument/hover`).
+- [x] `lince probar` con cobertura: qué sentencias han ejecutado las pruebas y qué líneas no.
+- [x] `lince perfil`: el tiempo de cada fotograma en Lince, en los módulos (dibujar…) y en mostrar y
+  esperar, y las funciones que más tardan.
+- [x] Paquetes con versión fija (`url@v1.2`) en `paquetes/` del juego y `lince.paquetes` con la
+  huella SHA-256; `lince instalar` sin nada los baja tal cual.
 
 ### 1.5 — Gráficos y texto en pantalla
 - [ ] Capas de dibujo con orden (`"capa": 3`).

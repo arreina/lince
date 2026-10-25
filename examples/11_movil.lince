@@ -100,6 +100,6 @@ mientras juego.abierto() {
     sea incl = juego.inclinacion()
     juego.texto("INCLINACIÓN: {matematica.redondear(incl[0] * 10) / 10}, {matematica.redondear(incl[1] * 10) / 10}", 12, 68, 1, [220, 220, 230])
     juego.texto("DEDOS: {dedos.longitud()} - PALANCA: {matematica.redondear(juego.eje("izq_x") * 10) / 10}" +
-                "{si juego.accion("correr") { " - CORRE" } sino { "" }}", 12, 56, 1, [220, 220, 230])
+            "{si juego.accion("correr") { " - CORRE" } sino { "" }}", 12, 56, 1, [220, 220, 230])
     juego.presentar()
 }

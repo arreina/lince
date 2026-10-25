@@ -10,9 +10,9 @@ juego.abrir("Peleas", 480, 270)
 juego.definir_accion("zarpazo", ["z", "mando:x"])
 fijo LINCE = juego.hoja("recursos/lince.png", 16)
 sea pj = juego.animador(LINCE, {
-    "quieto":  {"fila": 0, "por_segundo": 3},
+    "quieto": {"fila": 0, "por_segundo": 3},
     "zarpazo": {"fila": 3, "por_segundo": 12, "repetir": falso, "siguiente": "quieto",
-                "golpes": [[1, 13, 8, 3, 4], [2, 13, 8, 3, 4]], "cancelar": 2}
+        "golpes": [[1, 13, 8, 3, 4], [2, 13, 8, 3, 4]], "cancelar": 2}
 })
 sea destello = -1
 mientras juego.abierto() {

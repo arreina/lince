@@ -1,0 +1,5 @@
+importar "pruebas"
+importar "../libs/cuentas"
+pruebas.igual("doble de 2", 4, doble(2))
+pruebas.igual("signo de 3", "positivo", signo(3))
+pruebas.resumen()

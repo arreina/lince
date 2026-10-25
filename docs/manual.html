@@ -137,7 +137,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.3</span>
+  <span class="version">v1.4</span>
   <div class="crece"></div>
   <a class="pag aqui" href="manual.html">Lenguaje</a>
   <a class="pag" href="juego.html">Módulo juego</a>
@@ -158,13 +158,13 @@
 <div class="grupo"><a href="#tareas" class="sec">Tareas</a><a href="#tareas-0" class="sub">Esperar sin parar el juego</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
 <div class="grupo"><a href="#modulos-y-librerias" class="sec">Módulos y librerías</a><a href="#modulos-y-librerias-0" class="sub">Importar un módulo estándar</a><a href="#modulos-y-librerias-1" class="sub">Importar un archivo tuyo</a><a href="#modulos-y-librerias-2" class="sub">Con espacio de nombres: `como`</a><a href="#modulos-y-librerias-3" class="sub">Clases de una librería con `como`</a><a href="#modulos-y-librerias-4" class="sub">El módulo `matematica`</a><a href="#modulos-y-librerias-5" class="sub">El módulo `texto`</a><a href="#modulos-y-librerias-6" class="sub">Los módulos `archivos` y `sistema`</a><a href="#modulos-y-librerias-7" class="sub">El módulo `tiempo`</a><a href="#modulos-y-librerias-8" class="sub">El módulo `json`</a><a href="#modulos-y-librerias-9" class="sub">Los módulos `bytes` y `bits`</a><a href="#modulos-y-librerias-10" class="sub">El módulo `pruebas`</a><a href="#modulos-y-librerias-11" class="sub">Fechas con `tiempo`</a><a href="#modulos-y-librerias-12" class="sub">El módulo `juego`</a></div>
-<div class="grupo"><a href="#herramientas" class="sec">Herramientas</a><a href="#herramientas-0" class="sub">Ejecutar, comprobar y compilar</a><a href="#herramientas-1" class="sub">Avisos sin ejecutar</a><a href="#herramientas-2" class="sub">Depurar paso a paso</a><a href="#herramientas-3" class="sub">Probar cosas sueltas: el REPL</a><a href="#herramientas-4" class="sub">Paquetes y editores</a></div>
+<div class="grupo"><a href="#herramientas" class="sec">Herramientas</a><a href="#herramientas-0" class="sub">Ejecutar, comprobar y compilar</a><a href="#herramientas-1" class="sub">Avisos sin ejecutar</a><a href="#herramientas-2" class="sub">Formatear</a><a href="#herramientas-3" class="sub">La ayuda, en los comentarios</a><a href="#herramientas-4" class="sub">Pruebas y cobertura</a><a href="#herramientas-5" class="sub">Perfil: en qué se va el tiempo</a><a href="#herramientas-6" class="sub">Depurar paso a paso</a><a href="#herramientas-7" class="sub">Probar cosas sueltas: el REPL</a><a href="#herramientas-8" class="sub">Paquetes y editores</a></div>
 </nav>
 
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>60 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>61 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -338,9 +338,9 @@ vivo con 8
 15</pre></div><span class="fuente">125_romper.lince</span></article><article class="ej" id="control-de-flujo-5"><h3>Elegir / caso</h3><p class="nota"><code>otro</code> es el caso por defecto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> animal = <span class="s">&quot;lince&quot;</span>
 
 <span class="k">elegir</span> animal {
-    <span class="k">caso</span> <span class="s">&quot;gato&quot;</span>  { <span class="k">escribir</span>(<span class="s">&quot;miau&quot;</span>) }
+    <span class="k">caso</span> <span class="s">&quot;gato&quot;</span> { <span class="k">escribir</span>(<span class="s">&quot;miau&quot;</span>) }
     <span class="k">caso</span> <span class="s">&quot;lince&quot;</span> { <span class="k">escribir</span>(<span class="s">&quot;es un felino ibérico&quot;</span>) }
-    <span class="k">otro</span>         { <span class="k">escribir</span>(<span class="s">&quot;no sé qué hace&quot;</span>) }
+    <span class="k">otro</span> { <span class="k">escribir</span>(<span class="s">&quot;no sé qué hace&quot;</span>) }
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>es un felino ibérico</pre></div><span class="fuente">130_elegir.lince</span></article></section>
 <section id="funciones"><h2>Funciones</h2><article class="ej" id="funciones-0"><h3>Declarar y llamar</h3><p class="nota">Cada parámetro lleva su tipo y su nombre (delante puede ir <code>val</code>, que es lo normal, o <code>ref</code>: ver «val y ref»).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> area(<span class="k">val</span> <span class="t">numero</span> base, <span class="k">val</span> <span class="t">numero</span> altura): <span class="t">numero</span> {
     <span class="k">devolver</span> base * altura / <span class="n">2</span>
@@ -504,7 +504,7 @@ lista: [1, 2, 3]
 <section id="clases"><h2>Clases</h2><article class="ej" id="clases-0"><h3>Clase, constructor y métodos</h3><p class="nota"><code>mi</code> es la instancia actual. El constructor se llama <code>crear</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Rectangulo {
     <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> ancho, <span class="k">val</span> <span class="t">numero</span> alto): <span class="k">nulo</span> {
         <span class="k">mi</span>.ancho = ancho
-        <span class="k">mi</span>.alto  = alto
+        <span class="k">mi</span>.alto = alto
     }
     <span class="k">funcion</span> area(): <span class="t">numero</span> {
         <span class="k">devolver</span> <span class="k">mi</span>.ancho * <span class="k">mi</span>.alto
@@ -536,7 +536,7 @@ lista: [1, 2, 3]
 <span class="k">clase</span> Rectangulo <span class="k">implementa</span> Forma {
     <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> ancho, <span class="k">val</span> <span class="t">numero</span> alto): <span class="k">nulo</span> {
         <span class="k">mi</span>.ancho = ancho
-        <span class="k">mi</span>.alto  = alto
+        <span class="k">mi</span>.alto = alto
     }
     <span class="k">funcion</span> area(): <span class="t">numero</span> {
         <span class="k">devolver</span> <span class="k">mi</span>.ancho * <span class="k">mi</span>.alto
@@ -573,8 +573,8 @@ Cuadrado de lado 5 → 25</pre></div><span class="fuente">630_interfaces.lince</
 
 <span class="k">funcion</span> animacion(<span class="k">val</span> Estado e): <span class="t">texto</span> {
     <span class="k">elegir</span> e {
-        <span class="k">caso</span> Estado.Quieto   { <span class="k">devolver</span> <span class="s">&quot;respirar&quot;</span> }
-        <span class="k">caso</span> Estado.Andando  { <span class="k">devolver</span> <span class="s">&quot;andar&quot;</span> }
+        <span class="k">caso</span> Estado.Quieto { <span class="k">devolver</span> <span class="s">&quot;respirar&quot;</span> }
+        <span class="k">caso</span> Estado.Andando { <span class="k">devolver</span> <span class="s">&quot;andar&quot;</span> }
         <span class="k">caso</span> Estado.Saltando { <span class="k">devolver</span> <span class="s">&quot;saltar&quot;</span> }
     }
     <span class="k">devolver</span> <span class="s">&quot;&quot;</span>
@@ -698,7 +698,7 @@ x no puede ser negativa</pre></div><span class="fuente">680_propiedades.lince</s
 <span class="k">clase</span> Persona <span class="k">implementa</span> Saludable {
     <span class="k">funcion</span> nombre(): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;Ana&quot;</span> }
 }
-<span class="k">clase</span> Robot { }
+<span class="k">clase</span> Robot {}
 
 <span class="k">sea</span> p = Persona()
 <span class="k">escribir</span>(p.saludar())
@@ -880,7 +880,7 @@ esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span>
 {&quot;vivo&quot;: true}</pre></div><span class="fuente">910_importar.lince</span></article><article class="ej" id="modulos-y-librerias-1"><h3>Importar un archivo tuyo</h3><p class="nota">La ruta se resuelve junto al archivo que importa, no desde donde lanzas el programa. Importar dos veces el mismo archivo no hace nada la segunda.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;./lib_geometria&quot;</span>
 
 <span class="k">escribir</span>(area_circulo(<span class="n">1.0</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>3.14159</pre></div><span class="fuente">920_libreria.lince</span></article><article class="ej" id="modulos-y-librerias-2"><h3>Con espacio de nombres: `como`</h3><p class="nota">Con <code>como</code>, el archivo corre en su propio ámbito y sólo se alcanza por el alias. Así dos librerías pueden tener funciones del mismo nombre.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;./lib_metros&quot;</span> <span class="k">como</span> metros
-<span class="k">importar</span> <span class="s">&quot;./lib_pies&quot;</span>   <span class="k">como</span> pies
+<span class="k">importar</span> <span class="s">&quot;./lib_pies&quot;</span> <span class="k">como</span> pies
 
 <span class="k">escribir</span>(metros.convertir(<span class="n">100</span>))
 <span class="k">escribir</span>(pies.convertir(<span class="n">100</span>))
@@ -1022,17 +1022,56 @@ lince version</code></pre></div><span class="fuente">1010_compilar.lince</span><
 ⚠️  Aviso en línea 20: &#x27;mover&#x27; necesita 2 argumentos, y aquí le das 3.
 ⚠️  Aviso en línea 31: La clase &#x27;Jugador&#x27; no tiene &#x27;saltr&#x27;. ¿Querías decir &#x27;saltar&#x27;?
 ⚠️  Aviso en línea 40: &#x27;puntos&#x27; es numero, y aquí le das un texto.
-✅ Sintaxis correcta: juego.lince</code></pre></div><span class="fuente">1015_avisos.lince</span></article><article class="ej" id="herramientas-2"><h3>Depurar paso a paso</h3><p class="nota"><code>lince depurar programa.lince</code> lo ejecuta parándose en cada línea: <code>s</code> entra en la siguiente (también dentro de las funciones), <code>n</code> pasa a la siguiente sin entrar, <code>c</code> sigue hasta un punto de parada (<code>b archivo.lince:12</code>), <code>p expresión</code> enseña un valor, <code>v</code> las variables, <code>bt</code> la pila de llamadas y <code>q</code> sale.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince depurar programa.lince
+✅ Sintaxis correcta: juego.lince</code></pre></div><span class="fuente">1015_avisos.lince</span></article><article class="ej" id="herramientas-2"><h3>Formatear</h3><p class="nota"><code>lince formatear</code> deja el código con el estilo de Lince: sangría de 4 espacios según las llaves, un espacio alrededor de los operadores y tras las comas, <code>{ así }</code> en los bloques y <code>{&quot;así&quot;: 1}</code> en los diccionarios, y nada de espacios al final ni más de dos líneas en blanco seguidas. No cambia los saltos de línea, los textos ni los comentarios, y antes de guardar comprueba que el programa sigue siendo el mismo. Con <code>--comprobar</code> no toca nada y sale con 1 si algún archivo no tiene el estilo; con <code>--mostrar</code> escribe el resultado en la pantalla. El editor lo hace al guardar.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince formatear juego.lince
+✨ Formateado: juego.lince
+lince formatear --comprobar *.lince     # para la integración continua</code></pre></div><span class="fuente">1016_formatear.lince</span></article><article class="ej" id="herramientas-3"><h3>La ayuda, en los comentarios</h3><p class="nota">Los comentarios que van justo encima de una función, clase, método, enumeración o <code>fijo</code> son su ayuda: el editor la enseña al pasar el ratón por el nombre, y <code>lince documentar libreria.lince -o AYUDA.md</code> hace con todas una página en Markdown. Un bloque de comentarios al principio del archivo, separado del código, es la ayuda del archivo entero. Lo que empieza por <code>_</code> o es <code>privado</code> no sale.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="c"># Cuántas vidas hay al empezar.</span>
+<span class="k">fijo</span> VIDAS = <span class="n">3</span>
+
+<span class="c"># Lo que tarda en cruzar la pantalla a esa velocidad.</span>
+<span class="k">funcion</span> cruzar(<span class="t">numero</span> velocidad): <span class="t">numero</span> {
+    <span class="k">devolver</span> <span class="n">320</span> / velocidad
+}
+
+<span class="k">escribir</span>(cruzar(<span class="n">80</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>4</pre></div><span class="fuente">1017_documentar.lince</span></article><article class="ej" id="herramientas-4"><h3>Pruebas y cobertura</h3><p class="nota"><code>lince probar</code> busca los archivos que se llaman <code>prueba_algo.lince</code> o <code>algo_prueba.lince</code> (en la carpeta que le digas, o en la actual y sus subcarpetas), los ejecuta uno a uno y dice cuáles fallan, con lo que escribieron. Una prueba pasa si termina bien: con el módulo <code>pruebas</code>, <code>pruebas.resumen()</code> sale con error si algo falló. Después cuenta, para el código que han usado las pruebas, qué parte de sus sentencias se ha ejecutado y qué líneas no ha probado ninguna. <code>--sin-cobertura</code> se salta la cuenta.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince probar pruebas
+
+   ✅ pruebas/prueba_enemigos.lince
+   ❌ pruebas/prueba_puntos.lince
+      │     ❌ FALLO: récord
+      │        esperado: 120
+      │        obtenido: 100
+
+   1 de 2 pruebas bien
+
+   Cobertura (las sentencias que han ejecutado las pruebas):
+
+    92%  enemigos.lince   sin probar: 41-43
+    70%  puntos.lince   sin probar: 10, 16-17</code></pre></div><span class="fuente">1018_probar.lince</span></article><article class="ej" id="herramientas-5"><h3>Perfil: en qué se va el tiempo</h3><p class="nota"><code>lince perfil juego.lince</code> ejecuta el juego como siempre y, al cerrarlo, cuenta en qué se ha ido el tiempo de cada fotograma: en tu código, en las funciones de los módulos (dibujar, sonar…) y en mostrar el fotograma y esperar al siguiente. Después, las funciones que más tardan, cada una con su propio tiempo (sin el de las funciones que llama). Lo de antes del primer fotograma (abrir la ventana, cargar las imágenes) va aparte. Con un programa sin ventana, cuenta el tiempo total.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince perfil juego.lince
+
+⏱️  Perfil de juego.lince
+
+   1800 fotogramas, 16,67 ms cada uno de media (60 por segundo); el más lento, 18,02 ms
+   (antes del primero, al arrancar: 240,51 ms)
+
+    14,2%      2,37 ms por fotograma  Tu código (Lince)
+    10,1%      1,68 ms por fotograma  Funciones de los módulos (dibujar, sonar…)
+    75,7%     12,62 ms por fotograma  Mostrar el fotograma y esperar al siguiente
+
+   Lo que más tarda (el tiempo de cada una, sin el de las funciones que llama):
+
+     8,9%      1,48 ms por fotograma  mover_enemigos   1800 llamadas  (juego.lince:88)
+     6,0%      1,00 ms por fotograma  juego.dibujar    54000 llamadas</code></pre></div><span class="fuente">1019_perfil.lince</span></article><article class="ej" id="herramientas-6"><h3>Depurar paso a paso</h3><p class="nota"><code>lince depurar programa.lince</code> lo ejecuta parándose en cada línea: <code>s</code> entra en la siguiente (también dentro de las funciones), <code>n</code> pasa a la siguiente sin entrar, <code>c</code> sigue hasta un punto de parada (<code>b archivo.lince:12</code>), <code>p expresión</code> enseña un valor, <code>v</code> las variables, <code>bt</code> la pila de llamadas y <code>q</code> sale.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince depurar programa.lince
 → programa.lince:1   importar &quot;juego&quot;
 (lince-dbg) b programa.lince:12
 (lince-dbg) c
 (lince-dbg) p jugador[&quot;vida&quot;]
 (lince-dbg) v
-(lince-dbg) n</code></pre></div><span class="fuente">1020_depurar.lince</span></article><article class="ej" id="herramientas-3"><h3>Probar cosas sueltas: el REPL</h3><p class="nota"><code>lince</code> sin nada abre el REPL: se escribe una línea y se ejecuta al momento, recordando lo anterior. Sirve para probar una función o ver qué da una expresión. <code>:ayuda</code> dice sus órdenes.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>$ lince
+(lince-dbg) n</code></pre></div><span class="fuente">1020_depurar.lince</span></article><article class="ej" id="herramientas-7"><h3>Probar cosas sueltas: el REPL</h3><p class="nota"><code>lince</code> sin nada abre el REPL: se escribe una línea y se ejecuta al momento, recordando lo anterior. Sirve para probar una función o ver qué da una expresión. <code>:ayuda</code> dice sus órdenes.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>$ lince
 🐆 Lince v0.9.0 — Escribe :ayuda para ver los comandos
 &gt;&gt; sea vidas = 3
 &gt;&gt; vidas * 10
-=&gt; 30</code></pre></div><span class="fuente">1030_repl.lince</span></article><article class="ej" id="herramientas-4"><h3>Paquetes y editores</h3><p class="nota"><code>lince instalar</code> descarga una librería de Lince (un repositorio git) para usarla con <code>importar &quot;paquete:nombre&quot;</code>. Para el editor hay una extensión de VS Code con colores, plantillas, errores y avisos al escribir, autocompletado e ir a la definición; por debajo usa <code>lince lsp</code>, que cualquier editor que hable LSP puede usar.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince instalar https://github.com/usuario/paquete
+=&gt; 30</code></pre></div><span class="fuente">1030_repl.lince</span></article><article class="ej" id="herramientas-8"><h3>Paquetes y editores</h3><p class="nota"><code>lince instalar</code> descarga una librería de Lince (un repositorio git) para usarla con <code>importar &quot;paquete:nombre&quot;</code>. Con una versión (<code>@v1.2</code>: una etiqueta, una rama o un commit) el paquete es del juego: va a su carpeta <code>paquetes/</code> y se apunta en <code>lince.paquetes</code> con su huella; <code>lince instalar</code> sin nada más baja exactamente esos en otro ordenador, y no instala uno que haya cambiado desde entonces. Para el editor hay una extensión de VS Code con colores, plantillas, errores y avisos al escribir, autocompletado, ir a la definición, la ayuda al pasar el ratón y formatear al guardar; por debajo usa <code>lince lsp</code>, que cualquier editor que hable LSP puede usar.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code>lince instalar https://github.com/usuario/paquete
+lince instalar https://github.com/usuario/paquete@v1.2   # para este juego, esa versión
+lince instalar                                          # los de lince.paquetes
 lince listar
 lince desinstalar paquete
 code --install-extension lince-language-X.Y.Z.vsix   # viene con cada versión</code></pre></div><span class="fuente">1040_paquetes_y_editores.lince</span></article></section>

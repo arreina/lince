@@ -7,9 +7,9 @@ importar "juego"
 juego.abrir("Animador", 480, 270)
 fijo LINCE = juego.hoja("recursos/lince.png", 16)
 sea pj = juego.animador(LINCE, {
-    "quieto":  {"fila": 0, "por_segundo": 3},
-    "andar":   {"fila": 1, "por_segundo": 10},
-    "saltar":  {"fila": 2},
+    "quieto": {"fila": 0, "por_segundo": 3},
+    "andar": {"fila": 1, "por_segundo": 10},
+    "saltar": {"fila": 2},
     "zarpazo": {"fila": 3, "por_segundo": 12, "repetir": falso, "siguiente": "quieto"}
 })
 sea x = 60

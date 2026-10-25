@@ -263,6 +263,8 @@ static void agregar_token(Lexer *l, TipoToken tipo, const char *valor, int linea
     t->tipo  = tipo;
     t->valor = valor ? strdup(valor) : NULL;
     t->linea = linea;
+    t->desde = l->inicio;
+    t->hasta = l->pos;
     columna_de(l, l->inicio, l->pos, &t->columna, &t->ancho);
 }
 

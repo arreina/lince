@@ -19,6 +19,8 @@
 #include <ctype.h>
 #include "lsp.h"
 #include "revisor.h"
+#include "formatear.h"
+#include "documentar.h"
 #include "lexer.h"
 #include "parser.h"
 #include "interprete.h"
@@ -392,7 +394,7 @@ static char *json_cadena(const char *p) {
    Documentos abiertos
 ───────────────────────────────────────── */
 #define MAX_DOCS 64
-typedef struct { char *uri; char *texto; } Doc;
+typedef struct { char *uri; char *texto; int con_error; } Doc;
 static Doc docs[MAX_DOCS];
 
 static Doc *doc_buscar(const char *uri) {
@@ -884,7 +886,8 @@ static void diagnostico(Buf *b, int linea, int gravedad, const char *msg, int pr
     buf_str(b, "}");
 }
 
-static void publicar_diagnosticos(const char *uri, const char *texto) {
+/* Devuelve 1 si el texto tiene un error de sintaxis */
+static int publicar_diagnosticos(const char *uri, const char *texto) {
     int linea = 1; char msg[1024]; static char buf[65536];   /* el error, o los avisos del revisor */
     Buf b = {0};
     buf_str(&b, "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":");
@@ -916,6 +919,7 @@ static void publicar_diagnosticos(const char *uri, const char *texto) {
     buf_str(&b, "]}}");
     enviar(b.d);
     free(b.d);
+    return error;
 }
 
 /* Palabra bajo (linea, caracter) */
@@ -954,7 +958,8 @@ static void atender(const char *msg, int *salir, int *apagado) {
         responder(id,
             "{\"capabilities\":{\"textDocumentSync\":1,"
             "\"completionProvider\":{\"triggerCharacters\":[\".\"]},"
-            "\"documentSymbolProvider\":true,\"definitionProvider\":true},"
+            "\"documentSymbolProvider\":true,\"definitionProvider\":true,"
+            "\"hoverProvider\":true,\"documentFormattingProvider\":true},"
             "\"serverInfo\":{\"name\":\"lince\",\"version\":\"" LINCE_VERSION "\"}}");
     } else if (strcmp(metodo, "shutdown") == 0) {
         *apagado = 1;
@@ -965,7 +970,12 @@ static void atender(const char *msg, int *salir, int *apagado) {
                strcmp(metodo, "textDocument/didChange") == 0) {
         char *uri = json_cadena(json_valor(msg, "uri"));
         char *txt = json_cadena(json_valor(msg, "text"));
-        if (uri && txt) { doc_fijar(uri, txt); publicar_diagnosticos(uri, txt); }
+        if (uri && txt) {
+            doc_fijar(uri, txt);
+            int error = publicar_diagnosticos(uri, txt);
+            Doc *d = doc_buscar(uri);
+            if (d) d->con_error = error;
+        }
         free(uri); free(txt);
     } else if (strcmp(metodo, "textDocument/didClose") == 0) {
         char *uri = json_cadena(json_valor(msg, "uri"));
@@ -1061,6 +1071,70 @@ static void atender(const char *msg, int *salir, int *apagado) {
                     free(ruta_doc);
                 }
             }
+        }
+        if (id[0]) responder(id, r.d);
+        free(r.d); free(uri);
+    } else if (strcmp(metodo, "textDocument/hover") == 0) {
+        /* La ayuda de un nombre: su firma y los comentarios de encima (documentar.c) */
+        char *uri = json_cadena(json_valor(msg, "uri"));
+        Doc *d = uri ? doc_buscar(uri) : NULL;
+        char *ayuda = NULL;
+        if (d) {
+            int l, c; char w[96];
+            leer_posicion(msg, &l, &c);
+            if (palabra_en_posicion(d->texto, l, c, w, sizeof(w))) {
+                ayuda = documentar_ayuda(d->texto, w, -1);
+                char *ruta_doc = ayuda ? NULL : uri_a_ruta(uri);
+                if (ruta_doc) {
+                    char prefijo[96] = "";
+                    size_t off = offset_posicion(d->texto, l, c), ini = off;
+                    while (ini > 0 && es_ident_ch((unsigned char)d->texto[ini - 1])) ini--;
+                    if (ini > 0 && d->texto[ini - 1] == '.') {
+                        size_t fin = ini - 1, a = fin;
+                        while (a > 0 && es_ident_ch((unsigned char)d->texto[a - 1])) a--;
+                        if (fin - a > 0 && fin - a < sizeof prefijo) {
+                            memcpy(prefijo, d->texto + a, fin - a); prefijo[fin - a] = '\0';
+                        }
+                    }
+                    char otra[1024]; int lin = 0;
+                    if (definicion_importada(d, ruta_doc, w, prefijo[0] ? prefijo : NULL, otra, sizeof otra, &lin)) {
+                        char *codigo = leer_fichero(otra);
+                        if (codigo) { ayuda = documentar_ayuda(codigo, w, lin); free(codigo); }
+                    }
+                    free(ruta_doc);
+                }
+            }
+        }
+        if (id[0]) {
+            Buf r = {0};
+            if (ayuda) {
+                buf_str(&r, "{\"contents\":{\"kind\":\"markdown\",\"value\":");
+                buf_json(&r, ayuda);
+                buf_str(&r, "}}");
+            } else buf_str(&r, "null");
+            responder(id, r.d);
+            free(r.d);
+        }
+        free(ayuda); free(uri);
+    } else if (strcmp(metodo, "textDocument/formatting") == 0) {
+        /* El documento entero con el estilo de Lince (formatear.c), si no
+           tiene errores de sintaxis: con uno, el lexer cerraría el servidor */
+        char *uri = json_cadena(json_valor(msg, "uri"));
+        Doc *d = uri ? doc_buscar(uri) : NULL;
+        Buf r = {0};
+        buf_str(&r, "[]");
+        if (d && !d->con_error) {
+            char *nuevo = formatear_codigo(d->texto);
+            if (nuevo && strcmp(nuevo, d->texto) != 0) {
+                int lineas = 0;
+                for (const char *p = d->texto; *p; p++) if (*p == '\n') lineas++;
+                free(r.d); r.d = NULL; r.n = r.cap = 0;
+                buf_fmt(&r, "[{\"range\":{\"start\":{\"line\":0,\"character\":0},"
+                            "\"end\":{\"line\":%d,\"character\":0}},\"newText\":", lineas + 1);
+                buf_json(&r, nuevo);
+                buf_str(&r, "}]");
+            }
+            free(nuevo);
         }
         if (id[0]) responder(id, r.d);
         free(r.d); free(uri);

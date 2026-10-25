@@ -109,9 +109,9 @@ funcion _curva(val texto c, val numero t): numero {
     si t > 1 { t = 1 }
     elegir c {
         caso "lineal" { devolver t }
-        caso "suave"  { devolver si t < 0.5 { 4 * _al_cubo(t) } sino { 1 - _al_cubo(-2 * t + 2) / 2 } }
+        caso "suave" { devolver si t < 0.5 { 4 * _al_cubo(t) } sino { 1 - _al_cubo(-2 * t + 2) / 2 } }
         caso "entrar" { devolver _al_cubo(t) }
-        caso "salir"  { devolver 1 - _al_cubo(1 - t) }
+        caso "salir" { devolver 1 - _al_cubo(1 - t) }
         caso "rebote" {
             fijo N1 = 7.5625
             fijo D1 = 2.75
@@ -161,7 +161,7 @@ funcion curva(val texto nombre, val numero t): numero {
 # en un cambio de 'desde' a 'hasta' que empezó en 'inicio' (un juego.tiempo())
 # y dura 'segundos'; antes de empezar, 'desde', y al acabar, 'hasta'
 funcion suavizar(val cualquiera desde, val cualquiera hasta, val numero segundos, val numero inicio,
-                 val cualquiera nombre_curva = nulo): cualquiera {
+        val cualquiera nombre_curva = nulo): cualquiera {
     sea c = _nombre_curva(nombre_curva, "suavizar")
     sea t = si segundos > 0 { (juego.tiempo() - inicio) / segundos } sino { 1 }
     devolver _interpolar(desde, hasta, _curva(c, t), "suavizar")
@@ -316,7 +316,7 @@ funcion _son_numeros(val cualquiera l): logico {
 
 # Comprueba una opción de una animación; devuelve el mensaje si está mal, o nulo
 funcion _opcion_mala(val texto nombre, val texto c, val cualquiera v, val diccionario hoja,
-                     val diccionario animaciones): cualquiera {
+        val diccionario animaciones): cualquiera {
     elegir c {
         caso "fila" {
             si v es numero y v >= 0 y v < hoja["filas"] y v == matematica.piso(v) { devolver nulo }
@@ -349,7 +349,7 @@ funcion _opcion_mala(val texto nombre, val texto c, val cualquiera v, val diccio
             }
             si bien { devolver nulo }
             devolver "animador(): en \"{nombre}\", \"golpes\" es una lista de [cuadro, x, y, ancho, alto] " +
-                     "(la caja que golpea en ese cuadro, medida dentro de la celda)"
+                "(la caja que golpea en ese cuadro, medida dentro de la celda)"
         }
         caso "cancelar" {
             si v es numero y v >= 0 { devolver nulo }
@@ -379,7 +379,7 @@ funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera
         para cada texto c en cfg {
             si no _OPCIONES_ANIMACION.contiene(c) {
                 lanzar ErrorArgumento("animador(): en \"{nombre}\", no conozco '{c}' (hay \"fila\", \"cuadros\", \"por_segundo\", " +
-                             "\"repetir\", \"siguiente\", \"pisadas\", \"golpes\", \"cancelar\" y \"hoja\")")
+                        "\"repetir\", \"siguiente\", \"pisadas\", \"golpes\", \"cancelar\" y \"hoja\")")
             }
             sea mal = _opcion_mala(nombre, c, cfg[c], hc, animaciones)
             si mal != nulo { lanzar ErrorArgumento(mal) }
@@ -407,7 +407,7 @@ funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera
         primera = inicial
     }
     devolver {"animador": verdadero, "hoja": hoja, "animaciones": animaciones,
-              "actual": primera, "desde": juego.tiempo(), "cuadro": 0}
+        "actual": primera, "desde": juego.tiempo(), "cuadro": 0}
 }
 
 # Dónde va el animador ahora (o nulo si no tiene animación): la hoja, la fila
@@ -439,7 +439,7 @@ funcion _estado(val diccionario pj): cualquiera {
         sea pos = si repetir { k % n } sino { matematica.minimo(k, n - 1) }
         sea cuadro = si cuadros != nulo { matematica.truncar(cuadros[pos]) } sino { pos }
         devolver {"hoja": hoja, "fila": fila, "cuadro": cuadro, "cuadros": cuadros, "k": k, "n": n,
-                  "pos": pos, "acabada": acabada, "repetir": repetir, "cfg": cfg}
+            "pos": pos, "acabada": acabada, "repetir": repetir, "cfg": cfg}
     }
     devolver nulo
 }
@@ -513,7 +513,7 @@ funcion golpe(val cualquiera pj, val cualquiera px, val cualquiera py, val cualq
                 caja = [x0, y0, x1, y1]
             } sino {
                 caja = [matematica.minimo(caja[0], x0), matematica.minimo(caja[1], y0),
-                        matematica.maximo(caja[2], x1), matematica.maximo(caja[3], y1)]
+                    matematica.maximo(caja[2], x1), matematica.maximo(caja[3], y1)]
             }
         }
     }
@@ -688,7 +688,7 @@ funcion _mt_medidas(): diccionario {
     sea u = matematica.minimo(ancho, alto) * _mt["tamaño"]
     sea radio = u * 0.16
     devolver {"ancho": ancho, "alto": alto, "radio": radio, "boton": u * 0.085,
-              "casa": [u * 0.1 + radio, alto - u * 0.1 - radio], "centro": [ancho - u * 0.26, alto - u * 0.26]}
+        "casa": [u * 0.1 + radio, alto - u * 0.1 - radio], "centro": [ancho - u * 0.26, alto - u * 0.26]}
 }
 
 # Dónde va cada botón: en rombo como en un mando (A abajo, B a la derecha, X a
@@ -753,8 +753,8 @@ funcion _entrada(): nulo {
             si t["nuevo"] y t["x"] < m["ancho"] / 2 {
                 # la base, donde se pone el pulgar pero sin salirse de la pantalla
                 _mt_palanca = {"id": t["id"],
-                               "x": matematica.limitar(t["x"], m["radio"], m["ancho"] / 2 - m["radio"]),
-                               "y": matematica.limitar(t["y"], m["radio"], m["alto"] - m["radio"])}
+                    "x": matematica.limitar(t["x"], m["radio"], m["ancho"] / 2 - m["radio"]),
+                    "y": matematica.limitar(t["y"], m["radio"], m["alto"] - m["radio"])}
                 dedo = t
                 romper
             }
@@ -808,7 +808,7 @@ funcion _dibujar_mando(): nulo {
         juego.circulo(base[0], base[1], m["radio"], [255, 255, 255, alfa * 0.3])
         sea fuerte = si _mt_palanca != nulo { 1.4 } sino { 1 }
         juego.circulo(base[0] + _mt_eje[0] * m["radio"], base[1] + _mt_eje[1] * m["radio"], m["radio"] * 0.45,
-                      [255, 255, 255, matematica.minimo(255, alfa * fuerte)])
+            [255, 255, 255, matematica.minimo(255, alfa * fuerte)])
     }
     para cada texto b en _mt["botones"] {
         sea sitio = _mt_sitio(b, m)
@@ -816,11 +816,11 @@ funcion _dibujar_mando(): nulo {
         sea c = _MT_COLORES[b]
         sea radio = si b == "inicio" { m["boton"] * 0.6 } sino { m["boton"] }
         juego.circulo(sitio[0], sitio[1], si pulsado { radio * 0.9 } sino { radio },
-                      [c[0], c[1], c[2], matematica.minimo(255, si pulsado { alfa * 1.8 } sino { alfa })])
+            [c[0], c[1], c[2], matematica.minimo(255, si pulsado { alfa * 1.8 } sino { alfa })])
         sea letra = si b == "inicio" { "=" } sino { b.mayusculas() }
         sea escala = matematica.maximo(1, matematica.redondear(radio / 9))
         juego.texto(letra, sitio[0], sitio[1] - 3.5 * escala,
-                    {"escala": escala, "alinear": "centro", "color": [255, 255, 255, matematica.minimo(255, alfa * 1.8)]})
+            {"escala": escala, "alinear": "centro", "color": [255, 255, 255, matematica.minimo(255, alfa * 1.8)]})
     }
     juego.camara(camara[0], camara[1])
 }
@@ -883,7 +883,7 @@ funcion _ui_letra(val diccionario opciones, val numero escala): diccionario {
 }
 
 fijo _MENU_OPCIONES = ["x", "y", "escala", "fuente", "color", "color_elegido", "separacion", "atras",
-                      "sonido_mover", "sonido_elegir"]
+    "sonido_mover", "sonido_elegir"]
 
 funcion _ui_opciones(val cualquiera opciones, val lista validos, val texto fn): diccionario {
     si opciones == nulo { devolver {} }
@@ -1020,8 +1020,8 @@ funcion _dl_medidas(val diccionario aj, val logico con_retrato, val numero filas
     sea alto_caja = relleno * 2 + paso * matematica.maximo(lineas, filas) - (paso - alto_letra)
     sea retrato = si con_retrato { alto_caja - relleno } sino { 0 }
     devolver {"letra": letra, "alto_letra": alto_letra, "margen": margen, "relleno": relleno, "paso": paso,
-              "lineas": lineas, "alto": alto_caja, "retrato": retrato,
-              "ancho_texto": juego.ancho() - margen * 2 - relleno * 2 - (si con_retrato { retrato + relleno } sino { 0 })}
+        "lineas": lineas, "alto": alto_caja, "retrato": retrato,
+        "ancho_texto": juego.ancho() - margen * 2 - relleno * 2 - (si con_retrato { retrato + relleno } sino { 0 })}
 }
 
 funcion dialogo(val cualquiera paginas, val cualquiera opciones = nulo): nulo {
@@ -1054,7 +1054,7 @@ funcion dialogo(val cualquiera paginas, val cualquiera opciones = nulo): nulo {
             sea ultimo = quedan <= caben
             sea cuantas = si ultimo { quedan } sino { caben }
             sea trozo = {"lineas": [], "nombre": _de(p, "nombre", nulo), "retrato": _de(p, "retrato", nulo),
-                         "respuestas": si ultimo { respuestas } sino { [] }}
+                "respuestas": si ultimo { respuestas } sino { [] }}
             para (k = 0; k < cuantas; k++) { trozo["lineas"].agregar(todas[i + k]) }
             trozos.agregar(trozo)
             i = i + matematica.maximo(cuantas, 1)
@@ -1231,7 +1231,7 @@ funcion fisica(val cualquiera opciones = nulo): diccionario {
     si g es numero { g = [0, g] }
     si no (g es lista) o g.longitud() != 2 { lanzar ErrorTipo("fisica(): \"gravedad\" es un número (hacia abajo) o [x, y]") }
     devolver {"gravedad": g, "mapa": _de(op, "mapa", nulo), "pasos": _de(op, "pasos", 120),
-              "cuerpos": [], "toques": {}}
+        "cuerpos": [], "toques": {}}
 }
 
 funcion _es_mundo(val cualquiera m, val texto fn): nulo {
@@ -1354,7 +1354,7 @@ funcion _paso_fisica(val diccionario mundo, val numero dt): nulo {
             sea my = c["vy"] * dt
             para cada diccionario vecino en cuerpos {
                 si no vecino["fijo"] y no vecino["sensor"] y vecino["x"] + vecino["ancho"] > c["x"] y vecino["x"] < c["x"] + c["ancho"] y
-                   matematica.abs(vecino["y"] + vecino["alto"] - c["y"]) < 1.5 {
+                    matematica.abs(vecino["y"] + vecino["alto"] - c["y"]) < 1.5 {
                     _desplazar(mapa, vecino, mx, si my < 0 { my } sino { 0 })
                 }
             }
@@ -1454,7 +1454,7 @@ funcion avanzar_fisica(val cualquiera mundo, val cualquiera dt = nulo): nulo {
     para cada diccionario c en mundo["cuerpos"] {
         si no c["fijo"] y no c["en_suelo"] y mundo["mapa"] != nulo y no c["sensor"] {
             c["en_suelo"] = juego.solido(mundo["mapa"], matematica.piso((c["x"] + c["ancho"] / 2) / mundo["mapa"]["tamaño"]),
-                                         matematica.piso((c["y"] + c["alto"] + 0.5) / mundo["mapa"]["tamaño"]))
+                matematica.piso((c["y"] + c["alto"] + 0.5) / mundo["mapa"]["tamaño"]))
         }
     }
 }

@@ -3,6 +3,25 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.4.0
+
+Herramientas. El lenguaje no cambia: todo son comandos nuevos y ayudas del editor.
+
+- **`lince formatear`**: deja el código con el estilo de Lince (sangría de 4 espacios, espacios alrededor de los operadores y tras las comas, `{ así }` en los bloques y `{"así": 1}` en los diccionarios, sin espacios al final ni más de dos líneas en blanco). No cambia dónde se parten las líneas, los textos ni los comentarios, y comprueba que el programa sigue siendo el mismo antes de guardarlo. `--comprobar` para la integración continua y `--mostrar` para un editor. El editor formatea igual, y la extensión de VS Code lo hace al guardar. Los ejemplos, el juego completo y el manual ya tienen el estilo.
+- **La ayuda, en los comentarios**: los `#` que van justo encima de una función, clase, método, enumeración o `fijo` son su ayuda. El editor la enseña al pasar el ratón por el nombre (también de lo que viene de otro archivo), y **`lince documentar libreria.lince -o AYUDA.md`** hace con todas una página en Markdown.
+- **`lince probar`**: ejecuta los archivos `prueba_*.lince` y `*_prueba.lince`, dice cuáles fallan y con qué, y cuenta la **cobertura**: qué parte de las sentencias del código que usan se ha ejecutado y qué líneas no ha probado ninguna.
+- **`lince perfil juego.lince`**: ejecuta el juego y al cerrarlo cuenta en qué se va el tiempo de cada fotograma (tu código, las funciones de los módulos como dibujar, y mostrar el fotograma y esperar), el fotograma más lento y las funciones que más tardan.
+- **Paquetes con la versión fija**: `lince instalar https://github.com/usuario/paquete@v1.2` lo instala para el juego (en su carpeta `paquetes/`) y lo apunta en `lince.paquetes` con su versión y su huella. `lince instalar` sin nada más baja exactamente esos en otro ordenador, y no instala uno que haya cambiado desde entonces. `importar "paquete:x"` busca primero los del juego. Sin versión, todo sigue como antes.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.4.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.4.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.4.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.4.0.vsix` |
+
 ## 1.3.0
 
 Tipos donde faltaban y avisos sin ejecutar. Nada de lo que ya funcionaba cambia.

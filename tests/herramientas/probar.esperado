@@ -1,0 +1,19 @@
+
+🐆 Lince — Pruebas
+
+   ✅ pruebas/prueba_cuentas.lince
+   ❌ pruebas/prueba_falla.lince
+      │     ❌ FALLO: a propósito mal
+      │        esperado: 3
+      │        obtenido: 2
+      │   1 pruebas: 0 correctas, 1 fallidas
+   ✅ pruebas/signo_prueba.lince
+
+   2 de 3 pruebas bien
+
+   Cobertura (las sentencias que han ejecutado las pruebas):
+
+    70%  libs/cuentas.lince   sin probar: 10, 16-17
+
+   Total: 70% (7 de 10 sentencias)
+

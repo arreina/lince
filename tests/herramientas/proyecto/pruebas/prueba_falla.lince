@@ -1,0 +1,4 @@
+importar "pruebas"
+importar "../libs/cuentas"
+pruebas.igual("a propósito mal", 3, doble(1))
+pruebas.resumen()

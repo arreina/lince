@@ -19,6 +19,9 @@
 #include "repartir.h"
 #include "apk.h"
 #include "nuevo.h"
+#include "formatear.h"
+#include "documentar.h"
+#include "probar.h"
 #include "version.h"
 
 static char *leer_archivo(const char *ruta) {
@@ -52,10 +55,16 @@ static void mostrar_ayuda(void) {
     printf("  lince repartir <juego.lince> --android   El .apk para instalarlo en un móvil Android\n");
     printf("  lince repartir <juego.lince> --aab       El .aab para publicarlo en Google Play\n");
     printf("  lince comprobar <archivo.lince>          Sin ejecutar: la sintaxis, y avisos de descuidos\n");
+    printf("  lince probar [carpeta]                   Las pruebas (prueba_*.lince) y su cobertura\n");
+    printf("  lince formatear <archivo.lince>...       Deja el código con el estilo de Lince\n");
+    printf("  lince perfil <archivo.lince>             Lo ejecuta y dice en qué se va el tiempo\n");
+    printf("  lince documentar <archivo.lince> [-o a.md] La ayuda de sus comentarios, en Markdown\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");
     printf("  lince                                    Abre el REPL interactivo\n");
     printf("  lince instalar <url>                     Instala un paquete\n");
+    printf("  lince instalar <url>@<versión>           Lo instala para este juego, con esa versión fija\n");
+    printf("  lince instalar                           Instala los paquetes de lince.paquetes\n");
     printf("  lince desinstalar <nombre>               Desinstala un paquete\n");
     printf("  lince listar                             Lista paquetes instalados\n");
     printf("  lince version                            Dice qué versión de Lince es\n");
@@ -202,6 +211,106 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    /* 'lince formatear a.lince b.lince…': el estilo de siempre. Con --comprobar
+       no cambia nada y sale con 1 si algo no lo tiene; con --mostrar escribe
+       el resultado en la salida en vez de en el archivo (para el editor). */
+    if (strcmp(cmd, "formatear") == 0) {
+        int comprobar = 0, mostrar = 0, archivos = 0, distintos = 0;
+        for (int i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "--comprobar") == 0) comprobar = 1;
+            else if (strcmp(argv[i], "--mostrar") == 0) mostrar = 1;
+            else archivos++;
+        }
+        if (!archivos) {
+            fprintf(stderr, "\n❌ Uso: lince formatear [--comprobar | --mostrar] <archivo.lince>...\n\n");
+            return 1;
+        }
+        for (int i = 2; i < argc; i++) {
+            if (argv[i][0] == '-' && argv[i][1] == '-') continue;
+            char *codigo = leer_archivo(argv[i]);
+            {   /* con un error de sintaxis no se toca: lo dice y termina */
+                Lexer *lx = lexer_crear(codigo);
+                int nt = 0;
+                Token *tk = lexer_tokenizar(lx, &nt);
+                Parser *ps = parser_crear(tk, nt);
+                nodo_destruir(parser_parsear(ps));
+                parser_destruir(ps);
+                lexer_destruir(lx);
+            }
+            char *nuevo = formatear_codigo(codigo);
+            if (!nuevo) {
+                fprintf(stderr, "\n❌ No sé formatear '%s' sin cambiar el programa: lo dejo como estaba.\n"
+                                "   (Es un fallo de Lince: cuéntalo con el archivo, por favor.)\n\n", argv[i]);
+                return 1;
+            }
+            int igual = strcmp(nuevo, codigo) == 0;
+            if (mostrar) fputs(nuevo, stdout);
+            else if (comprobar) {
+                if (!igual) { printf("✏️  Sin formatear: %s\n", argv[i]); distintos++; }
+            } else if (!igual) {
+                FILE *f = fopen(argv[i], "wb");
+                if (!f || fwrite(nuevo, 1, strlen(nuevo), f) != strlen(nuevo)) {
+                    fprintf(stderr, "\n❌ No pude escribir '%s'.\n\n", argv[i]);
+                    return 1;
+                }
+                fclose(f);
+                printf("✨ Formateado: %s\n", argv[i]);
+            } else printf("✅ Ya tenía el estilo: %s\n", argv[i]);
+            free(nuevo);
+            free(codigo);
+        }
+        return comprobar && distintos ? 1 : 0;
+    }
+
+    /* 'lince perfil juego.lince [argumentos]': lo ejecuta midiendo en qué se
+       va el tiempo, y al terminar lo cuenta (ver interprete.c) */
+    if (strcmp(cmd, "perfil") == 0) {
+        if (argc < 3) {
+            fprintf(stderr, "\n❌ Uso: lince perfil <archivo.lince> [argumentos]\n\n");
+            return 1;
+        }
+        interprete_set_args(argc - 3, argv + 3);
+        interprete_perfil_activar(argv[2]);
+        return ejecutar_recargable(argv[2]);
+    }
+
+    /* 'lince probar [carpetas o archivos]': las pruebas y cuánto código recorren */
+    if (strcmp(cmd, "probar") == 0) return probar_ejecutar(argc - 2, argv + 2);
+
+    /* 'lince documentar libreria.lince [-o AYUDA.md]': la ayuda de sus comentarios */
+    if (strcmp(cmd, "documentar") == 0) {
+        const char *archivo = NULL, *salida = NULL;
+        for (int i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) salida = argv[++i];
+            else archivo = argv[i];
+        }
+        if (!archivo) {
+            fprintf(stderr, "\n❌ Uso: lince documentar <archivo.lince> [-o ayuda.md]\n\n");
+            return 1;
+        }
+        char *codigo = leer_archivo(archivo);
+        const char *base = strrchr(archivo, '/');
+#ifdef _WIN32
+        const char *b2 = strrchr(archivo, '\\');
+        if (!base || (b2 && b2 > base)) base = b2;
+#endif
+        char titulo[256];
+        snprintf(titulo, sizeof titulo, "%s", base ? base + 1 : archivo);
+        char *punto = strrchr(titulo, '.');
+        if (punto && strcmp(punto, ".lince") == 0) *punto = '\0';
+        char *md = documentar_markdown(codigo, titulo);
+        if (salida) {
+            FILE *f = fopen(salida, "wb");
+            if (!f) { fprintf(stderr, "\n❌ No pude escribir '%s'.\n\n", salida); return 1; }
+            fputs(md, f);
+            fclose(f);
+            printf("📖 Ayuda de %s → %s\n", archivo, salida);
+        } else fputs(md, stdout);
+        free(md);
+        free(codigo);
+        return 0;
+    }
+
     /* Subcomando compilar: empaqueta el programa en un ejecutable */
     if (strcmp(cmd, "compilar") == 0) {
         if (argc < 3) {
@@ -344,12 +453,7 @@ int main(int argc, char *argv[]) {
 
     /* Subcomandos del gestor de paquetes */
     if (strcmp(cmd, "instalar") == 0) {
-        if (argc < 3) {
-            fprintf(stderr,
-                "\n❌ Uso: lince instalar <url>\n"
-                "   Ejemplo: lince instalar https://github.com/usuario/paquete\n\n");
-            return 1;
-        }
+        if (argc < 3) return paquetes_instalar_proyecto();   /* los de lince.paquetes */
         return paquetes_instalar(argv[2]);
     }
 

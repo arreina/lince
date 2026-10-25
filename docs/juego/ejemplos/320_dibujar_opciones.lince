@@ -9,7 +9,7 @@ fijo LINCE = juego.hoja("recursos/lince.png", 16)
 mientras juego.abierto() {
     juego.limpiar([40, 50, 70])
     sea opciones = [{"escala": 4}, {"escala": 4, "espejo": verdadero}, {"escala": 4, "angulo": 30},
-                    {"escala": 4, "alfa": 110}, {"escala": 4, "color": [120, 160, 255]}, {"escala": 4, "blanco": 0.8}]
+        {"escala": 4, "alfa": 110}, {"escala": 4, "color": [120, 160, 255]}, {"escala": 4, "blanco": 0.8}]
     para (i = 0; i < 6; i++) {
         sea op = opciones[i]
         op["cuadro"] = 0

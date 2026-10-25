@@ -10,10 +10,15 @@
 #include <errno.h>
 #include "paquetes.h"
 #include "plataforma.h"
+#include "firmar.h"
+
+const char *interprete_archivo_principal(void);   /* interprete.h (sin mezclarlo con windows.h) */
 
 /* ─────────────────────────────────────────
    RUTAS
 ───────────────────────────────────────── */
+#define ARCHIVO_PROYECTO "lince.paquetes"
+
 static void dir_paquetes(char *buf, size_t max) {
 #ifdef LINCE_WINDOWS
     const char *home = getenv("USERPROFILE");
@@ -80,9 +85,237 @@ static int confirmar(const char *nombre, const char *url) {
 }
 
 /* ─────────────────────────────────────────
+   PAQUETES DEL JUEGO, CON SU VERSIÓN
+   'lince instalar <url>@v1.2' lo baja a paquetes/<nombre>.lince y lo apunta
+   en lince.paquetes con la versión y su huella (SHA-256). 'lince instalar'
+   sin nada baja otra vez exactamente eso: si lo que llega no tiene la misma
+   huella, no lo cambia y lo dice. Así el juego funciona igual en cualquier
+   ordenador y aunque el autor del paquete lo cambie.
+───────────────────────────────────────── */
+typedef struct { char nombre[128], version[128], origen[1024], huella[65]; } Entrada;
+
+static int leer_proyecto(Entrada **out) {
+    FILE *f = fopen(ARCHIVO_PROYECTO, "r");
+    *out = NULL;
+    if (!f) return 0;
+    int n = 0, cap = 0;
+    char linea[2048];
+    while (fgets(linea, sizeof linea, f)) {
+        char *p = linea;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '#' || *p == '\n' || *p == '\r' || !*p) continue;
+        Entrada e;
+        memset(&e, 0, sizeof e);
+        if (sscanf(p, "%127s %127s %1023s %64s", e.nombre, e.version, e.origen, e.huella) < 3) continue;
+        if (n == cap) { cap = cap ? cap * 2 : 8; *out = realloc(*out, sizeof(Entrada) * (size_t)cap); }
+        (*out)[n++] = e;
+    }
+    fclose(f);
+    return n;
+}
+
+static int guardar_proyecto(const Entrada *e, int n) {
+    FILE *f = fopen(ARCHIVO_PROYECTO, "w");
+    if (!f) return 0;
+    fprintf(f, "# Los paquetes de este juego. 'lince instalar' (sin nada más) los baja\n"
+               "# tal cual: esta versión y con esta huella. Para cambiar de versión:\n"
+               "#   lince instalar <origen>@<versión>\n"
+               "# nombre  versión  origen  huella (SHA-256)\n");
+    for (int i = 0; i < n; i++)
+        fprintf(f, "%s  %s  %s  %s\n", e[i].nombre, e[i].version, e[i].origen, e[i].huella);
+    fclose(f);
+    return 1;
+}
+
+static void huella_de(const char *ruta, char *hex) {
+    hex[0] = '\0';
+    FILE *f = fopen(ruta, "rb");
+    if (!f) return;
+    Sha256 s;
+    sha256_empezar(&s);
+    unsigned char buf[8192];
+    size_t r;
+    while ((r = fread(buf, 1, sizeof buf, f)) > 0) sha256_mas(&s, buf, r);
+    fclose(f);
+    unsigned char d[32];
+    sha256_acabar(&s, d);
+    for (int i = 0; i < 32; i++) sprintf(hex + 2 * i, "%02x", d[i]);
+}
+
+/* La dirección de donde se baja: en GitHub, el archivo <nombre>.lince del
+   repositorio en esa versión (una etiqueta, una rama o un commit) */
+static void direccion(const char *origen, const char *nombre, const char *version, char *out, size_t max) {
+    const char *gh = strstr(origen, "github.com/");
+    if (gh && !strstr(origen, ".lince")) {
+        char repo[512];
+        snprintf(repo, sizeof repo, "%s", gh + 11);
+        char *git = strstr(repo, ".git");
+        if (git) *git = '\0';
+        size_t l = strlen(repo);
+        if (l && repo[l - 1] == '/') repo[l - 1] = '\0';
+        /* LINCE_PAQUETES_RAW: otra raíz (para las pruebas, sin internet) */
+        const char *raiz = getenv("LINCE_PAQUETES_RAW");
+        snprintf(out, max, "%s/%s/%s/%s.lince", raiz ? raiz : "https://raw.githubusercontent.com",
+                 repo, version, nombre);
+    } else snprintf(out, max, "%s", origen);
+}
+
+static int bajar(const char *url, const char *destino) {
+    char cmd[4096];
+#ifdef LINCE_WINDOWS
+    snprintf(cmd, sizeof cmd, "curl -s -f -L \"%s\" -o \"%s\" 2>nul", url, destino);
+#else
+    snprintf(cmd, sizeof cmd, "curl -s -f -L '%s' -o '%s' 2>/dev/null", url, destino);
+#endif
+    if (system(cmd) != 0) return 0;
+    FILE *f = fopen(destino, "r");
+    if (!f) return 0;
+    char primera[64] = "";
+    int html = fgets(primera, sizeof primera, f) &&
+               (!strncmp(primera, "<!DOCTYPE", 9) || !strncmp(primera, "<html", 5));
+    fclose(f);
+    if (html) { remove(destino); return 0; }
+    return 1;
+}
+
+/* Baja 'e' a paquetes/; con huella, tiene que ser esa. 1 si va bien. */
+static int bajar_entrada(Entrada *e, int comprobar) {
+    char url[2048], tmp[1200], destino[1200];
+    fflush(stdout);                      /* que lo de stderr salga en su sitio */
+    crear_dir_si_no_existe("paquetes");
+    snprintf(destino, sizeof destino, "paquetes/%s.lince", e->nombre);
+    snprintf(tmp, sizeof tmp, "paquetes/.%s.bajando", e->nombre);
+    direccion(e->origen, e->nombre, e->version, url, sizeof url);
+    if (!bajar(url, tmp)) {
+        fprintf(stderr, "❌ No se pudo bajar '%s' (versión %s) de:\n   %s\n", e->nombre, e->version, url);
+        return 0;
+    }
+    char h[65];
+    huella_de(tmp, h);
+    if (comprobar && e->huella[0] && strcmp(h, e->huella) != 0) {
+        remove(tmp);
+        fprintf(stderr, "❌ '%s' %s no es el que se apuntó en %s: ha cambiado desde entonces.\n"
+                        "   No lo cambio. Si quieres el nuevo, instálalo otra vez:\n"
+                        "   lince instalar %s@%s\n", e->nombre, e->version, ARCHIVO_PROYECTO, e->origen, e->version);
+        return 0;
+    }
+    remove(destino);
+    if (rename(tmp, destino) != 0) { remove(tmp); fprintf(stderr, "❌ No pude guardar %s\n", destino); return 0; }
+    snprintf(e->huella, sizeof e->huella, "%s", h);
+    return 1;
+}
+
+static int instalar_en_proyecto(const char *url, const char *version) {
+    Entrada *es;
+    int n = leer_proyecto(&es);
+    Entrada e;
+    memset(&e, 0, sizeof e);
+    nombre_desde_url(url, e.nombre, sizeof e.nombre);
+    snprintf(e.origen, sizeof e.origen, "%s", url);
+    /* sin versión, la de siempre si ya estaba; si no, la rama principal */
+    const char *v = version;
+    for (int i = 0; i < n && !v; i++) if (strcmp(es[i].nombre, e.nombre) == 0) v = es[i].version;
+    snprintf(e.version, sizeof e.version, "%s", v && v[0] ? v : "main");
+
+    printf("\n🐆 Lince — Gestor de paquetes\n\n");
+    printf("   Paquete : %s\n", e.nombre);
+    printf("   Versión : %s\n", e.version);
+    printf("   Origen  : %s\n", e.origen);
+    printf("   Para    : este juego (paquetes/%s.lince, apuntado en %s)\n\n", e.nombre, ARCHIVO_PROYECTO);
+    printf("¿Instalar? [s/N] ");
+    fflush(stdout);
+    char resp[8];
+    if (!fgets(resp, sizeof resp, stdin) || (resp[0] != 's' && resp[0] != 'S')) {
+        printf("Instalación cancelada.\n\n");
+        free(es);
+        return 0;
+    }
+    if (!bajar_entrada(&e, 0)) { free(es); return 1; }
+    int k = 0;
+    while (k < n && strcmp(es[k].nombre, e.nombre) != 0) k++;
+    if (k == n) { es = realloc(es, sizeof(Entrada) * (size_t)(n + 1)); n++; }
+    es[k] = e;
+    if (!guardar_proyecto(es, n)) { fprintf(stderr, "❌ No pude escribir %s\n", ARCHIVO_PROYECTO); free(es); return 1; }
+    printf("✅ '%s' %s instalado para este juego (huella %.12s…).\n\n", e.nombre, e.version, e.huella);
+    printf("   Úsalo con:\n   importar \"paquete:%s\"\n\n", e.nombre);
+    free(es);
+    return 0;
+}
+
+int paquetes_instalar_proyecto(void) {
+    Entrada *es;
+    int n = leer_proyecto(&es);
+    if (n == 0) {
+        free(es);
+        fprintf(stderr, "\n❌ Aquí no hay %s con paquetes que instalar.\n"
+                        "   Instala uno con: lince instalar <url>@<versión>\n\n", ARCHIVO_PROYECTO);
+        return 1;
+    }
+    printf("\n🐆 Lince — Los paquetes de %s\n\n", ARCHIVO_PROYECTO);
+    int mal = 0, cambios = 0;
+    for (int i = 0; i < n; i++) {
+        char destino[1200], h[65];
+        snprintf(destino, sizeof destino, "paquetes/%s.lince", es[i].nombre);
+        huella_de(destino, h);
+        if (es[i].huella[0] && strcmp(h, es[i].huella) == 0) {
+            printf("   ✅ %s %s (ya estaba)\n", es[i].nombre, es[i].version);
+            continue;
+        }
+        int sin_huella = !es[i].huella[0];
+        if (bajar_entrada(&es[i], 1)) {
+            printf("   ⬇  %s %s\n", es[i].nombre, es[i].version);
+            if (sin_huella) cambios = 1;          /* se apunta la huella que faltaba */
+        } else mal++;
+    }
+    if (cambios) guardar_proyecto(es, n);
+    free(es);
+    printf("\n");
+    return mal ? 1 : 0;
+}
+
+/* ¿Es un paquete de este juego? Lo quita de lince.paquetes y de paquetes/ */
+static int desinstalar_de_proyecto(const char *nombre) {
+    Entrada *es;
+    int n = leer_proyecto(&es), k = 0;
+    while (k < n && strcmp(es[k].nombre, nombre) != 0) k++;
+    if (k == n) { free(es); return -1; }
+    memmove(&es[k], &es[k + 1], sizeof(Entrada) * (size_t)(n - k - 1));
+    guardar_proyecto(es, n - 1);
+    free(es);
+    char ruta[1200];
+    snprintf(ruta, sizeof ruta, "paquetes/%s.lince", nombre);
+    remove(ruta);
+    printf("\n✅ Paquete '%s' quitado de este juego.\n\n", nombre);
+    return 0;
+}
+
+/* ─────────────────────────────────────────
    RESOLVER RUTA DE PAQUETE
 ───────────────────────────────────────── */
+/* El directorio de 'archivo' ("" si no tiene) */
+static void carpeta_de(const char *archivo, char *out, size_t max) {
+    snprintf(out, max, "%s", archivo);
+    char *b = strrchr(out, '/');
+#ifdef LINCE_WINDOWS
+    char *b2 = strrchr(out, '\\');
+    if (!b || (b2 && b2 > b)) b = b2;
+#endif
+    if (b) b[1] = '\0'; else out[0] = '\0';
+}
+
 int paquetes_resolver(const char *nombre, char *ruta_out, size_t max) {
+    /* Primero los del juego (paquetes/ junto al programa, con la versión de
+       lince.paquetes), luego los de la carpeta de trabajo y luego los de
+       todos (~/.lince/paquetes) */
+    char base[1024];
+    const char *principal = interprete_archivo_principal();
+    carpeta_de(principal ? principal : "", base, sizeof base);
+    for (int k = 0; k < 2; k++) {
+        if (k == 1 && !base[0]) break;
+        snprintf(ruta_out, max, "%spaquetes/%s.lince", k == 0 ? base : "", nombre);
+        FILE *f = fopen(ruta_out, "r");
+        if (f) { fclose(f); return 1; }
+    }
     char dir[1024];
     dir_paquetes(dir, sizeof(dir));
     snprintf(ruta_out, max, "%s/%s.lince", dir, nombre);
@@ -90,7 +323,19 @@ int paquetes_resolver(const char *nombre, char *ruta_out, size_t max) {
     if (f) { fclose(f); return 1; }
     return 0;
 }
+static int instalar_en_proyecto(const char *url, const char *version);
+
 int paquetes_instalar(const char *url) {
+    /* url@versión, o una carpeta con lince.paquetes: el paquete es del juego */
+    const char *barra = strrchr(url, '/');
+    const char *arroba = strrchr(barra ? barra : url, '@');
+    FILE *proyecto = fopen(ARCHIVO_PROYECTO, "r");
+    if (proyecto) fclose(proyecto);
+    if (arroba || proyecto) {
+        char base[1024];
+        snprintf(base, sizeof base, "%.*s", (int)(arroba ? arroba - url : (long)strlen(url)), url);
+        return instalar_en_proyecto(base, arroba ? arroba + 1 : NULL);
+    }
     char nombre[256];
     nombre_desde_url(url, nombre, sizeof(nombre));
 
@@ -195,6 +440,7 @@ int paquetes_instalar(const char *url) {
    DESINSTALAR
 ───────────────────────────────────────── */
 int paquetes_desinstalar(const char *nombre) {
+    if (desinstalar_de_proyecto(nombre) == 0) return 0;
     char dir[1024], ruta[1024];
     dir_paquetes(dir, sizeof(dir));
     snprintf(ruta, sizeof(ruta), "%s/%s.lince", dir, nombre);
@@ -222,6 +468,14 @@ int paquetes_desinstalar(const char *nombre) {
 int paquetes_listar(void) {
     char dir[1024];
     dir_paquetes(dir, sizeof(dir));
+
+    Entrada *es;
+    int np = leer_proyecto(&es);
+    if (np > 0) {
+        printf("\n🐆 Lince — Paquetes de este juego (%s)\n\n", ARCHIVO_PROYECTO);
+        for (int i = 0; i < np; i++) printf("   📦 %-20s %-12s %s\n", es[i].nombre, es[i].version, es[i].origen);
+    }
+    free(es);
 
     printf("\n🐆 Lince — Paquetes instalados\n");
     printf("   Directorio: %s\n\n", dir);

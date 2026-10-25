@@ -1284,6 +1284,7 @@ static Valor *fn_jg_rueda(Valor **a, int n) { (void)a; (void)n; return valor_num
 static Valor *fn_jg_presentar(Valor **a, int n) {
     (void)a; (void)n;
     JG_ABIERTA();
+    interprete_perfil_fotograma();
     int recargar = recarga_activa() && jg_vigilar();
     /* Las tareas siguen una vez por fotograma, antes de mostrarlo: así lo que
        dibujen sale en este fotograma. Luego lo de juego.lince que va en cada
@@ -1293,6 +1294,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         if (!hay_error) valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_presentar", NULL, 0));
         if (hay_error) return valor_nulo();
     }
+    interprete_perfil_categoria(PERFIL_PRESENTAR);     /* desde aquí, mostrarlo y esperar */
     if (recarga_error()) jg_aviso_error(recarga_error(), 0);
     if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))
         jg_guardar_bmp(getenv("LINCE_JUEGO_CAPTURA"));      /* prueba: guarda el último fotograma */

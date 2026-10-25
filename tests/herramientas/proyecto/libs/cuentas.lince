@@ -1,0 +1,18 @@
+# Lo que prueban las pruebas de esta carpeta (lince probar)
+funcion doble(numero n): numero {
+    devolver n * 2
+}
+
+funcion signo(numero n): texto {
+    si n > 0 {
+        devolver "positivo"
+    } sino si n < 0 {
+        devolver "negativo"
+    }
+    devolver "cero"
+}
+
+funcion sin_probar(): nulo {
+    escribir("nadie")
+    escribir("me llama")
+}

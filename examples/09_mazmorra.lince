@@ -129,7 +129,7 @@ funcion mover_jugador(val numero dt): nulo {
         gemas = gemas + 1
         juego.efecto("moneda", {"tono": 1.3, "volumen": 0.35})
         juego.particulas(centro(aqui[0]), centro(aqui[1]), {"cantidad": 18, "color": [90, 220, 255],
-                                                          "velocidad": [40, 160], "vida": [0.3, 0.6]})
+            "velocidad": [40, 160], "vida": [0.3, 0.6]})
     }
     si t == "S" y gemas == total_gemas {
         estado = "ganado"
@@ -167,7 +167,7 @@ funcion mover_fantasmas(val numero dt): nulo {
             vidas = vidas - 1
             juego.efecto("perder", {"largo": 0.6})
             juego.particulas(yo["x"] + 10, yo["y"] + 10, {"cantidad": 40, "color": [255, 160, 60],
-                                                           "velocidad": [60, 220], "vida": [0.4, 0.8]})
+                "velocidad": [60, 220], "vida": [0.4, 0.8]})
             atrapado = verdadero
         }
     }
@@ -183,10 +183,10 @@ funcion dibujar(): nulo {
     si gemas == total_gemas { salida = [TILES, [3, 4], 0.3] }   # abierta: brilla (dos cuadros)
     sea suelo = [TILES, 1]
     juego.dibujar_mapa(NIVEL, {"#": [TILES, 0], "S": salida,
-                               ".": suelo, "*": suelo, "P": suelo, "F": suelo})
+        ".": suelo, "*": suelo, "P": suelo, "F": suelo})
     para cada lista g en juego.buscar_en_mapa(NIVEL, "*") {
         juego.dibujar(GEMA, centro(g[0]), centro(g[1]) + matematica.seno(juego.tiempo() * 4 + g[0]) * 2,
-                      {"escala": 3, "centrado": verdadero})
+            {"escala": 3, "centrado": verdadero})
     }
     si pausa == 0 o juego.cuadro(2, 12) == 0 {
         juego.circulo(yo["x"] + 10, yo["y"] + 10, 10, [255, 170, 60])
@@ -195,7 +195,7 @@ funcion dibujar(): nulo {
     }
     para cada diccionario f en fantasmas {
         juego.dibujar(FANTASMA, f["x"], f["y"] + matematica.seno(juego.tiempo() * 5) * 2,
-                      {"escala": 3, "centrado": verdadero, "alfa": 220})
+            {"escala": 3, "centrado": verdadero, "alfa": 220})
     }
     juego.dibujar_particulas()
     juego.texto("GEMAS " + a_texto(gemas) + "/" + a_texto(total_gemas), 8, 8, 2, [140, 230, 255])

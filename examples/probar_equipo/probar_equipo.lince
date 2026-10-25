@@ -130,8 +130,8 @@ fijo FILAS_TECLADO = [
     ["ctrl", "alt", "espacio", "izquierda", "abajo", "derecha"]
 ]
 fijo NOMBRE_CORTO = {"escape": "ESC", "borrar": "<-", "entrar": "ENTRAR", "mayus": "MAYUS", "ctrl": "CTRL",
-                     "alt": "ALT", "espacio": "ESPACIO", "tab": "TAB", "arriba": "^", "abajo": "v",
-                     "izquierda": "<", "derecha": ">"}
+    "alt": "ALT", "espacio": "ESPACIO", "tab": "TAB", "arriba": "^", "abajo": "v",
+    "izquierda": "<", "derecha": ">"}
 
 funcion pagina_teclado(): nulo {
     escribe("Las teclas se encienden mientras están pulsadas.", 8, 40, GRIS)

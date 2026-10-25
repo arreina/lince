@@ -737,6 +737,8 @@ static Nodo *expresion(Parser *p) {
 /* ─────────────────────────────────────────
    SENTENCIAS
 ───────────────────────────────────────── */
+void (*parser_al_leer_sentencia)(Nodo *sentencia) = NULL;
+
 static Nodo *bloque(Parser *p) {
     consumir(p, TOK_LLAVE_IZQ, "'{'");
     int cap = 16;
@@ -746,6 +748,7 @@ static Nodo *bloque(Parser *p) {
     while (!coincide(p, TOK_LLAVE_DER) && !coincide(p, TOK_EOF)) {
         if (cantidad == cap) { cap *= 2; sentencias = realloc(sentencias, sizeof(Nodo*) * cap); }
         sentencias[cantidad++] = sentencia(p);
+        if (parser_al_leer_sentencia && sentencias[cantidad - 1]) parser_al_leer_sentencia(sentencias[cantidad - 1]);
     }
     consumir(p, TOK_LLAVE_DER, "'}'");
 
@@ -1930,6 +1933,7 @@ Nodo *parser_parsear(Parser *p) {
     while (!coincide(p, TOK_EOF)) {
         if (cantidad == cap) { cap *= 2; sentencias = realloc(sentencias, sizeof(Nodo*) * cap); }
         sentencias[cantidad++] = sentencia(p);
+        if (parser_al_leer_sentencia && sentencias[cantidad - 1]) parser_al_leer_sentencia(sentencias[cantidad - 1]);
     }
 
     Nodo *programa = nodo_nuevo(NODO_BLOQUE, p);

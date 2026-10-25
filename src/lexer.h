@@ -134,6 +134,7 @@ typedef struct {
     int        linea;
     int        columna;     /* dónde empieza en su línea, contada en caracteres desde 0 */
     int        ancho;       /* cuántos caracteres ocupa (en su línea) */
+    int        desde, hasta;  /* dónde empieza y acaba en el código, en bytes (lo usa formatear) */
 } Token;
 
 /* ─────────────────────────────────────────

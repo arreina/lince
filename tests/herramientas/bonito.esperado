@@ -1,0 +1,36 @@
+# Un programa bien escrito pero con mal estilo: formatear lo deja como bonito.esperado
+importar "matematica"
+fijo ANCHO = 320
+sea lista l = [1, 2, 3]
+funcion doble(numero n): numero {
+    devolver n * 2
+}
+funcion larga(numero a,
+        numero b): numero {
+    sea x = -a + -b   # un comentario al final se queda donde estaba
+    si x > 0 y (a < b) o no (b == 1) { devolver x }
+    devolver matematica.abs(x)
+}
+clase Punto {
+    sea numero x = 0
+    funcion crear(numero x): nulo { mi.x = x }
+    funcion mas(numero d): numero {
+        devolver mi.x + d
+    }
+}
+
+
+# tres líneas en blanco arriba se quedan en dos
+sea p = Punto(3)
+para (i = 0; i < 2; i++) { escribir(l[i] * doble(i)) }
+escribir("texto {p.x+1}   con  {  ANCHO  } espacios")
+sea total = 1 +
+    2 +
+    3
+sea y = 5
+sea sigue = total > 1 y
+    y < 10
+sea d = {"a": 1, "b": [-1, y - 1]}
+escribir(larga(1, 2))
+escribir(p.mas(1))
+escribir([total, sigue, d["b"]])

@@ -4,7 +4,7 @@
 sea animal = "lince"
 
 elegir animal {
-    caso "gato"  { escribir("miau") }
+    caso "gato" { escribir("miau") }
     caso "lince" { escribir("es un felino ibérico") }
-    otro         { escribir("no sé qué hace") }
+    otro { escribir("no sé qué hace") }
 }

@@ -11,7 +11,7 @@ interfaz Saludable {
 clase Persona implementa Saludable {
     funcion nombre(): texto { devolver "Ana" }
 }
-clase Robot { }
+clase Robot {}
 
 sea p = Persona()
 escribir(p.saludar())

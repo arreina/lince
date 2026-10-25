@@ -58,6 +58,7 @@ typedef struct {
     int                 es_tarea;       /* 'tarea': llamarla la empieza y da la tarea */
     TipoDato            tipo_tarea;     /* el tipo de lo que devuelve la tarea al acabar */
     const char         *archivo;        /* el fichero donde se escribió (para los errores) */
+    int                 perfil;         /* su sitio en la tabla de 'lince perfil' (0: aún no tiene) */
 } FuncionLince;
 
 enum { VIS_PUBLICO = 0, VIS_PRIVADO = 1, VIS_PROTEGIDO = 2 };
@@ -249,6 +250,15 @@ void        interprete_set_args(int argc, char *argv[]);
 Valor      *ejecutar_nodo(Nodo *n, Entorno *e);
 char       *valor_a_texto_repl(Valor *v);
 void        valor_destruir(Valor *v);
+
+/* ── lince perfil: en qué se va el tiempo ── */
+enum { PERFIL_LINCE, PERFIL_MODULOS, PERFIL_PRESENTAR };
+/* Empieza a medir; al terminar el programa escribe el informe */
+void interprete_perfil_activar(const char *programa);
+/* Lo que se hace desde ahora cuenta como 'cat' (si se está midiendo) */
+void interprete_perfil_categoria(int cat);
+/* Empieza un fotograma (lo llama juego.presentar) */
+void interprete_perfil_fotograma(void);
 
 #endif /* LINCE_INTERPRETE_H */
 

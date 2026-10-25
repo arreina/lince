@@ -438,4 +438,8 @@ static inline void lince_clave_numerica(double d, char *buf, size_t tam) {
         snprintf(buf, tam, "%c%.17g", LINCE_CLAVE_NUMERO, d);
 }
 
+/* Si no es NULL, se llama con cada sentencia que se lee (lince probar la usa
+   para saber qué líneas tienen código que se puede ejecutar) */
+extern void (*parser_al_leer_sentencia)(Nodo *sentencia);
+
 #endif /* LINCE_PARSER_H */

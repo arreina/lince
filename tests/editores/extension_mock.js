@@ -7,7 +7,7 @@ const Module = require('module');
 const path = require('path');
 
 const lince = path.resolve(process.argv[2] || './lince');
-const registro = { completado: null, definicion: null, simbolos: null, diag: new Map() };
+const registro = { completado: null, definicion: null, simbolos: null, ayuda: null, formato: null, abrir: null, diag: new Map() };
 
 const vscode = {
     Uri: { parse: (s) => ({ toString: () => s, _s: s }) },
@@ -17,11 +17,14 @@ const vscode = {
     DiagnosticSeverity: { Error: 0 },
     CompletionItem: class { constructor(l, k) { this.label = l; this.kind = k; } },
     SymbolInformation: class { constructor(n, k, c, l) { this.name = n; this.kind = k; this.location = l; } },
+    Hover: class { constructor(c) { this.contents = c; } },
+    MarkdownString: class { constructor(v) { this.value = v; } },
+    TextEdit: { replace: (r, t) => ({ range: r, newText: t }) },
     window: { showWarningMessage: (m) => { registro.aviso = m; } },
     workspace: {
         textDocuments: [],
         getConfiguration: () => ({ get: () => lince }),
-        onDidOpenTextDocument: () => ({}), onDidChangeTextDocument: () => ({}),
+        onDidOpenTextDocument: (f) => { registro.abrir = f; return {}; }, onDidChangeTextDocument: () => ({}),
         onDidCloseTextDocument: () => ({}), onDidChangeConfiguration: () => ({}),
     },
     languages: {
@@ -31,6 +34,8 @@ const vscode = {
         registerCompletionItemProvider: (s, p) => { registro.completado = p; return {}; },
         registerDefinitionProvider: (s, p) => { registro.definicion = p; return {}; },
         registerDocumentSymbolProvider: (s, p) => { registro.simbolos = p; return {}; },
+        registerHoverProvider: (s, p) => { registro.ayuda = p; return {}; },
+        registerDocumentFormattingEditProvider: (s, p) => { registro.formato = p; return {}; },
     },
 };
 
@@ -68,6 +73,17 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
     const def = await registro.definicion.provideDefinition(doc, { line: 3, character: 10 });
     ok(def && def.range.start.line === 0, 'ir a la definición lleva a la declaración');
+
+    // Otro documento, bien escrito pero sin estilo: ayuda y formatear
+    const texto2 = '# Cuánto suma.\nfuncion sumar(numero a,numero b):numero{devolver a+b}\nescribir(sumar(1,2))\n';
+    const doc2 = { languageId: 'lince', version: 1, uri: vscode.Uri.parse('file:///tmp/ext_prueba2.lince'), getText: () => texto2 };
+    registro.abrir(doc2);
+    await espera(600);
+    const h = await registro.ayuda.provideHover(doc2, { line: 2, character: 11 });
+    ok(h && h.contents.value.includes('Cuánto suma.'), 'al pasar el ratón sale la ayuda de los comentarios');
+    const f = await registro.formato.provideDocumentFormattingEdits(doc2);
+    ok(f.length === 1 && f[0].newText.includes('funcion sumar(numero a, numero b): numero { devolver a + b }'),
+       'formatear deja el documento con el estilo de Lince');
 
     ext.deactivate();
     await espera(700);

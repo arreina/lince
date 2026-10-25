@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.3</span>
+  <span class="version">v1.4</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -289,7 +289,7 @@ juego.abrir(<span class="s">&quot;Opciones&quot;</span>, <span class="n">480</sp
 <span class="k">mientras</span> juego.abierto() {
     juego.limpiar([<span class="n">40</span>, <span class="n">50</span>, <span class="n">70</span>])
     <span class="k">sea</span> opciones = [{<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;espejo&quot;</span>: <span class="k">verdadero</span>}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;angulo&quot;</span>: <span class="n">30</span>},
-                    {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alfa&quot;</span>: <span class="n">110</span>}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">120</span>, <span class="n">160</span>, <span class="n">255</span>]}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;blanco&quot;</span>: <span class="n">0.8</span>}]
+        {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alfa&quot;</span>: <span class="n">110</span>}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">120</span>, <span class="n">160</span>, <span class="n">255</span>]}, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;blanco&quot;</span>: <span class="n">0.8</span>}]
     <span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">6</span>; i++) {
         <span class="k">sea</span> op = opciones[i]
         op[<span class="s">&quot;cuadro&quot;</span>] = <span class="n">0</span>
@@ -347,9 +347,9 @@ juego.abrir(<span class="s">&quot;Animar&quot;</span>, <span class="n">480</span
 juego.abrir(<span class="s">&quot;Animador&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
 <span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
 <span class="k">sea</span> pj = juego.animador(LINCE, {
-    <span class="s">&quot;quieto&quot;</span>:  {<span class="s">&quot;fila&quot;</span>: <span class="n">0</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">3</span>},
-    <span class="s">&quot;andar&quot;</span>:   {<span class="s">&quot;fila&quot;</span>: <span class="n">1</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">10</span>},
-    <span class="s">&quot;saltar&quot;</span>:  {<span class="s">&quot;fila&quot;</span>: <span class="n">2</span>},
+    <span class="s">&quot;quieto&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">0</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">3</span>},
+    <span class="s">&quot;andar&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">1</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">10</span>},
+    <span class="s">&quot;saltar&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">2</span>},
     <span class="s">&quot;zarpazo&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">3</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">12</span>, <span class="s">&quot;repetir&quot;</span>: <span class="k">falso</span>, <span class="s">&quot;siguiente&quot;</span>: <span class="s">&quot;quieto&quot;</span>}
 })
 <span class="k">sea</span> x = <span class="n">60</span>
@@ -642,11 +642,11 @@ juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">360</
 
 juego.abrir(<span class="s">&quot;Partículas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
 juego.particulas(<span class="n">110</span>, <span class="n">150</span>, {<span class="s">&quot;cantidad&quot;</span>: <span class="n">60</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">220</span>, <span class="n">80</span>], <span class="s">&quot;color_final&quot;</span>: [<span class="n">255</span>, <span class="n">60</span>, <span class="n">20</span>, <span class="n">0</span>],
-                            <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">220</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.4</span>, <span class="n">0.9</span>], <span class="s">&quot;mezcla&quot;</span>: <span class="s">&quot;sumar&quot;</span>})
+    <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">220</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.4</span>, <span class="n">0.9</span>], <span class="s">&quot;mezcla&quot;</span>: <span class="s">&quot;sumar&quot;</span>})
 juego.particulas(<span class="n">250</span>, <span class="n">200</span>, {<span class="s">&quot;cantidad&quot;</span>: <span class="n">30</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">200</span>, <span class="n">190</span>, <span class="n">170</span>], <span class="s">&quot;direccion&quot;</span>: -<span class="n">90</span>, <span class="s">&quot;apertura&quot;</span>: <span class="n">70</span>,
-                            <span class="s">&quot;velocidad&quot;</span>: [<span class="n">40</span>, <span class="n">120</span>], <span class="s">&quot;tamaño&quot;</span>: <span class="n">6</span>, <span class="s">&quot;tamaño_final&quot;</span>: <span class="n">14</span>, <span class="s">&quot;gravedad&quot;</span>: -<span class="n">30</span>})
+    <span class="s">&quot;velocidad&quot;</span>: [<span class="n">40</span>, <span class="n">120</span>], <span class="s">&quot;tamaño&quot;</span>: <span class="n">6</span>, <span class="s">&quot;tamaño_final&quot;</span>: <span class="n">14</span>, <span class="s">&quot;gravedad&quot;</span>: -<span class="n">30</span>})
 juego.particulas(<span class="n">380</span>, <span class="n">80</span>, {<span class="s">&quot;cantidad&quot;</span>: <span class="n">40</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">120</span>, <span class="n">200</span>, <span class="n">255</span>], <span class="s">&quot;velocidad&quot;</span>: [<span class="n">80</span>, <span class="n">160</span>],
-                           <span class="s">&quot;gravedad&quot;</span>: <span class="n">500</span>, <span class="s">&quot;vida&quot;</span>: <span class="n">1</span>})
+    <span class="s">&quot;gravedad&quot;</span>: <span class="n">500</span>, <span class="s">&quot;vida&quot;</span>: <span class="n">1</span>})
 <span class="k">mientras</span> juego.abierto() {
     juego.limpiar([<span class="n">15</span>, <span class="n">15</span>, <span class="n">25</span>])
     juego.dibujar_particulas()
@@ -753,9 +753,9 @@ juego.abrir(<span class="s">&quot;Peleas&quot;</span>, <span class="n">480</span
 juego.definir_accion(<span class="s">&quot;zarpazo&quot;</span>, [<span class="s">&quot;z&quot;</span>, <span class="s">&quot;mando:x&quot;</span>])
 <span class="k">fijo</span> LINCE = juego.hoja(<span class="s">&quot;recursos/lince.png&quot;</span>, <span class="n">16</span>)
 <span class="k">sea</span> pj = juego.animador(LINCE, {
-    <span class="s">&quot;quieto&quot;</span>:  {<span class="s">&quot;fila&quot;</span>: <span class="n">0</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">3</span>},
+    <span class="s">&quot;quieto&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">0</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">3</span>},
     <span class="s">&quot;zarpazo&quot;</span>: {<span class="s">&quot;fila&quot;</span>: <span class="n">3</span>, <span class="s">&quot;por_segundo&quot;</span>: <span class="n">12</span>, <span class="s">&quot;repetir&quot;</span>: <span class="k">falso</span>, <span class="s">&quot;siguiente&quot;</span>: <span class="s">&quot;quieto&quot;</span>,
-                <span class="s">&quot;golpes&quot;</span>: [[<span class="n">1</span>, <span class="n">13</span>, <span class="n">8</span>, <span class="n">3</span>, <span class="n">4</span>], [<span class="n">2</span>, <span class="n">13</span>, <span class="n">8</span>, <span class="n">3</span>, <span class="n">4</span>]], <span class="s">&quot;cancelar&quot;</span>: <span class="n">2</span>}
+        <span class="s">&quot;golpes&quot;</span>: [[<span class="n">1</span>, <span class="n">13</span>, <span class="n">8</span>, <span class="n">3</span>, <span class="n">4</span>], [<span class="n">2</span>, <span class="n">13</span>, <span class="n">8</span>, <span class="n">3</span>, <span class="n">4</span>]], <span class="s">&quot;cancelar&quot;</span>: <span class="n">2</span>}
 })
 <span class="k">sea</span> destello = -<span class="n">1</span>
 <span class="k">mientras</span> juego.abierto() {

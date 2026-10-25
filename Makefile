@@ -3,7 +3,7 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -Wno-maybe-uninitialized -Wno-format-truncation -Wno-stringop-truncation
 LDFLAGS = -lm
-SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c src/ogg.c src/recarga.c src/imagen.c src/repartir.c src/nuevo.c src/letra.c src/corrutina.c src/android.c src/firmar.c src/apk.c src/tiled.c src/revisor.c
+SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c src/ogg.c src/recarga.c src/imagen.c src/repartir.c src/nuevo.c src/letra.c src/corrutina.c src/android.c src/firmar.c src/apk.c src/tiled.c src/revisor.c src/formatear.c src/documentar.c src/probar.c
 
 # ── Detección de plataforma ───────────────
 UNAME := $(shell uname 2>/dev/null || echo Windows)
@@ -94,6 +94,7 @@ test-asan: debug
 	@bash -c 'ulimit -s 65536; $(ASAN_ENV) ./lince_debug tests/runner_compilador.lince'
 	@bash -c '$(ASAN_ENV) python3 tests/lsp/smoke.py ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/revisor/probar.sh ./lince_debug'
+	@bash -c '$(ASAN_ENV) bash tests/herramientas/probar.sh ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/depurador/smoke.sh ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/depurador/ide.sh ./lince_debug'
 	@bash -c '$(ASAN_ENV) bash tests/juego/smoke.sh ./lince_debug'
@@ -104,6 +105,10 @@ test-lsp: $(BIN)
 	@python3 tests/lsp/smoke.py ./$(BIN)
 	@bash tests/revisor/probar.sh ./$(BIN)
 
+# lince formatear, documentar, probar, perfil y los paquetes con versión
+test-herramientas: $(BIN)
+	@bash tests/herramientas/probar.sh ./$(BIN)
+
 # Soporte de editores: cada snippet es Lince válido, y la extensión de VS Code
 # (con un 'vscode' de mentira) habla bien con el servidor de lenguaje.
 test-editores: $(BIN)
@@ -111,7 +116,7 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-ejemplos test-lsp test-editores editores-check bibliotecas-check test-depurador test-juego test-android test-asan
+test-todo: test test-compilador test-ejemplos test-lsp test-herramientas test-editores editores-check bibliotecas-check test-depurador test-juego test-android test-asan
 
 test-juego: $(BIN)
 	@bash tests/juego/smoke.sh ./$(BIN)

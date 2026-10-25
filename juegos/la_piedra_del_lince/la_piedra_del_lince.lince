@@ -49,7 +49,7 @@ fijo SONIDO = {
     "piedra": [juego.sonido("recursos/sonidos/paso_piedra1.ogg"), juego.sonido("recursos/sonidos/paso_piedra2.ogg")]
 }
 fijo MUSICA = {"pueblo": "recursos/musica/pueblo.ogg", "bosque": "recursos/musica/bosque.ogg",
-               "mazmorra": "recursos/musica/mazmorra.ogg", "jefe": "recursos/musica/jefe.ogg"}
+    "mazmorra": "recursos/musica/mazmorra.ogg", "jefe": "recursos/musica/jefe.ogg"}
 fijo LETRITA = juego.crear_efecto("clic", {"volumen": 0.12, "tono": 1.6, "largo": 0.4})
 
 # Los cuadros de las hojas de Kenney
@@ -61,17 +61,17 @@ fijo REJA = 77
 fijo LLAVE = 117          # en la hoja del pueblo
 fijo ARBUSTO = 5          # en la hoja del pueblo
 fijo ENEMIGOS = {
-    "babosa":     {"cuadro": 108, "vida": 2, "dano": 1, "ancho": 10, "alto": 8},
+    "babosa": {"cuadro": 108, "vida": 2, "dano": 1, "ancho": 10, "alto": 8},
     "murcielago": {"cuadro": 120, "vida": 1, "dano": 1, "ancho": 8, "alto": 6},
-    "arana":      {"cuadro": 122, "vida": 2, "dano": 1, "ancho": 10, "alto": 8},
-    "fantasma":   {"cuadro": 121, "vida": 3, "dano": 2, "ancho": 10, "alto": 10},
-    "grum":       {"cuadro": 109, "vida": 14, "dano": 1, "ancho": 20, "alto": 14}
+    "arana": {"cuadro": 122, "vida": 2, "dano": 1, "ancho": 10, "alto": 8},
+    "fantasma": {"cuadro": 121, "vida": 3, "dano": 2, "ancho": 10, "alto": 10},
+    "grum": {"cuadro": 109, "vida": 14, "dano": 1, "ancho": 20, "alto": 14}
 }
 
 # Lo que se dibuja aquí, con texto
 fijo COLORES = {"R": [228, 59, 68], "r": [158, 40, 53], "W": [255, 230, 230], "K": [38, 23, 33],
-                "Y": [254, 231, 97], "y": [228, 166, 54], "o": [170, 110, 40],
-                "G": [99, 199, 77], "g": [38, 140, 70], "C": [200, 255, 230], "D": [24, 70, 50]}
+    "Y": [254, 231, 97], "y": [228, 166, 54], "o": [170, 110, 40],
+    "G": [99, 199, 77], "g": [38, 140, 70], "C": [200, 255, 230], "D": [24, 70, 50]}
 fijo CORAZON = juego.sprite([
     ".KK.KK.",
     "KRWKRRK",
@@ -127,9 +127,9 @@ fijo MAPAS = {
 # ── La partida (lo que se guarda) ────────────────────────────────────
 funcion partida_nueva(): diccionario {
     devolver {"mapa": "pueblo", "entrada": "inicio", "x": nulo, "y": nulo,
-              "vida": VIDA_INICIAL, "maximo": VIDA_INICIAL, "monedas": 0,
-              "espada": falso, "llave": falso, "puerta": falso, "reja": falso,
-              "jefe": falso, "piedra": falso, "mision": 0, "cofres": []}
+        "vida": VIDA_INICIAL, "maximo": VIDA_INICIAL, "monedas": 0,
+        "espada": falso, "llave": falso, "puerta": falso, "reja": falso,
+        "jefe": falso, "piedra": falso, "mision": 0, "cofres": []}
 }
 sea partida = partida_nueva()
 
@@ -188,8 +188,8 @@ funcion propiedad(val diccionario ob, val texto nombre, val cualquiera defecto):
 funcion nuevo_enemigo(val texto tipo, val numero x, val numero y, val texto sala): diccionario {
     sea d = ENEMIGOS[tipo]
     devolver {"tipo": tipo, "x": x + (16 - d["ancho"]) / 2, "y": y + 16 - d["alto"], "ancho": d["ancho"], "alto": d["alto"],
-              "vx": 0, "vy": 0, "vida": d["vida"], "golpe": -1, "flash": 0, "t": matematica.aleatorio() * 1.5,
-              "estado": "quieto", "sala": sala, "fase": matematica.aleatorio() * 6, "inv": 0}
+        "vx": 0, "vy": 0, "vida": d["vida"], "golpe": -1, "flash": 0, "t": matematica.aleatorio() * 1.5,
+        "estado": "quieto", "sala": sala, "fase": matematica.aleatorio() * 6, "inv": 0}
 }
 
 # Entrar en un mapa: se colocan sus cosas según cómo va la partida
@@ -240,7 +240,7 @@ funcion entrar_mapa(val texto nombre): nulo {
             }
             caso "cofre" {
                 cofres.agregar({"nombre": ob["nombre"], "x": x, "y": y, "contenido": propiedad(ob, "contenido", "monedas"),
-                                "cantidad": propiedad(ob, "cantidad", 5), "abierto": partida["cofres"].contiene(ob["nombre"])})
+                    "cantidad": propiedad(ob, "cantidad", 5), "abierto": partida["cofres"].contiene(ob["nombre"])})
                 bloquear(x, y, 16, 16, "#")
             }
             caso "arbusto" {
@@ -307,15 +307,15 @@ funcion hablar(val diccionario p): nulo {
         caso "sabia" {
             si partida["mision"] == 0 {
                 decir([pagina("Ura", c, "¡Por fin despiertas! Esta noche ha pasado algo terrible."),
-                       pagina("Ura", c, "Grum, el cíclope de las ruinas, ha robado la Piedra del Lince. Sin ella, el bosque se volverá contra el pueblo."),
-                       pagina("Ura", c, "Eres el único que puede recuperarla. Toma: era la espada de tu abuelo.")])
+                    pagina("Ura", c, "Grum, el cíclope de las ruinas, ha robado la Piedra del Lince. Sin ella, el bosque se volverá contra el pueblo."),
+                    pagina("Ura", c, "Eres el único que puede recuperarla. Toma: era la espada de tu abuelo.")])
                 despues = "espada"
             } sino si partida["mision"] == 1 {
                 decir(pagina("Ura", c, "La fortaleza de Grum está al norte del Bosque Viejo. Su puerta está cerrada: busca la llave en el bosque."))
             } sino si partida["mision"] == 2 {
                 decir([pagina("Ura", c, "¡La Piedra del Lince! ¡Lo has conseguido!"),
-                       pagina("Ura", c, "Mira cómo brilla... El bosque ya está en calma. Valleclaro te debe mucho."),
-                       pagina("Ura", c, "Tu abuelo estaría orgulloso de ti.")])
+                    pagina("Ura", c, "Mira cómo brilla... El bosque ya está en calma. Valleclaro te debe mucho."),
+                    pagina("Ura", c, "Tu abuelo estaría orgulloso de ti.")])
                 despues = "final"
             }
         }
@@ -329,7 +329,7 @@ funcion hablar(val diccionario p): nulo {
         caso "guardia2" { decir(pagina("Guardia", c, "Dicen que Grum duerme de día. ¡Pero ronca como un oso!")) }
         caso "herrero" {
             decir([pagina("Herrero", c, "Grum lanza rocas, pero es lento. Muévete sin parar y atácale por los lados."),
-                   pagina("Herrero", c, "Y si te hiere, vuelve al pueblo: la tendera vende pociones.")])
+                pagina("Herrero", c, "Y si te hiere, vuelve al pueblo: la tendera vende pociones.")])
         }
         caso "tendera" {
             sea p = pagina("Tendera", c, "¡Bienvenido! ¿Qué te pongo?")
@@ -596,12 +596,12 @@ funcion herir_enemigo(val diccionario e, val numero dano): nulo {
     }
     juego.reproducir(SONIDO["golpe"], {"volumen": 0.6, "tono": 0.9 + matematica.aleatorio() * 0.2})
     juego.particulas(centro_x(e), centro_y(e), {"cantidad": 8, "color": [255, 255, 255], "velocidad": [40, 120],
-                                                 "vida": [0.1, 0.3], "tamaño": 2})
+        "vida": [0.1, 0.3], "tamaño": 2})
 }
 
 funcion morir_enemigo(val diccionario e): nulo {
     juego.particulas(centro_x(e), centro_y(e), {"cantidad": 24, "color": [255, 240, 200], "color_final": [120, 90, 160, 0],
-                                                 "velocidad": [30, 110], "vida": [0.3, 0.7], "tamaño": 3, "tamaño_final": 0})
+        "velocidad": [30, 110], "vida": [0.3, 0.7], "tamaño": 3, "tamaño_final": 0})
     juego.efecto("explosion", {"volumen": 0.25, "tono": 1.6, "largo": 0.5})
     soltar(e["x"], e["y"])
 }
@@ -804,14 +804,14 @@ funcion mover_enemigos(val numero dt): nulo {
             juego.reproducir(SONIDO["puerta"])
             juego.temblor(2, 0.4)
             juego.particulas(reja["x"] + reja["ancho"] / 2, reja["y"] + 8, {"cantidad": 30, "color": [200, 200, 220],
-                                                                           "velocidad": [20, 80], "vida": [0.3, 0.8]})
+                "velocidad": [20, 80], "vida": [0.3, 0.8]})
         }
     }
 }
 
 funcion vencer_jefe(): nulo {
     juego.particulas(centro_x(jefe), centro_y(jefe), {"cantidad": 80, "color": [255, 230, 150], "color_final": [200, 60, 40, 0],
-                                                       "velocidad": [40, 200], "vida": [0.5, 1.2], "tamaño": 4, "tamaño_final": 0})
+        "velocidad": [40, 200], "vida": [0.5, 1.2], "tamaño": 4, "tamaño_final": 0})
     juego.efecto("explosion", {"volumen": 0.5, "largo": 1.5, "tono": 0.7})
     juego.temblor(5, 0.8)
     juego.congelar(0.25)
@@ -856,7 +856,7 @@ funcion cortar_arbustos(): nulo {
             bloquear(a["x"], a["y"], 16, 16, ".")
             juego.reproducir(SONIDO["arbusto"], 0.6)
             juego.particulas(a["x"] + 8, a["y"] + 8, {"cantidad": 14, "color": [80, 170, 70], "color_final": [40, 100, 40, 0],
-                                                       "velocidad": [30, 100], "vida": [0.3, 0.6], "tamaño": 3, "gravedad": 120})
+                "velocidad": [30, 100], "vida": [0.3, 0.6], "tamaño": 3, "gravedad": 120})
             soltar(a["x"], a["y"])
         } sino {
             quedan.agregar(a)
@@ -913,7 +913,7 @@ funcion dibujar_espada(): nulo {
     sea ang = base - 70 + avance * 140
     sea punta = matematica.vector(ang, 10)
     juego.dibujar(TM, centro_x(yo) + punta[0], centro_y(yo) - 3 + punta[1],
-                  {"cuadro": ESPADA, "angulo": ang + 90, "centrado": verdadero})
+        {"cuadro": ESPADA, "angulo": ang + 90, "centrado": verdadero})
 }
 
 funcion dibujar_enemigo(val diccionario e): nulo {
@@ -1074,7 +1074,7 @@ funcion jugar(): nulo {
         dibujar_mundo()
         juego.cubrir([0, 0, 0, 210])
         si juego.menu_controles({"acciones": ["izquierda", "derecha", "arriba", "abajo", "accion", "pausa"],
-                                 "nombres": {"accion": "hablar / espada"}, "fuente": LETRA, "escala": 1}) == "volver" {
+            "nombres": {"accion": "hablar / espada"}, "fuente": LETRA, "escala": 1}) == "volver" {
             en_controles = falso
         }
         devolver nulo
@@ -1085,7 +1085,7 @@ funcion jugar(): nulo {
         juego.cubrir([0, 0, 0, 160])
         juego.texto("PAUSA", ANCHO / 2, 40, {"fuente": GRANDE, "alinear": "centro", "color": [255, 220, 120]})
         sea e = juego.menu(["Continuar", "Controles", "Volver a la portada"],
-                           {"fuente": LETRA, "escala": 1, "y": 80, "atras": "Continuar", "separacion": 8})
+            {"fuente": LETRA, "escala": 1, "y": 80, "atras": "Continuar", "separacion": 8})
         si e == "Continuar" { pausa = falso }
         si e == "Controles" { en_controles = verdadero }
         si e == "Volver a la portada" {
@@ -1151,7 +1151,7 @@ funcion portada(): nulo {
     si en_controles {
         juego.cubrir([0, 0, 0, 200])
         si juego.menu_controles({"acciones": ["izquierda", "derecha", "arriba", "abajo", "accion", "pausa"],
-                                 "nombres": {"accion": "hablar / espada"}, "fuente": LETRA, "escala": 1}) == "volver" {
+            "nombres": {"accion": "hablar / espada"}, "fuente": LETRA, "escala": 1}) == "volver" {
             en_controles = falso
         }
         devolver nulo

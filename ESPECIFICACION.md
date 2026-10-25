@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.3
+# 🐆 Lince — Especificación del Lenguaje v1.4
 
 ## Filosofía
 
@@ -1882,6 +1882,9 @@ pruebas.lanza("divide por 0", funcion(): nulo { sea x = 1 / 0 })  # la función 
 pruebas.resumen()                              # total; sale con código 1 si algo falló
 ```
 
+Con los archivos de pruebas llamados `prueba_algo.lince`, `lince probar` los ejecuta todos y dice
+qué parte del código recorren (ver [Pruebas y cobertura](#pruebas-y-cobertura-lince-probar)).
+
 ---
 
 ## Importar archivos y paquetes
@@ -1950,6 +1953,32 @@ lince ayuda
 ```
 
 Los paquetes se instalan en `~/.lince/paquetes/`.
+
+### Con la versión fija: `lince.paquetes`
+
+Con una versión, el paquete es del juego y no de todos:
+
+```bash
+lince instalar https://github.com/usuario/estrellas@v1.2   # una etiqueta, una rama o un commit
+lince instalar                                             # en otro ordenador: los de lince.paquetes
+```
+
+Se baja a la carpeta `paquetes/` del juego y se apunta en `lince.paquetes` (en la carpeta donde se
+ejecuta), con su versión, de dónde viene y su huella (SHA-256):
+
+```
+# nombre  versión  origen  huella (SHA-256)
+estrellas  v1.2  https://github.com/usuario/estrellas  018569e24204…
+```
+
+`lince instalar` sin nada más baja exactamente lo que dice ese archivo; si lo que llega no tiene la
+misma huella (el autor cambió esa versión), no lo instala y lo dice. Para cambiar de versión se
+instala otra vez con la nueva. Si hay un `lince.paquetes` en la carpeta, `lince instalar <url>`
+también instala para el juego (con la versión que ya tenía apuntada, o la rama `main`). `lince
+listar` enseña también los del juego, y `lince desinstalar` los quita de los dos sitios.
+
+`importar "paquete:nombre"` busca primero en la carpeta `paquetes/` que hay junto al programa, luego
+en la de la carpeta de trabajo y luego en `~/.lince/paquetes/`.
 
 ---
 
@@ -2068,6 +2097,97 @@ El tipo de una expresión solo se conoce cuando no hay duda (un literal, una var
 parámetro con tipo, lo que devuelve una función con tipo, `Clase(...)`); si no se sabe, no se
 avisa. Los miembros de una clase se comprueban si la clase y sus antecesoras están en el mismo
 archivo, y cuentan también los campos que se crean con `objeto.campo = ...` en cualquier sitio.
+
+---
+
+## Formatear (`lince formatear`)
+
+```bash
+lince formatear juego.lince libs/*.lince   # los deja con el estilo de Lince
+lince formatear --comprobar *.lince        # no toca nada; sale con 1 si alguno no lo tiene
+lince formatear --mostrar juego.lince      # escribe el resultado en la salida (para un editor)
+```
+
+El estilo de Lince es uno solo:
+
+- 4 espacios de sangría por cada llave, corchete o paréntesis que sigue abierto. Una línea que
+  sigue la anterior (porque esta acaba en un operador, o la siguiente empieza por `y`, `o`, `.`…)
+  lleva uno más; los parámetros de `funcion f(a,` que siguen en otra línea, dos más, para que no
+  se confundan con el cuerpo.
+- Un espacio alrededor de los operadores (`a + b`, `x = 1`, `a ?? b`) y después de `,`, `;` y `:`;
+  ninguno en `f(x)`, `l[0]`, `a.b`, `-x` ni `i++`.
+- Los bloques llevan espacio dentro (`si x > 0 { escribir(x) }`) y los diccionarios no
+  (`{"vida": 3}`).
+- Sin espacios al final de las líneas, sin líneas en blanco al principio ni al final y como mucho
+  dos seguidas.
+
+No cambia nada más: ni dónde se parten las líneas, ni los textos, ni los comentarios (un
+comentario al final de una línea conserva su hueco). Antes de escribir, vuelve a leer el resultado
+y comprueba que es el mismo programa, token a token; si no, no toca el archivo. Con un error de
+sintaxis, tampoco. El editor (`lince lsp`) formatea igual, y la extensión de VS Code lo hace al
+guardar.
+
+---
+
+## La ayuda, en los comentarios (`lince documentar`)
+
+Los comentarios que van justo encima de una función, clase, interfaz, método, enumeración, `fijo`
+o `sea` (sin una línea en blanco entre medias) son su ayuda. El primer bloque de comentarios del
+archivo, si va separado del código por una línea en blanco, es la ayuda del archivo entero.
+
+```lince
+# Lo que tarda en cruzar la pantalla a esa velocidad.
+funcion cruzar(numero velocidad): numero {
+    devolver 320 / velocidad
+}
+```
+
+El editor la enseña al pasar el ratón por el nombre (también si viene de otro archivo importado).
+`lince documentar libreria.lince` escribe una página en Markdown con la firma y la ayuda de cada
+cosa (`-o AYUDA.md` la guarda en un archivo). Lo que empieza por `_` o es `privado` no sale, ni
+las variables `sea` sin comentario; las rayas de adorno (`# ─────`) tampoco.
+
+---
+
+## Pruebas y cobertura (`lince probar`)
+
+```bash
+lince probar                      # las de la carpeta actual y sus subcarpetas
+lince probar pruebas              # las de una carpeta
+lince probar prueba_x.lince       # una sola
+lince probar --sin-cobertura
+```
+
+Una prueba es un archivo que se llama `prueba_algo.lince` o `algo_prueba.lince` (normalmente con
+el módulo [`pruebas`](#pruebas)). Cada una se ejecuta aparte, como con `lince prueba_algo.lince`,
+y pasa si termina bien; de las que fallan se enseña lo que escribieron. `lince probar` sale con 1
+si alguna falla.
+
+Luego viene la cobertura: para cada archivo que han usado las pruebas (sin contar las propias
+pruebas ni las bibliotecas de Lince), qué parte de sus sentencias se ha ejecutado alguna vez, y las
+líneas que no ha probado ninguna:
+
+```
+    70%  libs/cuentas.lince   sin probar: 10, 16-17
+```
+
+---
+
+## Perfil (`lince perfil`)
+
+`lince perfil juego.lince [argumentos]` ejecuta el programa como siempre y, al terminar, escribe
+en qué se ha ido el tiempo. En un juego, por fotograma (de un `juego.presentar()` al siguiente):
+
+| Parte | Qué es |
+|---|---|
+| Tu código (Lince) | el código del juego y las bibliotecas escritas en Lince |
+| Funciones de los módulos | las de C: `juego.dibujar`, `juego.texto`, `juego.sonar`… |
+| Mostrar el fotograma y esperar al siguiente | lo que hace `juego.presentar()` al final: con 60 fotogramas por segundo, casi todo es esperar |
+
+También el fotograma más lento y lo que tardó en arrancar (lo de antes del primer fotograma no
+cuenta en lo demás). Después, las funciones que más tardan, cada una con su propio tiempo, sin el
+de las funciones que llama, y cuántas veces se han llamado. Sin ventana, todo es el tiempo total.
+Medir hace el programa algo más lento.
 
 ---
 
@@ -2224,7 +2344,11 @@ lince/
 │   ├── juego.h         # módulo juego (SDL2 cargada al ejecutar)
 │   ├── terceros/       # stb_image, stb_vorbis y stb_truetype, tal cual
 │   ├── repl.c/h        # REPL interactivo con historial
-│   ├── paquetes.c/h    # gestor de paquetes
+│   ├── paquetes.c/h    # gestor de paquetes (y lince.paquetes)
+│   ├── revisor.c/h     # avisos sin ejecutar (lince comprobar, el editor)
+│   ├── formatear.c/h   # lince formatear
+│   ├── documentar.c/h  # la ayuda de los comentarios (lince documentar, el editor)
+│   ├── probar.c/h      # lince probar: las pruebas y su cobertura
 │   └── plataforma.h    # compatibilidad multiplataforma
 ├── tests/
 │   ├── runner.lince           # runner de tests del intérprete
