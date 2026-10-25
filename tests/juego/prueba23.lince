@@ -9,6 +9,7 @@ sea q = juego.hoja(h, {"quitar": [1]})
 escribir("quitando el 1: " + a_texto(q["origen"]) + " por_fila: " + a_texto(q["por_fila"]))
 sea r = juego.hoja("figuras.png", {"columnas": 2, "filas": 2})
 escribir("rejilla: " + a_texto(r["origen"]))
+escribir("pisadas: " + a_texto(juego.pisadas(h, nulo, [0, 1, 2, 3])) + " caja: " + a_texto(juego.caja(h, 0, 0, {"cuadro": 0})))
 juego.guardar_imagen(q, "quitada.png")
 escribir("guardada: " + a_texto(archivos.existe("quitada.png")))
 

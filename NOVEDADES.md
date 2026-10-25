@@ -3,18 +3,28 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
-## 0.14.0
+## 1.0.0
 
-`claves()` y `valores()` en los diccionarios, métodos e índice sobre un texto escrito tal cual, y dos fallos que reventaban el programa.
+**Lince 1.0: el lenguaje queda congelado.** Desde esta versión, lo que escribas hoy seguirá funcionando: el lenguaje solo se amplía (cosas nuevas que no rompen nada) y los fallos se arreglan. La 1.0 es el compromiso de estabilidad, después de revisar el lenguaje (igualdad por contenido, `ref` que funciona, `val` opcional, vacío es falso), de escribir el manual y la especificación completos, de hacer un juego entero con Lince (`juegos/la_piedra_del_lince`) y de probar el sonido, el teclado, el ratón y los mandos en equipos reales (Linux y Android; Windows se probó con wine y en la CI, aún no en un equipo real).
+
+Qué hay en la 1.0: el lenguaje y su especificación (`ESPECIFICACION.md`); el módulo `juego` con ventana, dibujo, sonido, mandos, pantalla táctil, hojas de sprites, mapas de Tiled, física y menús; `lince compilar`, `repartir` (Linux, Windows, `.apk` y `.aab`), el servidor de lenguaje (`lince lsp`) y el depurador (`lince depurar`, también `--ide`); y la extensión de VS Code.
+
+Trae además lo de la 0.14.0, que no llegó a publicarse por separado (ver su apartado más abajo), y que `pisadas()` y `caja()` también funcionen sin ventana, como `hoja()` (lo pidió el IDE).
 
 ### Descargas
 
 | Archivo | Qué es |
 |---|---|
-| `lince-0.14.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
-| `lince-0.14.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-1.0.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.0.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
 | `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
-| `lince-language-0.14.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-0.14.0.vsix` |
+| `lince-language-1.0.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.0.0.vsix` |
+
+## 0.14.0
+
+`claves()` y `valores()` en los diccionarios, métodos e índice sobre un texto escrito tal cual, y dos fallos que reventaban el programa.
+
+*La 0.14.0 no llegó a publicarse como versión: sus cambios están en la 1.0.0.*
 
 ### El lenguaje
 

@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v0.13
+# 🐆 Lince — Especificación del Lenguaje v1.0
 
 ## Filosofía
 
@@ -1306,7 +1306,7 @@ no tiene que saber nada. También vale con una hoja ya hecha: `hoja(OTRA, {"quit
 hoja (la que guarda `guardar_imagen()`) conserva su rejilla entera, con el hueco de los cuadros quitados;
 `"celda"` es el tamaño de cada celda de esa imagen.
 
-`hoja()`, `imagen()` y `guardar_imagen()` también funcionan **sin ventana** (sin llamar a `juego.abrir()`),
+`hoja()`, `imagen()`, `guardar_imagen()`, `pisadas()` y `caja()` también funcionan **sin ventana** (sin llamar a `juego.abrir()`),
 para herramientas que solo preparan imágenes: no hace falta SDL2 ni pantalla. Las imágenes cargadas así
 se pueden dibujar luego, cuando se abra la ventana.
 

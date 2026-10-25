@@ -18,11 +18,11 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Camino a la 1.0
 
-La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10, 0.11... **Cuando la 1.0 esté terminada y probada, el lenguaje se queda ahí y se pasa a trabajar en el IDE** (lince-motor, en su propia conversación). Para llegar a ella:
+**La 1.0 está publicada (2026-10-25): el lenguaje queda congelado.** Desde ahora el lenguaje solo se amplía (lo que se añade no rompe juegos ya escritos) y el trabajo pasa al IDE (lince-motor, en su propia conversación). Lo que hubo que hacer:
 
-- [ ] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
-- [ ] **Probado en real** (lo hace el autor): sonido, mandos (también por Bluetooth), teclado y ratón en equipos de verdad. Con `examples/probar_equipo` y la lista de su `LEEME.md`. Subir un juego a Google Play queda para después de la 1.0.
-- [x] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta: `juegos/la_piedra_del_lince`. Probado con wine (Windows) y en el emulador de Android 16; falta en un móvil y un Windows de verdad.
+- [x] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
+- [x] **Probado en real** por el autor con `examples/probar_equipo`: Linux y Android, con teclado, ratón, sonido y un mando de PS5 conectado al PC; todo bien. **Sin probar en un equipo real: Windows** (se probó con wine y en la CI de Windows) **y los mandos de Xbox y genéricos**. Si sale algún fallo ahí, se arregla como cualquier otro. Subir un juego a Google Play queda para después de la 1.0.
+- [x] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta: `juegos/la_piedra_del_lince`. Probado con wine (Windows) y en el emulador de Android 16.
 - [x] **El manual lo cubre todo:** el del lenguaje (con los módulos `matematica`, `texto`, `json`, `bytes` y `bits` y las herramientas) y una página para el módulo `juego` (`docs/juego.html`) con un ejemplo y su captura real para cada tema. La lista completa de funciones y opciones sigue en la especificación.
 
 ## Lenguaje

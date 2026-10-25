@@ -76,7 +76,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 20 "$LINCE" "$DIR/prueba2.li
 [ $? -eq 0 ] && ok "la segunda prueba termina bien" || mal "la segunda prueba falló"
 for l in "hoja: 32x16" "misma imagen: verdadero" "bmp: 10x10" "camara: -50" "imagen inexistente: ok" \
          "dibujar sin imagen: ok" "duración: 0.5" "ogg: 0.5" "sonido inválido: ok" "voz: verdadero" "volumen: 0.8" "reproducir sin sonido: ok" \
-         "mandos: 0" "sprite: 3x3" "botón a: falso" "eje: 0" "tiempo: verdadero"; do
+         "mandos: ok" "sprite: 3x3" "botón a: falso" "eje: 0" "tiempo: verdadero"; do
     grep -qxF "$l" salida2.txt && ok "$l" || mal "falta la línea: $l"
 done
 python3 - <<'PY' || fallos=$((fallos+1))
@@ -566,7 +566,7 @@ PY
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=3 LINCE_JUEGO_CAPTURA=sinventana.bmp timeout 30 "$LINCE" "$DIR/prueba23.lince" > salida29.txt 2>&1
 for l in "cuadros: 4 por_fila: [2, 2]" "origen: [[5, 5, 10, 16], [25, 8, 16, 15], [10, 28, 11, 11], [45, 30, 6, 6]]" \
          "quitando el 1: [[5, 5, 10, 16], [10, 28, 11, 11], [45, 30, 6, 6]] por_fila: [1, 2]" \
-         "rejilla: [[0, 0, 30, 20], [30, 0, 30, 20], [0, 20, 30, 20], [30, 20, 30, 20]]" "guardada: verdadero"; do
+         "rejilla: [[0, 0, 30, 20], [30, 0, 30, 20], [0, 20, 30, 20], [30, 20, 30, 20]]" "guardada: verdadero" "pisadas: [1] caja: [3, 0, 10, 16]"; do
     grep -qxF "$l" salida29.txt && ok "hoja sin ventana: $l" || mal "falta la línea: $l"
 done
 python3 - <<'PY' && ok "hoja sin ventana: al abrir la ventana se dibujan (797 píxeles rojos)" || mal "hoja sin ventana: no se dibuja al abrir la ventana"

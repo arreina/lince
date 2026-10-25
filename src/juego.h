@@ -3018,7 +3018,6 @@ static const char *jg_pisadas_de(JgHoja *h, int fila, const int *cuadros, int n)
    'cuadros' (la lista de una animación, o cuántos desde el 0), en esa
    secuencia: da sus posiciones en ella */
 static Valor *fn_jg_pisadas(Valor **a, int n) {
-    JG_ABIERTA();
     JgHoja *h = n > 0 ? jg_hoja_de(a[0]) : NULL;
     if (!h) return jg_error("ErrorTipo", "pisadas() espera una hoja de juego.hoja() (y, si quieres, una fila)");
     int fila = -1;
@@ -3758,7 +3757,6 @@ static Valor *jg_caja_en_pantalla(JgRect c, int cw, int ch, double x, double y, 
     return l;
 }
 static Valor *fn_jg_caja(Valor **a, int n) {
-    JG_ABIERTA();
     JgHoja *hoja = NULL;
     int fila = -1, cuadro = 0, es_animador = n > 0 && a[0]->tipo == VAL_DICCIONARIO && jg_dic(a[0], "animador");
     Valor *op = n > 3 ? a[3] : NULL;

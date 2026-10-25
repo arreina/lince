@@ -64,7 +64,8 @@ intentar {
 }
 
 juego.presentar()
-escribir("mandos: " + a_texto(juego.mandos()))
+juego.mandos()                       # cuántos haya: con o sin mandos conectados al equipo, no falla
+escribir("mandos: ok")
 escribir("botón a: " + a_texto(juego.boton("a")))
 escribir("eje: " + a_texto(juego.eje("izq_x")))
 escribir("tiempo: " + a_texto(juego.tiempo() >= 0))
