@@ -579,13 +579,13 @@ PY
 # ── LINCE_JUEGO_ESCENA: empezar en otra escena ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=8 timeout 30 "$LINCE" "$DIR/prueba24.lince" > salida30.txt 2>&1
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=8 LINCE_JUEGO_ESCENA=final timeout 30 "$LINCE" "$DIR/prueba24.lince" > salida31.txt 2>&1
-{ [ "$(cat salida30.txt)" = "$(printf 'entra en portada\nentra en partida\nacaba en partida')" ] && ok "escena: sin la variable, el juego va por sus escenas"; } || mal "escena: sin la variable"
-{ [ "$(cat salida31.txt)" = "$(printf 'entra en final\nacaba en final')" ] && ok "escena: LINCE_JUEGO_ESCENA=final empieza en esa escena"; } || mal "escena: LINCE_JUEGO_ESCENA=final"
+{ [ "$(tr -d '\r' < salida30.txt)" = "$(printf 'entra en portada\nentra en partida\nacaba en partida')" ] && ok "escena: sin la variable, el juego va por sus escenas"; } || mal "escena: sin la variable"
+{ [ "$(tr -d '\r' < salida31.txt)" = "$(printf 'entra en final\nacaba en final')" ] && ok "escena: LINCE_JUEGO_ESCENA=final empieza en esa escena"; } || mal "escena: LINCE_JUEGO_ESCENA=final"
 # ── LINCE_JUEGO_GRABAR_GUION: lo que se graba vuelve a reproducirse igual ──
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100 LINCE_JUEGO_GUION="30:derecha:20,50:z:1,10:espacio:5,70:f3:2,80:escape:1" \
     LINCE_JUEGO_GRABAR_GUION=guion1.txt timeout 30 "$LINCE" "$DIR/prueba25.lince" > /dev/null 2>&1
-SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100 LINCE_JUEGO_GUION="$(cat guion1.txt)" \
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100 LINCE_JUEGO_GUION="$(tr -d '\r' < guion1.txt)" \
     LINCE_JUEGO_GRABAR_GUION=guion2.txt timeout 30 "$LINCE" "$DIR/prueba25.lince" > /dev/null 2>&1
-[ "$(cat guion1.txt)" = "10:espacio:5,30:derecha:20,50:z:1,70:f3:2" ] && ok "grabar guion: apunta las teclas (sin Esc), por orden" || mal "grabar guion: $(cat guion1.txt)"
-cmp -s guion1.txt guion2.txt && ok "grabar guion: lo grabado se reproduce igual" || mal "grabar guion: al reproducirlo sale otra cosa"
+[ "$(tr -d '\r' < guion1.txt)" = "10:espacio:5,30:derecha:20,50:z:1,70:f3:2" ] && ok "grabar guion: apunta las teclas (sin Esc), por orden" || mal "grabar guion: $(cat guion1.txt)"
+[ "$(tr -d '\r' < guion1.txt)" = "$(tr -d '\r' < guion2.txt)" ] && ok "grabar guion: lo grabado se reproduce igual" || mal "grabar guion: al reproducirlo sale otra cosa: $(cat guion1.txt) / $(cat guion2.txt)"
 [ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida5b.txt; exit 1; }

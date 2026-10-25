@@ -1023,7 +1023,7 @@ static void jg_grabar_guion_empezar(void) {
 }
 
 static void jg_grabar_guion_escribir(void) {
-    FILE *f = fopen(_jg_grab_ruta, "w");
+    FILE *f = fopen(_jg_grab_ruta, "wb");        /* siempre con \n, también en Windows */
     if (!f) return;
     int orden[JG_GUION_GRABADO];                       /* por fotograma de inicio, el mismo orden que se pulsó */
     for (int i = 0; i < _jg_ngrab; i++) orden[i] = i;
