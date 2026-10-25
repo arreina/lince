@@ -184,6 +184,8 @@ const char *nombre_token(TipoToken tipo) {
         case TOK_COMA:         return "COMA";
         case TOK_PUNTO:        return "PUNTO";
         case TOK_DOS_PUNTOS:   return "DOS_PUNTOS";
+        case TOK_PUNTO_OPCIONAL: return "PUNTO_OPCIONAL";
+        case TOK_NULO_O:       return "NULO_O";
         case TOK_EOF:          return "EOF";
         default:               return "DESCONOCIDO";
     }
@@ -545,6 +547,11 @@ static int lexer_paso(Lexer *l) {
         case ',': agregar_token(l, TOK_COMA,         ",", linea); break;
         case '.': agregar_token(l, TOK_PUNTO,        ".", linea); break;
         case ':': agregar_token(l, TOK_DOS_PUNTOS,   ":", linea); break;
+        case '?':      /* x ?? otro, x?.campo: lo que hacer con un nulo */
+            if (actual(l) == '?')      { avanzar(l); agregar_token(l, TOK_NULO_O,         "??", linea); }
+            else if (actual(l) == '.') { avanzar(l); agregar_token(l, TOK_PUNTO_OPCIONAL, "?.", linea); }
+            else                       { error_lexico(l, '?'); }
+            break;
         default:  error_lexico(l, c); break;
     }
     return 1;

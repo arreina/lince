@@ -189,6 +189,7 @@ static Nodo *postfijo(Parser *p, Nodo *base) {
             n->metodo.metodo         = strdup(base->acceso.campo);
             n->metodo.argumentos     = args;
             n->metodo.num_argumentos = nargs;
+            n->metodo.opcional       = base->acceso.opcional;
             free(base->acceso.campo);
             free(base);
             base = n;
@@ -235,9 +236,10 @@ static Nodo *postfijo(Parser *p, Nodo *base) {
             base = n;
             continue;
         }
-        /* Acceso por punto: base.campo o base.metodo() */
-        if (coincide(p, TOK_PUNTO)) {
-            consumir(p, TOK_PUNTO, "'.'");
+        /* Acceso por punto: base.campo o base.metodo(); con '?.', nulo si
+           base es nulo, en vez de un error */
+        if (coincide(p, TOK_PUNTO) || coincide(p, TOK_PUNTO_OPCIONAL)) {
+            int opcional = consumir_cualquiera(p)->tipo == TOK_PUNTO_OPCIONAL;
             /* Aceptar cualquier identificador O keyword como nombre de campo/método */
             Token *nombre;
             if (coincide(p, TOK_IDENTIFICADOR)   ||
@@ -269,11 +271,13 @@ static Nodo *postfijo(Parser *p, Nodo *base) {
                 n->metodo.metodo        = strdup(nombre->valor);
                 n->metodo.argumentos    = args;
                 n->metodo.num_argumentos = nargs;
+                n->metodo.opcional      = opcional;
                 base = n;
             } else {
                 Nodo *n = nodo_nuevo(NODO_ACCESO, p);
-                n->acceso.objeto = base;
-                n->acceso.campo  = strdup(nombre->valor);
+                n->acceso.objeto   = base;
+                n->acceso.campo    = strdup(nombre->valor);
+                n->acceso.opcional = opcional;
                 base = n;
             }
             continue;
@@ -286,6 +290,24 @@ static Nodo *postfijo(Parser *p, Nodo *base) {
 /* ─────────────────────────────────────────
    EXPRESIONES (por precedencia)
 ───────────────────────────────────────── */
+/* La clave de un {…} escrito tal cual: un texto, o un número (también
+   negativo), que se guarda como dice lince_clave_numerica */
+static char *clave_diccionario(Parser *p) {
+    int negativo = 0;
+    if (coincide(p, TOK_MENOS) && p->tokens[p->pos + 1].tipo == TOK_NUMERO) {
+        consumir_cualquiera(p);
+        negativo = 1;
+    }
+    if (coincide(p, TOK_NUMERO)) {
+        Token *t = consumir_cualquiera(p);
+        char buf[48];
+        lince_clave_numerica(negativo ? -atof(t->valor) : atof(t->valor), buf, sizeof buf);
+        return strdup(buf);
+    }
+    Token *clave = consumir(p, TOK_TEXTO, "clave del diccionario (un texto entre comillas o un número)");
+    return strdup(clave->valor);
+}
+
 static Nodo *primario(Parser *p) {
     Token *t = actual(p);
 
@@ -471,16 +493,14 @@ static Nodo *primario(Parser *p) {
         Nodo **valores = malloc(sizeof(Nodo*)  * 256);
         int    cant    = 0;
         if (!coincide(p, TOK_LLAVE_DER)) {
-            Token *clave = consumir(p, TOK_TEXTO, "clave del diccionario entre comillas");
-            claves[cant] = strdup(clave->valor);
+            claves[cant] = clave_diccionario(p);
             consumir(p, TOK_DOS_PUNTOS, "':'");
             valores[cant] = expresion(p);
             cant++;
             while (coincide(p, TOK_COMA)) {
                 consumir(p, TOK_COMA, "','");
                 if (coincide(p, TOK_LLAVE_DER)) break;
-                clave = consumir(p, TOK_TEXTO, "clave del diccionario entre comillas");
-                claves[cant] = strdup(clave->valor);
+                claves[cant] = clave_diccionario(p);
                 consumir(p, TOK_DOS_PUNTOS, "':'");
                 valores[cant] = expresion(p);
                 cant++;
@@ -646,7 +666,7 @@ static int es_operador_logico(Parser *p, const char *w) {
     switch (ver_siguiente(p)->tipo) {
         case TOK_IGUAL: case TOK_MAS_IGUAL: case TOK_MENOS_IGUAL: case TOK_POR_IGUAL:
         case TOK_ENTRE_IGUAL: case TOK_MODULO_IGUAL: case TOK_MAS_MAS: case TOK_MENOS_MENOS:
-        case TOK_PUNTO: case TOK_CORCHETE_IZQ: case TOK_PAREN_IZQ: case TOK_EOF:
+        case TOK_PUNTO: case TOK_PUNTO_OPCIONAL: case TOK_CORCHETE_IZQ: case TOK_PAREN_IZQ: case TOK_EOF:
             return 0;
         default:
             return 1;
@@ -679,8 +699,23 @@ static Nodo *logica_o(Parser *p) {
     return izq;
 }
 
+/* x ?? otro: x, o 'otro' si x es nulo (que solo se calcula entonces).
+   Va por debajo de 'o': 'a o b ?? c' es '(a o b) ?? c'. */
+static Nodo *nulo_o(Parser *p) {
+    Nodo *izq = logica_o(p);
+    while (coincide(p, TOK_NULO_O)) {
+        consumir_cualquiera(p);
+        Nodo *n = nodo_nuevo(NODO_BINARIO, p);
+        strcpy(n->binario.operador, "??");
+        n->binario.izquierda = izq;
+        n->binario.derecha   = logica_o(p);
+        izq = n;
+    }
+    return izq;
+}
+
 static Nodo *expresion(Parser *p) {
-    return logica_o(p);
+    return nulo_o(p);
 }
 
 /* ─────────────────────────────────────────
@@ -1515,6 +1550,10 @@ static Nodo *asignar_a_cadena(Parser *p, Nodo *base) {
         if (op) strcpy(n->asignacion_indice.op, op);
         free(base);
         return n;
+    }
+    if (base->tipo == NODO_ACCESO && base->acceso.opcional) {
+        error_sintaxis(p, "Con '?.' se lee un campo, pero no se le puede asignar: usa '.' (y comprueba antes que no es nulo).");
+        return NULL;
     }
     if (base->tipo == NODO_ACCESO) {
         Nodo *n = nodo_nuevo(NODO_ASIGNACION_CAMPO, p);

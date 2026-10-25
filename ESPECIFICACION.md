@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.1
+# 🐆 Lince — Especificación del Lenguaje v1.2
 
 ## Filosofía
 
@@ -124,11 +124,37 @@ funcion f(): texto {
 | Operador | Significado |
 |----------|-------------|
 | `+` | suma / concatenación de texto o de listas (`[1, 2] + [3]`) |
-| `-` `*` `/` `%` | resta, multiplicación, división, módulo |
+| `-` `*` `/` `%` | resta, multiplicación, división, módulo; `*` con un texto o una lista los repite: `"ab" * 3` es `"ababab"`, `[0] * 4` es `[0, 0, 0, 0]` (también `3 * "ab"`); las listas y diccionarios de dentro salen copiados, así que `[[0] * 3] * 3` son tres filas distintas |
 | `++` `--` | incremento / decremento, como sentencia: `i++`, `mi.vidas--`, `puntos[j]++` |
 | `+=` `-=` `*=` `/=` `%=` | operar y guardar: `x += 5` es `x = x + 5` |
-| `==` `!=` `<` `>` `<=` `>=` | comparación (`==` compara listas y diccionarios por lo que tienen: `[1, 2] == [1, 2]`; dos objetos son iguales si son el mismo, o según su método `igual`) |
+| `==` `!=` `<` `>` `<=` `>=` | comparación (`==` compara listas y diccionarios por lo que tienen: `[1, 2] == [1, 2]`; dos objetos son iguales si son el mismo, o según su método `igual`; `<` y `>` entre textos, en orden alfabético) |
 | `y` `o` `no` | lógicos |
+| `??` | `x ?? otro`: `x`, o `otro` si `x` es `nulo` (solo `nulo`: `0`, `""` y `falso` se quedan) |
+| `?.` | `x?.campo`, `x?.metodo()`: `nulo` si `x` es `nulo`, en vez de un error |
+
+**Textos en orden alfabético.** `<`, `>`, `<=`, `>=` y `ordenar()` ordenan los textos como un
+diccionario: sin distinguir mayúsculas, cada vocal con tilde junto a la misma sin tilde, y la ñ
+entre la n y la o. Los signos y las cifras van antes que las letras (y se comparan cifra a cifra:
+`"10" < "9"`). Si dos textos solo se distinguen por las tildes o las mayúsculas, va antes el que
+no las lleva:
+
+```lince
+escribir("nube" < "ñu")          # verdadero
+escribir("Zorro" < "árbol")      # falso: la á es una a
+escribir(["oso", "Ñu", "árbol", "Zorro", "nube"].ordenar())   # ["árbol", "nube", "Ñu", "oso", "Zorro"]
+```
+
+**Cuando algo puede ser `nulo`.** `??` da un valor por defecto, y `?.` lee un campo o llama a un
+método solo si hay objeto. La parte de la derecha de `??` solo se calcula si hace falta, y `?.`
+vale para un paso: en una cadena se pone en cada uno que pueda faltar.
+
+```lince
+sea nombre = jugador.arma?.nombre ?? "sin arma"
+enemigo?.atacar()                    # no hace nada si no hay enemigo
+sea x = nivel?.jefe?.vida ?? 0
+```
+
+Con `?.` se lee, pero no se asigna: `x?.vida = 3` es un error de sintaxis.
 
 `y` y `o` son operadores solo entre dos valores; fuera de ahí son nombres normales, porque en un
 juego `x` e `y` salen en cada línea:
@@ -250,7 +276,7 @@ Sin necesidad de `importar`:
 escribir("Hola")           # imprime en pantalla
 leer("¿Tu nombre? ")       # lee del teclado
 
-a_numero("3.14")           # texto → número
+a_numero("3.14")           # texto → número (los espacios de alrededor no cuentan: " 3 " es 3)
 a_texto(42)                # número → texto (una lista o un diccionario, como los escribe escribir)
 a_logico(1)                # valor → lógico
 
@@ -391,7 +417,7 @@ nums + [4, 5]           # las dos seguidas, en una lista nueva
 ```
 
 `ordenar()` usa el orden natural: números por valor, textos
-alfabéticamente. Para otro criterio se le pasa una función comparadora
+alfabéticamente (como `<`: ver «Operadores»). Para otro criterio se le pasa una función comparadora
 que devuelve un número negativo si el primer elemento va antes, positivo
 si va después y cero si da igual:
 
@@ -425,6 +451,16 @@ d.eliminar("edad")
 
 d.claves()              # ["nombre", "ciudad"]
 d.valores()             # ["Ana", "Madrid"]
+```
+
+Las claves son textos o **números**: `{1: "uno", 2: "dos"}`, `d[3] = "tres"`. Un número y su
+texto son claves distintas (`d[1]` no es `d["1"]`), y `1` y `1.0` son la misma. `claves()` y
+`para cada` devuelven las numéricas como números; al pasar a JSON (`json.texto`) salen como texto,
+que es lo único que admite JSON.
+
+```lince
+sea premios = {1: "oro", 2: "plata", 3: "bronce"}
+escribir(premios[puesto])
 ```
 
 `claves()` y `valores()` devuelven listas en el orden en que se metieron,
@@ -1016,6 +1052,9 @@ texto.dividir("a,b,c", ",")   # ["a", "b", "c"]
 texto.unir(["a","b"], "-")    # "a-b"
 texto.invertir("hola")        # "aloh"
 texto.posicion("hola", "ol")  # 1
+texto.decimales(3.5, 2)       # "3.50": siempre con esos decimales (de 0 a 20), redondeando
+texto.miles(1234567)          # "1.234.567"; con decimales, "1.234,5", como en español
+texto.miles(1234567, ",")     # "1,234,567"; con otro separador, los decimales tras un punto
 ```
 
 ### `archivos`

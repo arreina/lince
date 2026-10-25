@@ -171,6 +171,10 @@
         {
           "name": "keyword.operator.arrow.lince",
           "match": "->"
+        },
+        {
+          "name": "keyword.operator.null.lince",
+          "match": "(\\?\\?|\\?\\.)"
         }
       ]
     },

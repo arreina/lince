@@ -1,6 +1,6 @@
 # @seccion: Diccionarios
 # @titulo: Crear, leer y recorrer
-# @nota: Las claves son texto. `para cada` sobre un diccionario recorre las claves, y `claves()` y `valores()` las dan como listas.
+# @nota: Las claves son texto o número. `para cada` sobre un diccionario recorre las claves, y `claves()` y `valores()` las dan como listas.
 sea persona = {"nombre": "Ana", "edad": 22}
 persona["ciudad"] = "Córdoba"
 

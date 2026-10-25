@@ -6,6 +6,7 @@
 #ifndef LINCE_PARSER_H
 #define LINCE_PARSER_H
 
+#include <stdio.h>
 #include "lexer.h"
 
 /* ─────────────────────────────────────────
@@ -278,12 +279,14 @@ struct Nodo {
             char  *metodo;
             Nodo **argumentos;
             int    num_argumentos;
+            int    opcional;       /* objeto?.metodo(): nulo si el objeto es nulo */
         } metodo;
 
         /* NODO_ACCESO: objeto.campo */
         struct {
             Nodo *objeto;
             char *campo;
+            int   opcional;        /* objeto?.campo */
         } acceso;
 
         /* NODO_CLASE */
@@ -419,5 +422,17 @@ void    parser_conocer_enumeraciones(Parser *p, const char *texto,
                                      void (*importa)(const char *nombre, void *ctx), void *ctx);
 void    nodo_destruir(Nodo *n);
 void    nodo_imprimir(Nodo *n, int nivel);
+
+/* Un número como clave de diccionario ({1: "uno"}, d[3]) se guarda como
+   texto con este byte delante, para no confundirlo con la clave "1"; al
+   sacarlo (claves(), para cada, escribir) vuelve a ser un número. */
+#define LINCE_CLAVE_NUMERO '\x01'
+static inline void lince_clave_numerica(double d, char *buf, size_t tam) {
+    if (d == 0) d = 0;                           /* -0 y 0, la misma clave */
+    if (d == (double)(long long)d && d > -1e15 && d < 1e15)
+        snprintf(buf, tam, "%c%lld", LINCE_CLAVE_NUMERO, (long long)d);
+    else
+        snprintf(buf, tam, "%c%.17g", LINCE_CLAVE_NUMERO, d);
+}
 
 #endif /* LINCE_PARSER_H */

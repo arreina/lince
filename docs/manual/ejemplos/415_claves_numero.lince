@@ -1,0 +1,14 @@
+# @seccion: Diccionarios
+# @titulo: Números como claves
+# @nota: Una clave también puede ser un número: `{1: "oro"}`, `d[3] = x`. Sigue siendo un número al sacarla con `claves()` o `para cada`, y `d[1]` no es lo mismo que `d["1"]`.
+sea premios = {1: "oro", 2: "plata", 3: "bronce"}
+escribir(premios[2])
+
+sea casillas = {}
+casillas[10] = "cofre"
+casillas[25] = "trampa"
+para cada numero n en casillas {
+    escribir("casilla {n}, la siguiente es {n + 1}: {casillas[n]}")
+}
+escribir(casillas.contiene(10))
+escribir(casillas.contiene("10"))

@@ -1,0 +1,13 @@
+# @seccion: Texto
+# @titulo: En orden alfabético, y repetir
+# @nota: `<` y `>` comparan textos como un diccionario: sin mirar mayúsculas, la vocal con tilde junto a la misma sin tilde y la ñ entre la n y la o. `ordenar()` usa el mismo orden. Con `*`, un texto o una lista se repiten (las listas de dentro salen copiadas: cada fila de la rejilla es suya).
+escribir("nube" < "ñu")
+escribir("Zorro" < "árbol")
+escribir(["oso", "Ñu", "árbol", "Zorro", "nube"].ordenar())
+
+escribir("-" * 20)
+escribir([0] * 5)
+
+sea rejilla = [[0] * 3] * 2
+rejilla[0][1] = 7
+escribir(rejilla)

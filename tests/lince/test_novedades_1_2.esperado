@@ -1,0 +1,45 @@
+verdadero
+falso
+[verdadero, verdadero]
+[verdadero, verdadero, verdadero]
+["10", "9", "Ana", "ana", "árbol", "nube", "Ñu", "oso", "Zorro"]
+["ababab", "--", ""]
+[[0, 0, 0], [1, 2, 1, 2], []]
+{1: uno, -2: menos dos, "1": texto uno, 2.5: dos y medio}
+["uno", "texto uno", "menos dos", "dos y medio"]
+[verdadero, falso, [1, -2, "1", 2.5, 3]]
+[1, 2]
+[-2, -1]
+["1", "11"]
+[2.5, 3.5]
+{"1": "a"}
+[3, 4.5]
+neg ok
+dec ok
+La clave de un diccionario debe ser texto o número.
+La clave 9 no existe en el diccionario.
+abab
+sin arma
+nulo
+nada
+0
+espada
+3
+nulo
+5
+0
+falso
+0
+7
+5
+sin error
+sin ? falla: ok
+vacío
+["3.50", "2", "0.00", "7.0"]
+["12.000", "-1.234.567", "999", "1.234,5", "12,000", "1 234 567", "0"]
+ok
+[[0, 0, 0], [0, 5, 0], [0, 0, 0]]
+[{"x": 9}, {"x": 0}]
+[]
+
+[[1, 2], [1, 2]]

@@ -3,6 +3,27 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.2.0
+
+La primera versión del camino a la 2.0 (ver `PENDIENTE.md`): lo pequeño que quedó pendiente del lenguaje. Todo lo nuevo antes daba error, así que ningún juego escrito cambia, salvo lo de `ordenar()` (abajo).
+
+- **Textos en orden alfabético con `<`, `>`, `<=` y `>=`**: sin distinguir mayúsculas, cada vocal con tilde junto a la misma sin tilde y la ñ entre la n y la o (`"nube" < "ñu"`, `"Zorro" < "árbol"` es falso).
+- **`ordenar()` ordena los textos igual**, que es lo que ya decía la especificación («alfabéticamente»). Hasta ahora los ordenaba por el código de cada letra: las mayúsculas antes que todas las minúsculas y las letras con tilde al final, detrás de la z.
+- **Repetir con `*`**: `"ab" * 3` es `"ababab"`, `[0] * 4` es `[0, 0, 0, 0]` (y al revés: `3 * "ab"`). Las listas y diccionarios de dentro salen copiados: `[[0] * 3] * 3` es una rejilla de tres filas distintas.
+- **Números como claves de diccionario**: `{1: "oro", 2: "plata"}`, `d[3] = x`. `claves()` y `para cada` las dan como números; `d[1]` y `d["1"]` son claves distintas.
+- **`x ?? otro`**: `x`, o `otro` si `x` es `nulo`. **`x?.campo` y `x?.metodo()`**: `nulo` si `x` es `nulo`, en vez de un error.
+- **`a_numero(" 3 ")`** acepta espacios alrededor.
+- **`texto.decimales(3.5, 2)`** → `"3.50"` y **`texto.miles(12000)`** → `"12.000"` (y `"1.234,5"` con decimales).
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.2.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.2.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.2.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.2.0.vsix` |
+
 ## 1.1.0
 
 Dos variables de entorno nuevas para el IDE (lince-motor); no cambian nada de lo que ya hay:

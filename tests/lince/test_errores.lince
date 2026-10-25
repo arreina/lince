@@ -82,8 +82,8 @@ escribir(dividir_seguro(10, 0))
 sea s = "hola"
 sea diccionario d = {"a": 1}
 intentar { escribir(s.contiene(5)) } capturar (ErrorTipo e) { escribir(e.tipo) }
-intentar { escribir(d.contiene(5)) } capturar (ErrorTipo e) { escribir(e.tipo) }
-intentar { d.eliminar(5) }           capturar (ErrorTipo e) { escribir(e.tipo) }
+intentar { escribir(d.contiene([5])) } capturar (ErrorTipo e) { escribir(e.tipo) }
+intentar { d.eliminar([5]) }           capturar (ErrorTipo e) { escribir(e.tipo) }
 intentar { escribir(s.contiene([1])) } capturar (ErrorTipo e) { escribir(e.tipo) }
 intentar { escribir(d.contiene(nulo)) } capturar (ErrorTipo e) { escribir(e.tipo) }
 # Y lo correcto sigue funcionando

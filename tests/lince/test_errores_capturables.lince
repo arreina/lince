@@ -27,7 +27,7 @@ intentar {
 
 intentar {
     sea d = {"a": 1}
-    d[1] = 2
+    d[[1]] = 2
     escribir("clave-no-texto: NO dio error")
 } capturar (error e) {
     escribir("clave-no-texto: " + e.tipo)

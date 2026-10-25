@@ -83,7 +83,7 @@ static void mostrar_modulos(void) {
                     "               posicion, contar, extraer, es_numero,\n"
                     "               es_letra, es_vacio, empieza_con,\n"
                     "               termina_con, rellenar_izq, rellenar_der,\n"
-                    "               centrar\n", C(AMARILLO), C(RESET));
+                    "               centrar, decimales, miles\n", C(AMARILLO), C(RESET));
     fprintf(stdout, "  %sarchivos%s   — leer, escribir, agregar, existe\n",
             C(AMARILLO), C(RESET));
     fprintf(stdout, "  %stiempo%s     — ahora, esperar, fecha, hora\n\n",

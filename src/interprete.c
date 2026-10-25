@@ -490,6 +490,46 @@ int utf8_es_letra(const char *s) {
     return 1;
 }
 
+/* Peso de un carácter en el orden alfabético: mayúsculas y minúsculas
+   pesan lo mismo, las vocales con tilde o diéresis lo mismo que sin ella,
+   y la ñ va entre la n y la o. Antes de las letras van los signos y los
+   números; después, lo que no es del alfabeto latino. Avanza '*s'. */
+static long peso_alfabetico(const char **s) {
+    const unsigned char *u = (const unsigned char *)*s;
+    int k = utf8_tam(*s);
+    *s += k;
+    if (u[0] < 0x80) {
+        int c = tolower(u[0]);
+        if (c >= 'a' && c <= 'z') return 300 + (c - 'a') * 4;
+        if (c >= '0' && c <= '9') return 200 + (c - '0');
+        return c;
+    }
+    if (k == 2 && u[0] == 0xC3) {
+        /* U+00C0..U+00FF, sin distinguir mayúsculas (0x20 de diferencia) */
+        static const char base[] ="aaaaaa_ceeeeiiii_nooooo_ouuuuy__";
+        char b = base[(u[1] - 0x80) & 0x1F];
+        if (b == 'n') return 300 + ('n' - 'a') * 4 + 2;      /* ñ */
+        if (b != '_') return 300 + (b - 'a') * 4;
+    }
+    long cp = u[0];                                          /* el resto, por su código */
+    for (int i = 1; i < k; i++) cp = (cp << 6) | (u[i] & 0x3F);
+    return 100000 + cp;
+}
+
+/* Orden alfabético de dos textos: el de '<', '>' y ordenar(). Si solo se
+   distinguen por las tildes o las mayúsculas, decide el byte (así "papa"
+   va antes que "papá" y el orden es siempre el mismo). */
+int texto_comparar(const char *a, const char *b) {
+    const char *p = a, *q = b;
+    while (*p && *q) {
+        long x = peso_alfabetico(&p), y = peso_alfabetico(&q);
+        if (x != y) return x < y ? -1 : 1;
+    }
+    if (*p || *q) return *p ? 1 : -1;
+    int c = strcmp(a, b);
+    return c < 0 ? -1 : (c > 0);
+}
+
 Valor *valor_diccionario_crear(void) {
     Valor *v = valor_alloc();
     v->tipo                  = VAL_DICCIONARIO;
@@ -671,6 +711,24 @@ static Valor *clave_de(Valor *idx) {
     return t;
 }
 
+/* Cómo se guarda en un diccionario la clave 'idx' (ya pasada por clave_de):
+   un texto tal cual y un número con lince_clave_numerica, en 'buf'. NULL si
+   no vale como clave. */
+static const char *clave_guardada(Valor *idx, char *buf, size_t tam) {
+    if (idx->tipo == VAL_TEXTO) return idx->texto;
+    if (idx->tipo == VAL_NUMERO && !isnan(idx->numero)) {
+        lince_clave_numerica(idx->numero, buf, tam);
+        return buf;
+    }
+    return NULL;
+}
+
+/* Lo contrario: la clave guardada como valor de Lince (claves(), para cada) */
+static Valor *valor_de_clave(const char *k) {
+    if (k[0] == LINCE_CLAVE_NUMERO) return valor_numero(strtod(k + 1, NULL));
+    return valor_texto(k);
+}
+
 /* Convierte un valor a texto para escribir() */
 static char *valor_a_texto(Valor *v) {
     char buf[4096];
@@ -761,9 +819,11 @@ static char *valor_a_texto(Valor *v) {
         case VAL_DICCIONARIO: {
             char tmp[4096] = "{";
             for (int i = 0; i < v->diccionario.cantidad; i++) {
-                strncat(tmp, "\"", sizeof(tmp) - strlen(tmp) - 1);
-                strncat(tmp, v->diccionario.claves[i], sizeof(tmp) - strlen(tmp) - 1);
-                strncat(tmp, "\": ", sizeof(tmp) - strlen(tmp) - 1);
+                const char *k = v->diccionario.claves[i];
+                int num = k[0] == LINCE_CLAVE_NUMERO;     /* {1: …}, sin comillas */
+                if (!num) strncat(tmp, "\"", sizeof(tmp) - strlen(tmp) - 1);
+                strncat(tmp, k + num, sizeof(tmp) - strlen(tmp) - 1);
+                strncat(tmp, num ? ": " : "\": ", sizeof(tmp) - strlen(tmp) - 1);
                 char *s = valor_a_texto(v->diccionario.valores[i]);
                 strncat(tmp, s, sizeof(tmp) - strlen(tmp) - 1);
                 free(s);
@@ -1286,11 +1346,41 @@ static Valor *operador_objeto(Valor *izq, Valor *der, const char *op, int linea)
 
 static Valor *operar(Valor *izq, Valor *der, const char *op, int linea);
 
+/* Para lista * n: una copia de las listas y diccionarios (también los de
+   dentro); lo demás, compartido como siempre. 'hondo' corta una lista que
+   se contiene a sí misma. */
+static Valor *copia_para_repetir(Valor *v, int hondo) {
+    if (hondo > 32) return valor_copiar(v);
+    if (v->tipo == VAL_LISTA) {
+        Valor *l = valor_lista_crear();
+        for (int i = 0; i < v->lista.cantidad; i++)
+            lista_agregar(l, copia_para_repetir(v->lista.elementos[i], hondo + 1));
+        return l;
+    }
+    if (v->tipo == VAL_DICCIONARIO && !v->es_modulo) {
+        Valor *d = valor_diccionario_crear();
+        valor_diccionario_asegurar(d, v->diccionario.cantidad);
+        for (int i = 0; i < v->diccionario.cantidad; i++) {
+            d->diccionario.claves[i]  = strdup(v->diccionario.claves[i]);
+            d->diccionario.valores[i] = copia_para_repetir(v->diccionario.valores[i], hondo + 1);
+            d->diccionario.cantidad++;
+        }
+        return d;
+    }
+    return valor_copiar(v);
+}
+
 static Valor *exec_binario(Nodo *n, Entorno *e) {
     if (n->binario.operador[0] == 'e' && n->binario.operador[1] == 's' && !n->binario.operador[2])
         return exec_es(n, e);
     Valor *izq = ejecutar(n->binario.izquierda, e);
     const char *op = n->binario.operador;
+    /* x ?? otro: la derecha solo se calcula si hace falta */
+    if (op[0] == '?') {
+        if (izq->tipo != VAL_NULO || hay_error) return izq;
+        valor_destruir(izq);
+        return ejecutar(n->binario.derecha, e);
+    }
     /* 'y' / 'o' en cortocircuito: si la izquierda ya decide, la derecha no se
        evalúa (así 'lista.longitud() > 0 y lista[0] == x' no falla con la lista vacía) */
     if ((op[0] == 'y' || op[0] == 'o') && !op[1] && izq->tipo != VAL_OBJETO) {
@@ -1406,6 +1496,44 @@ static Valor *operar(Valor *izq, Valor *der, const char *op, int linea) {
         int cmp = strcmp(izq->texto, der->texto);
         if (strcmp(op, "==") == 0) resultado = valor_booleano(cmp == 0);
         else if (strcmp(op, "!=") == 0) resultado = valor_booleano(cmp != 0);
+        else if (op[0] == '<' || op[0] == '>') {     /* en orden alfabético */
+            int c = texto_comparar(izq->texto, der->texto);
+            int r = op[0] == '<' ? (op[1] ? c <= 0 : c < 0) : (op[1] ? c >= 0 : c > 0);
+            resultado = valor_booleano(r);
+        }
+    }
+
+    /* Repetir: "ab" * 3 es "ababab" y [0] * 3 es [0, 0, 0]; también al revés.
+       Las listas y diccionarios de dentro se copian, en cada vuelta, para
+       que [[0] * 3] * 3 sean tres filas distintas y no la misma tres veces. */
+    if (!resultado && op[0] == '*' && !op[1] &&
+        ((izq->tipo == VAL_NUMERO && (der->tipo == VAL_TEXTO || der->tipo == VAL_LISTA)) ||
+         (der->tipo == VAL_NUMERO && (izq->tipo == VAL_TEXTO || izq->tipo == VAL_LISTA)))) {
+        Valor *cosa = izq->tipo == VAL_NUMERO ? der : izq;
+        double veces = (izq->tipo == VAL_NUMERO ? izq : der)->numero;
+        size_t largo = cosa->tipo == VAL_TEXTO ? strlen(cosa->texto) : (size_t)cosa->lista.cantidad;
+        if (veces < 0 || veces != floor(veces)) {
+            valor_destruir(izq); valor_destruir(der);
+            return error_rt("ErrorArgumento", linea,
+                "'*' repite un texto o una lista un número entero de veces (0 o más), y le llegó %g.", veces);
+        }
+        if (largo > 0 && veces > (double)(256u << 20) / (double)largo) {
+            valor_destruir(izq); valor_destruir(der);
+            return error_rt("ErrorRango", linea, "Repetirlo %g veces daría algo demasiado grande.", veces);
+        }
+        size_t n = largo ? (size_t)veces : 0;
+        if (cosa->tipo == VAL_TEXTO) {
+            char *buf = malloc(largo * n + 1);
+            for (size_t i = 0; i < n; i++) memcpy(buf + i * largo, cosa->texto, largo);
+            buf[largo * n] = '\0';
+            resultado = valor_texto_propio(buf);
+        } else {
+            Valor *l = valor_lista_crear();
+            for (size_t i = 0; i < n; i++)
+                for (size_t j = 0; j < largo; j++)
+                    lista_agregar(l, copia_para_repetir(cosa->lista.elementos[j], 0));
+            resultado = l;
+        }
     }
 
     /* Listas: lista + lista es una lista nueva con las dos seguidas (las de
@@ -2014,7 +2142,7 @@ static int valor_comparar_natural(Valor *a, Valor *b) {
     if (a->tipo == VAL_NUMERO && b->tipo == VAL_NUMERO)
         return a->numero < b->numero ? -1 : (a->numero > b->numero ? 1 : 0);
     if (a->tipo == VAL_TEXTO && b->tipo == VAL_TEXTO)
-        return strcmp(a->texto, b->texto);
+        return texto_comparar(a->texto, b->texto);
     if (a->tipo == VAL_BOOLEANO && b->tipo == VAL_BOOLEANO)
         return (a->booleano ? 1 : 0) - (b->booleano ? 1 : 0);
     return (int)a->tipo - (int)b->tipo;
@@ -2808,7 +2936,7 @@ static Valor *exec_para_cada(Nodo *n, Entorno *e) {
     /* ── Diccionario — itera sobre claves ── */
     if (col->tipo == VAL_DICCIONARIO) {
         for (int i = 0; i < col->diccionario.cantidad && !hay_retorno && !hay_error; i++) {
-            Valor *clave = valor_texto(col->diccionario.claves[i]);
+            Valor *clave = valor_de_clave(col->diccionario.claves[i]);
 
             validar_tipo(clave, n->para_cada.tipo, "variable del bucle", n->para_cada.variable, n->linea);
 
@@ -3074,15 +3202,17 @@ static Valor *exec_indice(Nodo *n, Entorno *e) {
         return res;
     }
     if (obj->tipo == VAL_DICCIONARIO) {
-        if (idx->tipo != VAL_TEXTO) {
+        char kbuf[48];
+        const char *k = clave_guardada(idx, kbuf, sizeof kbuf);
+        if (!k) {
             valor_error = valor_error_nuevo("ErrorTipo",
-                "La clave de un diccionario debe ser texto.", n->linea);
+                "La clave de un diccionario debe ser texto o número.", n->linea);
             hay_error = 1;
             valor_destruir(obj); valor_destruir(idx);
             return valor_nulo();
         }
         {
-            int i = valor_diccionario_buscar(obj, idx->texto);
+            int i = valor_diccionario_buscar(obj, k);
             if (i >= 0) {
                 Valor *res = valor_copiar(obj->diccionario.valores[i]);
                 valor_destruir(obj); valor_destruir(idx);
@@ -3090,8 +3220,10 @@ static Valor *exec_indice(Nodo *n, Entorno *e) {
             }
         }
         char msg[256];
-        snprintf(msg, sizeof(msg),
-            "La clave \"%s\" no existe en el diccionario.", idx->texto);
+        if (k == kbuf)
+            snprintf(msg, sizeof(msg), "La clave %s no existe en el diccionario.", k + 1);
+        else
+            snprintf(msg, sizeof(msg), "La clave \"%s\" no existe en el diccionario.", k);
         valor_error = valor_error_nuevo("ErrorRango", msg, n->linea);
         hay_error = 1;
         valor_destruir(obj); valor_destruir(idx);
@@ -3206,12 +3338,14 @@ static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
         return valor_nulo();
     }
     if (obj->tipo == VAL_DICCIONARIO) {
-        if (idx->tipo != VAL_TEXTO) {
+        char kbuf[48];
+        const char *k = clave_guardada(idx, kbuf, sizeof kbuf);
+        if (!k) {
             valor_destruir(obj); valor_destruir(idx); valor_destruir(val);
-            return error_rt("ErrorTipo", n->linea, "La clave de un diccionario debe ser texto.");
+            return error_rt("ErrorTipo", n->linea, "La clave de un diccionario debe ser texto o número.");
         }
         {
-            int i = valor_diccionario_buscar(obj, idx->texto);
+            int i = valor_diccionario_buscar(obj, k);
             if (i >= 0) {
                 valor_destruir(obj->diccionario.valores[i]);
                 obj->diccionario.valores[i] = val;
@@ -3224,7 +3358,7 @@ static Valor *exec_asignacion_indice(Nodo *n, Entorno *e) {
         /* Clave nueva */
         valor_diccionario_asegurar(obj, obj->diccionario.cantidad + 1);
         int i = obj->diccionario.cantidad;
-        obj->diccionario.claves[i]  = strdup(idx->texto);
+        obj->diccionario.claves[i]  = strdup(k);
         obj->diccionario.valores[i] = val;
         obj->diccionario.cantidad++;
         if (n->asignacion_indice.objeto->tipo == NODO_IDENTIFICADOR)
@@ -3405,6 +3539,7 @@ static char *texto_reemplazar(const char *src, const char *pat, const char *rep)
 static Valor *exec_metodo(Nodo *n, Entorno *e) {
     Valor *obj = ejecutar(n->metodo.objeto, e);
     const char *met = n->metodo.metodo;
+    if (n->metodo.opcional && obj->tipo == VAL_NULO) return obj;   /* nulo?.metodo() */
 
     /* ── Módulo (diccionario con funciones nativas) ── */
     if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
@@ -3808,13 +3943,15 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 valor_destruir(obj);
                 return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
             }
-            Valor *clave = ejecutar(n->metodo.argumentos[0], e);
+            Valor *clave = clave_de(ejecutar(n->metodo.argumentos[0], e));
+            char kbuf[48];
+            const char *k = clave_guardada(clave, kbuf, sizeof kbuf);
             Valor *r;
             if (hay_error) r = valor_nulo();
-            else if (clave->tipo != VAL_TEXTO)
+            else if (!k)
                 r = error_rt("ErrorTipo", n->linea,
-                    "La clave de un diccionario debe ser texto.");
-            else r = valor_booleano(valor_diccionario_buscar(obj, clave->texto) >= 0);
+                    "La clave de un diccionario debe ser texto o número.");
+            else r = valor_booleano(valor_diccionario_buscar(obj, k) >= 0);
             valor_destruir(clave); valor_destruir(obj);
             return r;
         }
@@ -3829,15 +3966,17 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 return error_rt("ErrorArgumento", n->linea,
                     "'eliminar' necesita exactamente 1 argumento (clave).");
             }
-            Valor *clave = ejecutar(n->metodo.argumentos[0], e);
+            Valor *clave = clave_de(ejecutar(n->metodo.argumentos[0], e));
             if (hay_error) { valor_destruir(clave); valor_destruir(obj); return valor_nulo(); }
-            if (clave->tipo != VAL_TEXTO) {
+            char kbuf[48];
+            const char *k = clave_guardada(clave, kbuf, sizeof kbuf);
+            if (!k) {
                 valor_destruir(clave); valor_destruir(obj);
                 return error_rt("ErrorTipo", n->linea,
-                    "La clave de un diccionario debe ser texto.");
+                    "La clave de un diccionario debe ser texto o número.");
             }
             {
-                int i = valor_diccionario_buscar(obj, clave->texto);
+                int i = valor_diccionario_buscar(obj, k);
                 if (i >= 0) {
                     free(obj->diccionario.claves[i]);
                     valor_destruir(obj->diccionario.valores[i]);
@@ -3860,7 +3999,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                'para cada' era la única forma de verlas. */
             Valor *l = valor_lista_crear();
             for (int i = 0; i < obj->diccionario.cantidad; i++)
-                lista_agregar(l, valor_texto(obj->diccionario.claves[i]));
+                lista_agregar(l, valor_de_clave(obj->diccionario.claves[i]));
             valor_destruir(obj);
             return l;
         }
@@ -4166,7 +4305,9 @@ static Valor *acceso_en(Nodo *n, Valor *obj, const char *campo, Entorno *e) {
 }
 
 static Valor *exec_acceso(Nodo *n, Entorno *e) {
-    return acceso_en(n, ejecutar(n->acceso.objeto, e), n->acceso.campo, e);
+    Valor *obj = ejecutar(n->acceso.objeto, e);
+    if (n->acceso.opcional && obj->tipo == VAL_NULO) return obj;    /* nulo?.campo */
+    return acceso_en(n, obj, n->acceso.campo, e);
 }
 
 /* Crea el FuncionLince de un método de clase a partir de su nodo. */
@@ -5140,8 +5281,10 @@ static Valor *fn_conv_numero(Valor **a, int n) {
         case VAL_BOOLEANO: return valor_numero(v->booleano ? 1.0 : 0.0);
         case VAL_TEXTO: {
             char *fin;
-            double d = strtod(v->texto, &fin);
-            if (fin == v->texto || *fin != '\0') {
+            double d = strtod(v->texto, &fin);       /* salta los espacios de delante */
+            char *resto = fin;
+            while (isspace((unsigned char)*resto)) resto++;      /* y los de detrás: " 3 " */
+            if (fin == v->texto || *resto != '\0') {
                 hay_error = 1;
                 char msg[256];
                 snprintf(msg, sizeof(msg),

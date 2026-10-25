@@ -118,6 +118,8 @@ typedef enum {
     TOK_COMA,
     TOK_PUNTO,
     TOK_DOS_PUNTOS,     /* : */
+    TOK_PUNTO_OPCIONAL, /* ?. */
+    TOK_NULO_O,         /* ?? */
 
     /* Control */
     TOK_EOF,

@@ -292,7 +292,9 @@ static void b_valor(Buf *b, Valor *v) {
             b_txt(b, "{");
             for (int i = 0; i < v->diccionario.cantidad && b->n <= LARGO_VALOR; i++) {
                 if (i) b_txt(b, ", ");
-                b_texto_lince(b, v->diccionario.claves[i]);
+                if (v->diccionario.claves[i][0] == LINCE_CLAVE_NUMERO)
+                    b_txt(b, v->diccionario.claves[i] + 1);     /* {1: …} */
+                else b_texto_lince(b, v->diccionario.claves[i]);
                 b_txt(b, ": ");
                 b_valor(b, v->diccionario.valores[i]);
             }

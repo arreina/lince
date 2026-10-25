@@ -1,0 +1,76 @@
+# TEST: lo nuevo de la 1.2 (textos en orden, repetir con *, números como claves,
+# a_numero con espacios, ?? y ?., texto.decimales y texto.miles)
+escribir("a" < "b")
+escribir("Zorro" < "árbol")
+escribir(["nube" < "ñu", "ñu" < "oso"])
+escribir(["papa" < "papá", "B" >= "a", "a" <= "a"])
+escribir(["oso", "Ñu", "árbol", "Zorro", "nube", "Ana", "ana", "10", "9"].ordenar())
+escribir(["ab" * 3, 2 * "-", "x" * 0])
+escribir([[0] * 3, 2 * [1, 2], [] * 5])
+sea d = {1: "uno", -2: "menos dos", "1": "texto uno", 2.5: "dos y medio"}
+escribir(d)
+escribir([d[1], d["1"], d[-2], d[2.5]])
+d[3] = "tres"
+d[1.0] = "UNO"
+escribir([d.contiene(3), d.contiene("3"), d.claves()])
+d.eliminar(3)
+para cada cualquiera k en d { escribir([k, k + 1]) }
+importar "json"
+escribir(json.texto({1: "a"}))
+escribir([a_numero(" 3 "), a_numero("\t4.5\n")])
+intentar { escribir("a" * -1) } capturar (ErrorArgumento e) { escribir("neg ok") }
+intentar { escribir("a" * 1.5) } capturar (ErrorArgumento e) { escribir("dec ok") }
+intentar { d[[1]] = 2 } capturar (ErrorTipo e) { escribir(e.mensaje) }
+intentar { escribir(d[9]) } capturar (ErrorRango e) { escribir(e.mensaje) }
+sea s = "ab"
+s *= 2
+escribir(s)
+
+clase Arma {
+    sea nombre = "espada"
+    funcion golpe(): numero { devolver 3 }
+}
+clase Jugador {
+    sea arma = nulo
+}
+sea j = Jugador()
+escribir(j.arma ?? "sin arma")
+escribir(j.arma?.nombre)
+escribir(j.arma?.nombre ?? "nada")
+escribir(j.arma?.golpe() ?? 0)
+j.arma = Arma()
+escribir(j.arma?.nombre ?? "nada")
+escribir(j.arma?.golpe())
+sea nadie = nulo
+escribir(nadie?.arma?.nombre)
+sea cuenta = 0
+funcion contar(): numero { cuenta++
+ devolver 1 }
+escribir(5 ?? contar())
+escribir(cuenta)
+escribir(falso ?? 1)
+escribir(0 ?? 1)
+escribir(nulo ?? nulo ?? 7)
+escribir(nulo ?? 2 + 3)
+nadie?.atacar()
+escribir("sin error")
+intentar { escribir(nadie.arma) } capturar (ErrorTipo e) { escribir("sin ? falla: ok") }
+sea d2 = {"a": nulo}
+escribir(d2["a"] ?? "vacío")
+
+importar "texto"
+escribir([texto.decimales(3.5, 2), texto.decimales(2.345, 0), texto.decimales(-0.001, 2), texto.decimales(7, 1)])
+escribir([texto.miles(12000), texto.miles(-1234567), texto.miles(999), texto.miles(1234.5), texto.miles(12000, ","), texto.miles(1234567, " "), texto.miles(0)])
+intentar { sea r = texto.decimales(1, -1) } capturar (ErrorArgumento e) { escribir("ok") }
+sea rejilla = [[0] * 3] * 3
+rejilla[1][1] = 5
+escribir(rejilla)
+sea fichas = [{"x": 0}] * 2
+fichas[0]["x"] = 9
+escribir(fichas)
+escribir([] * 1000000000000)
+escribir("" * 1000000000000)
+sea fila = [1, 2]
+sea dos = [fila] * 2
+fila.agregar(3)
+escribir(dos)

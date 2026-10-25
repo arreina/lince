@@ -636,6 +636,69 @@ static Valor *fn_txt_rellenar_izq(Valor **a, int n) {
     return v;
 }
 
+/* texto.decimales(3.5, 2) → "3.50": siempre con esos decimales, redondeando */
+static Valor *fn_txt_decimales(Valor **a, int n) {
+    (void)n;
+    if (a[0]->tipo != VAL_NUMERO || a[1]->tipo != VAL_NUMERO) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo",
+            "decimales() espera un número y cuántos decimales", 0);
+        return valor_nulo();
+    }
+    double cifras = a[1]->numero;
+    if (cifras < 0 || cifras > 20 || cifras != floor(cifras)) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorArgumento",
+            "decimales() admite de 0 a 20 decimales", 0);
+        return valor_nulo();
+    }
+    char buf[400];
+    snprintf(buf, sizeof buf, "%.*f", (int)cifras, a[0]->numero);
+    /* -0.001 con 2 decimales sale "-0.00": sin el signo, que no es negativo */
+    const char *s = buf;
+    if (s[0] == '-' && strspn(s + 1, "0.") == strlen(s + 1)) s++;
+    return valor_texto(s);
+}
+
+/* texto.miles(12000) → "12.000", y con decimales como se escriben en
+   español: miles(1234.5) → "1.234,5". Con otro separador
+   (miles(12000, ",") → "12,000") los decimales van tras un punto. */
+static Valor *fn_txt_miles(Valor **a, int n) {
+    if (n < 1 || n > 2 || a[0]->tipo != VAL_NUMERO || (n == 2 && a[1]->tipo != VAL_TEXTO)) {
+        hay_error = 1;
+        valor_error = valor_error_nuevo("ErrorTipo",
+            "miles() espera un número y, si quieres, el separador (\".\" si no se pone)", 0);
+        return valor_nulo();
+    }
+    double x = a[0]->numero;
+    const char *sep = n == 2 ? a[1]->texto : ".";
+    if (!isfinite(x) || fabs(x) >= 1e15) {               /* como de_numero() */
+        char buf[64];
+        snprintf(buf, sizeof buf, "%g", x);
+        return valor_texto(buf);
+    }
+    char num[64];
+    if (x == (long long)x) snprintf(num, sizeof num, "%lld", (long long)x);
+    else                   snprintf(num, sizeof num, "%.15g", x);
+    const char *ent = num[0] == '-' ? num + 1 : num;
+    const char *punto = strchr(ent, '.');
+    size_t largo_ent = punto ? (size_t)(punto - ent) : strlen(ent);
+    size_t ls = strlen(sep);
+    char *buf = malloc(strlen(num) + (largo_ent / 3 + 1) * ls + 2);
+    size_t p = 0;
+    if (num[0] == '-') buf[p++] = '-';
+    for (size_t i = 0; i < largo_ent; i++) {
+        if (i > 0 && (largo_ent - i) % 3 == 0) { memcpy(buf + p, sep, ls); p += ls; }
+        buf[p++] = ent[i];
+    }
+    if (punto) {
+        buf[p++] = strcmp(sep, ".") == 0 ? ',' : '.';
+        strcpy(buf + p, punto + 1);
+    } else buf[p] = '\0';
+    Valor *v = valor_texto(buf); free(buf);
+    return v;
+}
+
 static Valor *fn_txt_rellenar_der(Valor **a, int n) {
     (void)n;
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO || a[2]->tipo != VAL_TEXTO) {
@@ -1386,7 +1449,9 @@ static void json_escribir(JsonBuf *b, Valor *v, int sangria, int hondo) {
                     for (int k = 0; k < (hondo + 1) * sangria; k++) jb_txt(b, " ");
                 }
                 if (dic) {
-                    json_escribir_texto(b, v->diccionario.claves[i]);
+                    /* en JSON las claves son siempre texto: {1: …} sale {"1": …} */
+                    const char *k = v->diccionario.claves[i];
+                    json_escribir_texto(b, k[0] == LINCE_CLAVE_NUMERO ? k + 1 : k);
                     jb_txt(b, ": ");
                     json_escribir(b, v->diccionario.valores[i], sangria, hondo + 1);
                 } else json_escribir(b, v->lista.elementos[i], sangria, hondo + 1);
@@ -1710,9 +1775,11 @@ static void cargar_texto(Entorno *entorno) {
         {"rellenar_izq",  fn_txt_rellenar_izq,  3},
         {"rellenar_der",  fn_txt_rellenar_der,  3},
         {"centrar",       fn_txt_centrar,       3},
+        {"decimales",     fn_txt_decimales,     2},
+        {"miles",         fn_txt_miles,        -1},
     };
     registrar_modulo_diccionario(entorno, "texto",
-        fns, 19, NULL, NULL, 0);
+        fns, 21, NULL, NULL, 0);
 }
 
 static void cargar_archivos(Entorno *entorno) {

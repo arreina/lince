@@ -198,6 +198,7 @@ int   utf8_desplazamiento(const char *s, int i); /* byte del carácter i, o -1 *
 char *utf8_mayusculas(const char *s);      /* cadena nueva, con malloc */
 char *utf8_minusculas(const char *s);      /* cadena nueva, con malloc */
 int   utf8_es_letra(const char *s);
+int   texto_comparar(const char *a, const char *b);  /* orden alfabético: <0, 0, >0 */
 
 Valor *valor_diccionario_crear(void);
 /* Reserva hueco para 'n' entradas en un diccionario (crece si hace falta). */

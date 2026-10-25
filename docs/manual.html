@@ -137,7 +137,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.1</span>
+  <span class="version">v1.2</span>
   <div class="crece"></div>
   <a class="pag aqui" href="manual.html">Lenguaje</a>
   <a class="pag" href="juego.html">Módulo juego</a>
@@ -151,9 +151,9 @@
 <div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">x e y</a><a href="#control-de-flujo-2" class="sub">Un si que da un valor</a><a href="#control-de-flujo-3" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-4" class="sub">Romper y continuar</a><a href="#control-de-flujo-5" class="sub">Elegir / caso</a></div>
 <div class="grupo"><a href="#funciones" class="sec">Funciones</a><a href="#funciones-0" class="sub">Declarar y llamar</a><a href="#funciones-1" class="sub">val y ref</a><a href="#funciones-2" class="sub">Valores por defecto</a><a href="#funciones-3" class="sub">Lambdas y funciones como argumento</a><a href="#funciones-4" class="sub">Llamar a cualquier cosa que dé una función</a><a href="#funciones-5" class="sub">Closures</a></div>
 <div class="grupo"><a href="#listas" class="sec">Listas</a><a href="#listas-0" class="sub">Crear, modificar y consultar</a><a href="#listas-1" class="sub">Operaciones que devuelven una lista nueva</a><a href="#listas-2" class="sub">Ordenar con tu propio criterio</a></div>
-<div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a></div>
-<div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a><a href="#texto-1" class="sub">Texto con valores dentro</a></div>
-<div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a></div>
+<div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a><a href="#diccionarios-1" class="sub">Números como claves</a></div>
+<div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a><a href="#texto-1" class="sub">En orden alfabético, y repetir</a><a href="#texto-2" class="sub">Texto con valores dentro</a></div>
+<div class="grupo"><a href="#clases" class="sec">Clases</a><a href="#clases-0" class="sub">Clase, constructor y métodos</a><a href="#clases-1" class="sub">Herencia</a><a href="#clases-2" class="sub">Interfaces</a><a href="#clases-3" class="sub">Enumeraciones</a><a href="#clases-4" class="sub">Visibilidad: `privado` y `protegido`</a><a href="#clases-5" class="sub">Miembros estáticos</a><a href="#clases-6" class="sub">Clases abstractas y `sobrescribe`</a><a href="#clases-7" class="sub">Propiedades, operadores y `a_texto`</a><a href="#clases-8" class="sub">Métodos por defecto y el operador `es`</a><a href="#clases-9" class="sub">Cuando algo puede ser `nulo`: `??` y `?.`</a></div>
 <div class="grupo"><a href="#generadores" class="sec">Generadores</a><a href="#generadores-0" class="sub">Producir valores de uno en uno</a><a href="#generadores-1" class="sub">Uno que no acaba nunca</a><a href="#generadores-2" class="sub">Un generador guardado sigue por donde iba</a></div>
 <div class="grupo"><a href="#tareas" class="sec">Tareas</a><a href="#tareas-0" class="sub">Esperar sin parar el juego</a></div>
 <div class="grupo"><a href="#errores" class="sec">Errores</a><a href="#errores-0" class="sub">Intentar, capturar, finalmente</a><a href="#errores-1" class="sub">Lanzar errores propios</a><a href="#errores-2" class="sub">El primer error es el que cuenta</a><a href="#errores-3" class="sub">Los fallos de uso también se pueden capturar</a></div>
@@ -164,7 +164,7 @@
 <main>
   <div class="intro">
     <h1>Manual de Lince</h1>
-    <p>Los <strong>56 ejemplos</strong> de esta página no están escritos a mano:
+    <p>Los <strong>59 ejemplos</strong> de esta página no están escritos a mano:
     son archivos <code>.lince</code> del repositorio que <strong>se ejecutan al generar
     el manual</strong>, y lo que ves bajo cada uno es su salida real. Si el lenguaje
     cambia de comportamiento, la página deja de cuadrar y la integración continua lo
@@ -416,7 +416,7 @@ verdadero</pre></div><span class="fuente">310_listas.lince</span></article><arti
     <span class="k">devolver</span> b - a
 }))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[1, 1, 3, 4, 5]
 [5, 4, 3, 1, 1]</pre></div><span class="fuente">330_ordenar_con.lince</span></article></section>
-<section id="diccionarios"><h2>Diccionarios</h2><article class="ej" id="diccionarios-0"><h3>Crear, leer y recorrer</h3><p class="nota">Las claves son texto. <code>para cada</code> sobre un diccionario recorre las claves, y <code>claves()</code> y <code>valores()</code> las dan como listas.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> persona = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>, <span class="s">&quot;edad&quot;</span>: <span class="n">22</span>}
+<section id="diccionarios"><h2>Diccionarios</h2><article class="ej" id="diccionarios-0"><h3>Crear, leer y recorrer</h3><p class="nota">Las claves son texto o número. <code>para cada</code> sobre un diccionario recorre las claves, y <code>claves()</code> y <code>valores()</code> las dan como listas.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> persona = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>, <span class="s">&quot;edad&quot;</span>: <span class="n">22</span>}
 persona[<span class="s">&quot;ciudad&quot;</span>] = <span class="s">&quot;Córdoba&quot;</span>
 
 <span class="k">escribir</span>(persona[<span class="s">&quot;nombre&quot;</span>])
@@ -436,7 +436,21 @@ edad = 22
 ciudad = Córdoba
 [&quot;nombre&quot;, &quot;edad&quot;, &quot;ciudad&quot;]
 [&quot;Ana&quot;, 22, &quot;Córdoba&quot;]
-[&quot;ciudad&quot;, &quot;edad&quot;, &quot;nombre&quot;]</pre></div><span class="fuente">410_diccionarios.lince</span></article></section>
+[&quot;ciudad&quot;, &quot;edad&quot;, &quot;nombre&quot;]</pre></div><span class="fuente">410_diccionarios.lince</span></article><article class="ej" id="diccionarios-1"><h3>Números como claves</h3><p class="nota">Una clave también puede ser un número: <code>{1: &quot;oro&quot;}</code>, <code>d[3] = x</code>. Sigue siendo un número al sacarla con <code>claves()</code> o <code>para cada</code>, y <code>d[1]</code> no es lo mismo que <code>d[&quot;1&quot;]</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> premios = {<span class="n">1</span>: <span class="s">&quot;oro&quot;</span>, <span class="n">2</span>: <span class="s">&quot;plata&quot;</span>, <span class="n">3</span>: <span class="s">&quot;bronce&quot;</span>}
+<span class="k">escribir</span>(premios[<span class="n">2</span>])
+
+<span class="k">sea</span> casillas = {}
+casillas[<span class="n">10</span>] = <span class="s">&quot;cofre&quot;</span>
+casillas[<span class="n">25</span>] = <span class="s">&quot;trampa&quot;</span>
+<span class="k">para</span> <span class="k">cada</span> <span class="t">numero</span> n <span class="k">en</span> casillas {
+    <span class="k">escribir</span>(<span class="s">&quot;casilla {n}, la siguiente es {n + 1}: {casillas[n]}&quot;</span>)
+}
+<span class="k">escribir</span>(casillas.contiene(<span class="n">10</span>))
+<span class="k">escribir</span>(casillas.contiene(<span class="s">&quot;10&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>plata
+casilla 10, la siguiente es 11: cofre
+casilla 25, la siguiente es 26: trampa
+verdadero
+falso</pre></div><span class="fuente">415_claves_numero.lince</span></article></section>
 <section id="texto"><h2>Texto</h2><article class="ej" id="texto-0"><h3>Métodos de texto</h3><p class="nota">La longitud cuenta caracteres, no bytes: las tildes y la eñe cuentan como uno. Los métodos y el índice valen también sobre un texto escrito tal cual.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
 
 <span class="k">sea</span> frase = <span class="s">&quot;año de la cigüeña&quot;</span>
@@ -454,7 +468,21 @@ AÑO DE LA CIGÜEÑA
 ababab
 HOLA
 ó
-verdadero</pre></div><span class="fuente">510_texto.lince</span></article><article class="ej" id="texto-1"><h3>Texto con valores dentro</h3><p class="nota">Entre llaves va cualquier expresión. Para una llave tal cual, <code>\{</code>; unas llaves vacías <code>{}</code> se quedan como están.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nombre = <span class="s">&quot;Ana&quot;</span>
+verdadero</pre></div><span class="fuente">510_texto.lince</span></article><article class="ej" id="texto-1"><h3>En orden alfabético, y repetir</h3><p class="nota"><code>&lt;</code> y <code>&gt;</code> comparan textos como un diccionario: sin mirar mayúsculas, la vocal con tilde junto a la misma sin tilde y la ñ entre la n y la o. <code>ordenar()</code> usa el mismo orden. Con <code>*</code>, un texto o una lista se repiten (las listas de dentro salen copiadas: cada fila de la rejilla es suya).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">escribir</span>(<span class="s">&quot;nube&quot;</span> &lt; <span class="s">&quot;ñu&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;Zorro&quot;</span> &lt; <span class="s">&quot;árbol&quot;</span>)
+<span class="k">escribir</span>([<span class="s">&quot;oso&quot;</span>, <span class="s">&quot;Ñu&quot;</span>, <span class="s">&quot;árbol&quot;</span>, <span class="s">&quot;Zorro&quot;</span>, <span class="s">&quot;nube&quot;</span>].ordenar())
+
+<span class="k">escribir</span>(<span class="s">&quot;-&quot;</span> * <span class="n">20</span>)
+<span class="k">escribir</span>([<span class="n">0</span>] * <span class="n">5</span>)
+
+<span class="k">sea</span> rejilla = [[<span class="n">0</span>] * <span class="n">3</span>] * <span class="n">2</span>
+rejilla[<span class="n">0</span>][<span class="n">1</span>] = <span class="n">7</span>
+<span class="k">escribir</span>(rejilla)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>verdadero
+falso
+[&quot;árbol&quot;, &quot;nube&quot;, &quot;Ñu&quot;, &quot;oso&quot;, &quot;Zorro&quot;]
+--------------------
+[0, 0, 0, 0, 0]
+[[0, 7, 0], [0, 0, 0]]</pre></div><span class="fuente">512_texto_en_orden.lince</span></article><article class="ej" id="texto-2"><h3>Texto con valores dentro</h3><p class="nota">Entre llaves va cualquier expresión. Para una llave tal cual, <code>\{</code>; unas llaves vacías <code>{}</code> se quedan como están.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nombre = <span class="s">&quot;Ana&quot;</span>
 <span class="k">sea</span> vidas = <span class="n">3</span>
 <span class="k">escribir</span>(<span class="s">&quot;{nombre} tiene {vidas} vidas&quot;</span>)
 <span class="k">escribir</span>(<span class="s">&quot;y {vidas * 100} puntos, {nombre.longitud()} letras&quot;</span>)
@@ -671,7 +699,24 @@ x no puede ser negativa</pre></div><span class="fuente">680_propiedades.lince</s
 verdadero
 falso
 verdadero
-verdadero</pre></div><span class="fuente">690_es_y_defecto.lince</span></article></section>
+verdadero</pre></div><span class="fuente">690_es_y_defecto.lince</span></article><article class="ej" id="clases-9"><h3>Cuando algo puede ser `nulo`: `??` y `?.`</h3><p class="nota"><code>x ?? otro</code> vale <code>x</code>, o <code>otro</code> si <code>x</code> es <code>nulo</code>. <code>x?.campo</code> y <code>x?.metodo()</code> dan <code>nulo</code> si <code>x</code> es <code>nulo</code>, en vez de un error. En una cadena, se pone <code>?.</code> en cada paso que pueda faltar.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Arma {
+    <span class="k">sea</span> nombre = <span class="s">&quot;espada&quot;</span>
+    <span class="k">funcion</span> golpe(): <span class="t">numero</span> { <span class="k">devolver</span> <span class="n">3</span> }
+}
+<span class="k">clase</span> Jugador {
+    <span class="k">sea</span> arma = <span class="k">nulo</span>
+}
+
+<span class="k">sea</span> ana = Jugador()
+<span class="k">escribir</span>(ana.arma?.nombre ?? <span class="s">&quot;sin arma&quot;</span>)
+<span class="k">escribir</span>(ana.arma?.golpe() ?? <span class="n">0</span>)
+
+ana.arma = Arma()
+<span class="k">escribir</span>(ana.arma?.nombre ?? <span class="s">&quot;sin arma&quot;</span>)
+<span class="k">escribir</span>(ana.arma?.golpe() ?? <span class="n">0</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>sin arma
+0
+espada
+3</pre></div><span class="fuente">692_nulo.lince</span></article></section>
 <section id="generadores"><h2>Generadores</h2><article class="ej" id="generadores-0"><h3>Producir valores de uno en uno</h3><p class="nota"><code>generador</code> en vez de <code>funcion</code>, y <code>producir</code> en vez de <code>devolver</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">generador</span> pares(<span class="k">val</span> <span class="t">numero</span> hasta): <span class="t">numero</span> {
     <span class="k">para</span> (i = <span class="n">0</span>; i &lt;= hasta; i++) {
         <span class="k">si</span> i % <span class="n">2</span> == <span class="n">0</span> { <span class="k">producir</span> i }
@@ -849,16 +894,22 @@ m</pre></div><span class="fuente">930_como.lince</span></article><article class=
 1
 120 10
 180 5 10
-verdadero</pre></div><span class="fuente">940_matematica.lince</span></article><article class="ej" id="modulos-y-librerias-5"><h3>El módulo `texto`</h3><p class="nota">Lo que se hace con textos y no es un método: partirlos por un separador, unir una lista, darles la vuelta y buscar dónde aparece algo (−1 si no está).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
+verdadero</pre></div><span class="fuente">940_matematica.lince</span></article><article class="ej" id="modulos-y-librerias-5"><h3>El módulo `texto`</h3><p class="nota">Lo que se hace con textos y no es un método: partirlos por un separador, unir una lista, darles la vuelta buscar dónde aparece algo (−1 si no está) y escribir números con los decimales justos o con los miles separados.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
 
 <span class="k">sea</span> partes = <span class="t">texto</span>.dividir(<span class="s">&quot;rojo,verde,azul&quot;</span>, <span class="s">&quot;,&quot;</span>)
 <span class="k">escribir</span>(partes)
 <span class="k">escribir</span>(<span class="t">texto</span>.unir(partes, <span class="s">&quot; y &quot;</span>))
 <span class="k">escribir</span>(<span class="t">texto</span>.invertir(<span class="s">&quot;lince&quot;</span>))
-<span class="k">escribir</span>(<span class="s">&quot;{texto.posicion(&quot;</span>perspicaz<span class="s">&quot;, &quot;</span>pica<span class="s">&quot;)} {texto.posicion(&quot;</span>lince<span class="s">&quot;, &quot;</span>x<span class="s">&quot;)}&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[&quot;rojo&quot;, &quot;verde&quot;, &quot;azul&quot;]
+<span class="k">escribir</span>(<span class="s">&quot;{texto.posicion(&quot;</span>perspicaz<span class="s">&quot;, &quot;</span>pica<span class="s">&quot;)} {texto.posicion(&quot;</span>lince<span class="s">&quot;, &quot;</span>x<span class="s">&quot;)}&quot;</span>)
+<span class="k">escribir</span>(<span class="t">texto</span>.decimales(<span class="n">3.5</span>, <span class="n">2</span>))
+<span class="k">escribir</span>(<span class="t">texto</span>.miles(<span class="n">1234567</span>))
+<span class="k">escribir</span>(<span class="t">texto</span>.miles(<span class="n">1234.5</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[&quot;rojo&quot;, &quot;verde&quot;, &quot;azul&quot;]
 rojo y verde y azul
 ecnil
-4 -1</pre></div><span class="fuente">945_modulo_texto.lince</span></article><article class="ej" id="modulos-y-librerias-6"><h3>Los módulos `archivos` y `sistema`</h3><p class="nota"><code>archivos</code> lee y escribe en disco; <code>sistema</code> ejecuta órdenes del sistema y lee el entorno.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;archivos&quot;</span>
+4 -1
+3.50
+1.234.567
+1.234,5</pre></div><span class="fuente">945_modulo_texto.lince</span></article><article class="ej" id="modulos-y-librerias-6"><h3>Los módulos `archivos` y `sistema`</h3><p class="nota"><code>archivos</code> lee y escribe en disco; <code>sistema</code> ejecuta órdenes del sistema y lee el entorno.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;archivos&quot;</span>
 <span class="k">importar</span> <span class="s">&quot;sistema&quot;</span>
 
 <span class="k">sea</span> ruta = <span class="s">&quot;/tmp/lince_manual_ejemplo.txt&quot;</span>

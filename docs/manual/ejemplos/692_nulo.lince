@@ -1,0 +1,18 @@
+# @seccion: Clases
+# @titulo: Cuando algo puede ser `nulo`: `??` y `?.`
+# @nota: `x ?? otro` vale `x`, o `otro` si `x` es `nulo`. `x?.campo` y `x?.metodo()` dan `nulo` si `x` es `nulo`, en vez de un error. En una cadena, se pone `?.` en cada paso que pueda faltar.
+clase Arma {
+    sea nombre = "espada"
+    funcion golpe(): numero { devolver 3 }
+}
+clase Jugador {
+    sea arma = nulo
+}
+
+sea ana = Jugador()
+escribir(ana.arma?.nombre ?? "sin arma")
+escribir(ana.arma?.golpe() ?? 0)
+
+ana.arma = Arma()
+escribir(ana.arma?.nombre ?? "sin arma")
+escribir(ana.arma?.golpe() ?? 0)

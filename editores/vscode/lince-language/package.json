@@ -2,7 +2,7 @@
   "name": "lince-language",
   "displayName": "Lince",
   "description": "Lince, el lenguaje de programación en español: resaltado, snippets, errores en vivo y autocompletado",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "arreina",
   "engines": {
     "vscode": "^1.70.0"

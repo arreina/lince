@@ -25,6 +25,71 @@ repensarlo cada vez. Las ideas para el editor visual van en
 - [x] **Algún juego completo hecho con Lince**, no solo los ejemplos, para que salga lo que falta: `juegos/la_piedra_del_lince`. Probado con wine (Windows) y en el emulador de Android 16.
 - [x] **El manual lo cubre todo:** el del lenguaje (con los módulos `matematica`, `texto`, `json`, `bytes` y `bits` y las herramientas) y una página para el módulo `juego` (`docs/juego.html`) con un ejemplo y su captura real para cada tema. La lista completa de funciones y opciones sigue en la especificación.
 
+## Camino a la 2.0
+
+Plan aprobado por el autor el 2026-10-25. Las 1.x **solo añaden**: ningún juego escrito deja de
+funcionar. Lo que haya que cambiar de verdad se marca como obsoleto durante las 1.x y se quita en
+la 2.0, con una herramienta que actualiza los juegos sola. **Cada versión nueva se le avisa a
+lince-motor** para que el IDE la incorpore (resaltado, LSP, autocompletado, ayudas).
+
+### 1.2 — Lo pequeño que quedó pendiente del lenguaje (publicada)
+- [x] Comparar textos con `<`, `>`, `<=`, `>=` en orden alfabético de verdad (tildes junto a su
+  letra, la ñ entre la n y la o, sin distinguir mayúsculas salvo para desempatar). `ordenar()`
+  usa el mismo orden, que es lo que ya decía la especificación.
+- [x] `"a" * 3` → `"aaa"` y `[0] * 10` (también al revés: `3 * "a"`).
+- [x] Números como claves de diccionario: `{1: "uno"}`, `d[3] = x`; `claves()` y `para cada`
+  las devuelven como números.
+- [x] `a_numero(" 3 ")`: acepta espacios alrededor.
+- [x] `x ?? 0` (si `x` es nulo, vale lo de la derecha) y `jugador?.arma` / `jugador?.atacar()`
+  (nulo en vez de error si `jugador` es nulo).
+- [x] `texto.decimales(3.5, 2)` → «3.50» y `texto.miles(12000)` → «12.000».
+
+### 1.3 — Tipos opcionales
+- [ ] Anotaciones no obligatorias: `sea vida: numero = 3`, `funcion daño(x: numero) -> logico`.
+- [ ] `lince revisar` (y el LSP) las comprueba sin ejecutar: tipos, llamadas, campos que no
+  existen, variables sin usar, código al que nunca se llega.
+- [ ] El alias de `importar ... como` vale también como tipo: `x es geo.Punto`, `extiende geo.Punto`.
+
+### 1.4 — Herramientas
+- [ ] `lince formatear` (estilo único; el IDE lo usa al guardar).
+- [ ] `lince documentar`: ayuda sacada de los comentarios de cada función (el IDE la enseña al pasar el ratón).
+- [ ] Cobertura en `lince probar`.
+- [ ] `lince perfil`: dónde se va el tiempo de cada fotograma (Lince frente a dibujar).
+- [ ] Paquetes con versión fija y archivo que las guarda.
+
+### 1.5 — Gráficos y texto en pantalla
+- [ ] Capas de dibujo con orden (`"capa": 3`).
+- [ ] Cámara con zoom y giro; varias cámaras (pantalla partida).
+- [ ] Medir texto y texto que salta de línea dentro de una caja.
+- [ ] Traducciones: `juego.traducir("hola")` con archivos de idioma; el menú de opciones cambia de idioma.
+- [ ] Tiled: capas con zstd y mapas infinitos (isométricos y hexagonales, solo si algún juego los pide).
+
+### 1.6 — Física y sonido
+- [ ] Cuerpos que giran, círculo contra caja de verdad, polígonos, uniones sencillas (cuerda, bisagra).
+- [ ] Grupos de volumen (música, efectos, voces), sonido a izquierda o derecha según la
+  posición, paso suave entre músicas.
+
+### 1.7 — Rendimiento (solo si hace falta)
+- [ ] La máquina virtual de bytecode («camino B», ver Rendimiento), si `lince perfil` demuestra que Lince es el cuello de botella.
+
+### 1.8 — Varios jugadores en el mismo equipo
+- [ ] Cada mando, un jugador: «pulsa un botón para unirte», controles por jugador; con la pantalla partida de la 1.5.
+
+### 1.9 — Preparar la 2.0
+- [ ] Lo que vaya a cambiar avisa «obsoleto: usa X».
+- [ ] `lince migrar --comprobar` (qué cambiaría) y `lince migrar` (lo cambia solo).
+- [ ] Última versión que añade cosas; después, solo arreglos.
+
+### 2.0 — Limpieza, no un lenguaje nuevo
+Cada cambio que rompa, aprobado por el autor uno por uno:
+- [ ] Ordenar el módulo `juego` en partes (`juego.fisica.cuerpo`, `juego.sonido.reproducir`…) con nombres y opciones coherentes.
+- [ ] Quitar las formas duplicadas de hacer lo mismo.
+- [ ] Las anotaciones de tipo, comprobadas también al ejecutar (cuando se ponen).
+- [ ] La 2.x se congela igual que la 1.x.
+
+Fuera del plan (decisión del autor): juego en red (se quitó a propósito), consolas (depende de
+que Nintendo y Sony aprueben; iría en un repositorio privado), macOS y navegador (descartados).
+
 ## Lenguaje
 
 **Revisión antes de congelar en la 1.0** (decidido por el autor el 2026-10-23):
@@ -38,7 +103,8 @@ repensarlo cada vez. Las ideas para el editor visual van en
   (`"hola".mayusculas()`): estaba apuntado para después de la 1.0, pero entró en la
   0.14.0. Es aditivo y no rompe nada. Queda pendiente el resto de esa lista.
 - Para después de la 1.0 (no rompen nada): comparar textos con `<`, `"a" * 3`,
-  números como claves de diccionario, `a_numero(" 3 ")` con espacios.
+  números como claves de diccionario, `a_numero(" 3 ")` con espacios. Van en la 1.2
+  (ver «Camino a la 2.0»).
 
 - [x] `mapear`, `filtrar` y `reducir` aceptan también generadores y bytes (salió escribiendo el manual).
 

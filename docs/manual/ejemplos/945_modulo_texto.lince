@@ -1,6 +1,6 @@
 # @seccion: Módulos y librerías
 # @titulo: El módulo `texto`
-# @nota: Lo que se hace con textos y no es un método: partirlos por un separador, unir una lista, darles la vuelta y buscar dónde aparece algo (−1 si no está).
+# @nota: Lo que se hace con textos y no es un método: partirlos por un separador, unir una lista, darles la vuelta buscar dónde aparece algo (−1 si no está) y escribir números con los decimales justos o con los miles separados.
 importar "texto"
 
 sea partes = texto.dividir("rojo,verde,azul", ",")
@@ -8,3 +8,6 @@ escribir(partes)
 escribir(texto.unir(partes, " y "))
 escribir(texto.invertir("lince"))
 escribir("{texto.posicion("perspicaz", "pica")} {texto.posicion("lince", "x")}")
+escribir(texto.decimales(3.5, 2))
+escribir(texto.miles(1234567))
+escribir(texto.miles(1234.5))
