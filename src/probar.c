@@ -214,6 +214,8 @@ int probar_ejecutar(int argc, char *argv[]) {
                 for (char *l = txt; *l; ) {
                     char *fin = strchr(l, '\n');
                     if (fin) *fin = '\0';
+                    size_t largo = strlen(l);
+                    while (largo > 0 && (l[largo - 1] == '\r' || l[largo - 1] == ' ')) l[--largo] = '\0';
                     if (*l) printf("      │ %s\n", l);
                     if (!fin) break;
                     l = fin + 1;
