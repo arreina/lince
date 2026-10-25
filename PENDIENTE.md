@@ -99,3 +99,15 @@ Nada pendiente ahora mismo.
   - `en`, `cualquiera`, `tarea`, `es`, `como`, `obtener`, `fijar`, etc. solo cuentan en su sitio.
 - **Ya están en Lince** los combos, `mantenida`, `pulsaciones`, las curvas, `suavizar`, `acercar`, las escenas y el animador. `presentar()` llama en cada fotograma a `_presentar()` de la biblioteca; `dibujar()` y `caja()` llaman a `_cuadro()` con un animador; las variables de la biblioteca se conservan al recargar en caliente.
 - **En C se queda** lo que habla con la pantalla, el teclado o el altavoz, o mira píxeles: dibujar, las hojas (dividirlas, la caja de lo que se ve, las pisadas), los sonidos, las fuentes, los mapas.
+
+## Encontrado repasando la especificación (0.14.0)
+
+- [x] La especificación decía que las clases de una librería **no** se podían instanciar a
+  través del alias de `importar ... como`, y sí se puede (`geo.Punto(1, 2)` funciona). El
+  límite que queda de verdad es otro: el alias no vale donde se espera un *tipo*
+  (`x es geo.Punto`, `clase Mia extiende geo.Punto` son errores de sintaxis). Corregido el
+  texto.
+- [ ] **Repasar la especificación entera contra el código antes de congelar la 1.0.** Son
+  2.100 líneas y cada afirmación pasa a ser un compromiso al congelar. De una muestra de
+  diez afirmaciones de la revisión de la 0.12.0 se cumplían las diez, pero el caso del
+  alias salió en la primera comprobación suelta, así que conviene el repaso completo.

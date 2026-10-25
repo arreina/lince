@@ -1845,9 +1845,12 @@ cualquier otra definición, así que repetirlo da error.
 `como` no es palabra reservada: se reconoce sólo después de un `importar`, y
 sigue valiendo como nombre de variable o de parámetro.
 
-**Límite actual:** las clases de una librería no se pueden instanciar a
-través del alias (`geo.Punto(1, 2)`). Importa el archivo sin `como` para
-usarlas.
+Las clases de la librería se instancian a través del alias
+(`geo.Punto(1, 2)`), y el objeto que sale se usa como cualquier otro.
+
+**Límite actual:** el alias no vale donde se espera un *tipo*, sólo donde se
+espera un valor: `x es geo.Punto` y `clase Mia extiende geo.Punto` son
+errores de sintaxis. Para eso, importa el archivo sin `como`.
 
 ---
 
