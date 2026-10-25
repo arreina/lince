@@ -15,3 +15,12 @@ falso
 verdadero
 299
 falso
+["gato", "ave", "perro"]
+[3, 1, 2]
+["ave", "gato", "perro"]
+[1, 2, 3]
+3
+[]
+[]
+3
+4

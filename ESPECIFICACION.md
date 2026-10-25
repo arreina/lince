@@ -420,6 +420,19 @@ d["ciudad"] = "Madrid"
 d.contiene("nombre")
 d.longitud()
 d.eliminar("edad")
+
+d.claves()              # ["nombre", "ciudad"]
+d.valores()             # ["Ana", "Madrid"]
+```
+
+`claves()` y `valores()` devuelven listas en el orden en que se metieron,
+así que se pueden ordenar, contar o pasar a otra función como cualquier
+otra lista:
+
+```lince
+para cada texto clave en d.claves().ordenar() {
+    escribir(clave + ": " + d[clave])
+}
 ```
 
 ---

@@ -67,3 +67,12 @@ escribir(texto.posicion("camión", "ó"))
 escribir(texto.extraer("camión", 4, 6))
 escribir(texto.es_letra("ñ"))
 escribir(texto.rellenar_der("niño", 8, "."))
+
+# Métodos e indexación directamente sobre un literal de texto, igual
+# que ya se podía con un literal de lista.
+escribir("hola".mayusculas())
+escribir("HOLA".minusculas())
+escribir("camión".longitud())
+escribir("camión"[4])
+escribir("camión"[-1])
+escribir("hola mundo".contiene("mundo"))

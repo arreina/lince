@@ -412,7 +412,10 @@ static Nodo *primario(Parser *p) {
         consumir_cualquiera(p);
         Nodo *n = nodo_nuevo(NODO_TEXTO, p);
         n->texto = strdup(t->valor);
-        return n;
+        /* Pasa por postfijo igual que los demás literales, para que
+           "hola".mayusculas() y "hola"[0] sean válidos: antes sólo las
+           listas lo permitían y el texto daba error de sintaxis. */
+        return postfijo(p, n);
     }
 
     /* verdadero */

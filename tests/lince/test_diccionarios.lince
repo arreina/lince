@@ -46,3 +46,19 @@ escribir(grande.contiene("k150"))
 grande.eliminar("k150")
 escribir(grande.longitud())
 escribir(grande.contiene("k150"))
+
+# claves() y valores() devuelven listas, en el orden de inserción.
+sea diccionario cuenta = {"gato": 3, "ave": 1, "perro": 2}
+escribir(cuenta.claves())
+escribir(cuenta.valores())
+escribir(cuenta.claves().ordenar())
+escribir(cuenta.valores().ordenar())
+escribir(cuenta.claves().longitud())
+sea diccionario vacio = {}
+escribir(vacio.claves())
+escribir(vacio.valores())
+# Las listas que devuelven son independientes del diccionario.
+sea lista ks = cuenta.claves()
+ks.agregar("nuevo")
+escribir(cuenta.longitud())
+escribir(ks.longitud())

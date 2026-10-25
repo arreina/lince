@@ -3839,6 +3839,23 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
             valor_destruir(clave);
             return valor_nulo();
         }
+        if (strcmp(met, "claves") == 0) {
+            /* Las claves como lista, en el orden en que se metieron.
+               Sin esto no se pueden ordenar ni pasar a otra función:
+               'para cada' era la única forma de verlas. */
+            Valor *l = valor_lista_crear();
+            for (int i = 0; i < obj->diccionario.cantidad; i++)
+                lista_agregar(l, valor_texto(obj->diccionario.claves[i]));
+            valor_destruir(obj);
+            return l;
+        }
+        if (strcmp(met, "valores") == 0) {
+            Valor *l = valor_lista_crear();
+            for (int i = 0; i < obj->diccionario.cantidad; i++)
+                lista_agregar(l, valor_copiar(obj->diccionario.valores[i]));
+            valor_destruir(obj);
+            return l;
+        }
         valor_destruir(obj);
         return error_rt("Error", n->linea, "Los diccionarios no tienen el método '%s'.", met);
     }
