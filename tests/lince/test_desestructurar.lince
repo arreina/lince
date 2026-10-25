@@ -82,3 +82,19 @@ archivos.eliminar(TMP)
 # Un 'si' que da valor dentro de otro
 sea nivel = 2
 escribir(si nivel > 1 { si nivel > 3 { "difícil" } sino { "normal" } } sino { "fácil" })
+
+# Una línea que empieza por '[' es otra sentencia, no un índice de lo
+# anterior: si no, la desestructuración se comía el final de la línea
+# de arriba (pasaba ya con un identificador, y también con un texto).
+sea p1 = 1
+sea p2 = 2
+sea otra = p1
+[p1, p2] = [p2, p1]
+escribir("" + p1 + p2)
+sea msg = "texto"
+[p1, p2] = [p2, p1]
+escribir(msg + p1 + p2)
+sea lista nums = [7, 8]
+sea tomado = nums[0]
+[p1, p2] = [p2, p1]
+escribir("" + tomado + p1 + p2)

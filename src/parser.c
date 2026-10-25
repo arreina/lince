@@ -220,8 +220,12 @@ static Nodo *postfijo(Parser *p, Nodo *base) {
             continue;
         }
 
-        /* Acceso por índice: base[expr] */
-        if (coincide(p, TOK_CORCHETE_IZQ)) {
+        /* Acceso por índice: base[expr]. Solo en la misma línea, igual que
+           la llamada de arriba: un '[' al principio de la siguiente empieza
+           otra sentencia, y si no se respeta se come la desestructuración
+           ('sea x = algo' y debajo '[a, b] = [b, a]'). */
+        if (coincide(p, TOK_CORCHETE_IZQ) && p->pos > 0 &&
+            p->tokens[p->pos - 1].linea == actual(p)->linea) {
             consumir(p, TOK_CORCHETE_IZQ, "'['");
             Nodo *indice = expresion(p);
             consumir(p, TOK_CORCHETE_DER, "']'");
