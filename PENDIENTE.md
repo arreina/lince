@@ -94,8 +94,10 @@ Nada pendiente ahora mismo.
 - **Recursos de terceros (imágenes, sonidos, fuentes) sí, si su licencia deja usarlos y repartirlos:** mejor CC0 (dominio público, como los de Kenney); con CC-BY u otras que piden citar, en un `CREDITOS.md` al lado. Cada recurso va con su licencia y de dónde viene. Lo que no tenga licencia clara no entra.
 - **Una hoja de sprites es una sola imagen con todos los fotogramas**, no un archivo por fotograma.
 - **Los sonidos realistas los pone quien hace el juego**, en archivos. Lince solo genera los de 8 bits (`juego.efecto`).
-- **Palabras reservadas que no pueden ser nombres:** entre otras, `y`, `o`, `no`, `lista`, `mi`, `caso`, `otro`, `romper` y `continuar`.
-  - Por eso no vale `sea [x, y] = ...`.
+- **Palabras reservadas que no pueden ser nombres:** entre otras, `no`, `lista`, `mi`, `caso`,
+  `otro`, `romper` y `continuar`.
+  - `y` y `o` **sí valen** como nombres desde la 0.11.0: son el operador sólo entre dos
+    valores. También en la desestructuración, así que `sea [x, y] = pos` funciona.
   - `en`, `cualquiera`, `tarea`, `es`, `como`, `obtener`, `fijar`, etc. solo cuentan en su sitio.
 - **Ya están en Lince** los combos, `mantenida`, `pulsaciones`, las curvas, `suavizar`, `acercar`, las escenas y el animador. `presentar()` llama en cada fotograma a `_presentar()` de la biblioteca; `dibujar()` y `caja()` llaman a `_cuadro()` con un animador; las variables de la biblioteca se conservan al recargar en caliente.
 - **En C se queda** lo que habla con la pantalla, el teclado o el altavoz, o mira píxeles: dibujar, las hojas (dividirlas, la caja de lo que se ve, las pisadas), los sonidos, las fuentes, los mapas.
@@ -107,7 +109,12 @@ Nada pendiente ahora mismo.
   límite que queda de verdad es otro: el alias no vale donde se espera un *tipo*
   (`x es geo.Punto`, `clase Mia extiende geo.Punto` son errores de sintaxis). Corregido el
   texto.
-- [ ] **Repasar la especificación entera contra el código antes de congelar la 1.0.** Son
-  2.100 líneas y cada afirmación pasa a ser un compromiso al congelar. De una muestra de
-  diez afirmaciones de la revisión de la 0.12.0 se cumplían las diez, pero el caso del
-  alias salió en la primera comprobación suelta, así que conviene el repaso completo.
+- [x] **Repasada la especificación entera contra el código** (0.14.0), sección por sección.
+  Salieron dos fallos que cerraban el programa —`lanzar e` dentro de un `capturar`, y
+  `elegir` casando con el caso equivocado cuando los tipos no coincidían— y cuatro cosas
+  que el documento decía y no eran ciertas (`sea [x, y]`, las clases por el alias, el campo
+  que «gana» a la propiedad, y que `capturar` es obligatorio). Todo corregido y con test de
+  regresión. Lo que no se pudo comprobar aquí: el módulo `juego` con ventana (sin pantalla
+  en el contenedor; sí lo de `hoja()`, `imagen()` y `guardar_imagen()` sin ventana) y
+  `make bench` (le falta `/usr/bin/time`), aunque los tiempos medidos a mano cuadran con
+  los de la especificación.

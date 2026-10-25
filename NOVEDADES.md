@@ -48,6 +48,38 @@ apartado que le toca de este archivo.
 
   La rama de la llamada ya exigía que el `(` fuera en la misma línea; a la del índice le
   faltaba la misma comprobación.
+- **`lanzar e` dentro de un `capturar` cerraba el programa.** Relanzar el error que acabas
+  de capturar es lo natural cuando quieres que suba después de hacer algo, y reventaba: la
+  variable del `capturar` se expone como un objeto sin clase (para dar `e.mensaje`,
+  `e.tipo`…) y `lanzar` leía esa clase nula. Ahora reconstruye el error con su tipo, su
+  mensaje y su línea, así que el `capturar` de fuera lo reconoce por tipo.
+- **`elegir` casaba con el caso equivocado si los tipos no coincidían.** Tenía su propia
+  comparación, distinta de la de `==`, y cuando el sujeto y el caso eran de tipos distintos
+  el resultado se quedaba en un valor que contaba como verdadero:
+
+  ```lince
+  elegir "a" {
+      caso 1   { ... }      # antes entraba aquí
+      caso "a" { ... }
+  }
+  ```
+
+  Ahora usa la misma igualdad que `==`, así que además compara listas y diccionarios por lo
+  que tienen, y `nulo` con `nulo`.
+
+### Repaso de la especificación
+
+Leída entera contra el código, antes de congelarla en la 1.0. Además de los dos fallos de
+arriba, se corrigieron cosas que el documento decía y no eran ciertas:
+
+- Decía que `y` y `o` no valen como nombres y que **`sea [x, y] = pos` no funciona**. Sí
+  funciona desde la 0.11.0, y es justo lo natural en un juego.
+- Decía que las clases de una librería no se pueden instanciar por el alias de
+  `importar ... como`. Sí se puede; el límite real es que el alias no vale donde se espera
+  un *tipo* (`x es geo.Punto`, `extiende geo.Punto`).
+- Decía que un campo con el mismo nombre que una propiedad «gana». Depende: uno declarado
+  con `sea v` tapa a la propiedad, pero un `mi.v = ...` llama a su `fijar`.
+- No decía que un `intentar` necesita al menos un `capturar` (`finalmente` solo no basta).
 
 ## 0.13.0
 

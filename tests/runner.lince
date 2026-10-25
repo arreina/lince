@@ -96,6 +96,7 @@ sea lista tests = [
     "test_variables",
     "test_operadores",
     "test_condicionales",
+    "test_elegir",
     "test_bucles",
     "test_funciones",
     "test_listas",

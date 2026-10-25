@@ -3886,17 +3886,13 @@ static Valor *exec_elegir(Nodo *n, Entorno *e) {
     for (int i = 0; i < n->elegir.num_casos && !hay_error && !hay_retorno; i++) {
         Valor *caso_val = ejecutar(n->elegir.valores[i], e);
 
-        /* Comparación por igualdad */
-        int iguales = iguales_enum(sujeto, caso_val);
-        if (iguales >= 0) {}
-        else if (sujeto->tipo == VAL_NUMERO && caso_val->tipo == VAL_NUMERO)
-            iguales = (sujeto->numero == caso_val->numero);
-        else if (sujeto->tipo == VAL_TEXTO && caso_val->tipo == VAL_TEXTO)
-            iguales = (strcmp(sujeto->texto, caso_val->texto) == 0);
-        else if (sujeto->tipo == VAL_BOOLEANO && caso_val->tipo == VAL_BOOLEANO)
-            iguales = (sujeto->booleano == caso_val->booleano);
-        else if (sujeto->tipo == VAL_NULO && caso_val->tipo == VAL_NULO)
-            iguales = 1;
+        /* Igualdad, la misma que usa '=='. Antes 'elegir' tenía su propia
+           copia parcial: si los tipos del sujeto y del caso no encajaban
+           en ninguna de sus ramas, el resultado se quedaba en el -1 de
+           iguales_enum —verdadero en C—, así que entraba por el caso
+           equivocado ('elegir' sobre un texto con un caso numérico
+           delante casaba con ese caso). */
+        int iguales = valores_iguales(sujeto, caso_val, 0);
 
         valor_destruir(caso_val);
 
@@ -4819,6 +4815,30 @@ static Valor *ejecutar(Nodo *n, Entorno *e) {
                    si no trae otra (Error("...") se crea sin línea) */
                 if (vobj->error->linea <= 0) vobj->error->linea = n->linea;
                 valor_error = vobj;
+            } else if (vobj->tipo == VAL_OBJETO && vobj->objeto->clase == NULL) {
+                /* Es la variable de un 'capturar', que se expone como un
+                   objeto sin clase con los campos del error. Relanzarla
+                   ('lanzar e') reconstruye el error con su tipo, su
+                   mensaje y su línea, en vez de perderlos. Antes entraba
+                   por la rama de abajo y reventaba al leer la clase. */
+                char *tipo = NULL, *msg = NULL;
+                int linea = n->linea;
+                for (int i = 0; i < vobj->objeto->num_campos; i++) {
+                    const char *cn = vobj->objeto->campos_nombres[i];
+                    Valor      *cv = vobj->objeto->campos_valores[i];
+                    if (strcmp(cn, "tipo") == 0 && cv->tipo == VAL_TEXTO)
+                        tipo = strdup(cv->texto);
+                    else if (strcmp(cn, "mensaje") == 0)
+                        msg = valor_a_texto(cv);
+                    else if (strcmp(cn, "linea") == 0 && cv->tipo == VAL_NUMERO
+                             && cv->numero > 0)
+                        linea = (int)cv->numero;
+                }
+                valor_error = valor_error_nuevo(tipo ? tipo : "Error",
+                                                msg ? msg : "sin mensaje", linea);
+                if (tipo) free(tipo);
+                if (msg) free(msg);
+                valor_destruir(vobj);
             } else if (vobj->tipo == VAL_OBJETO) {
                 /* Objeto de clase propia — envolver como error */
                 char *msg  = NULL;

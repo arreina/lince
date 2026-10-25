@@ -1,0 +1,28 @@
+# TEST: elegir / caso
+# Cada caso se compara con ==, así que tipos distintos no casan. Antes
+# 'elegir' tenía su propia comparación parcial y, si los tipos no encajaban
+# en ninguna de sus ramas, entraba por el caso equivocado.
+funcion mezcla(cualquiera v): texto {
+    elegir v {
+        caso 1   { devolver "uno" }
+        caso "a" { devolver "letra" }
+        otro     { devolver "otro" }
+    }
+}
+escribir(mezcla(1))
+escribir(mezcla("a"))
+escribir(mezcla(9))
+escribir(mezcla("z"))
+# Y por contenido, como ==
+funcion cont(cualquiera v): texto {
+    elegir v {
+        caso [1, 2]   { devolver "lista" }
+        caso {"a": 1} { devolver "dicc" }
+        caso nulo     { devolver "nulo" }
+        otro          { devolver "otro" }
+    }
+}
+escribir(cont([1, 2]))
+escribir(cont({"a": 1}))
+escribir(cont(nulo))
+escribir(cont(99))

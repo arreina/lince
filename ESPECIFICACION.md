@@ -92,8 +92,8 @@ fijo [COLUMNAS, FILAS] = [20, 15]
 - En una lista tiene que haber tantos elementos como nombres (si no,
   `ErrorRango`); en un diccionario, cada clave tiene que existir.
 - Las listas y diccionarios de dentro se comparten, igual que con `sea x = l[0]`.
-- Ojo: `y` y `o` son palabras del lenguaje y no valen como nombres, así que
-  `sea [x, y] = pos` no funciona; `sea [px, py] = pos` sí.
+- `x` e `y` valen como nombres aquí, que es lo natural en un juego:
+  `sea [x, y] = pos` funciona, igual que `sea y = 10` (ver «Operadores»).
 
 ### Un nombre se define una sola vez
 
@@ -315,7 +315,9 @@ elegir expresion {
 }
 ```
 
-Funciona con números, textos, lógicos y enumeraciones.
+Cada caso se compara con `==`, así que funciona con números, textos,
+lógicos, `nulo`, enumeraciones y también con listas y diccionarios (por lo
+que tienen). Si el sujeto y el caso son de tipos distintos, no casan.
 
 ### Bucles
 
@@ -642,8 +644,12 @@ p.edad = 30            # llama a 'fijar edad'
 escribir(p.edad)       # llama a 'obtener edad'
 ```
 
-Una propiedad con `obtener` y sin `fijar` es de sólo lectura. No pongas a
-un campo el mismo nombre que a una propiedad: el campo gana.
+Una propiedad con `obtener` y sin `fijar` es de sólo lectura. No pongas a un
+campo el mismo nombre que a una propiedad, porque gana uno u otro según cómo
+se escriba el campo: uno declarado con `sea v` tapa a la propiedad, mientras
+que un `mi.v = ...` dentro de un método llama a su `fijar` (y es un
+`ErrorTipo` si la propiedad es de sólo lectura, porque no hay dónde
+guardarlo).
 
 ### Operadores y `a_texto`
 
@@ -910,6 +916,16 @@ intentar {
 }
 ```
 
+Un `intentar` necesita **al menos un `capturar`**: `finalmente` no basta por
+sí solo. Si lo que quieres es que algo se haga pase lo que pase sin tratar el
+error, captura y relanza:
+
+```lince
+intentar { arriesgado() }
+capturar (error e) { lanzar e }
+finalmente { cerrar() }
+```
+
 ### Tipos de error predefinidos
 
 | Tipo | Cuándo |
@@ -944,7 +960,7 @@ como consecuencia suya.
 El objeto error tiene: `e.mensaje`, `e.tipo`, `e.linea` y `e.archivo` (el fichero donde
 pasó: el de una función importada, aunque se llame desde otro). Un error sin capturar acaba el
 programa con `❌ ErrorTipo en línea 3: ...`, y si pasó en un fichero importado, con
-`❌ ErrorTipo en línea 3 de libs/enemigos.lince: ...` (también los errores de sintaxis). Lo que
+`❌ ErrorTipo en línea 3 de ./libs/enemigos.lince: ...` (también los errores de sintaxis). Lo que
 escribe `escribir` sale en el momento, en orden con los errores, aunque la salida no sea una
 terminal (un editor, un IDE, un archivo).
 

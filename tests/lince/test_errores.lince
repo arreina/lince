@@ -89,3 +89,20 @@ intentar { escribir(d.contiene(nulo)) } capturar (ErrorTipo e) { escribir(e.tipo
 # Y lo correcto sigue funcionando
 escribir(s.contiene("ol"))
 escribir(d.contiene("a"))
+
+# Relanzar el error capturado con 'lanzar e'. Antes reventaba el proceso:
+# la variable del 'capturar' se expone como objeto sin clase y 'lanzar'
+# leía esa clase nula. Conserva tipo, mensaje y línea.
+intentar {
+    intentar { lanzar ErrorRango("fuera de rango") }
+    capturar (error e) { lanzar e }
+} capturar (ErrorRango e2) {
+    escribir(e2.tipo)
+    escribir(e2.mensaje)
+}
+# Con finalmente en medio: se ejecuta y el error sigue subiendo.
+intentar {
+    intentar { lanzar Error("sube") }
+    capturar (error e) { lanzar e }
+    finalmente { escribir("finalmente") }
+} capturar (error e) { escribir(e.mensaje) }
