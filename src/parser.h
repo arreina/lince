@@ -140,6 +140,9 @@ struct Nodo {
             int   es_diccionario;  /* sea diccionario x = {...} */
             int   vis;             /* campo de clase: 0 público, 1 privado, 2 protegido */
             int   estatico;        /* campo de clase estático */
+            int   tipado;          /* sea numero x = ...: lleva tipo (en 'tipo' y 'tipo_clase') */
+            TipoDato tipo;
+            char *tipo_clase;      /* si tipo == TIPO_CLASE: "Punto" o "geo.Punto" */
         } declaracion;
 
         /* NODO_DESESTRUCTURAR */

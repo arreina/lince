@@ -1,0 +1,61 @@
+# Lo que el revisor ('lince comprobar' y el editor) tiene que avisar: cada
+# aviso esperado está en avisos.esperado.
+importar "juego"
+importar "matematica"
+enumeracion Estado { Quieto, Andando }
+clase Arma {
+    sea texto nombre = "espada"
+    sea numero fuerza_base = 3
+    funcion golpe(numero fuerza): numero { devolver mi.fuerza_base * fuerza }
+}
+clase Jugador {
+    sea numero vida = 10
+    sea Arma arma = nulo
+    funcion crear(texto nombre): nulo { mi.nombre = nombre }
+    funcion herir(numero n): nulo {
+        mi.vda -= n
+        mi.vida = "mucho"
+    }
+    obtener salud(): numero { devolver mi.vida }
+}
+funcion sumar(numero a, numero b = 1): numero { devolver a + b }
+sea numero puntos = "cero"
+puntos = "uno"
+sea j = Jugador("Ana")
+j.herir("dos")
+j.saltar()
+escribir(j.salud)
+escribir(j.nombre)
+j.arma = Arma()
+escribir(j.arma.golpe(2, 3))
+escribir(sumar())
+escribir(sumar(1, 2, 3))
+escribir(sumar("a"))
+juego.dibujarr(1)
+escribir(matematica.raiz(4))
+escribir(Estado.Volando)
+funcion nombre_de(Jugador x): numero { devolver "Ana" }
+sea texto t = sumar(1)
+fijo MAX = 3
+MAX = 4
+sea Jugadr rival = nulo
+sea q = Jugador("x")
+q = 5
+q.nada()
+funcion f(): numero {
+    sea sobra = 2
+    sea _adrede = 3
+    devolver 1
+    escribir("nunca")
+}
+para cada numero i en rango(3) {
+    escribir(i)
+    romper
+    escribir("tampoco")
+}
+escribir(nmbre)
+importar "./libs/geo" como geo
+escribir(geo.Puntoo)
+escribir(geo.doble(2))
+escribir(despues(1))
+funcion despues(numero n): numero { devolver n }

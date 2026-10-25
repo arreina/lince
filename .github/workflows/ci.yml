@@ -34,7 +34,7 @@ jobs:
       - name: Suite del compilador
         run: make test-compilador
 
-      - name: Servidor de lenguaje (lince lsp)
+      - name: Servidor de lenguaje (lince lsp) y revisor
         run: make test-lsp
 
       - name: Soporte de editores
@@ -120,6 +120,9 @@ jobs:
 
       - name: Servidor de lenguaje
         run: python tests/lsp/smoke.py ./lince.exe
+
+      - name: Revisor (avisos de lince comprobar)
+        run: bash tests/revisor/probar.sh ./lince.exe
 
       - name: Depurador
         run: bash tests/depurador/smoke.sh ./lince.exe

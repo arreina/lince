@@ -3,6 +3,23 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.3.0
+
+Tipos donde faltaban y avisos sin ejecutar. Nada de lo que ya funcionaba cambia.
+
+- **Variables y campos con tipo**, delante del nombre como en los parámetros: `sea numero vida = 3`, `fijo texto TITULO = "..."`, `sea Arma arma = nulo`, y en una clase `sea numero saldo = 0`. Al ejecutar se comprueba el valor inicial (`ErrorTipo` si no es de ese tipo).
+- **`lince comprobar` avisa de descuidos sin ejecutar**, y el editor los enseña subrayados mientras escribes: un nombre que no existe (con «¿Querías decir…?»), algo usado antes de la línea que lo define, una variable que no se usa, código detrás de un `devolver`, un valor del tipo equivocado (también al darle otro valor a una variable con tipo, o al devolver), una llamada con los argumentos que no son, un campo o método que la clase no tiene, lo que no tiene un módulo, un alias o una enumeración (`juego.dibujarr`, `Estado.Volando`) y dar otro valor a un `fijo`. Son avisos: el programa se ejecuta igual.
+- **El alias de `importar ... como` vale como tipo**: `x es geo.Punto`, `clase Mia extiende geo.Punto`, `implementa geo.Forma`, `funcion mover(geo.Punto p)` y `sea geo.Punto p = ...`. Antes eran errores de sintaxis.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.3.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.3.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.3.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.3.0.vsix` |
+
 ## 1.2.0
 
 La primera versión del camino a la 2.0 (ver `PENDIENTE.md`): lo pequeño que quedó pendiente del lenguaje. Todo lo nuevo antes daba error, así que ningún juego escrito cambia, salvo lo de `ordenar()` (abajo).

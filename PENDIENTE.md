@@ -44,11 +44,20 @@ lince-motor** para que el IDE la incorpore (resaltado, LSP, autocompletado, ayud
   (nulo en vez de error si `jugador` es nulo).
 - [x] `texto.decimales(3.5, 2)` → «3.50» y `texto.miles(12000)` → «12.000».
 
-### 1.3 — Tipos opcionales
-- [ ] Anotaciones no obligatorias: `sea vida: numero = 3`, `funcion daño(x: numero) -> logico`.
-- [ ] `lince revisar` (y el LSP) las comprueba sin ejecutar: tipos, llamadas, campos que no
-  existen, variables sin usar, código al que nunca se llega.
-- [ ] El alias de `importar ... como` vale también como tipo: `x es geo.Punto`, `extiende geo.Punto`.
+### 1.3 — Tipos opcionales y avisos sin ejecutar (publicada)
+Lince ya llevaba tipos en los parámetros y en el retorno, delante del nombre; se siguió esa forma
+(`sea numero vida`) en vez de la `vida: numero` del primer borrador, para no tener dos maneras de
+escribir lo mismo. Y en vez de un `lince revisar` nuevo, los avisos los da el `lince comprobar` de
+siempre, que es el que ya usa el editor.
+- [x] Tipo delante del nombre en `sea` / `fijo` y en los campos de clase: `sea numero vida = 3`.
+  Al ejecutar se comprueba el valor inicial; los cambios posteriores, sin ejecutar.
+- [x] `lince comprobar` (y el editor) avisan sin ejecutar: nombres que no existen (con «¿querías
+  decir…?»), lo usado antes de definirse, variables sin usar, código que no se ejecuta, tipos que
+  no casan, llamadas con los argumentos que no son, campos y métodos que la clase no tiene,
+  miembros que no tiene un módulo, un alias o una enumeración, y dar otro valor a un `fijo`
+  (`src/revisor.c`).
+- [x] El alias de `importar ... como` vale también como tipo: `x es geo.Punto`, `extiende geo.Punto`,
+  `implementa geo.Forma`, parámetros y variables.
 
 ### 1.4 — Herramientas
 - [ ] `lince formatear` (estilo único; el IDE lo usa al guardar).

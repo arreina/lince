@@ -18,6 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "lsp.h"
+#include "revisor.h"
 #include "lexer.h"
 #include "parser.h"
 #include "interprete.h"
@@ -70,9 +71,10 @@ void lsp_analizar(const char *texto) {
     int     n = 0;
     Token  *t = lexer_tokenizar(l, &n);
     Parser *p = parser_crear(t, n);
-    parser_parsear(p);         /* termina el proceso si hay un error */
+    Nodo *programa = parser_parsear(p);   /* termina el proceso si hay un error */
     lsp_conocer_importados(p, texto, _ruta_analizada);
     parser_avisos(p, avisar_stderr);
+    revisar(programa, _ruta_analizada, avisar_stderr);
     fflush(stderr);
 }
 
@@ -883,7 +885,7 @@ static void diagnostico(Buf *b, int linea, int gravedad, const char *msg, int pr
 }
 
 static void publicar_diagnosticos(const char *uri, const char *texto) {
-    int linea = 1; char msg[1024], buf[4096];
+    int linea = 1; char msg[1024]; static char buf[65536];   /* el error, o los avisos del revisor */
     Buf b = {0};
     buf_str(&b, "{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/publishDiagnostics\",\"params\":{\"uri\":");
     buf_json(&b, uri);

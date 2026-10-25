@@ -1,0 +1,49 @@
+# TEST: tipos en 'sea' y en los campos (1.3), y el alias de 'importar ... como' como tipo
+importar "./ayuda_geo" como geo
+
+sea numero vida = 3
+sea texto nombre = "Ana"
+fijo logico ACTIVO = verdadero
+sea cualquiera algo = 1
+algo = "ya no es un número"
+sea funcion doble = funcion(numero n): numero { devolver n * 2 }
+escribir([vida, nombre, ACTIVO, algo, doble(4)])
+
+intentar { sea numero mal = "tres" } capturar (ErrorTipo e) { escribir(e.mensaje) }
+intentar { sea funcion f = 3 } capturar (ErrorTipo e) { escribir(e.mensaje) }
+
+clase Ficha {
+    sea numero x = 1
+    sea texto letra = "a"
+    sea saldo
+    sea Ficha siguiente = nulo
+}
+sea Ficha f = Ficha()
+escribir([f.x, f.letra, f.saldo, f.siguiente])
+
+clase Rota { sea numero x = "no" }
+intentar { sea r = Rota() } capturar (ErrorTipo e) { escribir(e.mensaje) }
+
+# Un campo sin valor no se come la línea siguiente como si fuera su tipo
+clase Cuenta {
+    sea saldo
+    privado sea titular = "nadie"
+    funcion quien(): texto { devolver mi.titular }
+}
+escribir(Cuenta().quien())
+
+# El alias como tipo: en 'es', 'extiende', 'implementa', parámetros y variables
+clase Mio extiende geo.Punto {
+    funcion triple(): numero { devolver mi.x * 3 }
+}
+clase Cuadro implementa geo.Forma {
+    funcion area(): numero { devolver 4 }
+}
+sea geo.Punto p = geo.Punto(2)
+sea m = Mio(5)
+escribir([p es geo.Punto, m es geo.Punto, 3 es geo.Punto, m.doble(), m.triple()])
+escribir([Cuadro() es geo.Forma, geo.Estado.Quieto es geo.Estado])
+funcion mover(geo.Punto q): geo.Punto { devolver q }
+escribir(mover(p).x)
+para cada geo.Punto q en [p, m] { escribir(q.x) }
+intentar { escribir(p es geo.Nada) } capturar (Error e) { escribir(e.mensaje) }

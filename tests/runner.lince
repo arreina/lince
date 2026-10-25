@@ -132,7 +132,8 @@ sea lista tests = [
     "test_desestructurar",
     "test_biblioteca",
     "test_tareas",
-    "test_novedades_1_2"
+    "test_novedades_1_2",
+    "test_tipos"
 ]
 
 # ── Cabecera ───────────────────────────────────────────────────

@@ -1207,6 +1207,25 @@ static CampoClase *buscar_campo(ClaseLince *c, const char *nombre, int estatico)
 }
 
 /* x es Tipo — clase, interfaz o tipo básico. */
+/* Una clase, interfaz o enumeración por su nombre: 'Punto', o 'geo.Punto'
+   si se importó 'como geo' (entonces vive en el diccionario del alias) */
+static Valor *obtener_tipo(Entorno *e, const char *nombre, int linea) {
+    const char *punto = strchr(nombre, '.');
+    if (!punto) return entorno_obtener(e, nombre, linea);
+    char alias[256];
+    snprintf(alias, sizeof alias, "%.*s", (int)(punto - nombre), nombre);
+    Valor *m = entorno_obtener(e, alias, linea);
+    if (hay_error) return m;
+    int i = m->tipo == VAL_DICCIONARIO && m->es_modulo ? valor_diccionario_buscar(m, punto + 1) : -1;
+    if (i < 0) {
+        valor_destruir(m);
+        return error_rt("Error", linea, "'%s' no tiene nada llamado '%s'.", alias, punto + 1);
+    }
+    Valor *r = valor_retener(m->diccionario.valores[i]);
+    valor_destruir(m);
+    return r;
+}
+
 static Valor *exec_es(Nodo *n, Entorno *e) {
     Valor *v = ejecutar(n->binario.izquierda, e);
     const char *nm = n->binario.derecha->identificador;
@@ -1222,8 +1241,10 @@ static Valor *exec_es(Nodo *n, Entorno *e) {
     else if (strcmp(nm, "funcion") == 0)     r = v->tipo == VAL_FUNCION;
     else if (strcmp(nm, "tarea") == 0)       r = v->tipo == VAL_TAREA;
     else {
-        Valor *t = entorno_obtener(e, nm, n->linea);
+        Valor *t = obtener_tipo(e, nm, n->linea);
         if (hay_error) { valor_destruir(v); valor_destruir(t); return valor_nulo(); }
+        const char *pt = strrchr(nm, '.');
+        if (pt) nm = pt + 1;                  /* geo.Estado: el nombre es 'Estado' */
         if (t->tipo == VAL_CLASE) {
             if (v->tipo == VAL_OBJETO && !v->objeto->clase) {
                 /* El error que recibe un 'capturar' es un objeto sin clase,
@@ -1665,6 +1686,25 @@ static void validar_tipo(Valor *v, TipoDato tipo, const char *contexto,
         valor_error = valor_error_nuevo("ErrorTipo", msg, linea);
         hay_error = 1;
     }
+}
+
+/* 'sea numero vida = ...' (o un campo así): el valor, del tipo que dice.
+   'lista' y 'diccionario' tienen su propio mensaje (exec_declaracion); los de
+   clase, como en los parámetros, no se comprueban al ejecutar. */
+static void validar_declarado(Valor *v, Nodo *decl, const char *contexto) {
+    if (!decl || !decl->declaracion.tipado || decl->declaracion.es_lista ||
+        decl->declaracion.es_diccionario) return;
+    if (decl->declaracion.tipo == TIPO_FUNCION) {
+        if (v->tipo != VAL_FUNCION) {
+            char msg[256];
+            snprintf(msg, sizeof msg, "Error de tipo en %s '%s': se esperaba 'funcion'.",
+                     contexto, decl->declaracion.nombre);
+            valor_error = valor_error_nuevo("ErrorTipo", msg, decl->linea);
+            hay_error = 1;
+        }
+        return;
+    }
+    validar_tipo(v, decl->declaracion.tipo, contexto, decl->declaracion.nombre, decl->linea);
 }
 
 /* El valor que devuelve una función: el de su 'devolver' si lo hubo, y nulo
@@ -2500,6 +2540,7 @@ static int inicializar_campos(Valor *vobj, ClaseLince *c, int linea) {
             v = ejecutar(cd->inicial, ie);
             entorno_destruir(ie);
             esto_actual = esto_ant; clase_actual = cls_ant;
+            if (!hay_error) validar_declarado(v, cd->decl, "campo");
             if (hay_error) { valor_destruir(v); return 0; }
         } else {
             v = valor_nulo();
@@ -2685,6 +2726,8 @@ static Valor *exec_declaracion(Nodo *n, Entorno *e) {
         valor_destruir(v);
         return valor_nulo();
     }
+    if (!hay_error) validar_declarado(v, n, "variable");
+    if (hay_error) { valor_destruir(v); return valor_nulo(); }
     const char *id = NI(n, n->declaracion.nombre);
     if (ya_definido_aqui_i(e, id) &&
         redefinido(e, n->declaracion.nombre,
@@ -4346,7 +4389,8 @@ static Valor *exec_clase(Nodo *n, Entorno *e) {
 
     /* Resolver clase padre */
     if (n->clase.padre) {
-        Valor *vpadre = entorno_obtener(e, n->clase.padre, n->linea);
+        Valor *vpadre = obtener_tipo(e, n->clase.padre, n->linea);
+        if (hay_error) { valor_destruir(vpadre); return valor_nulo(); }
         if (vpadre->tipo != VAL_CLASE) {
             valor_destruir(vpadre);
             return error_rt("ErrorTipo", n->linea,
@@ -4387,13 +4431,15 @@ static Valor *exec_clase(Nodo *n, Entorno *e) {
         cd->estatico  = cn->declaracion.estatico;
         cd->constante = cn->declaracion.constante;
         cd->inicial   = cn->declaracion.valor;
+        cd->decl      = cn;
         cd->duena     = c;
         cd->valor     = valor_nulo();
     }
 
     /* Verificar interfaces */
     for (int i = 0; i < n->clase.num_interfaces; i++) {
-        Valor *viface = entorno_obtener(e, n->clase.interfaces[i], n->linea);
+        Valor *viface = obtener_tipo(e, n->clase.interfaces[i], n->linea);
+        if (hay_error) { valor_destruir(viface); return valor_nulo(); }
         if (!viface || viface->tipo != VAL_DICCIONARIO || viface->es_modulo != 2) {
             valor_destruir(viface);
             return error_rt("ErrorTipo", n->linea,
@@ -4459,6 +4505,7 @@ static Valor *exec_clase(Nodo *n, Entorno *e) {
         valor_destruir(cd->valor);
         cd->valor = ejecutar(cd->inicial, ie);
         entorno_destruir(ie);
+        if (!hay_error) validar_declarado(cd->valor, cd->decl, "campo");
         if (hay_error) return valor_nulo();
     }
     return valor_nulo();

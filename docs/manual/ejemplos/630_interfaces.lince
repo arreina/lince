@@ -32,6 +32,6 @@ clase Cuadrado implementa Forma {
 }
 
 sea lista formas = [Rectangulo(2, 3), Cuadrado(5)]
-para cada elemento f en formas {
+para cada Forma f en formas {
     escribir(f.describir() + " → " + f.area())
 }

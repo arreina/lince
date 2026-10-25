@@ -72,6 +72,15 @@ send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
 d = recv()["params"]["diagnostics"]
 comprobar(len(d) == 1 and d[0]["severity"] == 2 and d[0]["range"]["start"]["line"] == 2 and
           "Estado.Andando ni Estado.Saltando" in d[0]["message"], "aviso de un elegir al que le faltan casos")
+# ── avisos del revisor: una errata y un tipo que no casa ──
+errata = 'sea numero vida = 3\nescribir(vda)\nvida = "mucha"\n'
+send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
+    "textDocument": {"uri": uri}, "contentChanges": [{"text": errata}]}})
+d = recv()["params"]["diagnostics"]
+comprobar(len(d) == 2 and all(x["severity"] == 2 for x in d) and
+          d[0]["range"]["start"]["line"] == 1 and "¿Querías decir 'vida'?" in d[0]["message"] and
+          d[1]["range"]["start"]["line"] == 2 and "es numero" in d[1]["message"],
+          "avisos del revisor: un nombre mal escrito y un tipo que no casa")
 send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
     "textDocument": {"uri": uri}, "contentChanges": [{"text": src}]}})
 recv()

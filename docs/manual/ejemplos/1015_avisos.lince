@@ -1,0 +1,10 @@
+# @seccion: Herramientas
+# @titulo: Avisos sin ejecutar
+# @nota: `lince comprobar` avisa de lo que casi seguro es un descuido: un nombre mal escrito (con el parecido), una variable que no se usa, código detrás de un `devolver`, un valor del tipo equivocado, una llamada con argumentos de más o de menos, un campo que la clase no tiene. El editor enseña lo mismo mientras escribes. Son avisos: el programa se ejecuta igual.
+# @lenguaje: terminal
+lince comprobar juego.lince
+⚠️  Aviso en línea 12: No hay nada llamado 'vda'. ¿Querías decir 'vida'?
+⚠️  Aviso en línea 20: 'mover' necesita 2 argumentos, y aquí le das 3.
+⚠️  Aviso en línea 31: La clase 'Jugador' no tiene 'saltr'. ¿Querías decir 'saltar'?
+⚠️  Aviso en línea 40: 'puntos' es numero, y aquí le das un texto.
+✅ Sintaxis correcta: juego.lince

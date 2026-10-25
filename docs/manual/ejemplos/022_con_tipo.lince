@@ -1,0 +1,13 @@
+# @seccion: Primeros pasos
+# @titulo: Variables con tipo
+# @nota: Delante del nombre puede ir su tipo, como en los parámetros (`numero`, `texto`, `logico`, `lista`, `funcion`, una clase...). No es obligatorio; si se pone, el valor inicial tiene que ser de ese tipo, y `lince comprobar` y el editor avisan si más adelante se le da otro.
+sea numero vida = 3
+sea texto nombre = "Ana"
+fijo logico MODO_FACIL = verdadero
+
+intentar {
+    sea numero puntos = "cero"
+} capturar (ErrorTipo e) {
+    escribir(e.mensaje)
+}
+escribir("{nombre}: {vida} vidas, fácil: {MODO_FACIL}")

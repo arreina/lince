@@ -1,0 +1,12 @@
+[3, "Ana", verdadero, "ya no es un número", 8]
+Error de tipo en variable 'mal': se esperaba 'numero' pero se recibió 'texto'.
+Error de tipo en variable 'f': se esperaba 'funcion'.
+[1, "a", nulo, nulo]
+Error de tipo en campo 'x': se esperaba 'numero' pero se recibió 'texto'.
+nadie
+[verdadero, verdadero, falso, 10, 15]
+[verdadero, verdadero]
+2
+2
+5
+'geo' no tiene nada llamado 'Nada'.

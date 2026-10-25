@@ -1,0 +1,13 @@
+# Librería para las pruebas del revisor (y de los tipos con alias)
+importar "matematica"
+
+clase Punto {
+    sea numero x = 0
+    funcion crear(numero x): nulo { mi.x = x }
+    funcion doble(): numero { devolver mi.x * 2 }
+}
+interfaz Forma { funcion area(): numero }
+enumeracion Estado { Quieto, Andando }
+fijo [ANCHO, ALTO] = [320, 180]
+
+funcion doble(numero n): numero { devolver n * 2 }

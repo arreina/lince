@@ -1,0 +1,123 @@
+# Un programa correcto que usa casi todo el lenguaje: el revisor no tiene que
+# avisar de nada. Si avisa, es un aviso falso (y enseña a no hacerles caso).
+importar "matematica"
+importar "texto"
+importar "./libs/geo" como geo
+
+enumeracion Dir { Arriba, Abajo }
+
+interfaz Saludable {
+    funcion nombre(): texto
+    funcion saludo(): texto { devolver "Hola, " + mi.nombre() }
+}
+
+abstracta clase Ser {
+    sea numero vida = 10
+    estatico sea numero CUANTOS = 0
+    funcion crear(numero vida): nulo {
+        mi.vida = vida
+        Ser.CUANTOS += 1
+    }
+    abstracto funcion ruido(): texto
+    obtener vivo(): logico { devolver mi.vida > 0 }
+}
+
+clase Gato extiende Ser implementa Saludable {
+    sea Gato amigo = nulo
+    funcion crear(texto nombre): nulo {
+        padre(7)
+        mi.apodo = nombre
+    }
+    sobrescribe funcion ruido(): texto { devolver "miau" }
+    funcion nombre(): texto { devolver mi.apodo }
+}
+
+clase Mio extiende geo.Punto {
+    funcion triple(): numero { devolver mi.x * 3 }
+}
+
+# una función puede llamar a otra que se define más abajo: se ejecuta después
+funcion cuadruple(numero n): numero { devolver doble(doble(n)) }
+funcion doble(numero n): numero { devolver n * 2 }
+escribir(cuadruple(1))
+
+funcion intercambiar(ref numero a, ref numero b): nulo {
+    sea t = a
+    a = b
+    b = t
+}
+
+generador hasta(numero n): numero {
+    para cada numero i en rango(n) { producir i }
+}
+
+tarea parpadear(numero veces) {
+    para cada numero i en rango(veces) { esperar() }
+    devolver veces
+}
+
+funcion contador(): funcion {
+    sea cuenta = 0
+    devolver funcion(): numero {
+        cuenta += 1
+        devolver cuenta
+    }
+}
+
+sea Gato g = Gato("Tom")
+g.amigo = Gato("Silvestre")
+escribir(g.saludo() + " " + g.ruido() + " " + a_texto(g.vivo))
+escribir(g.amigo?.nombre() ?? "solo")
+escribir(Ser.CUANTOS)
+sea gato = Gato("Félix")
+gato.extra = 3                  # un campo que se crea desde fuera
+escribir(gato.extra)
+
+sea numero x = 1
+sea numero y = 2
+intercambiar(x, y)
+escribir([x, y])
+
+sea suma = 0
+para cada numero n en hasta(4) { suma += n }
+escribir(suma)
+
+sea i = 0
+para (i = 0; i < 3; i++) { escribir(i) }
+para (k = 0; k < 2; k++) { escribir(k) }
+
+sea siguiente = contador()
+siguiente()
+escribir(siguiente())
+
+sea [ancho, alto] = [geo.ANCHO, geo.ALTO]
+escribir("{ancho}x{alto}")
+
+sea d = Dir.Arriba
+elegir d {
+    caso Dir.Arriba { escribir("sube") }
+    caso Dir.Abajo { escribir("baja") }
+}
+
+sea geo.Punto p = geo.Punto(2)
+sea m = Mio(5)
+escribir([p.doble(), m.triple(), m es geo.Punto, geo.Estado.Quieto es geo.Estado])
+
+intentar {
+    lanzar ErrorTipo("a propósito")
+} capturar (ErrorTipo e) {
+    escribir(e.mensaje)
+} finalmente {
+    escribir(texto.miles(matematica.raiz(1000000)))
+}
+
+sea t = parpadear(2)
+sea premios = {1: "oro", 2: "plata"}
+escribir(premios[1])
+sea l = mapear([1, 2, 3], funcion(numero v): numero { devolver v * v })
+escribir(l)
+escribir(si x > 1 { "mucho" } sino { "poco" })
+sea cualquiera algo = nulo
+algo = "ahora texto"
+escribir(algo)
+escribir(t es tarea)

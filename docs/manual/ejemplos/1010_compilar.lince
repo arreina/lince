@@ -1,9 +1,9 @@
 # @seccion: Herramientas
 # @titulo: Ejecutar, comprobar y compilar
-# @nota: `lince programa.lince` lo ejecuta (un juego, con recarga en caliente: al guardar cambios sigue con el código nuevo). `lince comprobar` solo mira que esté bien escrito. `lince compilar` hace un ejecutable con el programa dentro, y lo que importa, que funciona sin instalar Lince. `lince nuevo` crea un juego pequeño y completo para empezar a cambiarlo. Para compartir un juego, y para el móvil, mira [el módulo juego](juego.html#compartir-el-juego).
+# @nota: `lince programa.lince` lo ejecuta (un juego, con recarga en caliente: al guardar cambios sigue con el código nuevo). `lince comprobar` mira, sin ejecutarlo, que esté bien escrito y avisa de descuidos (ver «Avisos sin ejecutar»). `lince compilar` hace un ejecutable con el programa dentro, y lo que importa, que funciona sin instalar Lince. `lince nuevo` crea un juego pequeño y completo para empezar a cambiarlo. Para compartir un juego, y para el móvil, mira [el módulo juego](juego.html#compartir-el-juego).
 # @lenguaje: terminal
 lince programa.lince                    # ejecutarlo
-lince comprobar programa.lince          # solo la sintaxis
+lince comprobar programa.lince          # sin ejecutarlo: sintaxis y avisos
 lince compilar programa.lince -o prog   # un ejecutable con todo dentro
 lince nuevo mi_juego                    # una carpeta con un juego para empezar
 lince version

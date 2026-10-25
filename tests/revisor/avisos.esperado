@@ -1,0 +1,22 @@
+⚠️  Aviso en línea 16: La clase 'Jugador' no tiene 'vda'. ¿Querías decir 'vida'?
+⚠️  Aviso en línea 17: El campo 'vida' es numero, y aquí le das un texto.
+⚠️  Aviso en línea 22: 'puntos' es numero, y aquí le das un texto.
+⚠️  Aviso en línea 23: 'puntos' es numero, y aquí le das un texto.
+⚠️  Aviso en línea 25: El parámetro 'n' de 'herir' es numero, y aquí le das un texto.
+⚠️  Aviso en línea 26: La clase 'Jugador' no tiene 'saltar'.
+⚠️  Aviso en línea 30: 'golpe' necesita 1 argumento, y aquí le das 2.
+⚠️  Aviso en línea 31: 'sumar' necesita entre 1 y 2 argumentos, y aquí le das 0.
+⚠️  Aviso en línea 32: 'sumar' necesita entre 1 y 2 argumentos, y aquí le das 3.
+⚠️  Aviso en línea 33: El parámetro 'a' de 'sumar' es numero, y aquí le das un texto.
+⚠️  Aviso en línea 34: 'juego' no tiene nada llamado 'dibujarr'. ¿Querías decir 'dibujar'?
+⚠️  Aviso en línea 36: La enumeración 'Estado' no tiene 'Volando'.
+⚠️  Aviso en línea 37: 'nombre_de' devuelve numero, y aquí devuelve un texto.
+⚠️  Aviso en línea 38: 't' es texto, y aquí le das un número.
+⚠️  Aviso en línea 40: 'MAX' es fijo: no se le puede dar otro valor.
+⚠️  Aviso en línea 41: No hay ninguna clase ni interfaz llamada 'Jugadr'. ¿Querías decir 'Jugador'?
+⚠️  Aviso en línea 49: Esto no se ejecuta nunca: va detrás de un 'devolver'.
+⚠️  Aviso en línea 46: 'sobra' se define pero no se usa (si es a propósito, empieza su nombre por _).
+⚠️  Aviso en línea 54: Esto no se ejecuta nunca: va detrás de un 'romper'.
+⚠️  Aviso en línea 56: No hay nada llamado 'nmbre'.
+⚠️  Aviso en línea 58: 'geo' no tiene nada llamado 'Puntoo'. ¿Querías decir 'Punto'?
+⚠️  Aviso en línea 60: 'despues' se usa antes de definirlo (en la línea 61): aquí aún no existe.

@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.2
+# 🐆 Lince — Especificación del Lenguaje v1.3
 
 ## Filosofía
 
@@ -75,6 +75,26 @@ fijo PI = 3.14159               # constante
 sea lista notas = [9, 7, 10]
 sea diccionario d = {"nombre": "Ana", "edad": 22}
 ```
+
+### Con tipo
+
+Delante del nombre puede ir su tipo, como en los parámetros: `numero`, `texto`, `logico`,
+`lista`, `diccionario`, `funcion`, `cualquiera` o el nombre de una clase (también
+`alias.Clase`, de un `importar ... como`). No es obligatorio:
+
+```lince
+sea numero vida = 3
+sea texto nombre = "Ana"
+fijo logico MODO_FACIL = verdadero
+sea Arma arma = nulo
+sea geo.Punto centro = geo.Punto(0, 0)
+```
+
+- Al ejecutar, el valor inicial tiene que ser de ese tipo (si no, `ErrorTipo`). Los tipos de
+  clase no se comprueban al ejecutar, igual que en los parámetros.
+- `lince comprobar` y el editor avisan, sin ejecutar, cuando más adelante se le da un valor de
+  otro tipo (`vida = "mucha"`). A una variable de un tipo de clase se le puede dar `nulo`.
+- El tipo y el nombre van en la misma línea.
 
 ### Varios nombres de una vez
 
@@ -594,6 +614,7 @@ clase Cuenta {
     sea titular = "anónimo"
     fijo MONEDA = "EUR"        # constante: no se puede reasignar
     sea saldo                  # sin valor inicial: empieza en nulo
+    sea numero intereses = 0   # con tipo, como una variable
 }
 ```
 
@@ -1912,9 +1933,9 @@ sigue valiendo como nombre de variable o de parámetro.
 Las clases de la librería se instancian a través del alias
 (`geo.Punto(1, 2)`), y el objeto que sale se usa como cualquier otro.
 
-**Límite actual:** el alias no vale donde se espera un *tipo*, sólo donde se
-espera un valor: `x es geo.Punto` y `clase Mia extiende geo.Punto` son
-errores de sintaxis. Para eso, importa el archivo sin `como`.
+El alias vale también donde se espera un *tipo*: `x es geo.Punto`,
+`clase Mia extiende geo.Punto`, `implementa geo.Forma`, un parámetro
+`geo.Punto p` o una variable `sea geo.Punto p = ...`.
 
 ---
 
@@ -2017,6 +2038,36 @@ El ejecutable va a la velocidad del intérprete. Mediciones con los programas de
 iteraciones 0,35 · diccionario de 50.000 claves 0,03 · 576.000 píxeles con
 cuentas 0,3. Una vuelta de bucle cuesta unos 30 ns; una llamada a función,
 unos 70.
+
+---
+
+## Avisos sin ejecutar (`lince comprobar`)
+
+`lince comprobar programa.lince` mira que el programa esté bien escrito sin ejecutarlo, y avisa de
+lo que casi seguro es un descuido. El editor (con `lince lsp`) enseña lo mismo mientras se escribe,
+subrayado en amarillo. Son avisos, no errores: el programa se ejecuta igual.
+
+```
+⚠️  Aviso en línea 12: No hay nada llamado 'vda'. ¿Querías decir 'vida'?
+```
+
+| Avisa de | Ejemplo |
+|---|---|
+| un nombre que no existe (con el parecido, si hay uno) | `escribir(puntoss)` |
+| algo que se usa antes de la línea que lo define | `saludar()` arriba de `funcion saludar()` |
+| una variable que se define y no se usa (salvo si empieza por `_`) | `sea sobra = 2` dentro de una función |
+| código que no se ejecuta nunca | lo que va detrás de `devolver`, `lanzar`, `romper` o `continuar` |
+| un valor del tipo equivocado | `sea numero vida = "tres"`, `vida = "mucha"`, `devolver "x"` en una función `: numero` |
+| una llamada con los argumentos que no son | `mover(1, 2, 3)` si `mover` tiene dos parámetros; un texto donde va un `numero` |
+| un campo o método que la clase no tiene | `jugador.saltr()` |
+| algo que un módulo, un alias o una enumeración no tiene | `juego.dibujarr(...)`, `geo.Puntoo`, `Estado.Volando` |
+| darle otro valor a un `fijo` | `MAX = 4` |
+| una clase o interfaz que no existe donde va un tipo | `funcion f(Jugadr j)` |
+
+El tipo de una expresión solo se conoce cuando no hay duda (un literal, una variable o un
+parámetro con tipo, lo que devuelve una función con tipo, `Clase(...)`); si no se sabe, no se
+avisa. Los miembros de una clase se comprueban si la clase y sus antecesoras están en el mismo
+archivo, y cuentan también los campos que se crean con `objeto.campo = ...` en cualquier sitio.
 
 ---
 

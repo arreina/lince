@@ -9,7 +9,7 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-1.2-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-1.3-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-38%2F38-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows%20·%20Android-6A2D72.svg)]()
 
@@ -115,7 +115,7 @@ lince nuevo mi_juego              # crear un juego nuevo listo para cambiarlo
 lince compilar programa.lince     # crear un ejecutable autónomo
 lince repartir juego.lince        # carpeta y .zip para compartir el juego
 lince depurar programa.lince      # depurar paso a paso
-lince comprobar programa.lince    # sólo comprobar la sintaxis
+lince comprobar programa.lince    # sin ejecutar: la sintaxis y avisos de descuidos
 lince lsp                         # servidor de lenguaje para tu editor
 lince                             # REPL interactivo
 lince instalar https://github.com/usuario/paquete

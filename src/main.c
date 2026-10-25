@@ -51,7 +51,7 @@ static void mostrar_ayuda(void) {
     printf("  lince repartir <juego.lince>             Carpeta y .zip para compartir el juego (con SDL2)\n");
     printf("  lince repartir <juego.lince> --android   El .apk para instalarlo en un móvil Android\n");
     printf("  lince repartir <juego.lince> --aab       El .aab para publicarlo en Google Play\n");
-    printf("  lince comprobar <archivo.lince>          Comprueba la sintaxis sin ejecutar\n");
+    printf("  lince comprobar <archivo.lince>          Sin ejecutar: la sintaxis, y avisos de descuidos\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
     printf("  lince lsp                                Servidor de lenguaje para editores\n");
     printf("  lince                                    Abre el REPL interactivo\n");

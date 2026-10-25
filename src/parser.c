@@ -604,6 +604,21 @@ static Nodo *suma(Parser *p) {
     return izq;
 }
 
+/* El nombre de una clase, interfaz o enumeración donde va un tipo: 'Punto',
+   o 'geo.Punto' si viene de un 'importar ... como geo'. Cadena nueva. */
+static char *nombre_de_tipo(Parser *p, const char *que) {
+    Token *t = consumir(p, TOK_IDENTIFICADOR, que);
+    if (!coincide(p, TOK_PUNTO) || p->tokens[p->pos + 1].tipo != TOK_IDENTIFICADOR ||
+        actual(p)->linea != t->linea)
+        return strdup(t->valor);
+    consumir_cualquiera(p);
+    Token *u = consumir_cualquiera(p);
+    size_t n = strlen(t->valor) + strlen(u->valor) + 2;
+    char *r = malloc(n);
+    snprintf(r, n, "%s.%s", t->valor, u->valor);
+    return r;
+}
+
 /* 'x es Tipo': ¿viene un 'es' seguido de un nombre de clase, interfaz o tipo? */
 static int viene_es(Parser *p) {
     if (!(coincide(p, TOK_IDENTIFICADOR) && actual(p)->valor &&
@@ -621,9 +636,10 @@ static Nodo *comparacion(Parser *p) {
            viene_es(p)) {
         if (viene_es(p)) {
             consumir_cualquiera(p);                       /* es */
-            Token *tipo = consumir_cualquiera(p);         /* Nombre */
+            char *tipo = coincide(p, TOK_IDENTIFICADOR) ? nombre_de_tipo(p, "tipo")
+                                                        : strdup(consumir_cualquiera(p)->valor);
             Nodo *r = nodo_nuevo(NODO_IDENTIFICADOR, p);
-            r->identificador = strdup(tipo->valor);
+            r->identificador = tipo;
             Nodo *n = nodo_nuevo(NODO_BINARIO, p);
             strcpy(n->binario.operador, "es");
             n->binario.izquierda = izq;
@@ -800,12 +816,36 @@ static int viene_desestructurar(Parser *p) {
     return 0;
 }
 
+/* Tras 'sea' / 'fijo': ¿viene un tipo y luego el nombre? (sea numero vida,
+   sea Punto p, sea geo.Punto p, sea cualquiera x). 'lista' y 'diccionario'
+   van aparte, como siempre. Si viene, lo lee. */
+static int tipo_de_declaracion(Parser *p, TipoDato *tipo, char **clase) {
+    TipoToken t0 = actual(p)->tipo, t1 = ver_siguiente(p)->tipo;
+    int es_tipo = 0;
+    if ((t0 == TOK_TIPO_NUMERO || t0 == TOK_TIPO_TEXTO || t0 == TOK_TIPO_LOGICO ||
+         t0 == TOK_FUNCION) && t1 == TOK_IDENTIFICADOR) es_tipo = 1;
+    else if (t0 == TOK_IDENTIFICADOR && t1 == TOK_IDENTIFICADOR) es_tipo = 1;
+    else if (t0 == TOK_IDENTIFICADOR && t1 == TOK_PUNTO && p->pos + 3 < p->cantidad &&
+             p->tokens[p->pos + 2].tipo == TOK_IDENTIFICADOR &&
+             p->tokens[p->pos + 3].tipo == TOK_IDENTIFICADOR) es_tipo = 1;
+    /* el tipo y el nombre, en el mismo renglón: un campo sin valor ('sea saldo')
+       no se lee como tipo de lo que empieza la línea siguiente */
+    int fin = t1 == TOK_PUNTO ? p->pos + 3 : p->pos + 1;
+    if (!es_tipo || p->tokens[fin].linea != actual(p)->linea) return 0;
+    *tipo = parsear_tipo(p, clase);
+    return 1;
+}
+
 static Nodo *sent_declaracion(Parser *p, int constante) {
     consumir_cualquiera(p); /* sea / fijo */
 
     /* ¿Tipo explícito? */
-    int es_lista = 0, es_diccionario = 0;
-    if (coincide(p, TOK_LISTA)) {
+    int es_lista = 0, es_diccionario = 0, tipado = 0;
+    TipoDato tipo = TIPO_CUALQUIERA;
+    char *tipo_clase = NULL;
+    if (tipo_de_declaracion(p, &tipo, &tipo_clase)) {
+        tipado = 1;
+    } else if (coincide(p, TOK_LISTA)) {
         es_lista = 1;
         consumir(p, TOK_LISTA, "'lista'");
     } else if (coincide(p, TOK_DICCIONARIO)) {
@@ -832,6 +872,9 @@ static Nodo *sent_declaracion(Parser *p, int constante) {
     n->declaracion.constante     = constante;
     n->declaracion.es_lista      = es_lista;
     n->declaracion.es_diccionario = es_diccionario;
+    n->declaracion.tipado        = tipado || es_lista || es_diccionario;
+    n->declaracion.tipo          = es_lista ? TIPO_LISTA : es_diccionario ? TIPO_DICCIONARIO : tipo;
+    n->declaracion.tipo_clase    = tipo_clase;
     return n;
 }
 
@@ -1004,12 +1047,13 @@ static TipoDato parsear_tipo(Parser *p, char **tipo_clase_out) {
     if (coincide(p, TOK_NULO)   || coincide(p, TOK_TIPO_NULO))  { consumir_cualquiera(p); return TIPO_NULO; }
     if (coincide(p, TOK_FUNCION))                                { consumir_cualquiera(p); return TIPO_FUNCION; }
     if (coincide(p, TOK_IDENTIFICADOR)) {
-        Token *t = consumir_cualquiera(p);
         /* 'cualquiera': acepta un valor de cualquier tipo (no es palabra
            reservada, solo significa eso donde va un tipo) */
-        if (strcmp(t->valor, "cualquiera") == 0) return TIPO_CUALQUIERA;
-        if (strcmp(t->valor, "tarea") == 0)      return TIPO_TAREA;
-        if (tipo_clase_out) *tipo_clase_out = strdup(t->valor);
+        if (es_palabra(p, "cualquiera")) { consumir_cualquiera(p); return TIPO_CUALQUIERA; }
+        if (es_palabra(p, "tarea"))      { consumir_cualquiera(p); return TIPO_TAREA; }
+        char *nombre = nombre_de_tipo(p, "tipo");
+        if (tipo_clase_out) *tipo_clase_out = nombre;
+        else free(nombre);
         return TIPO_CLASE;
     }
     error_sintaxis(p, "Se esperaba un tipo (numero, texto, logico, lista, diccionario, nulo, funcion, o nombre de clase).");
@@ -1122,8 +1166,7 @@ static Nodo *sent_clase(Parser *p) {
     char *padre = NULL;
     if (coincide(p, TOK_EXTIENDE)) {
         consumir(p, TOK_EXTIENDE, "'extiende'");
-        Token *tnombre_padre = consumir(p, TOK_IDENTIFICADOR, "nombre de clase padre");
-        padre = strdup(tnombre_padre->valor);
+        padre = nombre_de_tipo(p, "nombre de clase padre");
     }
 
     /* ¿Implementa interfaces? */
@@ -1131,12 +1174,10 @@ static Nodo *sent_clase(Parser *p) {
     int    num_interfaces = 0;
     if (coincide(p, TOK_IMPLEMENTA)) {
         consumir(p, TOK_IMPLEMENTA, "'implementa'");
-        Token *ti = consumir(p, TOK_IDENTIFICADOR, "nombre de interfaz");
-        interfaces[num_interfaces++] = strdup(ti->valor);
+        interfaces[num_interfaces++] = nombre_de_tipo(p, "nombre de interfaz");
         while (coincide(p, TOK_COMA)) {
             consumir(p, TOK_COMA, "','");
-            ti = consumir(p, TOK_IDENTIFICADOR, "nombre de interfaz");
-            interfaces[num_interfaces++] = strdup(ti->valor);
+            interfaces[num_interfaces++] = nombre_de_tipo(p, "nombre de interfaz");
         }
     }
 
@@ -1209,8 +1250,11 @@ static Nodo *sent_clase(Parser *p) {
         } else if (coincide(p, TOK_SEA) || coincide(p, TOK_FIJO)) {
             int constante = coincide(p, TOK_FIJO);
             consumir_cualquiera(p);
-            int es_lista = 0, es_dic = 0;
-            if (coincide(p, TOK_LISTA)) { es_lista = 1; consumir_cualquiera(p); }
+            int es_lista = 0, es_dic = 0, tipado = 0;
+            TipoDato tipo = TIPO_CUALQUIERA;
+            char *tipo_clase = NULL;
+            if (tipo_de_declaracion(p, &tipo, &tipo_clase)) tipado = 1;
+            else if (coincide(p, TOK_LISTA)) { es_lista = 1; consumir_cualquiera(p); }
             else if (coincide(p, TOK_DICCIONARIO)) { es_dic = 1; consumir_cualquiera(p); }
             Token *cn = consumir(p, TOK_IDENTIFICADOR, "nombre del campo");
             Nodo *valor = NULL;
@@ -1224,6 +1268,9 @@ static Nodo *sent_clase(Parser *p) {
             c->declaracion.es_diccionario = es_dic;
             c->declaracion.vis = vis;
             c->declaracion.estatico = estatico;
+            c->declaracion.tipado = tipado || es_lista || es_dic;
+            c->declaracion.tipo = es_lista ? TIPO_LISTA : es_dic ? TIPO_DICCIONARIO : tipo;
+            c->declaracion.tipo_clase = tipo_clase;
             campos[num_campos++] = c;
         } else {
             (void)linea_mod;

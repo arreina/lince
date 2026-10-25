@@ -87,6 +87,7 @@ typedef struct {
     int                estatico;
     int                constante;
     Nodo              *inicial;          /* expresión inicial, o NULL */
+    Nodo              *decl;             /* su 'sea' / 'fijo' (el tipo, si lo lleva) */
     Valor             *valor;            /* valor del campo estático */
     struct ClaseLince *duena;
 } CampoClase;
