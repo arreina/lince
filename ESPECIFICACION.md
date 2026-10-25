@@ -490,6 +490,21 @@ Eso sí, una letra con tilde es una letra **distinta** de la misma sin
 tilde: `"á" != "a"`. Por eso `"Dábale arroz a la zorra el abad"` no sale
 palíndromo tal cual — para eso habría que quitar los acentos primero.
 
+Los métodos y el índice valen también sobre un texto escrito tal cual, no
+sólo sobre una variable, igual que ya pasaba con una lista
+(`[3, 1, 2].ordenar()`):
+
+```lince
+escribir("hola".mayusculas())        # "HOLA"
+escribir("camión"[4])                # "ó"
+si "hola mundo".contiene("mundo") { ... }
+```
+
+El `[` tiene que ir en la misma línea que el texto: uno al principio de la
+línea siguiente empieza otra sentencia, como con el `(` de una llamada.
+Así una desestructuración escrita debajo (`[a, b] = [b, a]`) no se toma
+por un índice de la línea de arriba.
+
 ---
 
 ## Clases

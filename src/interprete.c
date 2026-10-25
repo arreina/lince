@@ -3761,9 +3761,14 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
             }
             Valor *sub = ejecutar(n->metodo.argumentos[0], e);
-            int ok = strstr(obj->texto, sub->texto) != NULL;
+            Valor *r;
+            if (hay_error) r = valor_nulo();
+            else if (sub->tipo != VAL_TEXTO)
+                r = error_rt("ErrorTipo", n->linea,
+                    "'contiene' de un texto necesita un texto.");
+            else r = valor_booleano(strstr(obj->texto, sub->texto) != NULL);
             valor_destruir(sub); valor_destruir(obj);
-            return valor_booleano(ok);
+            return r;
         }
         if (strcmp(met, "reemplazar") == 0) {
             if (n->metodo.num_argumentos != 2) {
@@ -3804,10 +3809,14 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 return error_rt("ErrorArgumento", n->linea, "'contiene' necesita exactamente 1 argumento.");
             }
             Valor *clave = ejecutar(n->metodo.argumentos[0], e);
-            int ok = 0;
-            ok = valor_diccionario_buscar(obj, clave->texto) >= 0;
+            Valor *r;
+            if (hay_error) r = valor_nulo();
+            else if (clave->tipo != VAL_TEXTO)
+                r = error_rt("ErrorTipo", n->linea,
+                    "La clave de un diccionario debe ser texto.");
+            else r = valor_booleano(valor_diccionario_buscar(obj, clave->texto) >= 0);
             valor_destruir(clave); valor_destruir(obj);
-            return valor_booleano(ok);
+            return r;
         }
         if (strcmp(met, "longitud") == 0) {
             int len = obj->diccionario.cantidad;
@@ -3821,6 +3830,12 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                     "'eliminar' necesita exactamente 1 argumento (clave).");
             }
             Valor *clave = ejecutar(n->metodo.argumentos[0], e);
+            if (hay_error) { valor_destruir(clave); valor_destruir(obj); return valor_nulo(); }
+            if (clave->tipo != VAL_TEXTO) {
+                valor_destruir(clave); valor_destruir(obj);
+                return error_rt("ErrorTipo", n->linea,
+                    "La clave de un diccionario debe ser texto.");
+            }
             {
                 int i = valor_diccionario_buscar(obj, clave->texto);
                 if (i >= 0) {

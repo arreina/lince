@@ -34,9 +34,22 @@ La 1.0 será la primera versión estable: hasta entonces se sigue con 0.9, 0.10,
 - [x] `val` **opcional** (sin poner nada = `val`).
 - [x] En un `si`, **una lista o un diccionario vacíos cuentan como falso**, como `""`, `0` y `nulo`.
 - [x] `x % 0` da `ErrorMatematico`, como `x / 0` (antes daba `nan`).
-- Para después de la 1.0 (no rompen nada): comparar textos con `<`, `"a" * 3`, indexar un texto escrito tal cual (`"hola"[0]`), números como claves de diccionario, `a_numero(" 3 ")` con espacios.
+- [x] **Indexar un texto escrito tal cual** (`"hola"[0]`), y de paso sus métodos
+  (`"hola".mayusculas()`): estaba apuntado para después de la 1.0, pero entró en la
+  0.14.0. Es aditivo y no rompe nada. Queda pendiente el resto de esa lista.
+- Para después de la 1.0 (no rompen nada): comparar textos con `<`, `"a" * 3`,
+  números como claves de diccionario, `a_numero(" 3 ")` con espacios.
 
 - [x] `mapear`, `filtrar` y `reducir` aceptan también generadores y bytes (salió escribiendo el manual).
+
+- [x] **Todo error es capturable, también en los métodos** (0.14.0): `"x".contiene(5)`,
+  `d.contiene(5)` y `d.eliminar(5)` reventaban el proceso (leían la unión como `char*`);
+  ahora dan `ErrorTipo`. Auditados con argumentos del tipo equivocado todos los métodos y
+  todas las funciones de los módulos: no quedaba ningún otro.
+
+- [x] **Una línea que empieza por `[` es otra sentencia** (0.14.0), no un índice de la
+  anterior: `sea otra = a` y debajo `[a, b] = [b, a]` fallaba, porque la rama del índice de
+  `postfijo()` no exigía la misma línea como ya hacía la de la llamada.
 
 ## Biblioteca de juego en Lince
 

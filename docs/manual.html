@@ -137,7 +137,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v0.13</span>
+  <span class="version">v0.14</span>
   <div class="crece"></div>
   <a class="pag aqui" href="manual.html">Lenguaje</a>
   <a class="pag" href="juego.html">Módulo juego</a>
@@ -416,7 +416,7 @@ verdadero</pre></div><span class="fuente">310_listas.lince</span></article><arti
     <span class="k">devolver</span> b - a
 }))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[1, 1, 3, 4, 5]
 [5, 4, 3, 1, 1]</pre></div><span class="fuente">330_ordenar_con.lince</span></article></section>
-<section id="diccionarios"><h2>Diccionarios</h2><article class="ej" id="diccionarios-0"><h3>Crear, leer y recorrer</h3><p class="nota">Las claves son texto. <code>para cada</code> sobre un diccionario recorre las claves.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> persona = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>, <span class="s">&quot;edad&quot;</span>: <span class="n">22</span>}
+<section id="diccionarios"><h2>Diccionarios</h2><article class="ej" id="diccionarios-0"><h3>Crear, leer y recorrer</h3><p class="nota">Las claves son texto. <code>para cada</code> sobre un diccionario recorre las claves, y <code>claves()</code> y <code>valores()</code> las dan como listas.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> persona = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>, <span class="s">&quot;edad&quot;</span>: <span class="n">22</span>}
 persona[<span class="s">&quot;ciudad&quot;</span>] = <span class="s">&quot;Córdoba&quot;</span>
 
 <span class="k">escribir</span>(persona[<span class="s">&quot;nombre&quot;</span>])
@@ -424,21 +424,37 @@ persona[<span class="s">&quot;ciudad&quot;</span>] = <span class="s">&quot;Córd
 
 <span class="k">para</span> <span class="k">cada</span> <span class="t">texto</span> clave <span class="k">en</span> persona {
     <span class="k">escribir</span>(clave + <span class="s">&quot; = &quot;</span> + persona[clave])
-}</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Ana
+}
+
+<span class="c"># Como listas: se pueden ordenar, contar o pasar a otra función</span>
+<span class="k">escribir</span>(persona.claves())
+<span class="k">escribir</span>(persona.valores())
+<span class="k">escribir</span>(persona.claves().ordenar())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Ana
 3
 nombre = Ana
 edad = 22
-ciudad = Córdoba</pre></div><span class="fuente">410_diccionarios.lince</span></article></section>
-<section id="texto"><h2>Texto</h2><article class="ej" id="texto-0"><h3>Métodos de texto</h3><p class="nota">La longitud cuenta caracteres, no bytes: las tildes y la eñe cuentan como uno.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
+ciudad = Córdoba
+[&quot;nombre&quot;, &quot;edad&quot;, &quot;ciudad&quot;]
+[&quot;Ana&quot;, 22, &quot;Córdoba&quot;]
+[&quot;ciudad&quot;, &quot;edad&quot;, &quot;nombre&quot;]</pre></div><span class="fuente">410_diccionarios.lince</span></article></section>
+<section id="texto"><h2>Texto</h2><article class="ej" id="texto-0"><h3>Métodos de texto</h3><p class="nota">La longitud cuenta caracteres, no bytes: las tildes y la eñe cuentan como uno. Los métodos y el índice valen también sobre un texto escrito tal cual.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
 
 <span class="k">sea</span> frase = <span class="s">&quot;año de la cigüeña&quot;</span>
 <span class="k">escribir</span>(frase.longitud())
 <span class="k">escribir</span>(frase.mayusculas())
 <span class="k">escribir</span>(<span class="t">texto</span>.dividir(<span class="s">&quot;a,b,c&quot;</span>, <span class="s">&quot;,&quot;</span>))
-<span class="k">escribir</span>(<span class="t">texto</span>.repetir(<span class="s">&quot;ab&quot;</span>, <span class="n">3</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>17
+<span class="k">escribir</span>(<span class="t">texto</span>.repetir(<span class="s">&quot;ab&quot;</span>, <span class="n">3</span>))
+
+<span class="c"># Sobre un texto escrito tal cual, sin guardarlo en una variable</span>
+<span class="k">escribir</span>(<span class="s">&quot;hola&quot;</span>.mayusculas())
+<span class="k">escribir</span>(<span class="s">&quot;camión&quot;</span>[<span class="n">4</span>])
+<span class="k">escribir</span>(<span class="s">&quot;hola mundo&quot;</span>.contiene(<span class="s">&quot;mundo&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>17
 AÑO DE LA CIGÜEÑA
 [&quot;a&quot;, &quot;b&quot;, &quot;c&quot;]
-ababab</pre></div><span class="fuente">510_texto.lince</span></article><article class="ej" id="texto-1"><h3>Texto con valores dentro</h3><p class="nota">Entre llaves va cualquier expresión. Para una llave tal cual, <code>\{</code>; unas llaves vacías <code>{}</code> se quedan como están.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nombre = <span class="s">&quot;Ana&quot;</span>
+ababab
+HOLA
+ó
+verdadero</pre></div><span class="fuente">510_texto.lince</span></article><article class="ej" id="texto-1"><h3>Texto con valores dentro</h3><p class="nota">Entre llaves va cualquier expresión. Para una llave tal cual, <code>\{</code>; unas llaves vacías <code>{}</code> se quedan como están.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nombre = <span class="s">&quot;Ana&quot;</span>
 <span class="k">sea</span> vidas = <span class="n">3</span>
 <span class="k">escribir</span>(<span class="s">&quot;{nombre} tiene {vidas} vidas&quot;</span>)
 <span class="k">escribir</span>(<span class="s">&quot;y {vidas * 100} puntos, {nombre.longitud()} letras&quot;</span>)

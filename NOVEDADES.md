@@ -3,6 +3,52 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 0.14.0
+
+`claves()` y `valores()` en los diccionarios, métodos e índice sobre un texto escrito tal cual, y dos fallos que reventaban el programa.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-0.14.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-0.14.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-0.14.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-0.14.0.vsix` |
+
+### El lenguaje
+
+- **`d.claves()` y `d.valores()`**: las claves y los valores de un diccionario, como
+  listas y en el orden en que se metieron. Antes `para cada` era la única forma de
+  verlas, así que no se podían ordenar, contar ni pasar a otra función:
+
+  ```lince
+  para cada texto clave en puntos.claves().ordenar() {
+      escribir("{clave}: {puntos[clave]}")
+  }
+  ```
+
+- **Los métodos y el índice valen sobre un texto escrito tal cual**, no sólo sobre una
+  variable, como ya pasaba con una lista (`[3, 1, 2].ordenar()`): `"hola".mayusculas()`,
+  `"camión"[4]`, `si "hola mundo".contiene("mundo") { ... }`.
+
+### Arreglado
+
+- **`"x".contiene(5)`, `d.contiene(5)` y `d.eliminar(5)` cerraban el programa**: leían el
+  argumento como si fuera un texto fuese lo que fuese. Ahora dan `ErrorTipo`, capturable
+  como todo lo demás. Se repasaron con argumentos del tipo equivocado todos los métodos y
+  todas las funciones de los módulos: no quedaba ningún otro caso.
+- **Una línea que empieza por `[` es otra sentencia**, no un índice de la de arriba. Una
+  desestructuración escrita debajo de otra línea se tragaba su final:
+
+  ```lince
+  sea otra = a
+  [a, b] = [b, a]        # antes: ❌ Esperaba ']' pero encontré ','
+  ```
+
+  La rama de la llamada ya exigía que el `(` fuera en la misma línea; a la del índice le
+  faltaba la misma comprobación.
+
 ## 0.13.0
 
 Lo que pidió el IDE (lince-motor) para las hojas de sprites: `"origen"` en `hoja()` y poder prepararlas sin ventana.

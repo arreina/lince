@@ -76,3 +76,16 @@ funcion dividir_seguro(val numero a, val numero b): numero {
 }
 escribir(dividir_seguro(10, 2))
 escribir(dividir_seguro(10, 0))
+
+# Un argumento del tipo equivocado da ErrorTipo capturable, no un
+# segfault: antes estos tres desreferenciaban la unión como char*.
+sea s = "hola"
+sea diccionario d = {"a": 1}
+intentar { escribir(s.contiene(5)) } capturar (ErrorTipo e) { escribir(e.tipo) }
+intentar { escribir(d.contiene(5)) } capturar (ErrorTipo e) { escribir(e.tipo) }
+intentar { d.eliminar(5) }           capturar (ErrorTipo e) { escribir(e.tipo) }
+intentar { escribir(s.contiene([1])) } capturar (ErrorTipo e) { escribir(e.tipo) }
+intentar { escribir(d.contiene(nulo)) } capturar (ErrorTipo e) { escribir(e.tipo) }
+# Y lo correcto sigue funcionando
+escribir(s.contiene("ol"))
+escribir(d.contiene("a"))

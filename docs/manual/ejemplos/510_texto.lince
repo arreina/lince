@@ -1,6 +1,6 @@
 # @seccion: Texto
 # @titulo: Métodos de texto
-# @nota: La longitud cuenta caracteres, no bytes: las tildes y la eñe cuentan como uno.
+# @nota: La longitud cuenta caracteres, no bytes: las tildes y la eñe cuentan como uno. Los métodos y el índice valen también sobre un texto escrito tal cual.
 importar "texto"
 
 sea frase = "año de la cigüeña"
@@ -8,3 +8,8 @@ escribir(frase.longitud())
 escribir(frase.mayusculas())
 escribir(texto.dividir("a,b,c", ","))
 escribir(texto.repetir("ab", 3))
+
+# Sobre un texto escrito tal cual, sin guardarlo en una variable
+escribir("hola".mayusculas())
+escribir("camión"[4])
+escribir("hola mundo".contiene("mundo"))
