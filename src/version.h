@@ -6,6 +6,6 @@
 #ifndef LINCE_VERSION_H
 #define LINCE_VERSION_H
 
-#define LINCE_VERSION "1.6.0"
+#define LINCE_VERSION "1.6.1"
 
 #endif /* LINCE_VERSION_H */

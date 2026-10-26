@@ -13,6 +13,12 @@ sea filas = []
 para cada numero i en rango(0, 10) { filas.agregar("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX....................") }
 fijo HOJA = juego.hoja(juego.sprite(filas, {"X": [255, 0, 0]}), 10, 10)
 escribir("celdas: " + a_texto(HOJA["por_fila"][0]))
+# una hoja leída de un archivo (el destello sale de su transparencia guardada):
+# el cuadro 0, rojo a la izquierda y transparente a la derecha; el 1, azul entero
+sea filas_archivo = []
+para cada numero i en rango(0, 10) { filas_archivo.agregar("RRRRR.....BBBBBBBBBB") }
+juego.guardar_imagen(juego.sprite(filas_archivo, {"R": [255, 0, 0], "B": [0, 0, 255]}), "hoja_archivo.png")
+fijo HOJA_ARCHIVO = juego.hoja("hoja_archivo.png", 10, 10)
 sea pj = juego.animador(HOJA, {
     "quieto": {"fila": 0, "por_segundo": 10},
     "golpe":  {"cuadros": [0, 1, 2], "por_segundo": 10, "repetir": falso, "siguiente": "quieto",
@@ -95,6 +101,8 @@ mientras juego.abierto() {
     juego.dibujar(ROJO, 70, 40, {"mezcla": "sumar"})
     juego.dibujar(ROJO, 80, 40, {"blanco": 0.5})
     juego.dibujar(ROJO, 90, 40)
+    juego.dibujar(HOJA_ARCHIVO, 20, 40, {"cuadro": 0, "blanco": 1})
+    juego.dibujar(HOJA_ARCHIVO, 35, 40, {"cuadro": 1, "blanco": 1})
     si f == 98 { juego.particulas(30, 30, {"cantidad": 1, "mezcla": "sumar", "velocidad": 0, "color": [100, 0, 0], "color_final": [100, 0, 0]}) }
     juego.dibujar_particulas()
     si f == 98 { juego.captura("golpes.bmp") }

@@ -145,7 +145,8 @@ typedef struct { int modo; unsigned char color[3]; double escala;
                  int ncolores; unsigned char colores[JG_COLORES][6]; } JgPreparar;   /* "colores": [de, a] */
 /* version: cambia cada vez que cambia la textura (para las cachés que salen de ella) */
 typedef struct { void *tex; unsigned version; int ancho, alto; char *ruta; long long mtime, tam;
-                 unsigned char *px; int origen; JgReceta receta; JgPreparar prep; } JgImagen;
+                 unsigned char *px; int origen; JgReceta receta; JgPreparar prep;
+                 unsigned char *alfa; } JgImagen;   /* alfa: la transparencia de las de archivo, para el destello */
 typedef struct { short *datos; int muestras; char *ruta; long long mtime, tam; } JgSonido;   /* muestras por canal */
 typedef struct {
     const short *datos; int muestras, bucle, activa, id;
@@ -342,7 +343,21 @@ static struct {
 } _jgs;
 
 static unsigned _jg_version_tex;
-static void jg_poner_textura(JgImagen *im, void *tex) { im->tex = tex; im->version = ++_jg_version_tex; }
+static void jg_poner_textura(JgImagen *im, void *tex) {
+    im->tex = tex;
+    im->version = ++_jg_version_tex;
+    free(im->alfa);                     /* era de la textura de antes */
+    im->alfa = NULL;
+}
+
+/* La transparencia de unos píxeles RGBA (1 byte por píxel en vez de 4): con
+   ella se hace la silueta blanca del destello sin volver a leer el archivo,
+   que en una hoja grande tarda tanto que el primer golpe da un tirón */
+static unsigned char *jg_alfa_de(const unsigned char *px, int w, int h) {
+    unsigned char *a = malloc((size_t)w * h);
+    if (a) for (size_t i = 0; i < (size_t)w * h; i++) a[i] = px[i * 4 + 3];
+    return a;
+}
 
 static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
@@ -364,7 +379,7 @@ static double jg_reloj_real(void);
 static void jg_historial(void);
 static void jg_aviso_error(const char *msg, int pantalla);
 static int jg_cargar_wav(const char *ruta, short **datos, int *muestras, char *error, size_t max);
-static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max);
+static int jg_leer_textura(const char *ruta, void **tex, unsigned char **alfa, char *msg, size_t max);
 static void jg_rehacer_animaciones(int origen);
 static void jg_grabar_guion(int cerrando);
 static void jg_grabar_guion_empezar(void);
@@ -850,6 +865,8 @@ static void jg_cerrar_todo(void) {
         if (_jgs.imagenes[i].tex) _jg.DestroyTexture(_jgs.imagenes[i].tex);
         free(_jgs.imagenes[i].ruta);
         free(_jgs.imagenes[i].px);
+        free(_jgs.imagenes[i].alfa);
+        _jgs.imagenes[i].alfa = NULL;
     }
     _jgs.nimagenes = 0;
     jg_blancas_liberar();
@@ -1794,9 +1811,11 @@ static void jg_recargar_recursos(void) {
         if (m < 0 || (m == im->mtime && t == im->tam)) continue;
         char msg[600];
         void *tex;
-        if (!jg_leer_textura(im->ruta, &tex, msg, sizeof msg)) continue;   /* a medio guardar: luego */
+        unsigned char *alfa;
+        if (!jg_leer_textura(im->ruta, &tex, &alfa, msg, sizeof msg)) continue;   /* a medio guardar: luego */
         if (im->tex) _jg.DestroyTexture(im->tex);
         jg_poner_textura(im, tex);
+        im->alfa = alfa;
         _jg.QueryTexture(tex, NULL, NULL, &im->ancho, &im->alto);
         im->mtime = m; im->tam = t;
         jg_rehacer_animaciones(i);              /* las generadas con animar() a partir de ella */
@@ -2638,7 +2657,7 @@ static Valor *jg_imagen_valor(int k) {
 
 /* Lee la imagen 'ruta' como textura; 1 si va bien, 0 con el motivo en msg.
    Lee PNG, JPG, BMP, GIF y TGA con stb_image. */
-static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) {
+static int jg_leer_textura(const char *ruta, void **tex, unsigned char **alfa, char *msg, size_t max) {
     size_t largo = 0;
     char *bytes = interprete_leer_bytes(ruta, &largo);
     if (!bytes) {
@@ -2660,6 +2679,7 @@ static int jg_leer_textura(const char *ruta, void **tex, char *msg, size_t max) 
     }
     *tex = _jg.TextureFromSurface(_jgs.render, sup);
     _jg.FreeSurface(sup);
+    *alfa = *tex ? jg_alfa_de(px, w, h) : NULL;
     free(px);
     if (!*tex) {
         snprintf(msg, max, "no se pudo preparar la imagen '%s': %s", ruta, _jg.GetError());
@@ -2697,11 +2717,13 @@ static Valor *jg_imagen_archivo(Valor **a, int n) {
         recarga_huella(a[0]->texto, &_jgs.imagenes[k].mtime, &_jgs.imagenes[k].tam);
         return jg_imagen_valor(k);
     }
-    if (!jg_leer_textura(a[0]->texto, &tex, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
+    unsigned char *alfa;
+    if (!jg_leer_textura(a[0]->texto, &tex, &alfa, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
     int k = _jgs.nimagenes++;
     memset(&_jgs.imagenes[k], 0, sizeof _jgs.imagenes[k]);
     _jgs.imagenes[k].origen = -1;
     jg_poner_textura(&_jgs.imagenes[k], tex);
+    _jgs.imagenes[k].alfa = alfa;
     _jgs.imagenes[k].ruta = strdup(a[0]->texto);
     recarga_huella(a[0]->texto, &_jgs.imagenes[k].mtime, &_jgs.imagenes[k].tam);
     _jg.QueryTexture(tex, NULL, NULL, &_jgs.imagenes[k].ancho, &_jgs.imagenes[k].alto);
@@ -2743,7 +2765,7 @@ static void jg_texturas_pendientes(void) {
         void *tex = jg_textura_rgba(im->px, im->ancho, im->alto);
         if (!tex) continue;
         jg_poner_textura(im, tex);
-        if (im->ruta[0] != '<') { free(im->px); im->px = NULL; }
+        if (im->ruta[0] != '<') { im->alfa = jg_alfa_de(im->px, im->ancho, im->alto); free(im->px); im->px = NULL; }
     }
 }
 
@@ -4243,23 +4265,58 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
 
 /* La silueta blanca de una imagen (para el destello de "blanco"): se hace la
    primera vez y otra si la imagen cambia */
-static struct { unsigned version; void *blanca; } _jg_blanca[JG_MAX_IMAGENES];
-static void *jg_textura_blanca(int k) {
+/* La silueta blanca del destello ("blanco"), solo del trozo que se dibuja (un
+   cuadro de la hoja), y guardada para la próxima vez: hacerla de una hoja
+   entera de miles de píxeles de lado congelaba el juego en el primer golpe */
+#define JG_BLANCAS 512
+static struct { int img; unsigned version; JgRect r; void *tex; } _jg_blanca[JG_BLANCAS];
+static int _jg_nblancas, _jg_blanca_turno;
+static void *jg_textura_blanca(int k, const JgRect *r) {
     JgImagen *im = &_jgs.imagenes[k];
-    if (_jg_blanca[k].version == im->version && _jg_blanca[k].blanca) return _jg_blanca[k].blanca;
-    if (_jg_blanca[k].blanca) _jg.DestroyTexture(_jg_blanca[k].blanca);
-    _jg_blanca[k].blanca = NULL;
-    _jg_blanca[k].version = im->version;
-    unsigned char *px = jg_pixeles(k);
-    if (!px) return NULL;
-    for (size_t i = 0; i < (size_t)im->ancho * im->alto; i++) px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = 255;
-    _jg_blanca[k].blanca = jg_textura_rgba(px, im->ancho, im->alto);
+    for (int i = 0; i < _jg_nblancas; i++) {
+        if (_jg_blanca[i].img != k || memcmp(&_jg_blanca[i].r, r, sizeof *r)) continue;
+        if (_jg_blanca[i].version == im->version) return _jg_blanca[i].tex;
+        _jg.DestroyTexture(_jg_blanca[i].tex);        /* la imagen cambió: se rehace aquí mismo */
+        _jg_blanca[i].tex = NULL;
+        break;
+    }
+    int x0 = r->x < 0 ? 0 : r->x, y0 = r->y < 0 ? 0 : r->y;
+    int x1 = r->x + r->w > im->ancho ? im->ancho : r->x + r->w, y1 = r->y + r->h > im->alto ? im->alto : r->y + r->h;
+    if (x1 <= x0 || y1 <= y0 || r->x != x0 || r->y != y0 || r->x + r->w != x1 || r->y + r->h != y1) return NULL;
+    unsigned char *todo = NULL;                       /* sin la transparencia guardada: la imagen entera */
+    if (!im->px && !im->alfa && !(todo = jg_pixeles(k))) return NULL;
+    unsigned char *px = malloc((size_t)r->w * r->h * 4);
+    if (!px) { free(todo); return NULL; }
+    for (int y = 0; y < r->h; y++)
+        for (int x = 0; x < r->w; x++) {
+            size_t o = (size_t)(r->y + y) * im->ancho + (size_t)(r->x + x), d = ((size_t)y * r->w + x) * 4;
+            px[d] = px[d + 1] = px[d + 2] = 255;
+            px[d + 3] = im->px ? im->px[o * 4 + 3] : im->alfa ? im->alfa[o] : todo[o * 4 + 3];
+        }
+    free(todo);
+    void *tex = jg_textura_rgba(px, r->w, r->h);
     free(px);
-    return _jg_blanca[k].blanca;
+    if (!tex) return NULL;
+    int i;
+    for (i = 0; i < _jg_nblancas; i++) if (_jg_blanca[i].img == k && !memcmp(&_jg_blanca[i].r, r, sizeof *r)) break;
+    if (i == _jg_nblancas) {
+        if (_jg_nblancas < JG_BLANCAS) i = _jg_nblancas++;
+        else {                                         /* llena: se va la más antigua */
+            i = _jg_blanca_turno;
+            _jg_blanca_turno = (_jg_blanca_turno + 1) % JG_BLANCAS;
+            _jg.DestroyTexture(_jg_blanca[i].tex);
+        }
+    }
+    _jg_blanca[i].img = k;
+    _jg_blanca[i].version = im->version;
+    _jg_blanca[i].r = *r;
+    _jg_blanca[i].tex = tex;
+    return tex;
 }
 static void jg_blancas_liberar(void) {
-    for (int i = 0; i < JG_MAX_IMAGENES; i++) if (_jg_blanca[i].blanca) _jg.DestroyTexture(_jg_blanca[i].blanca);
+    for (int i = 0; i < _jg_nblancas; i++) if (_jg_blanca[i].tex) _jg.DestroyTexture(_jg_blanca[i].tex);
     memset(_jg_blanca, 0, sizeof _jg_blanca);
+    _jg_nblancas = _jg_blanca_turno = 0;
 }
 
 /* dibujar(imagen, x, y[, opciones]). Opciones (todas opcionales):
@@ -4371,11 +4428,11 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
         _jg.RenderCopyEx(_jgs.render, img->tex, &src, &dst, angulo, NULL, volteo);
         if (mezcla != 1) _jg.TextureBlend(img->tex, 1);
     }
-    void *bl = blanco > 0 ? jg_textura_blanca(k) : NULL;
+    void *bl = blanco > 0 ? jg_textura_blanca(k, &src) : NULL;
     if (bl) {                                       /* la silueta blanca encima */
         _jg.TextureAlpha(bl, (unsigned char)(alfa * blanco));
         if (mezcla != 1) _jg.TextureBlend(bl, mezcla);
-        _jg.RenderCopyEx(_jgs.render, bl, &src, &dst, angulo, NULL, volteo);
+        _jg.RenderCopyEx(_jgs.render, bl, NULL, &dst, angulo, NULL, volteo);
         if (mezcla != 1) _jg.TextureBlend(bl, 1);
     }
     return valor_nulo();

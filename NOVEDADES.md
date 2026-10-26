@@ -3,6 +3,21 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.6.1
+
+Un arreglo de rendimiento.
+
+- **Sin tirón en el primer destello**: la primera vez que se dibujaba algo con `"blanco"` (el destello de un golpe), Lince volvía a leer la imagen entera para hacer su silueta blanca. Con una hoja de sprites grande, el juego se quedaba congelado unos 90 ms justo al dar el primer golpe. Ahora la silueta se hace solo del cuadro que se dibuja, a partir de la transparencia que se guarda al cargar la imagen: el fotograma más lento de la demo de lucha ha pasado de 93 ms a menos de 5.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.6.1-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.6.1-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.6.1.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.6.1.vsix` |
+
 ## 1.6.0
 
 Física y sonido. Nada de lo que ya funcionaba cambia.

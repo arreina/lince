@@ -95,6 +95,11 @@ está en `juego.lince`.
 
 ### 1.7 — Rendimiento (solo si hace falta)
 - [ ] La máquina virtual de bytecode («camino B», ver Rendimiento), si `lince perfil` demuestra que Lince es el cuello de botella.
+- Revisado el 2026-10-26: **no hace falta por ahora**.
+  - Con `lince perfil`, jugando 600 fotogramas, el código Lince ocupa como mucho 0,21 ms por fotograma en los 13 ejemplos, *La piedra del lince* y las demos de lucha.
+  - Con la tarjeta gráfica, la demo de lucha tarda 1,9 ms por fotograma, casi todo de SDL. Los 15 ms que salían en las pruebas eran por dibujar sin tarjeta gráfica.
+  - Lo único que se encontró fue un tirón de 90 ms en el primer destello (`"blanco"`), arreglado en la 1.6.1.
+  - Donde más pesa Lince es en la física con muchos cuerpos que giran (36 cajas, 6 ms).
 
 ### 1.8 — Varios jugadores en el mismo equipo
 - [ ] Cada mando, un jugador: «pulsa un botón para unirte», controles por jugador; con la pantalla partida de la 1.5.

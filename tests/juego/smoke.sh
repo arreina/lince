@@ -341,6 +341,8 @@ else: print("  ❌ pelear: la ventana mide", w, abs(h)); mal += 1
 casos = [((0, 0), (255, 255, 255), "tras camara() no tiembla"), ((10, 10), (100, 100, 100), "y acaba donde debe"),
          ((121, 81), (255, 255, 255), "blanco 1: todo blanco"), ((141, 81), (255, 100, 100), "mezcla sumar"),
          ((161, 81), (255, 127, 127), "blanco 0,5: a medias"), ((181, 81), (255, 0, 0), "sin nada: rojo"),
+         ((43, 83), (255, 255, 255), "blanco en una hoja de archivo"), ((55, 83), (100, 100, 100), "su parte transparente sigue transparente"),
+         ((73, 83), (255, 255, 255), "blanco en otro cuadro de la misma hoja"),
          ((61, 61), (200, 100, 100), "partículas que suman")]
 for (x, y), esp, nombre in casos:
     if px(x, y) == esp: print("  ✅ pelear:", nombre)
