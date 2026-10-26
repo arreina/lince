@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.5
+# 🐆 Lince — Especificación del Lenguaje v1.6
 
 ## Filosofía
 
@@ -1205,6 +1205,7 @@ mientras juego.abierto() {
 | `cubrir(color)` | pinta toda la ventana encima de lo dibujado, sin moverse con la cámara ni con el temblor: con alfa la oscurece o la tiñe (`juego.cubrir([0, 0, 0, 160])` en una pausa) |
 | `rectangulo(x, y, ancho, alto[, color])` · `contorno(...)` | rectángulo relleno / solo borde |
 | `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
+| `poligono(puntos[, color[, opciones]])` | rellena el polígono de esos puntos `[[x, y], [x, y], ...]` (también con entrantes). Opciones: `relleno` (falso: solo el borde) y `capa` |
 | `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
 | `texto(t, x, y, opciones)` · `ancho_texto(t, opciones)` · `medir_texto(t[, opciones])` | con otra fuente, alineado o partido en líneas (ver **Letras**, abajo). `medir_texto` da `[ancho, alto]` |
 | `posicion_camara()` | `[x, y]` de la cámara (sin el temblor) |
@@ -1330,10 +1331,12 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | Función | Qué hace |
 |---|---|
 | `sonido(ruta)` | carga un `.wav` o un `.ogg` (Ogg Vorbis, mucho más pequeño: mejor para la música); devuelve `{"sonido", "duracion", "ruta"}` |
-| `reproducir(sonido[, volumen[, bucle]])` · `reproducir(sonido, opciones)` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz. Opciones: `volumen` (0 a 1), `bucle`, `lado` (−1 izquierda, 0 en medio, 1 derecha: que suene de donde pasa) y `tono` (1 normal, 2 una octava más agudo y el doble de rápido, 0,5 más grave; variarlo un poco, de 0,9 a 1,1, hace que un golpe repetido no suene siempre igual) |
-| `detener([voz])` | para esa voz o, sin argumento, todo |
-| `musica(ruta o sonido[, volumen])` · `musica(nulo)` | suena en bucle y sustituye a la anterior / la para. Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
-| `volumen([v])` | volumen general de 0 a 1 |
+| `reproducir(sonido[, volumen[, bucle]])` · `reproducir(sonido, opciones)` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz. Opciones: `volumen` (0 a 1), `bucle`, `lado` (−1 izquierda, 0 en medio, 1 derecha: que suene de donde pasa), `tono` (1 normal, 2 una octava más agudo y el doble de rápido, 0,5 más grave; variarlo un poco, de 0,9 a 1,1, hace que un golpe repetido no suene siempre igual), `grupo` (`"efectos"`, el de siempre; `"voces"` o `"musica"`) y `fundido` (segundos que tarda en subir desde 0) |
+| `reproducir_en(sonido, x, y[, opciones])` · `mover_voz(voz, x, y)` | como `reproducir`, pero suena por la izquierda o por la derecha según dónde se ve el punto (x, y) del mundo, y más bajo cuanto más lejos queda de la pantalla: a `alcance` píxeles fuera (la mitad del ancho de la pantalla) ya no se oye. `mover_voz` lo vuelve a calcular, para lo que suena mientras se mueve; devuelve si sigue sonando |
+| `cambiar_voz(voz, opciones)` · `sonando(voz)` | cambia lo que ya suena (`volumen`, `lado`, `tono`, `grupo`, y `fundido`: los segundos en que cambia el volumen) y devuelve si sigue sonando · ¿sigue sonando? |
+| `detener([voz[, segundos]])` | para esa voz (con segundos, bajando poco a poco) o, sin argumento, todo |
+| `musica(ruta o sonido[, volumen o opciones])` · `musica(nulo[, opciones])` | suena en bucle y sustituye a la anterior / la para. Opciones: `volumen` (0,6) y `fundido` (los segundos en que la anterior se va bajando mientras la nueva entra subiendo; con `nulo`, lo que tarda en apagarse). Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
+| `volumen([v])` · `volumen(grupo[, v])` | volumen general de 0 a 1 · el de un grupo (`"efectos"`, `"musica"` o `"voces"`), que se multiplica por el general: para el menú de opciones (`juego.volumen("musica", 0.5)`). Los diálogos suenan en `"voces"` |
 | `pitido(frecuencia, segundos[, volumen])` | tono sencillo, sin archivos: `pitido(440, 0.1)` |
 | `efecto(tipo[, opciones])` | genera y hace sonar un efecto al estilo de los juegos de 8 bits, sin archivos: `"moneda"`, `"salto"`, `"disparo"`, `"explosion"`, `"golpe"`, `"subir"`, `"clic"` o `"perder"`. Cada vez suena un poco distinto. Opciones: `volumen` (0,5), `tono` y `largo` (multiplican la frecuencia y la duración: `{"tono": 1.5}` más agudo) y `semilla` (siempre el mismo sonido) |
 | `crear_efecto(tipo[, opciones])` | el efecto como sonido, para `reproducir()` o `guardar_sonido()`; sin `semilla` usa la 1 |
@@ -1697,8 +1700,9 @@ objetos se mueven lo mismo, así que siguen en su sitio. Los mapas
 y lo que usan (tilesets e imágenes) van dentro del juego al hacer `lince compilar` o `lince
 repartir`, como las imágenes.
 
-**Física sencilla.** Cosas que caen, rebotan, se empujan y chocan entre ellas y con un mapa, sin
-girar: cajas, pelotas, plataformas que se mueven y el propio personaje. Está escrita en Lince.
+**Física sencilla.** Cosas que caen, rebotan, se empujan y chocan entre ellas y con un mapa:
+cajas, pelotas, plataformas que se mueven y el propio personaje. Las que llevan `"gira"` (o
+`"puntos"`) giran al chocar (ver **Física con giros**, abajo). Está escrita en Lince.
 
 ```lince
 sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
@@ -1717,13 +1721,44 @@ para cada diccionario t en juego.tocando(mundo, yo) {
 
 | Función | Qué hace |
 |---|---|
-| `fisica([opciones])` | un mundo: `gravedad` (900 hacia abajo, o `[x, y]`), `mapa` (un mapa de `mapa()` o `mapa_tiled()` con el que chocar) y `pasos` (120: cuántas veces por segundo se calcula, para que nada atraviese nada) |
+| `fisica([opciones])` | un mundo: `gravedad` (900 hacia abajo, o `[x, y]`), `mapa` (un mapa de `mapa()` o `mapa_tiled()` con el que chocar), `pasos` (cuántas veces por segundo se calcula, para que nada atraviese nada: 120, o 60 si hay cuerpos que giran o uniones) e `iteraciones` (8: cuántas veces se ajustan los choques de los cuerpos que giran en cada paso; más, pilas más quietas, pero más lento) |
 | `cuerpo(mundo, datos)` | añade un cuerpo y lo devuelve: el mismo diccionario, con lo que falte puesto. `x`, `y` (la esquina), `ancho` y `alto`, o `radio` (un círculo); `vx`, `vy`; `masa` (1: el más pesado empuja más y lo empujan menos); `rebote` (0 a 1); `friccion` (0,5: cómo frena en el suelo); `gravedad` (1; 0 para que flote); `fijo` (no lo mueven ni la gravedad ni los choques: suelos, muros y, con `vx` o `vy`, plataformas y ascensores, que llevan lo que tengan encima); `sensor` (no choca, solo cuenta lo que toca: monedas, zonas). Puede llevar más datos tuyos (`"tipo": "caja"`) |
 | `avanzar_fisica(mundo[, dt])` | mueve todo lo de un fotograma: gravedad, mapa y choques. Deja en cada cuerpo `en_suelo` (apoyado en el mapa o en otro cuerpo), y `techo` y `pared` si hay mapa |
-| `tocando(mundo, cuerpo)` · `empujar(cuerpo, fx, fy)` · `quitar_cuerpo(mundo, cuerpo)` | los cuerpos que tocaba en el último `avanzar_fisica` · un golpe que cambia su velocidad según su masa · lo quita del mundo |
+| `tocando(mundo, cuerpo)` · `empujar(cuerpo, fx, fy[, punto])` · `quitar_cuerpo(mundo, cuerpo)` | los cuerpos que tocaba en el último `avanzar_fisica` · un golpe que cambia su velocidad según su masa (y, si gira y se da el `punto` `[x, y]` donde le dan, lo hace girar) · lo quita del mundo (y lo que lo unía a otros) |
 
 Los cuerpos son diccionarios normales: para moverlos se cambian `vx` y `vy` (o `x` e `y`), y se
-dibujan como cada uno quiera. `examples/13_fisica.lince` lo usa todo.
+dibujan como cada uno quiera. `examples/13_fisica.lince` lo usa todo. Un círculo que no gira choca
+con las cajas por su forma de verdad: en una esquina resbala, no se queda apoyado en el aire.
+
+**Física con giros.** Un cuerpo con `"gira": verdadero` gira al chocar: vuelca, rueda, se apila y
+cae de canto. Lleva `angulo` (en grados, el mismo de `dibujar`) y `vgiro` (grados por segundo), que
+se pueden cambiar como `vx` y `vy`. Con `"puntos"` es un **polígono** convexo (sin entrantes; uno
+con entrantes se hace con varios), de 3 a 16 puntos medidos desde su `x`, `y`; gira solo, salvo
+con `"gira": falso`. Su `x`, `y` sigue siendo la esquina de la caja sin girar (el centro no se
+mueve al girar), así que una imagen se dibuja con `juego.dibujar(imagen, c["x"], c["y"],
+{"angulo": c["angulo"]})`. Los que no giran también chocan con estos (como si no pudieran girar),
+y los fijos que giran (`"vgiro"`) son aspas y molinos.
+
+```lince
+sea rampa = juego.cuerpo(mundo, {"x": 0, "y": 200, "puntos": [[0, 0], [300, 100], [0, 100]], "fijo": verdadero})
+sea caja = juego.cuerpo(mundo, {"x": 200, "y": 50, "ancho": 30, "alto": 30, "gira": verdadero})
+sea rueda = juego.cuerpo(mundo, {"x": 20, "y": 150, "radio": 15, "gira": verdadero})
+juego.bisagra(mundo, puerta, nulo, [300, 100])                    # la puerta gira clavada en ese punto
+juego.cuerda(mundo, farol, [200, 0], {"largo": 80})               # cuelga del techo
+```
+
+| Función | Qué hace |
+|---|---|
+| `bisagra(mundo, a, b, punto)` | clava `a` y `b` por ese punto `[x, y]` del mundo y los deja girar alrededor de él: puertas, péndulos, ruedas, los eslabones de una cadena o las tablas de un puente. Con `b` nulo, `a` queda clavado al fondo. Lo unido por una bisagra no choca entre sí |
+| `cuerda(mundo, a, b[, opciones])` | `a` y `b` no se pueden alejar más que el largo de la cuerda, pero sí acercarse. `b` es un cuerpo o un punto fijo `[x, y]`. Opciones: `largo` (lo que estén separados ahora), `en_a` y `en_b` (dónde se ata: `[x, y]` desde el centro, sin girar) y `rigida` (una barra: tampoco se acercan) |
+| `quitar_union(mundo, union)` · `puntos_union(union)` | la quita (y lo que unía vuelve a chocar) · `[[x, y], [x, y]]`: por dónde dibujar la cuerda, o dónde está la bisagra |
+| `centro_cuerpo(c)` · `puntos_cuerpo(c)` | `[x, y]` de su centro · su contorno en el mundo, ya girado (para `poligono()`) |
+| `dibujar_cuerpo(c[, color[, opciones]])` | lo dibuja tal cual es, relleno y con el borde más oscuro (un círculo, con una raya para que se vea girar); opciones de `poligono` |
+
+Se resuelve como Box2D Lite: en cada paso se buscan los puntos de contacto y se ajustan las
+velocidades con impulsos, empezando por los del paso anterior, para que las pilas se queden quietas.
+Está escrita en Lince: unas 20 cajas que giran caben de sobra en un fotograma (3 ms en un
+ordenador normal); con muchas más, menos `iteraciones` o menos cuerpos que giran.
 
 **Partículas.** Chispas, polvo, explosiones: `particulas(x, y[, opciones])` lanza un puñado y
 `dibujar_particulas()` las mueve y las dibuja (llámala en cada fotograma, después de lo que deban

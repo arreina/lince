@@ -152,7 +152,12 @@ typedef struct {
     double pos;           /* en muestras por canal; avanza 'paso' cada vez (el "tono") */
     float vol, izq, der, paso;
     short *propio;        /* pitidos: la voz es dueña de sus datos */
+    int grupo;            /* JG_G_EFECTOS, JG_MUSICA o JG_VOCES: su volumen se multiplica */
+    float objetivo, rampa; int parar;   /* un fundido: el volumen va hacia 'objetivo' (y para al llegar) */
 } JgVoz;
+/* los grupos de volumen: volumen("musica", 0.5) baja toda la música */
+enum { JG_G_EFECTOS, JG_MUSICA, JG_VOCES, JG_GRUPOS };
+static const char *const JG_NOMBRES_GRUPO[] = {"efectos", "musica", "voces", NULL};
 
 #define JG_MAX_IMAGENES 1024
 #define JG_MAX_SONIDOS  256
@@ -303,7 +308,7 @@ static struct {
     int ntiled;
     /* música en streaming: el OGG se decodifica poco a poco en un anillo que
        el mezclador va vaciando (juego.musica("tema.ogg")) */
-    struct {
+    struct JgFlujo {
         char *bytes, *ruta;
         size_t largo;
         OggFlujo *ogg;
@@ -311,8 +316,11 @@ static struct {
         short *anillo;
         int cap, lee, escribe, lleno;    /* en muestras (L y R cuentan por separado) */
         int activa, canales;
-        float vol;
-    } flujo;
+        float vol, objetivo, rampa;      /* el fundido, como en las voces */
+        int parar;
+    } flujos[2];                         /* dos: la que entra y la que se va, al cambiar con fundido */
+    int flujo_musica;                    /* cuál de los dos es la música de ahora */
+    float grupos[JG_GRUPOS];
     double t_vigilar;                    /* última comprobación de archivos cambiados */
     /* el reloj del juego: avanza con dt, que se para con congelar() y va más
        lento o más rápido con velocidad() (las escenas van con el reloj de verdad) */
@@ -587,7 +595,12 @@ static int jg_diferir(JgFnDibujo fn, Valor **a, int n) {
     d->n = n;
     d->args = malloc(sizeof(Valor *) * (size_t)(n > 0 ? n : 1));
     for (int i = 0; i < n; i++) {
-        if (i == 0) { a[0]->refs++; d->args[0] = a[0]; }
+        if (i == 0 && a[0]->tipo == VAL_LISTA) {          /* los puntos de poligono(): con sus [x, y] */
+            Valor *l = valor_lista_crear();
+            for (int k = 0; k < a[0]->lista.cantidad; k++) lista_agregar(l, jg_copia_corta(a[0]->lista.elementos[k]));
+            d->args[0] = l;
+        }
+        else if (i == 0) { a[0]->refs++; d->args[0] = a[0]; }
         else d->args[i] = jg_copia_corta(a[i]);
     }
     d->capa = capa;
@@ -962,6 +975,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     _jgs.completa = 0;
     _jgs.njoy = -1;
     _jgs.volumen = 1;
+    for (int g = 0; g < JG_GRUPOS; g++) _jgs.grupos[g] = 1;
     _jgs.voz_musica = 0;
     _jgs.t_inicio = jg_ahora();
     _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.zoom = (int)z; _jgs.cierre = 0; _jgs.atras = 0;
@@ -1098,6 +1112,65 @@ static Valor *fn_jg_circulo(Valor **a, int n) {
         int dx = (int)floor(sqrt((double)r * r - (double)dy * dy) + 0.5);
         JgRect fila = {cx - dx, cy + dy, 2 * dx + 1, 1};
         _jg.FillRect(_jgs.render, &fila);
+    }
+    return valor_nulo();
+}
+
+/* poligono(puntos[, color[, opciones]]): relleno, con una línea horizontal
+   por fila (vale con entrantes: par-impar). Con {"relleno": falso}, solo el borde. */
+#define JG_MAX_PUNTOS 1024
+static Valor *fn_jg_poligono(Valor **a, int n) {
+    JG_ABIERTA();
+    JG_DIBUJO(fn_jg_poligono);
+    const char *uso = "poligono() espera una lista de puntos [[x, y], [x, y], [x, y], ...] (al menos 3)";
+    if (n < 1 || a[0]->tipo != VAL_LISTA || a[0]->lista.cantidad < 3) return jg_error("ErrorTipo", uso);
+    int np = a[0]->lista.cantidad;
+    if (np > JG_MAX_PUNTOS) return jg_error("ErrorArgumento", "poligono(): como mucho 1024 puntos");
+    static double px[JG_MAX_PUNTOS], py[JG_MAX_PUNTOS];
+    for (int i = 0; i < np; i++) {
+        Valor *p = a[0]->lista.elementos[i];
+        if (p->tipo != VAL_LISTA || p->lista.cantidad < 2 || p->lista.elementos[0]->tipo != VAL_NUMERO ||
+            p->lista.elementos[1]->tipo != VAL_NUMERO) return jg_error("ErrorTipo", uso);
+        px[i] = p->lista.elementos[0]->numero - _jgs.cam_x;
+        py[i] = p->lista.elementos[1]->numero - _jgs.cam_y;
+    }
+    unsigned char c[4] = {255, 255, 255, 255};
+    if (n > 1 && a[1]->tipo != VAL_DICCIONARIO && !jg_color(a, n, 1, c)) return valor_nulo();
+    Valor *op = n > 2 ? a[2] : n > 1 && a[1]->tipo == VAL_DICCIONARIO ? a[1] : NULL;
+    if (op) {
+        if (op->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo", "poligono(): las opciones van en un diccionario (\"relleno\", \"capa\")");
+        static const char *const V[] = {"relleno", "capa", NULL};
+        if (!jg_opciones_validas(op, "poligono", V)) return valor_nulo();
+    }
+    Valor *rv = jg_opcion_valor(op, "relleno");
+    if (rv && rv->tipo != VAL_BOOLEANO) return jg_error("ErrorTipo", "poligono(): \"relleno\" es verdadero o falso");
+    jg_pintar(c);
+    if (rv && !rv->booleano) {
+        for (int i = 0; i < np; i++) {
+            int j = (i + 1) % np;
+            _jg.DrawLine(_jgs.render, (int)floor(px[i]), (int)floor(py[i]), (int)floor(px[j]), (int)floor(py[j]));
+        }
+        return valor_nulo();
+    }
+    double y0 = py[0], y1 = py[0];
+    for (int i = 1; i < np; i++) { if (py[i] < y0) y0 = py[i]; if (py[i] > y1) y1 = py[i]; }
+    if (y0 < _jgs.vista[1] - 1) y0 = _jgs.vista[1] - 1;                  /* solo las filas que se ven */
+    if (y1 > _jgs.vista[3] + 1) y1 = _jgs.vista[3] + 1;
+    static double xs[JG_MAX_PUNTOS];
+    for (int fila = (int)floor(y0); fila <= (int)ceil(y1); fila++) {
+        double y = fila + 0.5;                                  /* el centro de la fila de píxeles */
+        int nx = 0;
+        for (int i = 0; i < np; i++) {
+            int j = (i + 1) % np;
+            if ((py[i] <= y && py[j] > y) || (py[j] <= y && py[i] > y))
+                xs[nx++] = px[i] + (y - py[i]) / (py[j] - py[i]) * (px[j] - px[i]);
+        }
+        for (int i = 1; i < nx; i++)                            /* pocas: por inserción */
+            for (int k = i; k > 0 && xs[k - 1] > xs[k]; k--) { double t = xs[k]; xs[k] = xs[k - 1]; xs[k - 1] = t; }
+        for (int i = 0; i + 1 < nx; i += 2) {
+            int x0 = (int)ceil(xs[i] - 0.5), x1 = (int)ceil(xs[i + 1] - 0.5);
+            if (x1 > x0) { JgRect r = {x0, fila, x1 - x0, 1}; _jg.FillRect(_jgs.render, &r); }
+        }
     }
     return valor_nulo();
 }
@@ -1877,6 +1950,18 @@ static Valor *fn_jg_captura(Valor **a, int n) {
 /* ── Sonido: mezclador propio ──
    Un dispositivo de audio (estéreo, 16 bits, 44100 Hz) con callback que suma
    hasta JG_VOCES voces. Los sonidos se convierten a ese formato al cargarlos. */
+/* Un paso del fundido (una muestra); 1 si ha llegado al final y hay que parar */
+static int jg_rampa(float *vol, float objetivo, float *rampa, int parar) {
+    if (*rampa == 0) return 0;
+    *vol += *rampa;
+    if ((*rampa > 0 && *vol >= objetivo) || (*rampa < 0 && *vol <= objetivo)) {
+        *vol = objetivo;
+        *rampa = 0;
+        return parar;
+    }
+    return 0;
+}
+
 static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
     (void)datos;
     short *salida = (short *)flujo;
@@ -1890,17 +1975,25 @@ static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
                 if (voz->bucle && voz->muestras > 0) voz->pos = 0;
                 else { voz->activa = 0; continue; }
             }
+            if (jg_rampa(&voz->vol, voz->objetivo, &voz->rampa, voz->parar)) { voz->activa = 0; continue; }
             const short *m = voz->datos + (size_t)voz->pos * JG_CANALES;
-            acc[0] += m[0] * voz->vol * voz->izq;
-            acc[1] += m[1] * voz->vol * voz->der;
+            float g = voz->vol * _jgs.grupos[voz->grupo];
+            acc[0] += m[0] * g * voz->izq;
+            acc[1] += m[1] * g * voz->der;
             voz->pos += voz->paso;
         }
-        for (int c = 0; c < 2; c++) {
-            if (_jgs.flujo.activa && _jgs.flujo.lleno > 0) {       /* música en streaming */
-                acc[c] += _jgs.flujo.anillo[_jgs.flujo.lee] * _jgs.flujo.vol;
-                _jgs.flujo.lee = (_jgs.flujo.lee + 1) % _jgs.flujo.cap;
-                _jgs.flujo.lleno--;
+        for (int k = 0; k < 2; k++) {                          /* música en streaming */
+            struct JgFlujo *f = &_jgs.flujos[k];
+            if (!f->activa || f->lleno < 2) continue;
+            if (jg_rampa(&f->vol, f->objetivo, &f->rampa, f->parar)) { f->activa = 0; continue; }
+            float g = f->vol * _jgs.grupos[JG_MUSICA];
+            for (int c = 0; c < 2; c++) {
+                acc[c] += f->anillo[f->lee] * g;
+                f->lee = (f->lee + 1) % f->cap;
             }
+            f->lleno -= 2;
+        }
+        for (int c = 0; c < 2; c++) {
             int t = (int)(acc[c] * _jgs.volumen);
             salida[i + c] = (short)(t > 32767 ? 32767 : t < -32768 ? -32768 : t);
         }
@@ -1968,6 +2061,7 @@ static int jg_sonar(const short *datos, int muestras, float vol, int bucle, shor
     voz->datos = datos; voz->muestras = muestras; voz->pos = 0;
     voz->vol = vol; voz->bucle = bucle; voz->propio = propio;
     voz->izq = voz->der = voz->paso = 1;
+    voz->grupo = JG_G_EFECTOS; voz->objetivo = vol; voz->rampa = 0; voz->parar = 0;
     voz->id = ++_jgs.siguiente_voz;
     voz->activa = 1;
     _jg.UnlockAudio(_jgs.audio);
@@ -1982,61 +2076,112 @@ static void jg_parar_voz(int id) {
     _jg.UnlockAudio(_jgs.audio);
 }
 
+/* Pone en marcha un fundido: el volumen va hacia 'objetivo' en 'seg' segundos
+   (con 0, ya); con 'parar', la voz se calla al llegar. Con el audio bloqueado. */
+static void jg_fundir(float *vol, float *obj, float *rampa, int *parar, float objetivo, double seg, int p) {
+    *obj = objetivo;
+    *parar = p;
+    if (seg <= 0 || *vol == objetivo) {
+        *vol = objetivo;
+        *rampa = 0;
+        return;
+    }
+    *rampa = (float)((objetivo - *vol) / (seg * JG_FRECUENCIA));
+    if (*rampa == 0) *vol = objetivo;
+}
+
 /* ── Música en streaming ── */
-static void jg_parar_flujo(void) {
+static void jg_parar_un_flujo(struct JgFlujo *f) {
     if (_jgs.audio) _jg.LockAudio(_jgs.audio);
-    _jgs.flujo.activa = 0;
+    f->activa = 0;
     if (_jgs.audio) _jg.UnlockAudio(_jgs.audio);
-    ogg_cerrar(_jgs.flujo.ogg);
-    if (_jgs.flujo.conv) _jg.FreeStream(_jgs.flujo.conv);
-    free(_jgs.flujo.bytes); free(_jgs.flujo.anillo); free(_jgs.flujo.ruta);
-    memset(&_jgs.flujo, 0, sizeof _jgs.flujo);
+    ogg_cerrar(f->ogg);
+    if (f->conv) _jg.FreeStream(f->conv);
+    free(f->bytes); free(f->anillo); free(f->ruta);
+    memset(f, 0, sizeof *f);
+}
+
+static void jg_parar_flujo(void) {
+    jg_parar_un_flujo(&_jgs.flujos[0]);
+    jg_parar_un_flujo(&_jgs.flujos[1]);
 }
 
 /* Decodifica lo que falte para tener el anillo lleno (unos 2 segundos por
    delante). Se llama en cada presentar(): un fotograma que tarde más que eso
-   dejaría un hueco de silencio, nada peor. */
+   dejaría un hueco de silencio, nada peor. La que acabó de irse se libera. */
 static void jg_alimentar_flujo(void) {
-    if (!_jgs.flujo.activa) return;
-    short ent[4096 * 2], sal[8192 * 2];
-    int vueltas = 0;
-    for (;;) {
-        int libre = _jgs.flujo.cap - _jgs.flujo.lleno;        /* lo lee el hilo de audio: solo crece */
-        if (libre < (int)(sizeof sal / sizeof sal[0])) break;
-        int disp = _jg.StreamAvailable(_jgs.flujo.conv);
-        if (disp <= 0) {
-            int n = ogg_leer(_jgs.flujo.ogg, ent, 4096 / _jgs.flujo.canales);
-            if (n <= 0) {                                       /* al acabar, vuelve a empezar */
-                if (++vueltas > 2) break;                       /* archivo sin sonido: no insistir */
-                ogg_rebobinar(_jgs.flujo.ogg);
-                continue;
-            }
-            _jg.StreamPut(_jgs.flujo.conv, ent, n * (int)sizeof(short) * _jgs.flujo.canales);
+    for (int k = 0; k < 2; k++) {
+        struct JgFlujo *f = &_jgs.flujos[k];
+        if (!f->activa) {
+            if (f->bytes) jg_parar_un_flujo(f);
             continue;
         }
-        int pedir = disp < (int)sizeof sal ? disp : (int)sizeof sal;
-        pedir -= pedir % 4;
-        int r = _jg.StreamGet(_jgs.flujo.conv, sal, pedir);
-        if (r <= 0) break;
-        int muestras = r / (int)sizeof(short);
-        _jg.LockAudio(_jgs.audio);
-        for (int i = 0; i < muestras; i++) {
-            _jgs.flujo.anillo[_jgs.flujo.escribe] = sal[i];
-            _jgs.flujo.escribe = (_jgs.flujo.escribe + 1) % _jgs.flujo.cap;
+        short ent[4096 * 2], sal[8192 * 2];
+        int vueltas = 0;
+        for (;;) {
+            int libre = f->cap - f->lleno;                       /* lo lee el hilo de audio: solo crece */
+            if (libre < (int)(sizeof sal / sizeof sal[0])) break;
+            int disp = _jg.StreamAvailable(f->conv);
+            if (disp <= 0) {
+                int n = ogg_leer(f->ogg, ent, 4096 / f->canales);
+                if (n <= 0) {                                    /* al acabar, vuelve a empezar */
+                    if (++vueltas > 2) break;                    /* archivo sin sonido: no insistir */
+                    ogg_rebobinar(f->ogg);
+                    continue;
+                }
+                _jg.StreamPut(f->conv, ent, n * (int)sizeof(short) * f->canales);
+                continue;
+            }
+            int pedir = disp < (int)sizeof sal ? disp : (int)sizeof sal;
+            pedir -= pedir % 4;
+            int r = _jg.StreamGet(f->conv, sal, pedir);
+            if (r <= 0) break;
+            int muestras = r / (int)sizeof(short);
+            _jg.LockAudio(_jgs.audio);
+            for (int i = 0; i < muestras; i++) {
+                f->anillo[f->escribe] = sal[i];
+                f->escribe = (f->escribe + 1) % f->cap;
+            }
+            f->lleno += muestras;
+            _jg.UnlockAudio(_jgs.audio);
         }
-        _jgs.flujo.lleno += muestras;
-        _jg.UnlockAudio(_jgs.audio);
     }
 }
 
-/* Empieza la música en streaming desde 'ruta' (un .ogg); 0 con el motivo en msg */
-static int jg_empezar_flujo(const char *ruta, float vol, char *msg, size_t max) {
-    if (_jgs.flujo.activa && strcmp(_jgs.flujo.ruta, ruta) == 0) {    /* ya suena: solo el volumen */
-        _jgs.flujo.vol = vol;
+/* La música de ahora se va: en 'seg' segundos, bajando, o ya */
+static void jg_musica_fuera(double seg) {
+    if (!_jgs.audio) return;
+    _jg.LockAudio(_jgs.audio);
+    for (int v = 0; v < JG_VOCES; v++) {
+        JgVoz *vz = &_jgs.voces[v];
+        if (_jgs.voz_musica > 0 && vz->id == _jgs.voz_musica && vz->activa) {
+            if (seg > 0) jg_fundir(&vz->vol, &vz->objetivo, &vz->rampa, &vz->parar, 0, seg, 1);
+            else vz->activa = 0;
+        }
+    }
+    struct JgFlujo *f = &_jgs.flujos[_jgs.flujo_musica];
+    int parar_ya = f->activa && seg <= 0;
+    if (f->activa && seg > 0) jg_fundir(&f->vol, &f->objetivo, &f->rampa, &f->parar, 0, seg, 1);
+    _jg.UnlockAudio(_jgs.audio);
+    if (parar_ya) jg_parar_un_flujo(f);
+    _jgs.voz_musica = 0;
+}
+
+/* Empieza la música en streaming desde 'ruta' (un .ogg); 0 con el motivo en msg.
+   Con 'seg', la anterior se va bajando mientras esta entra subiendo. */
+static int jg_empezar_flujo(const char *ruta, float vol, double seg, char *msg, size_t max) {
+    struct JgFlujo *f = &_jgs.flujos[_jgs.flujo_musica];
+    if (f->activa && !f->parar && strcmp(f->ruta, ruta) == 0) {    /* ya suena: solo el volumen */
+        _jg.LockAudio(_jgs.audio);
+        jg_fundir(&f->vol, &f->objetivo, &f->rampa, &f->parar, vol, seg, 0);
+        _jg.UnlockAudio(_jgs.audio);
         return 1;
     }
-    jg_parar_flujo();
+    jg_musica_fuera(seg);
     if (!jg_audio()) return 1;                                  /* sin audio: se juega en silencio */
+    int k = f->activa ? 1 - _jgs.flujo_musica : _jgs.flujo_musica;
+    f = &_jgs.flujos[k];
+    if (f->activa || f->bytes) jg_parar_un_flujo(f);           /* la que aún se iba: ya */
     size_t largo = 0;
     char *bytes = interprete_leer_bytes(ruta, &largo);
     if (!bytes) { snprintf(msg, max, "no se encuentra la música '%s'", ruta); return 0; }
@@ -2052,14 +2197,16 @@ static int jg_empezar_flujo(const char *ruta, float vol, char *msg, size_t max) 
         snprintf(msg, max, "no se pudo preparar la música '%s'", ruta);
         return 0;
     }
-    _jgs.flujo.bytes = bytes; _jgs.flujo.largo = largo; _jgs.flujo.ogg = ogg; _jgs.flujo.conv = conv;
-    _jgs.flujo.canales = canales;
-    _jgs.flujo.anillo = anillo; _jgs.flujo.cap = cap;
-    _jgs.flujo.lee = _jgs.flujo.escribe = _jgs.flujo.lleno = 0;
-    _jgs.flujo.ruta = strdup(ruta);
-    _jgs.flujo.vol = vol;
+    f->bytes = bytes; f->largo = largo; f->ogg = ogg; f->conv = conv;
+    f->canales = canales;
+    f->anillo = anillo; f->cap = cap;
+    f->lee = f->escribe = f->lleno = 0;
+    f->ruta = strdup(ruta);
+    f->vol = seg > 0 ? 0 : vol;
+    jg_fundir(&f->vol, &f->objetivo, &f->rampa, &f->parar, vol, seg, 0);
+    _jgs.flujo_musica = k;
     _jg.LockAudio(_jgs.audio);
-    _jgs.flujo.activa = 1;
+    f->activa = 1;
     _jg.UnlockAudio(_jgs.audio);
     jg_alimentar_flujo();
     return 1;
@@ -2235,35 +2382,92 @@ static JgSonido *jg_sonido_arg(Valor **a, int n, const char *fn) {
     return &_jgs.sonidos[k];
 }
 
+/* El grupo de volumen por su nombre ("efectos", "musica", "voces"); -1 si no es ninguno */
+static int jg_grupo(Valor *v, const char *fn) {
+    if (v->tipo == VAL_TEXTO)
+        for (int g = 0; JG_NOMBRES_GRUPO[g]; g++) if (!strcmp(v->texto, JG_NOMBRES_GRUPO[g])) return g;
+    char msg[200];
+    snprintf(msg, sizeof msg, "%s(): el grupo es \"efectos\", \"musica\" o \"voces\"", fn);
+    jg_error("ErrorArgumento", msg);
+    return -1;
+}
+
+/* Cambia lo que se pida de una voz que suena (con el audio bloqueado):
+   volumen (con fundido), lado y tono. 0 y el error si una opción está mal. */
+static int jg_ajustar_voz(JgVoz *vz, Valor *op, const char *fn, int con_volumen) {
+    double vol = -1, lado = 2, tono = 0, fundido = 0;
+    char msg[200];
+    if (con_volumen && jg_opcion(op, "volumen", &vol) && (vol < 0 || vol > 1)) {
+        snprintf(msg, sizeof msg, "%s(): \"volumen\" va de 0 a 1", fn);
+        jg_error("ErrorArgumento", msg);
+        return 0;
+    }
+    if (jg_opcion(op, "lado", &lado) && (lado < -1 || lado > 1)) {
+        snprintf(msg, sizeof msg, "%s(): \"lado\" va de -1 (izquierda) a 1 (derecha)", fn);
+        jg_error("ErrorArgumento", msg);
+        return 0;
+    }
+    if (jg_opcion(op, "tono", &tono) && (tono < 0.25 || tono > 4)) {
+        snprintf(msg, sizeof msg, "%s(): \"tono\" va de 0.25 a 4 (1 es el normal)", fn);
+        jg_error("ErrorArgumento", msg);
+        return 0;
+    }
+    if (jg_opcion(op, "fundido", &fundido) && (fundido < 0 || fundido > 60)) {
+        snprintf(msg, sizeof msg, "%s(): \"fundido\" son los segundos que tarda en cambiar el volumen (de 0 a 60)", fn);
+        jg_error("ErrorArgumento", msg);
+        return 0;
+    }
+    Valor *gv = jg_opcion_valor(op, "grupo");
+    int grupo = gv ? jg_grupo(gv, fn) : vz->grupo;
+    if (grupo < 0) return 0;
+    vz->grupo = grupo;
+    if (vol >= 0) jg_fundir(&vz->vol, &vz->objetivo, &vz->rampa, &vz->parar, (float)vol, fundido, 0);
+    if (lado <= 1) {
+        vz->izq = (float)(lado > 0 ? 1 - lado : 1);
+        vz->der = (float)(lado < 0 ? 1 + lado : 1);
+    }
+    if (tono > 0) vz->paso = (float)tono;
+    return 1;
+}
+
+static JgVoz *jg_voz_de(int id) {
+    if (!_jgs.audio || id <= 0) return NULL;
+    for (int v = 0; v < JG_VOCES; v++)
+        if (_jgs.voces[v].id == id && _jgs.voces[v].activa) return &_jgs.voces[v];
+    return NULL;
+}
+
 /* reproducir(sonido[, volumen[, bucle]]) o reproducir(sonido, opciones):
    devuelve el número de la voz. Opciones: "volumen" (0 a 1), "bucle",
-   "lado" (-1 izquierda, 0 en medio, 1 derecha: suena de donde pasa) y
+   "lado" (-1 izquierda, 0 en medio, 1 derecha: suena de donde pasa),
    "tono" (1 normal, 2 una octava más agudo y el doble de rápido, 0.5 más
-   grave; variarlo un poco hace que un golpe repetido no suene a calco). */
+   grave; variarlo un poco hace que un golpe repetido no suene a calco),
+   "grupo" ("efectos", "voces" o "musica": su volumen, con volumen(grupo, v))
+   y "fundido" (segundos que tarda en llegar a su volumen, desde 0). */
 static Valor *fn_jg_reproducir(Valor **a, int n) {
     JG_ABIERTA();
     JgSonido *s = jg_sonido_arg(a, n, "reproducir");
     if (!s) return valor_nulo();
     if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
         Valor *op = a[1];
-        static const char *const V[] = {"volumen", "bucle", "lado", "tono", NULL};
+        static const char *const V[] = {"volumen", "bucle", "lado", "tono", "grupo", "fundido", NULL};
         if (!jg_opciones_validas(op, "reproducir", V)) return valor_nulo();
-        double vol = 1, lado = 0, tono = 1, b = 0;
-        jg_opcion(op, "volumen", &vol); jg_opcion(op, "lado", &lado); jg_opcion(op, "tono", &tono);
+        double vol = 1, b = 0;
+        jg_opcion(op, "volumen", &vol);
         Valor *vb = jg_opcion_valor(op, "bucle");
         if (vb) { if (vb->tipo != VAL_BOOLEANO) return jg_error("ErrorTipo", "reproducir(): \"bucle\" es verdadero o falso"); b = vb->booleano; }
-        if (vol < 0 || vol > 1) return jg_error("ErrorArgumento", "reproducir(): \"volumen\" va de 0 a 1");
-        if (lado < -1 || lado > 1) return jg_error("ErrorArgumento", "reproducir(): \"lado\" va de -1 (izquierda) a 1 (derecha)");
-        if (tono < 0.25 || tono > 4) return jg_error("ErrorArgumento", "reproducir(): \"tono\" va de 0.25 a 4 (1 es el normal)");
+        JgVoz prueba;                                   /* las opciones, comprobadas antes de sonar */
+        memset(&prueba, 0, sizeof prueba);
+        if (!jg_ajustar_voz(&prueba, op, "reproducir", 1)) return valor_nulo();
         int id = jg_sonar(s->datos, s->muestras, (float)vol, (int)b, NULL);
         if (id > 0) {
             _jg.LockAudio(_jgs.audio);
-            for (int v = 0; v < JG_VOCES; v++)
-                if (_jgs.voces[v].id == id) {
-                    _jgs.voces[v].izq = (float)(lado > 0 ? 1 - lado : 1);
-                    _jgs.voces[v].der = (float)(lado < 0 ? 1 + lado : 1);
-                    _jgs.voces[v].paso = (float)tono;
-                }
+            JgVoz *vz = jg_voz_de(id);
+            if (vz) {
+                double f = 0;
+                if (jg_opcion(op, "fundido", &f) && f > 0) vz->vol = 0;
+                jg_ajustar_voz(vz, op, "reproducir", 1);
+            }
             _jg.UnlockAudio(_jgs.audio);
         }
         return valor_numero(id);
@@ -2272,10 +2476,54 @@ static Valor *fn_jg_reproducir(Valor **a, int n) {
     return valor_numero(jg_sonar(s->datos, s->muestras, jg_volumen_arg(a, n, 1, 1), bucle, NULL));
 }
 
-/* detener([voz]): para una voz o, sin argumento, todo (también la música) */
+/* cambiar_voz(voz, opciones): cambia lo que suena (volumen, lado, tono, con
+   "fundido" para que el volumen cambie poco a poco). Devuelve si sigue sonando. */
+static Valor *fn_jg_cambiar_voz(Valor **a, int n) {
+    JG_ABIERTA();
+    if (n < 1 || a[0]->tipo != VAL_NUMERO) return jg_error("ErrorTipo", "cambiar_voz() espera (voz, opciones): la voz es lo que devuelve reproducir()");
+    if (n > 1) {
+        if (a[1]->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo", "cambiar_voz(): las opciones son un diccionario: \"volumen\", \"lado\", \"tono\", \"fundido\", \"grupo\"");
+        static const char *const V[] = {"volumen", "lado", "tono", "grupo", "fundido", NULL};
+        if (!jg_opciones_validas(a[1], "cambiar_voz", V)) return valor_nulo();
+        JgVoz prueba;
+        memset(&prueba, 0, sizeof prueba);
+        if (!jg_ajustar_voz(&prueba, a[1], "cambiar_voz", 1)) return valor_nulo();
+    }
+    if (!_jgs.audio) return valor_booleano(0);
+    _jg.LockAudio(_jgs.audio);
+    JgVoz *vz = jg_voz_de((int)a[0]->numero);
+    if (vz && vz->parar) vz = NULL;                     /* ya se estaba yendo */
+    if (vz && n > 1) jg_ajustar_voz(vz, a[1], "cambiar_voz", 1);
+    _jg.UnlockAudio(_jgs.audio);
+    return valor_booleano(vz != NULL);
+}
+
+/* sonando(voz): ¿sigue sonando? */
+static Valor *fn_jg_sonando(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_NUMERO) return jg_error("ErrorTipo", "sonando() espera la voz que devuelve reproducir()");
+    if (!_jgs.audio) return valor_booleano(0);
+    _jg.LockAudio(_jgs.audio);
+    JgVoz *vz = jg_voz_de((int)a[0]->numero);
+    int si = vz && !vz->parar;
+    _jg.UnlockAudio(_jgs.audio);
+    return valor_booleano(si);
+}
+
+/* detener([voz[, segundos]]): para una voz (con segundos, bajando poco a poco)
+   o, sin argumento, todo (también la música) */
 static Valor *fn_jg_detener(Valor **a, int n) {
     JG_ABIERTA();
-    if (n > 0 && a[0]->tipo == VAL_NUMERO) { jg_parar_voz((int)a[0]->numero); return valor_nulo(); }
+    if (n > 0 && a[0]->tipo == VAL_NUMERO) {
+        double seg = 0;
+        if (n > 1 && !jg_num(a, n, 1, &seg, "detener")) return valor_nulo();
+        if (seg < 0 || seg > 60) return jg_error("ErrorArgumento", "detener(voz, segundos): los segundos van de 0 a 60");
+        if (seg == 0 || !_jgs.audio) { jg_parar_voz((int)a[0]->numero); return valor_nulo(); }
+        _jg.LockAudio(_jgs.audio);
+        JgVoz *vz = jg_voz_de((int)a[0]->numero);
+        if (vz) jg_fundir(&vz->vol, &vz->objetivo, &vz->rampa, &vz->parar, 0, seg, 1);
+        _jg.UnlockAudio(_jgs.audio);
+        return valor_nulo();
+    }
     if (_jgs.audio) {
         _jg.LockAudio(_jgs.audio);
         for (int v = 0; v < JG_VOCES; v++) _jgs.voces[v].activa = 0;
@@ -2286,29 +2534,39 @@ static Valor *fn_jg_detener(Valor **a, int n) {
     return valor_nulo();
 }
 
-/* ¿Sigue sonando la voz con ese id y esos datos? */
+/* ¿Sigue sonando la voz con ese id y esos datos (y no se está yendo)? */
 static int jg_voz_suena(int id, const short *datos) {
     if (!_jgs.audio || id <= 0) return 0;
     for (int v = 0; v < JG_VOCES; v++)
-        if (_jgs.voces[v].id == id) return _jgs.voces[v].activa && _jgs.voces[v].datos == datos;
+        if (_jgs.voces[v].id == id) return _jgs.voces[v].activa && !_jgs.voces[v].parar && _jgs.voces[v].datos == datos;
     return 0;
 }
 
-/* musica(ruta o sonido[, volumen]): suena en bucle y sustituye a la anterior;
-   musica(nulo) la para. Con la ruta de un .ogg se lee poco a poco (streaming):
-   una canción larga no ocupa decenas de MB. Si ya está sonando la misma, solo
-   cambia el volumen (así no vuelve a empezar al recargar en caliente). */
+/* musica(ruta o sonido[, volumen o opciones]): suena en bucle y sustituye a la
+   anterior; musica(nulo) la para. Opciones: "volumen" (0,6) y "fundido" (los
+   segundos en que la anterior se va bajando mientras esta entra). Con la ruta
+   de un .ogg se lee poco a poco (streaming): una canción larga no ocupa
+   decenas de MB. Si ya está sonando la misma, solo cambia el volumen (así no
+   vuelve a empezar al recargar en caliente). */
 static Valor *fn_jg_musica(Valor **a, int n) {
     JG_ABIERTA();
     float vol = jg_volumen_arg(a, n, 1, 0.6f);
+    double seg = 0;
+    if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
+        static const char *const V[] = {"volumen", "fundido", NULL};
+        if (!jg_opciones_validas(a[1], "musica", V)) return valor_nulo();
+        double v = 0.6;
+        if (jg_opcion(a[1], "volumen", &v) && (v < 0 || v > 1)) return jg_error("ErrorArgumento", "musica(): \"volumen\" va de 0 a 1");
+        if (jg_opcion(a[1], "fundido", &seg) && (seg < 0 || seg > 60))
+            return jg_error("ErrorArgumento", "musica(): \"fundido\" son los segundos del paso de una música a otra (de 0 a 60)");
+        vol = (float)v;
+    }
     if (n >= 1 && a[0]->tipo == VAL_TEXTO) {
         size_t l = strlen(a[0]->texto);
         int es_ogg = l > 4 && (strcmp(a[0]->texto + l - 4, ".ogg") == 0 || strcmp(a[0]->texto + l - 4, ".OGG") == 0);
         if (es_ogg) {
-            jg_parar_voz(_jgs.voz_musica);
-            _jgs.voz_musica = 0;
             char msg[600];
-            if (!jg_empezar_flujo(a[0]->texto, vol, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
+            if (!jg_empezar_flujo(a[0]->texto, vol, seg, msg, sizeof msg)) return jg_error("ErrorJuego", msg);
             return valor_nulo();
         }
         /* un .wav: se carga entero, como juego.sonido() */
@@ -2319,25 +2577,47 @@ static Valor *fn_jg_musica(Valor **a, int n) {
         valor_destruir(s);
         return r;
     }
-    jg_parar_flujo();
     if (n < 1 || a[0]->tipo == VAL_NULO) {
-        jg_parar_voz(_jgs.voz_musica);
-        _jgs.voz_musica = 0;
+        jg_musica_fuera(seg);
         return valor_nulo();
     }
     JgSonido *s = jg_sonido_arg(a, n, "musica");
     if (!s) return valor_nulo();
     if (jg_voz_suena(_jgs.voz_musica, s->datos)) {               /* la misma: solo el volumen */
-        for (int v = 0; v < JG_VOCES; v++) if (_jgs.voces[v].id == _jgs.voz_musica) _jgs.voces[v].vol = vol;
+        _jg.LockAudio(_jgs.audio);
+        JgVoz *vz = jg_voz_de(_jgs.voz_musica);
+        if (vz) jg_fundir(&vz->vol, &vz->objetivo, &vz->rampa, &vz->parar, vol, seg, 0);
+        _jg.UnlockAudio(_jgs.audio);
         return valor_nulo();
     }
-    jg_parar_voz(_jgs.voz_musica);
-    _jgs.voz_musica = jg_sonar(s->datos, s->muestras, vol, 1, NULL);
+    jg_musica_fuera(seg);
+    int id = jg_sonar(s->datos, s->muestras, vol, 1, NULL);
+    if (id > 0) {
+        _jg.LockAudio(_jgs.audio);
+        JgVoz *vz = jg_voz_de(id);
+        if (vz) {
+            vz->grupo = JG_MUSICA;
+            if (seg > 0) { vz->vol = 0; jg_fundir(&vz->vol, &vz->objetivo, &vz->rampa, &vz->parar, vol, seg, 0); }
+        }
+        _jg.UnlockAudio(_jgs.audio);
+    }
+    _jgs.voz_musica = id;
     return valor_nulo();
 }
 
-/* volumen(v): volumen general de 0 a 1 */
+/* volumen([v]): volumen general de 0 a 1. volumen(grupo[, v]): el de un grupo
+   ("efectos", "musica" o "voces"), que se multiplica por el general. */
 static Valor *fn_jg_volumen(Valor **a, int n) {
+    if (n > 0 && a[0]->tipo == VAL_TEXTO) {
+        int g = jg_grupo(a[0], "volumen");
+        if (g < 0) return valor_nulo();
+        if (n > 1) {
+            double v;
+            if (!jg_num(a, n, 1, &v, "volumen")) return valor_nulo();
+            _jgs.grupos[g] = (float)(v < 0 ? 0 : v > 1 ? 1 : v);
+        }
+        return valor_numero(_jgs.grupos[g]);
+    }
     if (n > 0) {
         double v;
         if (!jg_num(a, n, 0, &v, "volumen")) return valor_nulo();
@@ -6813,6 +7093,7 @@ static void cargar_juego(Entorno *entorno) {
         {"rectangulo",      fn_jg_rectangulo,      -1},
         {"contorno",        fn_jg_contorno,        -1},
         {"linea",           fn_jg_linea,           -1},
+        {"poligono",        fn_jg_poligono,        -1},
         {"circulo",         fn_jg_circulo,         -1},
         {"texto",           fn_jg_texto,           -1},
         {"ancho_texto",     fn_jg_ancho_texto,     -1},
@@ -6845,6 +7126,8 @@ static void cargar_juego(Entorno *entorno) {
         {"detener",         fn_jg_detener,         -1},
         {"musica",          fn_jg_musica,          -1},
         {"volumen",         fn_jg_volumen,         -1},
+        {"cambiar_voz",     fn_jg_cambiar_voz,     -1},
+        {"sonando",         fn_jg_sonando,          1},
         {"camara",          fn_jg_camara,          -1},
         {"camara_actual",   fn_jg_camara_actual,    0},
         {"capa",            fn_jg_capa,            -1},

@@ -1,0 +1,14 @@
+# @seccion: Sonido
+# @titulo: Grupos de volumen, sonido con sitio y fundidos
+# @nota: Cada sonido va en un grupo: `"efectos"` (el de siempre), `"voces"` o `"musica"` (lo de `juego.musica()`). `juego.volumen("musica", 0.5)` baja solo la música, para el menú de opciones; `juego.volumen(v)` sigue siendo el general.
+# @nota: `juego.reproducir_en(sonido, x, y)` suena por la izquierda o por la derecha según dónde se ve ese punto, y más bajo cuanto más lejos queda de la pantalla; `juego.mover_voz(voz, x, y)` lo sigue mientras se mueve. Con `"fundido"`, `juego.musica()` pasa de una canción a otra bajando una mientras sube la otra, y `juego.detener(voz, segundos)` apaga poco a poco.
+# @ejecutar: no
+importar "juego"
+
+juego.volumen("musica", 0.4)                                        # lo que elija el jugador en las opciones
+juego.reproducir(juego.sonido("hola.wav"), {"grupo": "voces"})
+sea motor = juego.reproducir_en(juego.sonido("motor.wav"), 900, 200, {"bucle": verdadero})
+juego.mover_voz(motor, 700, 200)                                    # en cada fotograma, donde esté el coche
+juego.musica("musica/pelea.ogg", {"fundido": 2})                   # la del bosque se va en 2 segundos
+juego.detener(motor, 0.5)
+juego.cambiar_voz(motor, {"tono": 1.2, "fundido": 0.3})            # devuelve si sigue sonando

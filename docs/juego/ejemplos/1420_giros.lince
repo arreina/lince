@@ -1,0 +1,25 @@
+# @seccion: Física
+# @titulo: Cuerpos que giran
+# @nota: Con `"gira": verdadero` un cuerpo gira al chocar: vuelca, rueda y se apila de verdad, y lleva su `angulo` (en grados, el mismo que usa `dibujar`) y su `vgiro` (grados por segundo). Con `"puntos"` es un polígono convexo (una rampa, una cuña, una piedra), con los puntos medidos desde su `x`, `y`.
+# @nota: `juego.dibujar_cuerpo(c, color)` lo dibuja tal cual es, para probar o para juegos de formas; con imágenes se dibuja con `juego.dibujar(imagen, c["x"], c["y"], {"angulo": c["angulo"]})`, porque `x`, `y` siguen siendo la esquina de la caja sin girar.
+# @fotogramas: 120
+importar "juego"
+
+juego.abrir("Giros", 480, 270)
+sea mundo = juego.fisica({"gravedad": 900})
+juego.cuerpo(mundo, {"x": 0, "y": 250, "ancho": 480, "alto": 20, "fijo": verdadero})
+juego.cuerpo(mundo, {"x": 0, "y": 130, "puntos": [[0, 0], [200, 90], [200, 120], [0, 120]], "fijo": verdadero})   # una rampa
+para (i = 0; i < 5; i++) {
+    juego.cuerpo(mundo, {"x": 360, "y": 220 - i * 31, "ancho": 30, "alto": 30, "gira": verdadero})    # una torre
+}
+juego.cuerpo(mundo, {"x": 20, "y": 90, "radio": 14, "gira": verdadero, "masa": 3})       # una bola por la rampa
+juego.cuerpo(mundo, {"x": 250, "y": 20, "ancho": 50, "alto": 14, "gira": verdadero, "angulo": 35})
+juego.cuerpo(mundo, {"x": 300, "y": 0, "puntos": [[0, 30], [15, 0], [30, 30]], "gira": verdadero})   # un triángulo
+mientras juego.abierto() {
+    juego.avanzar_fisica(mundo)
+    juego.limpiar([25, 30, 45])
+    para cada diccionario c en mundo["cuerpos"] {
+        juego.dibujar_cuerpo(c, si c["fijo"] { [70, 80, 110] } sino si c.contiene("radio") { [240, 120, 90] } sino { [200, 150, 80] })
+    }
+    juego.presentar()
+}

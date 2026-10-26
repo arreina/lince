@@ -3,6 +3,27 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.6.0
+
+Física y sonido. Nada de lo que ya funcionaba cambia.
+
+- **Cuerpos que giran**: con `"gira": verdadero` un cuerpo de `juego.fisica()` vuelca, rueda, se apila y cae de canto, con su `angulo` (en grados, el de `dibujar`) y su `vgiro`. Con `"puntos"`, un **polígono** convexo: rampas, cuñas, piedras. Las pilas se quedan quietas (impulsos que empiezan donde lo dejó el paso anterior, como en Box2D Lite). `empujar(c, fx, fy, punto)` lo hace girar si el golpe no es en el centro. Escrita en Lince, como el resto de la física: unas 20 cajas que giran caben en 3 ms por fotograma.
+- **Uniones**: `juego.bisagra(mundo, a, b, [x, y])` clava dos cuerpos por un punto (puertas, péndulos, cadenas, puentes) y `juego.cuerda(mundo, a, b)` no deja que se alejen más que su largo (o, `"rigida"`, es una barra). `puntos_union()` para dibujarlas.
+- **Círculo contra caja de verdad**: una pelota que cae en la esquina de una caja resbala, ya no se queda apoyada en el aire.
+- **`juego.poligono(puntos, color)`** dibuja polígonos rellenos (o solo el borde), y `juego.dibujar_cuerpo(c)` dibuja un cuerpo tal cual es.
+- **Grupos de volumen**: `juego.volumen("musica", 0.5)`, `"efectos"` y `"voces"`, para el menú de opciones. `reproducir(..., {"grupo": "voces"})`; los diálogos suenan en `"voces"`.
+- **Sonido con sitio**: `juego.reproducir_en(sonido, x, y)` suena por la izquierda o por la derecha según dónde se ve ese punto, y más bajo cuanto más lejos queda; `juego.mover_voz(voz, x, y)` lo sigue.
+- **Fundidos**: `juego.musica("pelea.ogg", {"fundido": 2})` pasa de una música a otra bajando una mientras sube la otra; `juego.detener(voz, segundos)` apaga poco a poco, y `juego.cambiar_voz(voz, opciones)` cambia el volumen, el lado o el tono de lo que ya suena.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.6.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.6.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.6.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.6.0.vsix` |
+
 ## 1.5.1
 
 Un arreglo.

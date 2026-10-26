@@ -85,9 +85,13 @@ está en `juego.lince`.
 - [ ] Tiled isométricos y hexagonales: solo si algún juego los pide.
 
 ### 1.6 — Física y sonido
-- [ ] Cuerpos que giran, círculo contra caja de verdad, polígonos, uniones sencillas (cuerda, bisagra).
-- [ ] Grupos de volumen (música, efectos, voces), sonido a izquierda o derecha según la
-  posición, paso suave entre músicas.
+- [x] Cuerpos que giran, círculo contra caja de verdad, polígonos, uniones sencillas (cuerda, bisagra).
+  En Lince (Box2D Lite: impulsos con arranque en caliente); en C solo `poligono()` para dibujar.
+- [x] Grupos de volumen (música, efectos, voces), sonido a izquierda o derecha según la
+  posición, paso suave entre músicas. En C lo del mezclador (grupos, fundidos, dos músicas a la
+  vez); el sonido con sitio, en Lince.
+- [ ] Con muchos cuerpos que giran (unos 40 o más) la física pasa de 6 ms por fotograma: se mira en
+  la 1.7 (rendimiento), si algún juego lo necesita.
 
 ### 1.7 — Rendimiento (solo si hace falta)
 - [ ] La máquina virtual de bytecode («camino B», ver Rendimiento), si `lince perfil` demuestra que Lince es el cuello de botella.

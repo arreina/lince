@@ -625,4 +625,56 @@ for (x, y), esp, nombre in casos:
     else: print("  ❌ 1.5, píxel:", nombre, "→", px(x, y)); mal += 1
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida5b.txt; exit 1; }
+# ── 1.6: física con giros, uniones, polígonos y sonido (grupos, fundidos, con sitio) ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=260 LINCE_JUEGO_AUDIO=mezcla.wav \
+    timeout 120 "$LINCE" "$DIR/prueba27.lince" > salida33.txt 2>&1
+for l in "pila: 282 quieta: verdadero" "cae de esquina y queda plana: 380 verdadero" "la bola baja rodando: verdadero verdadero" \
+         "en_suelo: verdadero verdadero" "la pelota resbala por la esquina: verdadero" \
+         "bisagra: no se suelta: verdadero y cae girando: verdadero" "cuerda: no se estira: verdadero" \
+         "uniones tras quitar el peso: 0" "mapa: 66 verdadero" "puntos_cuerpo: [[0, 0], [10, 0], [10, 4], [0, 4]]" \
+         "sonando: verdadero" "sonando al irse: falso" "grupos: 0 1 1" "cambiar_voz: verdadero falso falso" \
+         'error: cuerpo(): el polígono tiene que ser convexo (sin entrantes); uno con entrantes se hace con varios' \
+         'error: cuerpo(): los puntos del polígono no encierran nada (están en línea)' \
+         'error: cuerda(): ata dos cuerpos distintos (o uno y un punto [x, y])' \
+         'error: bisagra(): ese cuerpo no está en este mundo' \
+         'error: volumen(): el grupo es "efectos", "musica" o "voces"' \
+         'error: musica(): "fundido" son los segundos del paso de una música a otra (de 0 a 60)' \
+         'error: reproducir(): el grupo es "efectos", "musica" o "voces"' \
+         'error: reproducir_en(): el lado sale de dónde está (x, y); para ponerlo a mano, reproducir()'; do
+    grep -qxF "$l" salida33.txt && ok "1.6: $l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys, wave
+mal = 0
+def mira(bien, nombre):
+    global mal
+    print("  ✅ 1.6:" if bien else "  ❌ 1.6:", nombre)
+    mal += not bien
+# el sonido, a trozos de fotogramas (735 muestras cada uno)
+w = wave.open("mezcla.wav"); n = w.getnframes()
+d = struct.unpack("<%dh" % (n * 2), w.readframes(n))
+def rms(f0, f1, c):
+    s = d[f0 * 1470 + c:f1 * 1470:2]
+    return (sum(x * x for x in s) / len(s)) ** 0.5
+mira(rms(0, 10, 0) < rms(25, 35, 0) < rms(50, 60, 0), "la música entra subiendo (fundido)")
+mira(rms(95, 115, 0) < 50, "volumen(\"musica\", 0) la calla")
+mira(rms(140, 148, 0) < rms(122, 128, 0) / 2 and rms(155, 168, 0) < 50, "musica(nulo, fundido) baja y para")
+mira(rms(175, 188, 0) > 3 * rms(175, 188, 1), "reproducir_en a la izquierda suena por la izquierda")
+mira(rms(195, 208, 1) > 3 * rms(195, 208, 0), "mover_voz a la derecha")
+mira(rms(225, 238, 1) < 50, "detener(voz, segundos) acaba callando")
+mira(rms(245, 258, 0) < 50, "volumen(\"efectos\", 0) calla los efectos")
+# los polígonos
+b = open("poligonos.bmp", "rb").read()
+off = struct.unpack_from("<I", b, 10)[0]; ancho, alto = struct.unpack_from("<ii", b, 18); B = struct.unpack_from("<H", b, 28)[0] // 8
+fila = (ancho * B + 3) & ~3
+def px(x, y):
+    f = (abs(alto) - 1 - y) if alto > 0 else y
+    i = off + f * fila + x * B
+    return (b[i + 2], b[i + 1], b[i])
+for (x, y), esp, nombre in [((50, 20), (255, 0, 0), "polígono relleno"), ((15, 50), (0, 0, 0), "fuera del polígono"),
+                            ((100, 30), (0, 255, 0), "solo el borde"), ((125, 35), (0, 0, 0), "sin relleno dentro"),
+                            ((185, 15), (0, 0, 255), "polígono en una capa")]:
+    mira(px(x, y) == esp, "píxel: %s %s" % (nombre, "" if px(x, y) == esp else px(x, y)))
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida5b.txt; exit 1; }

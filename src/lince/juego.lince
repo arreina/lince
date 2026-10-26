@@ -1112,7 +1112,7 @@ funcion _dl_entrada(): nulo {
     _dl["letras"] = matematica.minimo(total, _dl["letras"] + _de(_dl["opciones"], "velocidad", 40) * (ahora - _dl["desde"]))
     _dl["desde"] = ahora
     si _dl["opciones"].contiene("sonido") y matematica.piso(_dl["letras"]) != antes y antes % 2 == 0 {
-        juego.reproducir(_dl["opciones"]["sonido"])
+        juego.reproducir(_dl["opciones"]["sonido"], {"grupo": "voces"})
     }
     sea acabada = _dl["letras"] >= total
     sea respuestas = trozo["respuestas"]
@@ -1217,16 +1217,17 @@ funcion _dibujar_dialogo(): nulo {
 }
 
 # ── Física sencilla ──
-# Cuerpos que caen, rebotan, se empujan y chocan entre ellos y con un mapa,
-# sin girar: cajas, pelotas, plataformas que se mueven y el propio personaje.
-# Un cuerpo es un diccionario como los de mover_en_mapa (x, y, ancho, alto,
-# vx, vy) con lo suyo: masa, rebote, friccion, fijo, sensor, gravedad.
+# Cuerpos que caen, rebotan, se empujan y chocan entre ellos y con un mapa:
+# cajas, pelotas, plataformas que se mueven y el propio personaje. Un cuerpo
+# es un diccionario como los de mover_en_mapa (x, y, ancho, alto, vx, vy) con
+# lo suyo: masa, rebote, friccion, fijo, sensor, gravedad. Los que llevan
+# "gira" (o "puntos", un polígono) giran al chocar: ver «Física con giros».
 #   sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
 #   sea caja = juego.cuerpo(mundo, {"x": 100, "y": 50, "ancho": 24, "alto": 24})
 #   # en cada fotograma:
 #   juego.avanzar_fisica(mundo)
 
-fijo _FISICA_OPCIONES = ["gravedad", "mapa", "pasos"]
+fijo _FISICA_OPCIONES = ["gravedad", "mapa", "pasos", "iteraciones"]
 sea _cuerpos_creados = 0
 
 funcion fisica(val cualquiera opciones = nulo): diccionario {
@@ -1234,8 +1235,11 @@ funcion fisica(val cualquiera opciones = nulo): diccionario {
     sea g = _de(op, "gravedad", 900)
     si g es numero { g = [0, g] }
     si no (g es lista) o g.longitud() != 2 { lanzar ErrorTipo("fisica(): \"gravedad\" es un número (hacia abajo) o [x, y]") }
+    sea it = _de(op, "iteraciones", 8)
+    si no (it es numero) o it < 1 o it > 100 { lanzar ErrorArgumento("fisica(): \"iteraciones\" va de 1 a 100 (más: pilas más quietas, pero más lento)") }
     devolver {"gravedad": g, "mapa": _de(op, "mapa", nulo), "pasos": _de(op, "pasos", 120),
-        "cuerpos": [], "toques": {}}
+        "iteraciones": it, "_pasos_puestos": op.contiene("pasos"), "cuerpos": [], "toques": {}, "uniones": [], "_cache": {}, "_casillas": {},
+        "_sin_choque": {}}
 }
 
 funcion _es_mundo(val cualquiera m, val texto fn): nulo {
@@ -1256,6 +1260,7 @@ funcion cuerpo(val cualquiera mundo, val cualquiera datos): diccionario {
         datos["ancho"] = datos["radio"] * 2
         datos["alto"] = datos["radio"] * 2
     }
+    si datos.contiene("puntos") { _medir_puntos(datos) }
     para cada texto c en ["x", "y", "ancho", "alto"] {
         si no datos.contiene(c) o no (datos[c] es numero) {
             lanzar ErrorTipo("cuerpo(): falta \"{c}\" (un número; o \"radio\" en vez de ancho y alto)")
@@ -1268,6 +1273,7 @@ funcion cuerpo(val cualquiera mundo, val cualquiera datos): diccionario {
     si no datos.contiene("fijo") { datos["fijo"] = falso }
     si no datos.contiene("sensor") { datos["sensor"] = falso }
     si datos["masa"] <= 0 { lanzar ErrorArgumento("cuerpo(): la masa tiene que ser mayor que 0") }
+    si datos.contiene("puntos") o (datos.contiene("gira") y datos["gira"]) { _preparar_rigido(datos) }
     _cuerpos_creados = _cuerpos_creados + 1
     datos["id_fisica"] = _cuerpos_creados
     datos["en_suelo"] = falso
@@ -1282,13 +1288,28 @@ funcion quitar_cuerpo(val cualquiera mundo, val cualquiera c): nulo {
         si vecino["id_fisica"] != c["id_fisica"] { quedan.agregar(vecino) }
     }
     mundo["cuerpos"] = quedan
+    sea uniones = []                     # y lo que lo unía a otros
+    para cada diccionario u en mundo["uniones"] {
+        si u["a"]["id_fisica"] != c["id_fisica"] y no (u["b"] es diccionario y u["b"]["id_fisica"] == c["id_fisica"]) {
+            uniones.agregar(u)
+        }
+    }
+    mundo["uniones"] = uniones
 }
 
-# empujar(cuerpo, fx, fy): un golpe: cambia su velocidad según su masa
-funcion empujar(val cualquiera c, val numero fx, val numero fy): nulo {
+# empujar(cuerpo, fx, fy[, punto]): un golpe: cambia su velocidad según su
+# masa. Si gira y el golpe es en un punto [x, y] que no es su centro, gira.
+funcion empujar(val cualquiera c, val numero fx, val numero fy, val cualquiera punto = nulo): nulo {
     si c["fijo"] { devolver nulo }
     c["vx"] = c["vx"] + fx / c["masa"]
     c["vy"] = c["vy"] + fy / c["masa"]
+    si punto != nulo y c.contiene("_forma") y c["gira"] {
+        sea p = _punto(punto, nulo, "empujar")
+        sea centro = centro_cuerpo(c)
+        sea rx = p[0] - centro[0]
+        sea ry = p[1] - centro[1]
+        c["vgiro"] = c["vgiro"] + matematica.grados((rx * fy - ry * fx) / (c["masa"] * c["_forma"]["inercia"]))
+    }
 }
 
 # tocando(mundo, cuerpo): los cuerpos que tocaba en el último avanzar_fisica()
@@ -1340,6 +1361,23 @@ funcion _solape(val diccionario a, val diccionario b): cualquiera {
         si d == 0 { devolver [0, -1, r] }
         devolver [dx / d, dy / d, r - d]
     }
+    sea a_circulo = a.contiene("radio")
+    si a_circulo != b.contiene("radio") {             # un círculo y una caja: las esquinas cuentan
+        sea circ = si a_circulo { a } sino { b }
+        sea caja = si a_circulo { b } sino { a }
+        sea r = circ["radio"]
+        sea cx = circ["x"] + r
+        sea cy = circ["y"] + r
+        sea ex = cx - matematica.maximo(caja["x"], matematica.minimo(cx, caja["x"] + caja["ancho"]))
+        sea ey = cy - matematica.maximo(caja["y"], matematica.minimo(cy, caja["y"] + caja["alto"]))
+        sea d2 = ex * ex + ey * ey
+        si d2 >= r * r { devolver nulo }
+        si d2 > 0 {                                     # si el centro está dentro, como dos cajas
+            sea d = matematica.raiz(d2)
+            si a_circulo { devolver [ex / d, ey / d, r - d] }
+            devolver [-ex / d, -ey / d, r - d]
+        }
+    }
     sea px = (a["ancho"] + b["ancho"]) / 2 - matematica.abs(dx)
     sea py = (a["alto"] + b["alto"]) / 2 - matematica.abs(dy)
     si px <= 0 o py <= 0 { devolver nulo }
@@ -1353,11 +1391,12 @@ funcion _paso_fisica(val diccionario mundo, val numero dt): nulo {
     sea cuerpos = mundo["cuerpos"]
     # los fijos que se mueven (plataformas) llevan encima lo que tienen apoyado
     para cada diccionario c en cuerpos {
-        si c["fijo"] y (c["vx"] != 0 o c["vy"] != 0) {
+        si c["fijo"] y (c["vx"] != 0 o c["vy"] != 0) y no c.contiene("_forma") {
             sea mx = c["vx"] * dt
             sea my = c["vy"] * dt
             para cada diccionario vecino en cuerpos {
-                si no vecino["fijo"] y no vecino["sensor"] y vecino["x"] + vecino["ancho"] > c["x"] y vecino["x"] < c["x"] + c["ancho"] y
+                si no vecino["fijo"] y no vecino["sensor"] y no vecino.contiene("_forma") y
+                    vecino["x"] + vecino["ancho"] > c["x"] y vecino["x"] < c["x"] + c["ancho"] y
                     matematica.abs(vecino["y"] + vecino["alto"] - c["y"]) < 1.5 {
                     _desplazar(mapa, vecino, mx, si my < 0 { my } sino { 0 })
                 }
@@ -1368,7 +1407,7 @@ funcion _paso_fisica(val diccionario mundo, val numero dt): nulo {
     }
     # la gravedad y el mapa
     para cada diccionario c en cuerpos {
-        si c["fijo"] { continuar }
+        si c["fijo"] o c.contiene("_forma") { continuar }
         c["vx"] = c["vx"] + g[0] * c["gravedad"] * dt
         c["vy"] = c["vy"] + g[1] * c["gravedad"] * dt
         c["en_suelo"] = falso
@@ -1392,12 +1431,14 @@ funcion _paso_fisica(val diccionario mundo, val numero dt): nulo {
     sea n = cuerpos.longitud()
     para (i = 0; i < n; i++) {
         sea a = cuerpos[i]
+        si a.contiene("_forma") { continuar }
         sea izq = a["x"]
         sea der = izq + a["ancho"]
         sea arr = a["y"]
         sea aba = arr + a["alto"]
         para (j = i + 1; j < n; j++) {
             sea b = cuerpos[j]
+            si b.contiene("_forma") { continuar }
             sea bx = b["x"]
             sea bz = b["y"]
             # lo rápido primero: si están lejos, nada
@@ -1452,15 +1493,875 @@ funcion avanzar_fisica(val cualquiera mundo, val cualquiera dt = nulo): nulo {
     si dt == nulo { dt = juego.dt() }
     mundo["toques"] = {}
     si dt <= 0 { devolver nulo }
-    sea pasos = matematica.maximo(1, matematica.techo(dt * mundo["pasos"]))
-    para (k = 0; k < pasos; k++) { _paso_fisica(mundo, dt / pasos) }
+    sea rigidos = mundo["uniones"].longitud() > 0
+    para cada diccionario c en mundo["cuerpos"] { si c.contiene("_forma") { rigidos = verdadero } }
+    # con cuerpos que giran bastan 60 pasos por segundo (los impulsos van de un paso al siguiente)
+    sea por_segundo = si rigidos y no mundo["_pasos_puestos"] { 60 } sino { mundo["pasos"] }
+    sea pasos = matematica.maximo(1, matematica.techo(dt * por_segundo - 0.000001))
+    si rigidos { _rigidos_leer(mundo) }
+    para (k = 0; k < pasos; k++) {
+        _paso_fisica(mundo, dt / pasos)
+        si rigidos { _paso_rigido(mundo, dt / pasos) }
+    }
+    si rigidos { _rigidos_escribir(mundo) }
     # al acabar, en_suelo dice si está apoyado en algo
     para cada diccionario c en mundo["cuerpos"] {
-        si no c["fijo"] y no c["en_suelo"] y mundo["mapa"] != nulo y no c["sensor"] {
+        si no c["fijo"] y no c["en_suelo"] y mundo["mapa"] != nulo y no c["sensor"] y no c.contiene("_forma") {
             c["en_suelo"] = juego.solido(mundo["mapa"], matematica.piso((c["x"] + c["ancho"] / 2) / mundo["mapa"]["tamaño"]),
                 matematica.piso((c["y"] + c["alto"] + 0.5) / mundo["mapa"]["tamaño"]))
         }
     }
+}
+
+# ── Física con giros ──
+# Un cuerpo con "gira": verdadero, o con "puntos" (un polígono convexo), gira
+# al chocar: lleva "angulo" (en grados, como dibujar()) y "vgiro" (grados por
+# segundo). Sus esquinas chocan de verdad, rueda, vuelca y se apila. Con
+# cuerda() y bisagra() se unen dos cuerpos (o un cuerpo y un punto fijo).
+# Su (x, y) es la esquina de la caja sin girar, como en los demás: el centro
+# no se mueve al girar, así que se dibuja con juego.dibujar(imagen, c["x"],
+# c["y"], {"angulo": c["angulo"]}).
+#
+# Se resuelve como Box2D Lite: en cada paso se buscan los puntos de contacto
+# y se ajustan las velocidades varias veces ("iteraciones" del mundo) con
+# impulsos, empezando por los del paso anterior, para que las pilas se queden
+# quietas. Los cuerpos que no giran también chocan con los que giran (como si
+# no pudieran girar); entre ellos sigue todo como antes.
+
+fijo _HUECO = 0.5          # lo que se deja meter un cuerpo en otro sin empujarlo (quita temblores)
+fijo _CORREGIR = 0.2       # qué parte de lo que se han metido se corrige en cada paso
+
+fijo _CORREGIR_UNION = 0.3     # en las uniones, algo más
+fijo _SIN_BOTE = 40        # por debajo de esta velocidad (píxeles por segundo) no rebota
+
+# ancho y alto de un polígono, por sus puntos
+funcion _medir_puntos(val diccionario c): nulo {
+    sea ps = c["puntos"]
+    sea uso = "cuerpo(): \"puntos\" es una lista de puntos [[x, y], [x, y], [x, y], ...] (al menos 3), desde (x, y)"
+    si no (ps es lista) o ps.longitud() < 3 { lanzar ErrorTipo(uso) }
+    si ps.longitud() > 16 { lanzar ErrorArgumento("cuerpo(): un polígono tiene como mucho 16 puntos") }
+    sea x1 = 0
+    sea y1 = 0
+    para cada cualquiera p en ps {
+        si no (p es lista) o p.longitud() < 2 o no (p[0] es numero) o no (p[1] es numero) { lanzar ErrorTipo(uso) }
+        x1 = matematica.maximo(x1, p[0])
+        y1 = matematica.maximo(y1, p[1])
+    }
+    c["ancho"] = x1
+    c["alto"] = y1
+}
+
+# La forma del cuerpo desde su centro de masas: {"radio"} o {"puntos", "normales"},
+# con "cm" (dónde está el centro desde (x, y)) e "inercia" (por unidad de masa)
+funcion _preparar_rigido(val diccionario c): nulo {
+    si no c.contiene("angulo") { c["angulo"] = 0 }
+    si no c.contiene("vgiro") { c["vgiro"] = 0 }
+    si no c.contiene("gira") { c["gira"] = verdadero }
+    para cada texto k en ["angulo", "vgiro"] {
+        si no (c[k] es numero) { lanzar ErrorTipo("cuerpo(): \"{k}\" es un número (en grados)") }
+    }
+    si c.contiene("radio") {
+        c["_forma"] = {"radio": c["radio"], "cm": [c["radio"], c["radio"]], "inercia": c["radio"] * c["radio"] / 2}
+        devolver nulo
+    }
+    sea ps = []
+    si c.contiene("puntos") {
+        para cada lista p en c["puntos"] { ps.agregar([p[0], p[1]]) }
+    } sino {
+        ps = [[0, 0], [c["ancho"], 0], [c["ancho"], c["alto"]], [0, c["alto"]]]
+    }
+    # el centro de masas (el de la superficie) y hacia dónde van los puntos
+    sea n = ps.longitud()
+    sea area = 0
+    sea cx = 0
+    sea cy = 0
+    para (i = 0; i < n; i++) {
+        sea p = ps[i]
+        sea q = ps[(i + 1) % n]
+        sea cr = p[0] * q[1] - q[0] * p[1]
+        area = area + cr
+        cx = cx + (p[0] + q[0]) * cr
+        cy = cy + (p[1] + q[1]) * cr
+    }
+    si matematica.abs(area) < 0.0001 { lanzar ErrorArgumento("cuerpo(): los puntos del polígono no encierran nada (están en línea)") }
+    cx = cx / (3 * area)
+    cy = cy / (3 * area)
+    si area < 0 { ps = ps.invertir() }
+    sea locales = []
+    para cada lista p en ps { locales.agregar([p[0] - cx, p[1] - cy]) }
+    sea normales = []
+    sea arriba = 0
+    sea abajo = 0
+    para (i = 0; i < n; i++) {
+        sea p = locales[i]
+        sea q = locales[(i + 1) % n]
+        sea r = locales[(i + 2) % n]
+        si (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0]) < -0.0001 {
+            lanzar ErrorArgumento("cuerpo(): el polígono tiene que ser convexo (sin entrantes); uno con entrantes se hace con varios")
+        }
+        sea ex = q[0] - p[0]
+        sea ey = q[1] - p[1]
+        sea l = matematica.raiz(ex * ex + ey * ey)
+        si l < 0.0001 { lanzar ErrorArgumento("cuerpo(): el polígono tiene dos puntos repetidos seguidos") }
+        normales.agregar([ey / l, -ex / l])
+        sea cr = p[0] * q[1] - q[0] * p[1]
+        arriba = arriba + cr * (p[0] * p[0] + p[1] * p[1] + p[0] * q[0] + p[1] * q[1] + q[0] * q[0] + q[1] * q[1])
+        abajo = abajo + cr
+    }
+    c["_forma"] = {"puntos": locales, "normales": normales, "cm": [cx, cy], "inercia": arriba / (6 * abajo)}
+}
+
+# El centro de masas de un cuerpo, [x, y] (en uno que no gira, el de su caja)
+funcion centro_cuerpo(val cualquiera c): lista {
+    si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("centro_cuerpo() espera un cuerpo de juego.cuerpo()") }
+    si c.contiene("_forma") { devolver [c["x"] + c["_forma"]["cm"][0], c["y"] + c["_forma"]["cm"][1]] }
+    devolver [c["x"] + c["ancho"] / 2, c["y"] + c["alto"] / 2]
+}
+
+# puntos_cuerpo(c): su contorno en el mundo, ya girado (para poligono())
+funcion puntos_cuerpo(val cualquiera c): lista {
+    sea centro = centro_cuerpo(c)
+    sea a = 0
+    si c.contiene("_forma") { a = matematica.radianes(c["angulo"]) }
+    sea co = matematica.coseno(a)
+    sea se = matematica.seno(a)
+    sea locales = []
+    si c.contiene("radio") {
+        para (i = 0; i < 24; i++) {
+            sea t = i * matematica.PI / 12
+            locales.agregar([c["radio"] * matematica.coseno(t), c["radio"] * matematica.seno(t)])
+        }
+    } sino si c.contiene("_forma") {
+        locales = c["_forma"]["puntos"]
+    } sino {
+        sea w = c["ancho"] / 2
+        sea h = c["alto"] / 2
+        locales = [[-w, -h], [w, -h], [w, h], [-w, h]]
+    }
+    sea r = []
+    para cada lista p en locales { r.agregar([centro[0] + p[0] * co - p[1] * se, centro[1] + p[0] * se + p[1] * co]) }
+    devolver r
+}
+
+# dibujar_cuerpo(c[, color[, opciones]]): lo dibuja tal cual es (para probar,
+# o para juegos de formas). Opciones: las de poligono() ("relleno", "capa").
+# Con relleno, el borde va algo más oscuro (para que se distingan dos cajas juntas).
+funcion dibujar_cuerpo(val cualquiera c, val cualquiera color = [220, 220, 220], val cualquiera opciones = nulo): nulo {
+    sea ps = puntos_cuerpo(c)
+    sea op = {}
+    si opciones != nulo {
+        si no (opciones es diccionario) { lanzar ErrorTipo("dibujar_cuerpo(): las opciones son un diccionario (\"relleno\", \"capa\")") }
+        para cada texto k en opciones { op[k] = opciones[k] }
+    }
+    juego.poligono(ps, color, op)
+    si op.contiene("relleno") y no op["relleno"] { devolver nulo }
+    sea borde = si color es lista y color.longitud() >= 3 { [color[0] * 0.6, color[1] * 0.6, color[2] * 0.6] } sino { [0, 0, 0] }
+    op["relleno"] = falso
+    juego.poligono(ps, borde, op)
+    si c.contiene("radio") y c.contiene("_forma") {         # una raya, para que se vea girar
+        sea centro = centro_cuerpo(c)
+        sea a = matematica.radianes(c["angulo"])
+        sea antes = nulo
+        si op.contiene("capa") { antes = juego.capa(op["capa"]) }     # en la misma capa que el círculo
+        juego.linea(centro[0], centro[1], centro[0] + c["radio"] * matematica.coseno(a),
+            centro[1] + c["radio"] * matematica.seno(a), borde)
+        si antes != nulo { juego.capa(antes) }
+    }
+}
+
+# Pasa lo que puso el juego (x, y, angulo, vgiro) a lo de dentro (centro, radianes)
+funcion _rigidos_leer(val diccionario mundo): nulo {
+    para cada diccionario c en mundo["cuerpos"] {
+        si c.contiene("_forma") {
+            sea f = c["_forma"]
+            c["_px"] = c["x"] + f["cm"][0]
+            c["_py"] = c["y"] + f["cm"][1]
+            c["_a"] = matematica.radianes(c["angulo"])
+            c["_w"] = matematica.radianes(c["vgiro"])
+            c["_im"] = si c["fijo"] { 0 } sino { 1 / c["masa"] }
+            c["_ii"] = si c["fijo"] o no c["gira"] { 0 } sino { 1 / (c["masa"] * f["inercia"]) }
+            c["en_suelo"] = falso
+        } sino {
+            c["_a"] = 0
+            c["_w"] = 0
+            c["_ii"] = 0
+            c["_im"] = si c["fijo"] { 0 } sino { 1 / c["masa"] }
+        }
+    }
+}
+
+funcion _rigidos_escribir(val diccionario mundo): nulo {
+    para cada diccionario c en mundo["cuerpos"] {
+        si c.contiene("_forma") {
+            sea f = c["_forma"]
+            c["x"] = c["_px"] - f["cm"][0]
+            c["y"] = c["_py"] - f["cm"][1]
+            sea a = matematica.grados(c["_a"]) % 360
+            c["angulo"] = si a > 180 { a - 360 } sino { a }
+            c["vgiro"] = matematica.grados(c["_w"])
+        }
+    }
+}
+
+# Dónde está cada cuerpo en este paso: centro, esquinas y normales giradas, y su caja
+funcion _geometria(val diccionario c): nulo {
+    si c.contiene("_forma") {
+        sea f = c["_forma"]
+        si f.contiene("radio") {
+            sea r = f["radio"]
+            c["_caja"] = [c["_px"] - r, c["_py"] - r, c["_px"] + r, c["_py"] + r]
+            devolver nulo
+        }
+        sea px = c["_px"]
+        sea py = c["_py"]
+        sea co = matematica.coseno(c["_a"])
+        sea se = matematica.seno(c["_a"])
+        sea vs = []
+        sea x0 = px
+        sea y0 = py
+        sea x1 = px
+        sea y1 = py
+        para cada lista p en f["puntos"] {
+            sea x = px + p[0] * co - p[1] * se
+            sea y = py + p[0] * se + p[1] * co
+            vs.agregar([x, y])
+            si x < x0 { x0 = x }
+            si x > x1 { x1 = x }
+            si y < y0 { y0 = y }
+            si y > y1 { y1 = y }
+        }
+        sea ns = []
+        para cada lista q en f["normales"] { ns.agregar([q[0] * co - q[1] * se, q[0] * se + q[1] * co]) }
+        c["_v"] = vs
+        c["_n"] = ns
+        c["_caja"] = [x0, y0, x1, y1]
+        devolver nulo
+    }
+    # uno que no gira: su caja (o su círculo), tal cual
+    sea x = c["x"]
+    sea y = c["y"]
+    sea w = c["ancho"]
+    sea h = c["alto"]
+    c["_px"] = x + w / 2
+    c["_py"] = y + h / 2
+    c["_caja"] = [x, y, x + w, y + h]
+    si no c.contiene("radio") {
+        c["_v"] = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
+        c["_n"] = [[0, -1], [1, 0], [0, 1], [-1, 0]]
+    }
+}
+
+funcion _radio_de(val diccionario c): cualquiera {
+    si c.contiene("_forma") {
+        si c["_forma"].contiene("radio") { devolver c["_forma"]["radio"] }
+        devolver nulo
+    }
+    si c.contiene("radio") { devolver c["radio"] }
+    devolver nulo
+}
+
+# Los puntos de contacto entre a y b: [nx, ny, separacion, x, y, clave] con la
+# normal de a hacia b y la separación negativa si se han metido uno en otro
+funcion _contactos(val diccionario a, val diccionario b): lista {
+    sea ra = _radio_de(a)
+    sea rb = _radio_de(b)
+    si ra != nulo y rb != nulo {
+        sea dx = b["_px"] - a["_px"]
+        sea dy = b["_py"] - a["_py"]
+        sea d = matematica.raiz(dx * dx + dy * dy)
+        sea s = d - ra - rb
+        si s > 0 { devolver [] }
+        sea nx = 0
+        sea ny = 1
+        si d > 0.0001 {
+            nx = dx / d
+            ny = dy / d
+        }
+        sea k = ra + s / 2
+        devolver [[nx, ny, s, a["_px"] + nx * k, a["_py"] + ny * k, "cc"]]
+    }
+    si ra != nulo {
+        sea cs = _poligono_circulo(b, a, ra)
+        para cada lista c en cs {
+            c[0] = -c[0]
+            c[1] = -c[1]
+        }
+        devolver cs
+    }
+    si rb != nulo { devolver _poligono_circulo(a, b, rb) }
+    devolver _poligonos(a, b)
+}
+
+# Polígono p contra el círculo c (normal de p hacia c)
+funcion _poligono_circulo(val diccionario p, val diccionario c, val numero r): lista {
+    sea vs = p["_v"]
+    sea ns = p["_n"]
+    sea cx = c["_px"]
+    sea cy = c["_py"]
+    sea n = vs.longitud()
+    sea mejor = -1000000000
+    sea cual = 0
+    para (i = 0; i < n; i++) {
+        sea s = ns[i][0] * (cx - vs[i][0]) + ns[i][1] * (cy - vs[i][1])
+        si s > r { devolver [] }
+        si s > mejor {
+            mejor = s
+            cual = i
+        }
+    }
+    sea v1 = vs[cual]
+    sea v2 = vs[(cual + 1) % n]
+    sea nx = ns[cual][0]
+    sea ny = ns[cual][1]
+    si mejor > 0.0001 {                                  # fuera: puede que dé en una esquina
+        sea ex = v2[0] - v1[0]
+        sea ey = v2[1] - v1[1]
+        sea esquina = nulo
+        si (cx - v1[0]) * ex + (cy - v1[1]) * ey <= 0 { esquina = v1 }
+        sino si (cx - v2[0]) * -ex + (cy - v2[1]) * -ey <= 0 { esquina = v2 }
+        si esquina != nulo {
+            sea dx = cx - esquina[0]
+            sea dy = cy - esquina[1]
+            sea d = matematica.raiz(dx * dx + dy * dy)
+            si d > r o d < 0.0001 { devolver [] }
+            devolver [[dx / d, dy / d, d - r, esquina[0], esquina[1], "e"]]
+        }
+    }
+    sea s = mejor - r
+    devolver [[nx, ny, s, cx - nx * (r + s / 2), cy - ny * (r + s / 2), "l{cual}"]]
+}
+
+# La cara de 'a' que más separa a 'b': [separacion, cual]
+funcion _mas_separados(val diccionario a, val diccionario b): lista {
+    sea va = a["_v"]
+    sea na = a["_n"]
+    sea vb = b["_v"]
+    sea mejor = -1000000000
+    sea cual = 0
+    sea n = va.longitud()
+    para (i = 0; i < n; i++) {
+        sea nx = na[i][0]
+        sea ny = na[i][1]
+        sea ox = va[i][0]
+        sea oy = va[i][1]
+        sea menor = 1000000000
+        para cada lista q en vb {
+            sea s = (q[0] - ox) * nx + (q[1] - oy) * ny
+            si s < menor { menor = s }
+        }
+        si menor > mejor {
+            mejor = menor
+            cual = i
+        }
+        si mejor > 0 { devolver [mejor, cual] }        # ya se sabe que no se tocan
+    }
+    devolver [mejor, cual]
+}
+
+# Deja de un segmento lo que queda del lado positivo de t (t·p >= d)
+funcion _recortar(val lista p1, val lista p2, val numero tx, val numero ty, val numero d, val texto corte): lista {
+    sea d1 = p1[0] * tx + p1[1] * ty - d
+    sea d2 = p2[0] * tx + p2[1] * ty - d
+    sea r = []
+    si d1 >= 0 { r.agregar(p1) }
+    si d2 >= 0 { r.agregar(p2) }
+    si d1 * d2 < 0 {
+        sea f = d1 / (d1 - d2)
+        r.agregar([p1[0] + (p2[0] - p1[0]) * f, p1[1] + (p2[1] - p1[1]) * f, corte])
+    }
+    devolver r
+}
+
+# Dos polígonos: la cara que menos se mete de uno de ellos (la de referencia)
+# y la cara del otro que da contra ella, recortada por los lados de la primera
+funcion _poligonos(val diccionario a, val diccionario b): lista {
+    sea sa = _mas_separados(a, b)
+    si sa[0] > 0 { devolver [] }
+    sea sb = _mas_separados(b, a)
+    si sb[0] > 0 { devolver [] }
+    sea base = a
+    sea contra = b
+    sea cara = sa[1]
+    sea vuelta = falso
+    si sb[0] > sa[0] + 0.05 {
+        base = b
+        contra = a
+        cara = sb[1]
+        vuelta = verdadero
+    }
+    sea vr = base["_v"]
+    sea nr = base["_n"][cara]
+    sea nx = nr[0]
+    sea ny = nr[1]
+    # la cara del otro que más se le opone
+    sea vi = contra["_v"]
+    sea ni = contra["_n"]
+    sea m = vi.longitud()
+    sea otra = 0
+    sea menor = 1000000000
+    para (i = 0; i < m; i++) {
+        sea d = ni[i][0] * nx + ni[i][1] * ny
+        si d < menor {
+            menor = d
+            otra = i
+        }
+    }
+    sea p1 = [vi[otra][0], vi[otra][1], "a"]
+    sea p2 = [vi[(otra + 1) % m][0], vi[(otra + 1) % m][1], "b"]
+    sea r1 = vr[cara]
+    sea r2 = vr[(cara + 1) % vr.longitud()]
+    sea tx = r2[0] - r1[0]
+    sea ty = r2[1] - r1[1]
+    sea tl = matematica.raiz(tx * tx + ty * ty)
+    tx = tx / tl
+    ty = ty / tl
+    sea pts = _recortar(p1, p2, tx, ty, r1[0] * tx + r1[1] * ty, "c")
+    si pts.longitud() < 2 { devolver [] }
+    pts = _recortar(pts[0], pts[1], -tx, -ty, -(r2[0] * tx + r2[1] * ty), "d")
+    si pts.longitud() < 2 { devolver [] }
+    sea r = []
+    sea signo = si vuelta { -1 } sino { 1 }
+    para cada lista p en pts {
+        sea s = (p[0] - r1[0]) * nx + (p[1] - r1[1]) * ny
+        si s <= 0 {
+            r.agregar([nx * signo, ny * signo, s, p[0] - nx * s / 2, p[1] - ny * s / 2,
+                "{si vuelta { "v" } sino { "" }}{cara}.{otra}{p[2]}"])
+        }
+    }
+    devolver r
+}
+
+# Una casilla sólida del mapa, como un cuerpo fijo (se guarda para la próxima vez)
+funcion _casilla_cuerpo(val diccionario mundo, val numero col, val numero fila, val numero t): diccionario {
+    sea k = "{col},{fila}"
+    si mundo["_casillas"].contiene(k) { devolver mundo["_casillas"][k] }
+    sea x = col * t
+    sea y = fila * t
+    sea c = {"id_fisica": "m" + k, "_px": x + t / 2, "_py": y + t / 2, "_a": 0, "_w": 0, "_im": 0, "_ii": 0,
+        "vx": 0, "vy": 0, "_caja": [x, y, x + t, y + t],
+        "_v": [[x, y], [x + t, y], [x + t, y + t], [x, y + t]], "_n": [[0, -1], [1, 0], [0, 1], [-1, 0]]}
+    mundo["_casillas"][k] = c
+    devolver c
+}
+
+# Un contacto es una lista (más rápida que un diccionario), con:
+#  0 a, 1 b, 2 nx, 3 ny, 4 separación, 5 x, 6 y, 7 clave, 8 rozamiento, 9 rebote,
+#  10 masa normal, 11 masa tangente, 12-15 brazos (rax, ray, rbx, rby),
+#  16 cuánto corregir, 17 impulso normal, 18 impulso tangente
+
+# Prepara un contacto para resolverlo: masas efectivas, cuánto corregir y el
+# impulso del paso anterior (que se aplica ya: así empieza casi resuelto)
+funcion _preparar_contacto(val lista k, val numero dt, val diccionario cache): nulo {
+    sea a = k[0]
+    sea b = k[1]
+    sea nx = k[2]
+    sea ny = k[3]
+    sea rax = k[5] - a["_px"]
+    sea ray = k[6] - a["_py"]
+    sea rbx = k[5] - b["_px"]
+    sea rby = k[6] - b["_py"]
+    sea ima = a["_im"]
+    sea imb = b["_im"]
+    sea iia = a["_ii"]
+    sea iib = b["_ii"]
+    sea rna = rax * ny - ray * nx
+    sea rnb = rbx * ny - rby * nx
+    sea rta = rax * -nx - ray * ny
+    sea rtb = rbx * -nx - rby * ny
+    sea bias = -k[4] - _HUECO
+    bias = si bias > 0 { _CORREGIR / dt * bias } sino { 0 }
+    sea dvx = b["vx"] - b["_w"] * rby - a["vx"] + a["_w"] * ray
+    sea dvy = b["vy"] + b["_w"] * rbx - a["vy"] - a["_w"] * rax
+    sea vn = dvx * nx + dvy * ny
+    si vn < -_SIN_BOTE y -k[9] * vn > bias { bias = -k[9] * vn }
+    sea pn = 0
+    sea pt = 0
+    si cache.contiene(k[7]) {
+        sea antes = cache[k[7]]
+        pn = antes[0]
+        pt = antes[1]
+    }
+    k.agregar(1 / (ima + imb + iia * rna * rna + iib * rnb * rnb))
+    k.agregar(1 / (ima + imb + iia * rta * rta + iib * rtb * rtb))
+    k.agregar(rax)
+    k.agregar(ray)
+    k.agregar(rbx)
+    k.agregar(rby)
+    k.agregar(bias)
+    k.agregar(pn)
+    k.agregar(pt)
+    si pn != 0 o pt != 0 {
+        sea px = pn * nx + pt * ny
+        sea py = pn * ny - pt * nx
+        a["vx"] = a["vx"] - px * ima
+        a["vy"] = a["vy"] - py * ima
+        a["_w"] = a["_w"] - iia * (rax * py - ray * px)
+        b["vx"] = b["vx"] + px * imb
+        b["vy"] = b["vy"] + py * imb
+        b["_w"] = b["_w"] + iib * (rbx * py - rby * px)
+    }
+}
+
+funcion _resolver_contacto(val lista k): nulo {
+    sea a = k[0]
+    sea b = k[1]
+    sea nx = k[2]
+    sea ny = k[3]
+    sea rax = k[12]
+    sea ray = k[13]
+    sea rbx = k[14]
+    sea rby = k[15]
+    sea ima = a["_im"]
+    sea imb = b["_im"]
+    sea iia = a["_ii"]
+    sea iib = b["_ii"]
+    sea avx = a["vx"]
+    sea avy = a["vy"]
+    sea aw = a["_w"]
+    sea bvx = b["vx"]
+    sea bvy = b["vy"]
+    sea bw = b["_w"]
+    # que no se metan más (sin tirar nunca de ellos)
+    sea antes = k[17]
+    sea pn = antes + k[10] * (k[16] - ((bvx - bw * rby - avx + aw * ray) * nx + (bvy + bw * rbx - avy - aw * rax) * ny))
+    si pn < 0 { pn = 0 }
+    k[17] = pn
+    sea d = pn - antes
+    sea px = d * nx
+    sea py = d * ny
+    avx = avx - px * ima
+    avy = avy - py * ima
+    aw = aw - iia * (rax * py - ray * px)
+    bvx = bvx + px * imb
+    bvy = bvy + py * imb
+    bw = bw + iib * (rbx * py - rby * px)
+    # el rozamiento, a lo largo de la superficie (como mucho, mu por lo que aprieta)
+    sea tope = k[8] * pn
+    antes = k[18]
+    sea pt = antes - k[11] * ((bvx - bw * rby - avx + aw * ray) * ny - (bvy + bw * rbx - avy - aw * rax) * nx)
+    si pt > tope { pt = tope }
+    si pt < -tope { pt = -tope }
+    k[18] = pt
+    d = pt - antes
+    px = d * ny
+    py = -d * nx
+    a["vx"] = avx - px * ima
+    a["vy"] = avy - py * ima
+    a["_w"] = aw - iia * (rax * py - ray * px)
+    b["vx"] = bvx + px * imb
+    b["vy"] = bvy + py * imb
+    b["_w"] = bw + iib * (rbx * py - rby * px)
+}
+
+funcion _apuntar_contactos(val lista lista_k, val lista cs, val diccionario a, val diccionario b, val numero mu, val numero e): nulo {
+    para cada lista c en cs {
+        lista_k.agregar([a, b, c[0], c[1], c[2], c[3], c[4], "{a["id_fisica"]}:{b["id_fisica"]}:{c[5]}", mu, e])
+        si c[1] > 0.5 { a["en_suelo"] = verdadero }
+        si c[1] < -0.5 { b["en_suelo"] = verdadero }
+    }
+}
+
+funcion _paso_rigido(val diccionario mundo, val numero dt): nulo {
+    sea g = mundo["gravedad"]
+    sea cuerpos = mundo["cuerpos"]
+    sea mapa = mundo["mapa"]
+    # la gravedad, y dónde está cada uno
+    para cada diccionario c en cuerpos {
+        si c.contiene("_forma") y no c["fijo"] {
+            c["vx"] = c["vx"] + g[0] * c["gravedad"] * dt
+            c["vy"] = c["vy"] + g[1] * c["gravedad"] * dt
+        }
+        _geometria(c)
+    }
+    # los contactos: entre cuerpos (si al menos uno gira) y con el mapa
+    sea ks = []
+    sea sin_choque = mundo["_sin_choque"]
+    sea n = cuerpos.longitud()
+    para (i = 0; i < n; i++) {
+        sea a = cuerpos[i]
+        sea ra = a.contiene("_forma")
+        sea ca = a["_caja"]
+        para (j = i + 1; j < n; j++) {
+            sea b = cuerpos[j]
+            si no ra y no b.contiene("_forma") { continuar }
+            sea cb = b["_caja"]
+            si cb[0] > ca[2] o cb[2] < ca[0] o cb[1] > ca[3] o cb[3] < ca[1] { continuar }
+            si a["fijo"] y b["fijo"] { continuar }
+            si sin_choque.contiene("{a["id_fisica"]}:{b["id_fisica"]}") { continuar }
+            sea cs = _contactos(a, b)
+            si cs.longitud() == 0 { continuar }
+            _apunta_toque(mundo, a, b)
+            _apunta_toque(mundo, b, a)
+            si a["sensor"] o b["sensor"] { continuar }
+            _apuntar_contactos(ks, cs, a, b, matematica.raiz(a["friccion"] * b["friccion"]),
+                matematica.maximo(a["rebote"], b["rebote"]))
+        }
+        si ra y mapa != nulo y no a["fijo"] y no a["sensor"] {
+            sea t = mapa["tamaño"]
+            para (fila = matematica.piso(ca[1] / t); fila <= matematica.piso(ca[3] / t); fila++) {
+                para (col = matematica.piso(ca[0] / t); col <= matematica.piso(ca[2] / t); col++) {
+                    si no juego.solido(mapa, col, fila) { continuar }
+                    sea casilla = _casilla_cuerpo(mundo, col, fila, t)
+                    sea cs = _contactos(a, casilla)
+                    # sin tropezar con la junta entre dos casillas: la normal no
+                    # puede ir hacia otra casilla sólida
+                    sea buenos = []
+                    para cada lista c en cs {
+                        sea vecina = si matematica.abs(c[0]) > matematica.abs(c[1]) {
+                            juego.solido(mapa, col - (si c[0] > 0 { 1 } sino { -1 }), fila)
+                        } sino {
+                            juego.solido(mapa, col, fila - (si c[1] > 0 { 1 } sino { -1 }))
+                        }
+                        si no vecina { buenos.agregar(c) }
+                    }
+                    _apuntar_contactos(ks, buenos, a, casilla, a["friccion"], a["rebote"])
+                }
+            }
+        }
+    }
+    # las uniones y los contactos, ajustados varias veces
+    sea cache = mundo["_cache"]
+    para cada diccionario u en mundo["uniones"] { _preparar_union(u, dt) }
+    para cada lista k en ks { _preparar_contacto(k, dt, cache) }
+    sea uniones = mundo["uniones"]
+    para (it = 0; it < mundo["iteraciones"]; it++) {
+        para cada diccionario u en uniones { _resolver_union(u) }
+        para cada lista k en ks { _resolver_contacto(k) }
+    }
+    sea nuevo = {}
+    para cada lista k en ks { nuevo[k[7]] = [k[17], k[18]] }
+    mundo["_cache"] = nuevo
+    # y se mueven
+    para cada diccionario c en cuerpos {
+        si c.contiene("_forma") {
+            c["_px"] = c["_px"] + c["vx"] * dt
+            c["_py"] = c["_py"] + c["vy"] * dt
+            c["_a"] = c["_a"] + c["_w"] * dt
+        }
+    }
+}
+
+# ── Uniones ──
+# bisagra(mundo, a, b, punto): a y b quedan clavados por ese punto [x, y] del
+# mundo y giran alrededor de él (una puerta, un péndulo, una rueda, los
+# eslabones de una cadena). Con b nulo, a queda clavado al fondo. Lo unido
+# por una bisagra no choca entre sí.
+# cuerda(mundo, a, b[, opciones]): a y b no se pueden alejar más que el largo
+# de la cuerda (sí acercarse). b es un cuerpo o un punto fijo [x, y].
+# Opciones: "largo" (lo que estén separados ahora), "en_a" y "en_b" (dónde se
+# ata, [x, y] desde el centro de cada uno sin girar; en el centro si no se
+# dice) y "rigida" (una barra: ni se alejan ni se acercan).
+# Devuelven la unión, que se quita con quitar_union(mundo, union). Con
+# puntos_union(union) se sabe por dónde dibujarla.
+
+sea _uniones_creadas = 0
+
+funcion _sitio_cuerpo(val diccionario c): lista {
+    si c.contiene("_forma") { devolver [c["x"] + c["_forma"]["cm"][0], c["y"] + c["_forma"]["cm"][1], matematica.radianes(c["angulo"])] }
+    devolver [c["x"] + c["ancho"] / 2, c["y"] + c["alto"] / 2, 0]
+}
+
+# De un punto del mundo a cómo se ve desde el cuerpo (sin girar)
+funcion _a_local(val diccionario c, val lista p): lista {
+    sea s = _sitio_cuerpo(c)
+    sea dx = p[0] - s[0]
+    sea dy = p[1] - s[1]
+    sea co = matematica.coseno(s[2])
+    sea se = matematica.seno(s[2])
+    devolver [dx * co + dy * se, -dx * se + dy * co]
+}
+
+funcion _es_cuerpo_de(val diccionario mundo, val cualquiera c, val texto fn): nulo {
+    si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("{fn}() espera cuerpos de juego.cuerpo()") }
+    sea esta = falso
+    para cada diccionario cuerpo_o en mundo["cuerpos"] { si cuerpo_o["id_fisica"] == c["id_fisica"] { esta = verdadero } }
+    si no esta { lanzar ErrorArgumento("{fn}(): ese cuerpo no está en este mundo") }
+}
+
+funcion bisagra(val cualquiera mundo, val cualquiera a, val cualquiera b, val cualquiera punto): diccionario {
+    _es_mundo(mundo, "bisagra")
+    _es_cuerpo_de(mundo, a, "bisagra")
+    sea p = _punto(punto, nulo, "bisagra")
+    _uniones_creadas = _uniones_creadas + 1
+    sea u = {"union": "bisagra", "id_union": _uniones_creadas, "a": a, "b": b, "en_a": _a_local(a, p), "p": [0, 0]}
+    si b == nulo {
+        u["en_b"] = p
+    } sino {
+        _es_cuerpo_de(mundo, b, "bisagra")
+        si b["id_fisica"] == a["id_fisica"] { lanzar ErrorArgumento("bisagra(): une dos cuerpos distintos (o uno y nulo, para clavarlo al fondo)") }
+        u["en_b"] = _a_local(b, p)
+        mundo["_sin_choque"]["{a["id_fisica"]}:{b["id_fisica"]}"] = verdadero
+        mundo["_sin_choque"]["{b["id_fisica"]}:{a["id_fisica"]}"] = verdadero
+    }
+    mundo["uniones"].agregar(u)
+    devolver u
+}
+
+funcion cuerda(val cualquiera mundo, val cualquiera a, val cualquiera b, val cualquiera opciones = nulo): diccionario {
+    _es_mundo(mundo, "cuerda")
+    _es_cuerpo_de(mundo, a, "cuerda")
+    sea op = _ui_opciones(opciones, ["largo", "en_a", "en_b", "rigida"], "cuerda")
+    sea en_a = _punto(_de(op, "en_a", [0, 0]), nulo, "cuerda")
+    _uniones_creadas = _uniones_creadas + 1
+    sea u = {"union": "cuerda", "id_union": _uniones_creadas, "a": a, "b": b, "en_a": en_a, "rigida": _de(op, "rigida", falso), "p": 0}
+    si b es lista {
+        u["en_b"] = _punto(b, nulo, "cuerda")
+        u["b"] = nulo
+    } sino {
+        _es_cuerpo_de(mundo, b, "cuerda")
+        si b["id_fisica"] == a["id_fisica"] { lanzar ErrorArgumento("cuerda(): ata dos cuerpos distintos (o uno y un punto [x, y])") }
+        u["en_b"] = _punto(_de(op, "en_b", [0, 0]), nulo, "cuerda")
+    }
+    si no (u["rigida"] es logico) { lanzar ErrorTipo("cuerda(): \"rigida\" es verdadero o falso") }
+    sea ps = puntos_union(u)
+    sea dx = ps[1][0] - ps[0][0]
+    sea dy = ps[1][1] - ps[0][1]
+    u["largo"] = _de(op, "largo", matematica.raiz(dx * dx + dy * dy))
+    si no (u["largo"] es numero) o u["largo"] < 0 { lanzar ErrorArgumento("cuerda(): \"largo\" es un número de píxeles (0 o más)") }
+    mundo["uniones"].agregar(u)
+    devolver u
+}
+
+funcion quitar_union(val cualquiera mundo, val cualquiera u): nulo {
+    _es_mundo(mundo, "quitar_union")
+    si no (u es diccionario) o no u.contiene("id_union") { lanzar ErrorTipo("quitar_union() espera una unión de cuerda() o bisagra()") }
+    sea quedan = []
+    para cada diccionario otra en mundo["uniones"] { si otra["id_union"] != u["id_union"] { quedan.agregar(otra) } }
+    mundo["uniones"] = quedan
+    si u["union"] == "bisagra" y u["b"] != nulo {
+        sea ka = "{u["a"]["id_fisica"]}:{u["b"]["id_fisica"]}"
+        sea kb = "{u["b"]["id_fisica"]}:{u["a"]["id_fisica"]}"
+        sea sigue = falso                  # si no queda otra bisagra entre los dos, vuelven a chocar
+        para cada diccionario otra en quedan {
+            si otra["union"] == "bisagra" y otra["b"] != nulo {
+                sea k = "{otra["a"]["id_fisica"]}:{otra["b"]["id_fisica"]}"
+                si k == ka o k == kb { sigue = verdadero }
+            }
+        }
+        si no sigue {
+            si mundo["_sin_choque"].contiene(ka) { mundo["_sin_choque"].eliminar(ka) }
+            si mundo["_sin_choque"].contiene(kb) { mundo["_sin_choque"].eliminar(kb) }
+        }
+    }
+}
+
+# puntos_union(u): [[x, y] en a, [x, y] en b]: por dónde va la cuerda o dónde está la bisagra
+funcion puntos_union(val cualquiera u): lista {
+    si no (u es diccionario) o no u.contiene("union") { lanzar ErrorTipo("puntos_union() espera una unión de cuerda() o bisagra()") }
+    sea r = []
+    para cada texto lado en ["a", "b"] {
+        sea c = u[lado]
+        sea en = u["en_" + lado]
+        si c == nulo {
+            r.agregar([en[0], en[1]])
+        } sino {
+            sea s = _sitio_cuerpo(c)
+            sea co = matematica.coseno(s[2])
+            sea se = matematica.seno(s[2])
+            r.agregar([s[0] + en[0] * co - en[1] * se, s[1] + en[0] * se + en[1] * co])
+        }
+    }
+    devolver r
+}
+
+# El brazo (del centro al punto de la unión) ya girado; [0, 0] si es el fondo
+funcion _brazo(val cualquiera c, val lista en): lista {
+    si c == nulo { devolver [0, 0] }
+    sea co = matematica.coseno(c["_a"])
+    sea se = matematica.seno(c["_a"])
+    devolver [en[0] * co - en[1] * se, en[0] * se + en[1] * co]
+}
+
+fijo _FONDO = {"vx": 0, "vy": 0, "_w": 0, "_im": 0, "_ii": 0}
+
+funcion _preparar_union(val diccionario u, val numero dt): nulo {
+    sea a = u["a"]
+    sea b = si u["b"] == nulo { _FONDO } sino { u["b"] }
+    _geometria(a)
+    si u["b"] != nulo { _geometria(b) }
+    sea r1 = _brazo(a, u["en_a"])
+    sea r2 = _brazo(u["b"], u["en_b"])
+    sea p2 = si u["b"] == nulo { u["en_b"] } sino { [b["_px"] + r2[0], b["_py"] + r2[1]] }
+    sea dx = p2[0] - (a["_px"] + r1[0])
+    sea dy = p2[1] - (a["_py"] + r1[1])
+    u["r1"] = r1
+    u["r2"] = r2
+    u["activa"] = verdadero
+    sea im = a["_im"] + b["_im"]
+    sea ia = a["_ii"]
+    sea ib = b["_ii"]
+    si u["union"] == "bisagra" {
+        sea k11 = im + ia * r1[1] * r1[1] + ib * r2[1] * r2[1]
+        sea k12 = -ia * r1[0] * r1[1] - ib * r2[0] * r2[1]
+        sea k22 = im + ia * r1[0] * r1[0] + ib * r2[0] * r2[0]
+        sea det = k11 * k22 - k12 * k12
+        si det == 0 {
+            u["activa"] = falso
+            devolver nulo
+        }
+        u["m"] = [k22 / det, -k12 / det, k11 / det]          # la inversa (simétrica)
+        u["bias"] = [-_CORREGIR_UNION / dt * dx, -_CORREGIR_UNION / dt * dy]
+        _empujar_union(a, b, r1, r2, u["p"][0], u["p"][1])
+        devolver nulo
+    }
+    # cuerda: solo tira (una rígida, también empuja). Floja, deja acercarse lo
+    # que le falta para tensarse en este paso, ni un poco más
+    sea largo = matematica.raiz(dx * dx + dy * dy)
+    sea estira = largo - u["largo"]
+    si largo < 0.0001 o im == 0 {
+        u["activa"] = falso
+        u["p"] = 0
+        devolver nulo
+    }
+    sea nx = dx / largo
+    sea ny = dy / largo
+    u["n"] = [nx, ny]
+    sea rn1 = r1[0] * ny - r1[1] * nx
+    sea rn2 = r2[0] * ny - r2[1] * nx
+    u["m"] = 1 / (im + ia * rn1 * rn1 + ib * rn2 * rn2)
+    u["bias"] = si estira < 0 y no u["rigida"] { -estira / dt } sino { -_CORREGIR_UNION / dt * estira }
+    _empujar_union(a, b, r1, r2, u["p"] * nx, u["p"] * ny)
+}
+
+# Un impulso (px, py) a b en su punto, y el contrario a a
+funcion _empujar_union(val diccionario a, val diccionario b, val lista r1, val lista r2, val numero px, val numero py): nulo {
+    si px == 0 y py == 0 { devolver nulo }
+    a["vx"] = a["vx"] - px * a["_im"]
+    a["vy"] = a["vy"] - py * a["_im"]
+    a["_w"] = a["_w"] - a["_ii"] * (r1[0] * py - r1[1] * px)
+    si b["_im"] != 0 o b["_ii"] != 0 {
+        b["vx"] = b["vx"] + px * b["_im"]
+        b["vy"] = b["vy"] + py * b["_im"]
+        b["_w"] = b["_w"] + b["_ii"] * (r2[0] * py - r2[1] * px)
+    }
+}
+
+funcion _resolver_union(val diccionario u): nulo {
+    si no u["activa"] { devolver nulo }
+    sea a = u["a"]
+    sea b = si u["b"] == nulo { _FONDO } sino { u["b"] }
+    sea r1 = u["r1"]
+    sea r2 = u["r2"]
+    sea dvx = b["vx"] - b["_w"] * r2[1] - a["vx"] + a["_w"] * r1[1]
+    sea dvy = b["vy"] + b["_w"] * r2[0] - a["vy"] - a["_w"] * r1[0]
+    si u["union"] == "bisagra" {
+        sea m = u["m"]
+        sea bx = u["bias"][0] - dvx
+        sea by = u["bias"][1] - dvy
+        sea px = m[0] * bx + m[1] * by
+        sea py = m[1] * bx + m[2] * by
+        u["p"] = [u["p"][0] + px, u["p"][1] + py]
+        _empujar_union(a, b, r1, r2, px, py)
+        devolver nulo
+    }
+    sea n = u["n"]
+    sea l = u["m"] * (u["bias"] - (dvx * n[0] + dvy * n[1]))
+    sea antes = u["p"]
+    sea total = antes + l
+    si no u["rigida"] { total = matematica.minimo(total, 0) }      # una cuerda solo tira
+    u["p"] = total
+    l = total - antes
+    _empujar_union(a, b, r1, r2, l * n[0], l * n[1])
 }
 
 # ── Controles a gusto del jugador ──
@@ -1706,6 +2607,63 @@ funcion a_pantalla(val cualquiera x, val cualquiera y = nulo): lista {
     sea g = matematica.radianes(c["giro"])
     devolver [z[0] + z[2] / 2 + dx * matematica.coseno(g) - dy * matematica.seno(g),
         z[1] + z[3] / 2 + dx * matematica.seno(g) + dy * matematica.coseno(g)]
+}
+
+# ── Sonido que sale de un sitio del mundo ──
+# reproducir_en(sonido, x, y[, opciones]): como reproducir(), pero se oye por
+# la izquierda o por la derecha según dónde se ve (x, y) en la pantalla, y más
+# bajo cuanto más lejos queda de lo que se ve. Opciones: las de reproducir() y
+# "alcance" (a cuántos píxeles fuera de la pantalla deja de oírse; por
+# defecto, la mitad de su ancho). mover_voz(voz, x, y) lo vuelve a calcular,
+# para lo que suena mientras se mueve (un coche, la cascada al pasar).
+
+sea _voces_en = {}    # {voz: {"volumen", "alcance"}} de lo que salió de reproducir_en()
+
+funcion _oido(val numero x, val numero y, val numero alcance): lista {
+    sea p = a_pantalla(x, y)
+    sea z = _zona_camara(juego.camara_actual())
+    sea mitad = z[2] / 2
+    sea lado = matematica.maximo(-1, matematica.minimo(1, (p[0] - z[0] - mitad) / mitad)) * 0.8
+    sea dx = matematica.maximo(0, matematica.maximo(z[0] - p[0], p[0] - z[0] - z[2]))
+    sea dy = matematica.maximo(0, matematica.maximo(z[1] - p[1], p[1] - z[1] - z[3]))
+    sea d = matematica.raiz(dx * dx + dy * dy)
+    devolver [matematica.maximo(0, 1 - d / alcance), lado]
+}
+
+funcion reproducir_en(val cualquiera sonido, val numero x, val numero y, val cualquiera opciones = nulo): numero {
+    sea op = {}
+    si opciones != nulo {
+        si no (opciones es diccionario) { lanzar ErrorTipo("reproducir_en(): las opciones son un diccionario, como las de reproducir()") }
+        para cada texto c en opciones { op[c] = opciones[c] }
+    }
+    sea alcance = _de(op, "alcance", juego.ancho() / 2)
+    si no (alcance es numero) o alcance <= 0 { lanzar ErrorArgumento("reproducir_en(): \"alcance\" son los píxeles fuera de la pantalla hasta dejar de oírse (más que 0)") }
+    si op.contiene("alcance") { op.eliminar("alcance") }
+    si op.contiene("lado") { lanzar ErrorArgumento("reproducir_en(): el lado sale de dónde está (x, y); para ponerlo a mano, reproducir()") }
+    sea volumen = _de(op, "volumen", 1)
+    sea oido = _oido(x, y, alcance)
+    op["volumen"] = matematica.maximo(0, matematica.minimo(1, volumen * oido[0]))
+    op["lado"] = oido[1]
+    sea voz = juego.reproducir(sonido, op)
+    sea siguen = {}                              # de paso, se olvidan las que ya acabaron
+    para cada texto k en _voces_en { si juego.sonando(a_numero(k)) { siguen[k] = _voces_en[k] } }
+    _voces_en = siguen
+    si voz > 0 { _voces_en["{voz}"] = {"volumen": volumen, "alcance": alcance} }
+    devolver voz
+}
+
+# mover_voz(voz, x, y): devuelve si sigue sonando
+funcion mover_voz(val numero voz, val numero x, val numero y): logico {
+    sea k = "{voz}"
+    si no _voces_en.contiene(k) {
+        si juego.sonando(voz) { lanzar ErrorArgumento("mover_voz(): esa voz no salió de reproducir_en()") }
+        devolver falso
+    }
+    sea oido = _oido(x, y, _voces_en[k]["alcance"])
+    sea v = matematica.maximo(0, matematica.minimo(1, _voces_en[k]["volumen"] * oido[0]))
+    si juego.cambiar_voz(voz, {"volumen": v, "lado": oido[1], "fundido": 0.05}) { devolver verdadero }
+    _voces_en.eliminar(k)
+    devolver falso
 }
 
 # ── Texto en una caja ──

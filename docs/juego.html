@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.5</span>
+  <span class="version">v1.6</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -158,13 +158,13 @@
 <div class="grupo"><a href="#animador" class="sec">Animador</a><a href="#animador-0" class="sub">El animador</a></div>
 <div class="grupo"><a href="#entrada" class="sec">Entrada</a><a href="#entrada-0" class="sub">Teclas y ratón</a><a href="#entrada-1" class="sub">Acciones: teclado y mando a la vez</a><a href="#entrada-2" class="sub">Escribir un nombre</a></div>
 <div class="grupo"><a href="#movil" class="sec">Móvil</a><a href="#movil-0" class="sub">El mando de la pantalla táctil</a><a href="#movil-1" class="sub">Dedos, vibrar e inclinar</a></div>
-<div class="grupo"><a href="#sonido" class="sec">Sonido</a><a href="#sonido-0" class="sub">Efectos sin archivos</a><a href="#sonido-1" class="sub">Sonidos y música de archivos</a></div>
+<div class="grupo"><a href="#sonido" class="sec">Sonido</a><a href="#sonido-0" class="sub">Efectos sin archivos</a><a href="#sonido-1" class="sub">Sonidos y música de archivos</a><a href="#sonido-2" class="sub">Grupos de volumen, sonido con sitio y fundidos</a></div>
 <div class="grupo"><a href="#movimiento" class="sec">Movimiento</a><a href="#movimiento-0" class="sub">Movimiento suave</a></div>
 <div class="grupo"><a href="#camara" class="sec">Cámara</a><a href="#camara-0" class="sub">Cámara y temblor</a><a href="#camara-1" class="sub">Zoom, giro y pantalla partida</a></div>
 <div class="grupo"><a href="#choques" class="sec">Choques</a><a href="#choques-0" class="sub">¿Se tocan?</a></div>
 <div class="grupo"><a href="#mapas" class="sec">Mapas</a><a href="#mapas-0" class="sub">Un nivel escrito con texto</a><a href="#mapas-1" class="sub">Tiles y tiles animados</a><a href="#mapas-2" class="sub">Buscar el camino</a></div>
 <div class="grupo"><a href="#mapas-de-tiled" class="sec">Mapas de Tiled</a><a href="#mapas-de-tiled-0" class="sub">Niveles hechos con Tiled</a></div>
-<div class="grupo"><a href="#fisica" class="sec">Física</a><a href="#fisica-0" class="sub">Cajas, pelotas y ascensores</a></div>
+<div class="grupo"><a href="#fisica" class="sec">Física</a><a href="#fisica-0" class="sub">Cajas, pelotas y ascensores</a><a href="#fisica-1" class="sub">Cuerpos que giran</a><a href="#fisica-2" class="sub">Cuerdas y bisagras</a></div>
 <div class="grupo"><a href="#particulas" class="sec">Partículas</a><a href="#particulas-0" class="sub">Chispas, polvo y explosiones</a></div>
 <div class="grupo"><a href="#escenas" class="sec">Escenas</a><a href="#escenas-0" class="sub">Portada, partida y final</a></div>
 <div class="grupo"><a href="#menus-y-dialogos" class="sec">Menús y diálogos</a><a href="#menus-y-dialogos-0" class="sub">Menús</a><a href="#menus-y-dialogos-1" class="sub">Diálogos</a><a href="#menus-y-dialogos-2" class="sub">Idiomas</a></div>
@@ -181,7 +181,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>38 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>40 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -476,7 +476,15 @@ juego.pitido(<span class="n">440</span>, <span class="n">0.1</span>)</code></pre
 juego.reproducir(PASO, {<span class="s">&quot;volumen&quot;</span>: <span class="n">0.6</span>, <span class="s">&quot;tono&quot;</span>: <span class="n">0.9</span> + matematica.aleatorio() * <span class="n">0.2</span>})
 juego.musica(<span class="s">&quot;musica/bosque.ogg&quot;</span>, <span class="n">0.5</span>)          <span class="c"># en bucle</span>
 juego.musica(<span class="k">nulo</span>)                              <span class="c"># la para</span>
-juego.volumen(<span class="n">0.8</span>)                              <span class="c"># el volumen general</span></code></pre></div></article></section>
+juego.volumen(<span class="n">0.8</span>)                              <span class="c"># el volumen general</span></code></pre></div></article><article class="ej" id="sonido-2"><h3>Grupos de volumen, sonido con sitio y fundidos</h3><p class="nota">Cada sonido va en un grupo: <code>&quot;efectos&quot;</code> (el de siempre), <code>&quot;voces&quot;</code> o <code>&quot;musica&quot;</code> (lo de <code>juego.musica()</code>). <code>juego.volumen(&quot;musica&quot;, 0.5)</code> baja solo la música, para el menú de opciones; <code>juego.volumen(v)</code> sigue siendo el general.</p><p class="nota"><code>juego.reproducir_en(sonido, x, y)</code> suena por la izquierda o por la derecha según dónde se ve ese punto, y más bajo cuanto más lejos queda de la pantalla; <code>juego.mover_voz(voz, x, y)</code> lo sigue mientras se mueve. Con <code>&quot;fundido&quot;</code>, <code>juego.musica()</code> pasa de una canción a otra bajando una mientras sube la otra, y <code>juego.detener(voz, segundos)</code> apaga poco a poco.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.volumen(<span class="s">&quot;musica&quot;</span>, <span class="n">0.4</span>)                                        <span class="c"># lo que elija el jugador en las opciones</span>
+juego.reproducir(juego.sonido(<span class="s">&quot;hola.wav&quot;</span>), {<span class="s">&quot;grupo&quot;</span>: <span class="s">&quot;voces&quot;</span>})
+<span class="k">sea</span> motor = juego.reproducir_en(juego.sonido(<span class="s">&quot;motor.wav&quot;</span>), <span class="n">900</span>, <span class="n">200</span>, {<span class="s">&quot;bucle&quot;</span>: <span class="k">verdadero</span>})
+juego.mover_voz(motor, <span class="n">700</span>, <span class="n">200</span>)                                    <span class="c"># en cada fotograma, donde esté el coche</span>
+juego.musica(<span class="s">&quot;musica/pelea.ogg&quot;</span>, {<span class="s">&quot;fundido&quot;</span>: <span class="n">2</span>})                   <span class="c"># la del bosque se va en 2 segundos</span>
+juego.detener(motor, <span class="n">0.5</span>)
+juego.cambiar_voz(motor, {<span class="s">&quot;tono&quot;</span>: <span class="n">1.2</span>, <span class="s">&quot;fundido&quot;</span>: <span class="n">0.3</span>})            <span class="c"># devuelve si sigue sonando</span></code></pre></div></article></section>
 <section id="movimiento"><h2>Movimiento</h2><article class="ej" id="movimiento-0"><h3>Movimiento suave</h3><p class="nota"><code>juego.suavizar(desde, hasta, segundos, inicio, curva)</code> da el valor que toca ahora en un cambio que empezó en <code>inicio</code> (un <code>juego.tiempo()</code>): para que un menú entre desde un lado o un título caiga y rebote. Las curvas: <code>&quot;lineal&quot;</code>, <code>&quot;suave&quot;</code>, <code>&quot;entrar&quot;</code>, <code>&quot;salir&quot;</code>, <code>&quot;rebote&quot;</code>, <code>&quot;elastico&quot;</code> y <code>&quot;atras&quot;</code>. <code>juego.curva(nombre, t)</code> da la curva tal cual, como en esta gráfica.</p><p class="nota"><code>juego.acercar(actual, objetivo, rapidez)</code> da un paso hacia el objetivo, más largo cuanto más lejos: una cámara que sigue al jugador sin tirones.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Curvas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
@@ -699,7 +707,58 @@ juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">360</
         }
     }
     juego.presentar()
-}</code></pre></div><figure><img src="img/juego/1410_fisica.png" alt="Captura de «Cajas, pelotas y ascensores»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1410_fisica.lince</span></article></section>
+}</code></pre></div><figure><img src="img/juego/1410_fisica.png" alt="Captura de «Cajas, pelotas y ascensores»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1410_fisica.lince</span></article><article class="ej" id="fisica-1"><h3>Cuerpos que giran</h3><p class="nota">Con <code>&quot;gira&quot;: verdadero</code> un cuerpo gira al chocar: vuelca, rueda y se apila de verdad, y lleva su <code>angulo</code> (en grados, el mismo que usa <code>dibujar</code>) y su <code>vgiro</code> (grados por segundo). Con <code>&quot;puntos&quot;</code> es un polígono convexo (una rampa, una cuña, una piedra), con los puntos medidos desde su <code>x</code>, <code>y</code>.</p><p class="nota"><code>juego.dibujar_cuerpo(c, color)</code> lo dibuja tal cual es, para probar o para juegos de formas; con imágenes se dibuja con <code>juego.dibujar(imagen, c[&quot;x&quot;], c[&quot;y&quot;], {&quot;angulo&quot;: c[&quot;angulo&quot;]})</code>, porque <code>x</code>, <code>y</code> siguen siendo la esquina de la caja sin girar.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Giros&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">sea</span> mundo = juego.fisica({<span class="s">&quot;gravedad&quot;</span>: <span class="n">900</span>})
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">0</span>, <span class="s">&quot;y&quot;</span>: <span class="n">250</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">480</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">20</span>, <span class="s">&quot;fijo&quot;</span>: <span class="k">verdadero</span>})
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">0</span>, <span class="s">&quot;y&quot;</span>: <span class="n">130</span>, <span class="s">&quot;puntos&quot;</span>: [[<span class="n">0</span>, <span class="n">0</span>], [<span class="n">200</span>, <span class="n">90</span>], [<span class="n">200</span>, <span class="n">120</span>], [<span class="n">0</span>, <span class="n">120</span>]], <span class="s">&quot;fijo&quot;</span>: <span class="k">verdadero</span>})   <span class="c"># una rampa</span>
+<span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">5</span>; i++) {
+    juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">360</span>, <span class="s">&quot;y&quot;</span>: <span class="n">220</span> - i * <span class="n">31</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">30</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">30</span>, <span class="s">&quot;gira&quot;</span>: <span class="k">verdadero</span>})    <span class="c"># una torre</span>
+}
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">20</span>, <span class="s">&quot;y&quot;</span>: <span class="n">90</span>, <span class="s">&quot;radio&quot;</span>: <span class="n">14</span>, <span class="s">&quot;gira&quot;</span>: <span class="k">verdadero</span>, <span class="s">&quot;masa&quot;</span>: <span class="n">3</span>})       <span class="c"># una bola por la rampa</span>
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">250</span>, <span class="s">&quot;y&quot;</span>: <span class="n">20</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">50</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">14</span>, <span class="s">&quot;gira&quot;</span>: <span class="k">verdadero</span>, <span class="s">&quot;angulo&quot;</span>: <span class="n">35</span>})
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">300</span>, <span class="s">&quot;y&quot;</span>: <span class="n">0</span>, <span class="s">&quot;puntos&quot;</span>: [[<span class="n">0</span>, <span class="n">30</span>], [<span class="n">15</span>, <span class="n">0</span>], [<span class="n">30</span>, <span class="n">30</span>]], <span class="s">&quot;gira&quot;</span>: <span class="k">verdadero</span>})   <span class="c"># un triángulo</span>
+<span class="k">mientras</span> juego.abierto() {
+    juego.avanzar_fisica(mundo)
+    juego.limpiar([<span class="n">25</span>, <span class="n">30</span>, <span class="n">45</span>])
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> c <span class="k">en</span> mundo[<span class="s">&quot;cuerpos&quot;</span>] {
+        juego.dibujar_cuerpo(c, <span class="k">si</span> c[<span class="s">&quot;fijo&quot;</span>] { [<span class="n">70</span>, <span class="n">80</span>, <span class="n">110</span>] } <span class="k">sino</span> <span class="k">si</span> c.contiene(<span class="s">&quot;radio&quot;</span>) { [<span class="n">240</span>, <span class="n">120</span>, <span class="n">90</span>] } <span class="k">sino</span> { [<span class="n">200</span>, <span class="n">150</span>, <span class="n">80</span>] })
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1420_giros.png" alt="Captura de «Cuerpos que giran»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1420_giros.lince</span></article><article class="ej" id="fisica-2"><h3>Cuerdas y bisagras</h3><p class="nota"><code>juego.bisagra(mundo, a, b, [x, y])</code> clava dos cuerpos por ese punto y los deja girar (con <code>b</code> nulo, clava <code>a</code> al fondo): puertas, péndulos, cadenas. <code>juego.cuerda(mundo, a, b)</code> no deja que se alejen más que el <code>largo</code> de la cuerda, pero sí acercarse; <code>b</code> puede ser un punto fijo <code>[x, y]</code>, y con <code>&quot;rigida&quot;: verdadero</code> es una barra.</p><p class="nota"><code>juego.puntos_union(u)</code> dice por dónde dibujar la cuerda. Lo que está unido por una bisagra no choca entre sí; con cuerda, sí.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Uniones&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">sea</span> mundo = juego.fisica({<span class="s">&quot;gravedad&quot;</span>: <span class="n">900</span>})
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">0</span>, <span class="s">&quot;y&quot;</span>: <span class="n">250</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">480</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">20</span>, <span class="s">&quot;fijo&quot;</span>: <span class="k">verdadero</span>})
+<span class="c"># un puente de tablas, clavado por los dos lados</span>
+<span class="k">sea</span> anterior = <span class="k">nulo</span>
+<span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">8</span>; i++) {
+    <span class="k">sea</span> tabla = juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">40</span> + i * <span class="n">30</span>, <span class="s">&quot;y&quot;</span>: <span class="n">120</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">30</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">8</span>, <span class="s">&quot;gira&quot;</span>: <span class="k">verdadero</span>})
+    juego.bisagra(mundo, tabla, anterior, [<span class="n">40</span> + i * <span class="n">30</span>, <span class="n">124</span>])
+    anterior = tabla
+}
+juego.bisagra(mundo, anterior, <span class="k">nulo</span>, [<span class="n">280</span>, <span class="n">124</span>])
+juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">140</span>, <span class="s">&quot;y&quot;</span>: <span class="n">40</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">26</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">26</span>, <span class="s">&quot;gira&quot;</span>: <span class="k">verdadero</span>, <span class="s">&quot;masa&quot;</span>: <span class="n">2</span>})
+<span class="c"># una bola colgada de una cuerda, que empieza de lado</span>
+<span class="k">sea</span> bola = juego.cuerpo(mundo, {<span class="s">&quot;x&quot;</span>: <span class="n">300</span>, <span class="s">&quot;y&quot;</span>: <span class="n">40</span>, <span class="s">&quot;radio&quot;</span>: <span class="n">14</span>, <span class="s">&quot;gira&quot;</span>: <span class="k">verdadero</span>})
+<span class="k">sea</span> cuerda = juego.cuerda(mundo, bola, [<span class="n">400</span>, <span class="n">30</span>])
+<span class="k">mientras</span> juego.abierto() {
+    juego.avanzar_fisica(mundo)
+    juego.limpiar([<span class="n">25</span>, <span class="n">30</span>, <span class="n">45</span>])
+    <span class="k">sea</span> p = juego.puntos_union(cuerda)
+    juego.linea(p[<span class="n">0</span>][<span class="n">0</span>], p[<span class="n">0</span>][<span class="n">1</span>], p[<span class="n">1</span>][<span class="n">0</span>], p[<span class="n">1</span>][<span class="n">1</span>], [<span class="n">230</span>, <span class="n">230</span>, <span class="n">200</span>])
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> c <span class="k">en</span> mundo[<span class="s">&quot;cuerpos&quot;</span>] {
+        juego.dibujar_cuerpo(c, <span class="k">si</span> c[<span class="s">&quot;fijo&quot;</span>] { [<span class="n">70</span>, <span class="n">80</span>, <span class="n">110</span>] } <span class="k">sino</span> <span class="k">si</span> c.contiene(<span class="s">&quot;radio&quot;</span>) { [<span class="n">240</span>, <span class="n">120</span>, <span class="n">90</span>] } <span class="k">sino</span> { [<span class="n">200</span>, <span class="n">150</span>, <span class="n">80</span>] })
+    }
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> u <span class="k">en</span> mundo[<span class="s">&quot;uniones&quot;</span>] {
+        <span class="k">si</span> u[<span class="s">&quot;union&quot;</span>] == <span class="s">&quot;bisagra&quot;</span> {
+            <span class="k">sea</span> b = juego.puntos_union(u)[<span class="n">0</span>]
+            juego.circulo(b[<span class="n">0</span>], b[<span class="n">1</span>], <span class="n">2</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>])
+        }
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1430_uniones.png" alt="Captura de «Cuerdas y bisagras»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1430_uniones.lince</span></article></section>
 <section id="particulas"><h2>Partículas</h2><article class="ej" id="particulas-0"><h3>Chispas, polvo y explosiones</h3><p class="nota"><code>juego.particulas(x, y, opciones)</code> lanza un puñado de partículas y <code>juego.dibujar_particulas()</code> las mueve y las dibuja en cada fotograma. Opciones: <code>cantidad</code>, <code>color</code> y <code>color_final</code>, <code>velocidad</code>, <code>direccion</code> y <code>apertura</code> (en grados), <code>vida</code>, <code>tamaño</code> y <code>tamaño_final</code>, <code>gravedad</code> y <code>mezcla</code> (<code>&quot;sumar&quot;</code> para que brillen). Las que admiten <code>[mínimo, máximo]</code> toman un valor al azar para cada una.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Partículas&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
