@@ -102,7 +102,10 @@ está en `juego.lince`.
   - Donde más pesa Lince es en la física con muchos cuerpos que giran (36 cajas, 6 ms).
 
 ### 1.8 — Varios jugadores en el mismo equipo
-- [ ] Cada mando, un jugador: «pulsa un botón para unirte», controles por jugador; con la pantalla partida de la 1.5.
+- [x] Cada mando, un jugador: «pulsa un botón para unirte», controles por jugador; con la pantalla partida de la 1.5.
+  En Lince (`unirse`, `menu_jugadores`, copias de las acciones por jugador); en C, que cada mando
+  conserve su número y el jugador en `accion`/`direccion`.
+- [ ] Probarlo con varios mandos de verdad, conectando y desconectando (lo hace el autor).
 
 ### 1.9 — Preparar la 2.0
 - [ ] Lo que vaya a cambiar avisa «obsoleto: usa X».

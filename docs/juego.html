@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.6</span>
+  <span class="version">v1.8</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -168,7 +168,7 @@
 <div class="grupo"><a href="#particulas" class="sec">Partículas</a><a href="#particulas-0" class="sub">Chispas, polvo y explosiones</a></div>
 <div class="grupo"><a href="#escenas" class="sec">Escenas</a><a href="#escenas-0" class="sub">Portada, partida y final</a></div>
 <div class="grupo"><a href="#menus-y-dialogos" class="sec">Menús y diálogos</a><a href="#menus-y-dialogos-0" class="sub">Menús</a><a href="#menus-y-dialogos-1" class="sub">Diálogos</a><a href="#menus-y-dialogos-2" class="sub">Idiomas</a></div>
-<div class="grupo"><a href="#controles" class="sec">Controles</a><a href="#controles-0" class="sub">Que el jugador elija sus teclas</a></div>
+<div class="grupo"><a href="#controles" class="sec">Controles</a><a href="#controles-0" class="sub">Que el jugador elija sus teclas</a><a href="#controles-1" class="sub">Varios jugadores, cada uno con su mando</a></div>
 <div class="grupo"><a href="#partidas-guardadas" class="sec">Partidas guardadas</a><a href="#partidas-guardadas-0" class="sub">Guardar y cargar</a></div>
 <div class="grupo"><a href="#tareas" class="sec">Tareas</a><a href="#tareas-0" class="sub">Esperar sin parar el juego</a></div>
 <div class="grupo"><a href="#peleas" class="sec">Peleas</a><a href="#peleas-0" class="sub">Golpes que se notan</a></div>
@@ -181,7 +181,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>40 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>41 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -837,7 +837,46 @@ juego.definir_accion(<span class="s">&quot;disparar&quot;</span>, [<span class="
         juego.salir()
     }
     juego.presentar()
-}</code></pre></div><figure><img src="img/juego/1810_controles.png" alt="Captura de «Que el jugador elija sus teclas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1810_controles.lince</span></article></section>
+}</code></pre></div><figure><img src="img/juego/1810_controles.png" alt="Captura de «Que el jugador elija sus teclas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1810_controles.lince</span></article><article class="ej" id="controles-1"><h3>Varios jugadores, cada uno con su mando</h3><p class="nota">Cada mando es un jugador, y el teclado otro. <code>juego.menu_jugadores()</code> es la pantalla de «pulsa un botón para unirte»: el que pulsa A (o ENTRAR) se une, B (o ESCAPE) se va, e INICIO (o ENTRAR) empieza; devuelve la lista de <code>juego.jugadores()</code>. Para hacer una propia, <code>juego.unirse()</code> en cada fotograma.</p><p class="nota">Las acciones se definen una vez, como siempre, con <code>&quot;mando:a&quot;</code>. Después, <code>juego.accion(&quot;saltar&quot;, 2)</code> o <code>juego.direccion(&quot;izquierda&quot;, &quot;derecha&quot;, 2)</code> son las del jugador 2, que solo miran su mando (o el teclado, si es el suyo). <code>juego.pantalla_partida(n)</code> da la zona de la pantalla de cada uno, para <code>camara()</code>. Si un mando se desconecta, conserva su número: al volver a conectarlo, es el mismo jugador.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Jugadores&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izquierda&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;d&quot;</span>, <span class="s">&quot;mando:derecha&quot;</span>, <span class="s">&quot;mando:izq_x+&quot;</span>])
+juego.definir_accion(<span class="s">&quot;arriba&quot;</span>, [<span class="s">&quot;arriba&quot;</span>, <span class="s">&quot;w&quot;</span>, <span class="s">&quot;mando:arriba&quot;</span>, <span class="s">&quot;mando:izq_y-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;abajo&quot;</span>, [<span class="s">&quot;abajo&quot;</span>, <span class="s">&quot;s&quot;</span>, <span class="s">&quot;mando:abajo&quot;</span>, <span class="s">&quot;mando:izq_y+&quot;</span>])
+<span class="k">fijo</span> COLORES = [[<span class="n">240</span>, <span class="n">120</span>, <span class="n">90</span>], [<span class="n">90</span>, <span class="n">180</span>, <span class="n">240</span>], [<span class="n">130</span>, <span class="n">220</span>, <span class="n">110</span>], [<span class="n">240</span>, <span class="n">210</span>, <span class="n">90</span>]]
+<span class="k">sea</span> jugando = <span class="k">nulo</span>
+<span class="k">sea</span> sitios = []
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">25</span>, <span class="n">30</span>, <span class="n">45</span>])
+    <span class="k">si</span> jugando == <span class="k">nulo</span> {
+        jugando = juego.menu_jugadores({<span class="s">&quot;titulo&quot;</span>: <span class="s">&quot;¿QUIÉN JUEGA?&quot;</span>})
+        <span class="k">si</span> jugando == <span class="s">&quot;volver&quot;</span> { <span class="k">romper</span> }
+        <span class="k">si</span> jugando != <span class="k">nulo</span> { <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> j <span class="k">en</span> jugando { sitios.agregar([<span class="n">100</span> + j[<span class="s">&quot;numero&quot;</span>] * <span class="n">60</span>, <span class="n">120</span>]) } }
+    } <span class="k">sino</span> {
+        <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> j <span class="k">en</span> jugando {             <span class="c"># cada uno se mueve con lo suyo</span>
+            <span class="k">sea</span> s = sitios[j[<span class="s">&quot;numero&quot;</span>] - <span class="n">1</span>]
+            s[<span class="n">0</span>] = s[<span class="n">0</span>] + juego.direccion(<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;derecha&quot;</span>, j[<span class="s">&quot;numero&quot;</span>]) * <span class="n">150</span> * juego.dt()
+            s[<span class="n">1</span>] = s[<span class="n">1</span>] + juego.direccion(<span class="s">&quot;arriba&quot;</span>, <span class="s">&quot;abajo&quot;</span>, j[<span class="s">&quot;numero&quot;</span>]) * <span class="n">150</span> * juego.dt()
+        }
+        <span class="k">sea</span> zonas = juego.pantalla_partida(jugando.longitud())
+        <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> j <span class="k">en</span> jugando {             <span class="c"># cada uno, su trozo de pantalla siguiéndole</span>
+            <span class="k">sea</span> z = zonas[j[<span class="s">&quot;numero&quot;</span>] - <span class="n">1</span>]
+            <span class="k">sea</span> s = sitios[j[<span class="s">&quot;numero&quot;</span>] - <span class="n">1</span>]
+            juego.camara(s[<span class="n">0</span>] - z[<span class="n">2</span>] / <span class="n">2</span>, s[<span class="n">1</span>] - z[<span class="n">3</span>] / <span class="n">2</span>, {<span class="s">&quot;zona&quot;</span>: z})
+            juego.rectangulo(-<span class="n">400</span>, -<span class="n">400</span>, <span class="n">1400</span>, <span class="n">1100</span>, [<span class="n">40</span>, <span class="n">48</span>, <span class="n">70</span>])
+            <span class="k">para</span> (x = -<span class="n">400</span>; x &lt; <span class="n">1000</span>; x += <span class="n">60</span>) { juego.linea(x, -<span class="n">400</span>, x, <span class="n">700</span>, [<span class="n">60</span>, <span class="n">70</span>, <span class="n">100</span>]) }
+            <span class="k">para</span> (<span class="k">y</span> = -<span class="n">400</span>; <span class="k">y</span> &lt; <span class="n">700</span>; <span class="k">y</span> += <span class="n">60</span>) { juego.linea(-<span class="n">400</span>, <span class="k">y</span>, <span class="n">1000</span>, <span class="k">y</span>, [<span class="n">60</span>, <span class="n">70</span>, <span class="n">100</span>]) }
+            <span class="k">para</span> (k = <span class="n">0</span>; k &lt; sitios.longitud(); k++) {
+                juego.rectangulo(sitios[k][<span class="n">0</span>] - <span class="n">10</span>, sitios[k][<span class="n">1</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>, COLORES[k])
+            }
+            juego.camara()
+            juego.<span class="t">texto</span>(<span class="s">&quot;JUGADOR {j[&quot;</span><span class="t">numero</span><span class="s">&quot;]}&quot;</span>, z[<span class="n">0</span>] + <span class="n">8</span>, z[<span class="n">1</span>] + <span class="n">8</span>, {<span class="s">&quot;color&quot;</span>: COLORES[j[<span class="s">&quot;numero&quot;</span>] - <span class="n">1</span>]})
+        }
+        <span class="k">si</span> jugando.longitud() == <span class="n">2</span> { juego.rectangulo(juego.ancho() / <span class="n">2</span> - <span class="n">1</span>, <span class="n">0</span>, <span class="n">2</span>, juego.alto(), [<span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>]) }
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1820_jugadores.png" alt="Captura de «Varios jugadores, cada uno con su mando»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1820_jugadores.lince</span></article></section>
 <section id="partidas-guardadas"><h2>Partidas guardadas</h2><article class="ej" id="partidas-guardadas-0"><h3>Guardar y cargar</h3><p class="nota"><code>juego.guardar(&quot;partida&quot;, datos)</code> guarda números, textos, listas y diccionarios, y <code>juego.cargar(&quot;partida&quot;, por_defecto)</code> los recupera (o da <code>por_defecto</code> si no hay nada). Van a la carpeta del usuario de cada sistema (en el móvil, la de la app), una por juego, sin pensar en rutas. Si el juego se cierra mientras guarda, lo de antes sigue entero. <code>juego.olvidar(&quot;partida&quot;)</code> lo borra.</p><p class="nota">Con un diccionario por defecto, lo que falte en lo guardado se toma de ahí: una opción nueva de una versión posterior del juego tiene valor desde el principio.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 <span class="k">sea</span> opciones = juego.cargar(<span class="s">&quot;opciones&quot;</span>, {<span class="s">&quot;musica&quot;</span>: <span class="n">0.8</span>, <span class="s">&quot;idioma&quot;</span>: <span class="s">&quot;es&quot;</span>})

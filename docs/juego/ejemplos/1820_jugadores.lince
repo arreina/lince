@@ -1,0 +1,46 @@
+# @seccion: Controles
+# @titulo: Varios jugadores, cada uno con su mando
+# @nota: Cada mando es un jugador, y el teclado otro. `juego.menu_jugadores()` es la pantalla de «pulsa un botón para unirte»: el que pulsa A (o ENTRAR) se une, B (o ESCAPE) se va, e INICIO (o ENTRAR) empieza; devuelve la lista de `juego.jugadores()`. Para hacer una propia, `juego.unirse()` en cada fotograma.
+# @nota: Las acciones se definen una vez, como siempre, con `"mando:a"`. Después, `juego.accion("saltar", 2)` o `juego.direccion("izquierda", "derecha", 2)` son las del jugador 2, que solo miran su mando (o el teclado, si es el suyo). `juego.pantalla_partida(n)` da la zona de la pantalla de cada uno, para `camara()`. Si un mando se desconecta, conserva su número: al volver a conectarlo, es el mismo jugador.
+# @fotogramas: 90
+# @guion: 5:mando1:a:1,12:entrar:1,20:mando1:inicio:1,30:mando1:izq_x+:60,30:arriba:60
+importar "juego"
+
+juego.abrir("Jugadores", 480, 270)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("arriba", ["arriba", "w", "mando:arriba", "mando:izq_y-"])
+juego.definir_accion("abajo", ["abajo", "s", "mando:abajo", "mando:izq_y+"])
+fijo COLORES = [[240, 120, 90], [90, 180, 240], [130, 220, 110], [240, 210, 90]]
+sea jugando = nulo
+sea sitios = []
+mientras juego.abierto() {
+    juego.limpiar([25, 30, 45])
+    si jugando == nulo {
+        jugando = juego.menu_jugadores({"titulo": "¿QUIÉN JUEGA?"})
+        si jugando == "volver" { romper }
+        si jugando != nulo { para cada diccionario j en jugando { sitios.agregar([100 + j["numero"] * 60, 120]) } }
+    } sino {
+        para cada diccionario j en jugando {             # cada uno se mueve con lo suyo
+            sea s = sitios[j["numero"] - 1]
+            s[0] = s[0] + juego.direccion("izquierda", "derecha", j["numero"]) * 150 * juego.dt()
+            s[1] = s[1] + juego.direccion("arriba", "abajo", j["numero"]) * 150 * juego.dt()
+        }
+        sea zonas = juego.pantalla_partida(jugando.longitud())
+        para cada diccionario j en jugando {             # cada uno, su trozo de pantalla siguiéndole
+            sea z = zonas[j["numero"] - 1]
+            sea s = sitios[j["numero"] - 1]
+            juego.camara(s[0] - z[2] / 2, s[1] - z[3] / 2, {"zona": z})
+            juego.rectangulo(-400, -400, 1400, 1100, [40, 48, 70])
+            para (x = -400; x < 1000; x += 60) { juego.linea(x, -400, x, 700, [60, 70, 100]) }
+            para (y = -400; y < 700; y += 60) { juego.linea(-400, y, 1000, y, [60, 70, 100]) }
+            para (k = 0; k < sitios.longitud(); k++) {
+                juego.rectangulo(sitios[k][0] - 10, sitios[k][1] - 10, 20, 20, COLORES[k])
+            }
+            juego.camara()
+            juego.texto("JUGADOR {j["numero"]}", z[0] + 8, z[1] + 8, {"color": COLORES[j["numero"] - 1]})
+        }
+        si jugando.longitud() == 2 { juego.rectangulo(juego.ancho() / 2 - 1, 0, 2, juego.alto(), [0, 0, 0]) }
+    }
+    juego.presentar()
+}

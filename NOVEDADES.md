@@ -3,6 +3,26 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.8.0
+
+Varios jugadores en el mismo equipo. Nada de lo que ya funcionaba cambia. (No hay 1.7: era la de
+rendimiento, y al medir los juegos se vio que no hacía falta; ver PENDIENTE.md.)
+
+- **Cada mando, un jugador** (y el teclado, otro): `juego.menu_jugadores()` es la pantalla de «pulsa un botón para unirte», y `juego.unirse()` sirve para hacer una propia. `juego.jugadores()` dice quién juega y con qué.
+- **Controles por jugador**: las acciones se definen una vez, como siempre, y `juego.accion("saltar", 2)`, `juego.direccion("izquierda", "derecha", 2)`, `combo`, `pulsaciones`, `mantenida` y `estado_accion` con el número de jugador solo miran su mando (o el teclado, si es el suyo).
+- **Con la pantalla partida**: `juego.pantalla_partida(n)` da la zona de cada jugador para `camara()`.
+- **Los mandos conservan su número**: si se desconecta uno, los demás siguen siendo los mismos jugadores, y al volver a conectarlo vuelve a su sitio (`jugadores()` dice si está `conectado`, para pausar). `juego.mando_conectado(n)` y `juego.vibrar(segundos, fuerza, mando)` para uno solo.
+- **Pruebas con mandos de mentira**: `LINCE_JUEGO_GUION` acepta botones y ejes de un mando (`5:mando2:a:1`).
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.8.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.8.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.8.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.8.0.vsix` |
+
 ## 1.6.1
 
 Un arreglo de rendimiento.

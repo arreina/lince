@@ -86,6 +86,10 @@ static struct {
     int  (*IsGameController)(int);
     void *(*ControllerOpen)(int);
     void (*ControllerClose)(void *);
+    int  (*ControllerAttached)(void *);
+    void *(*ControllerJoystick)(void *);
+    int  (*JoystickInstanceID)(void *);
+    int  (*DeviceInstanceID)(int);
     unsigned char (*ControllerButton)(void *, int);
     short (*ControllerAxis)(void *, int);
     int  (*SetFullscreen)(void *, unsigned);
@@ -167,7 +171,7 @@ static const char *const JG_NOMBRES_GRUPO[] = {"efectos", "musica", "voces", NUL
 #define JG_BOTONES      15
 #define JG_EJES         6
 #define JG_ESCRITO      512       /* texto tecleado en un fotograma ('\b' = borrar) */
-#define JG_ACCIONES     64
+#define JG_ACCIONES     256      /* las del juego y, con jugadores, las de cada uno */
 #define JG_HISTORIAL    32
 #define JG_GUION        256
 #define JG_ENTRADAS     16
@@ -337,7 +341,8 @@ static struct {
     double hist_id;     /* número de la última pulsación apuntada */
     int nhist;
     /* LINCE_JUEGO_GUION: teclas mantenidas desde un fotograma durante otros tantos */
-    struct { long desde, cuantos; int tecla; } guion[JG_GUION];
+    struct { long desde, cuantos; int tecla; JgEntrada mando; } guion[JG_GUION];   /* tecla -1: del mando */
+    unsigned char mando_prueba[JG_MANDOS];   /* prueba: un mando del guion cuenta como conectado */
     int nguion;
     int zoom;                   /* la "escala" de abrir() */
 } _jgs;
@@ -393,6 +398,7 @@ static double jg_reloj(void);
 static int jg_opcion(Valor *op, const char *clave, double *out);
 static Valor *jg_opcion_valor(Valor *op, const char *clave);
 static void jg_dic_poner(Valor *d, const char *clave, Valor *v);
+static int jg_entrada(const char *t, JgEntrada *e, char *msg, size_t max);
 
 static Valor *jg_error(const char *tipo, const char *msg) {
     hay_error = 1;
@@ -730,6 +736,10 @@ static int jg_cargar(void) {
     JG_FN(LogicalSize, "SDL_RenderSetLogicalSize")
     JG_FN(OutputSize, "SDL_GetRendererOutputSize")
     *(void **)(&_jg.WindowToLogical) = JG_SIMBOLO(h, "SDL_RenderWindowToLogical");
+    *(void **)(&_jg.ControllerAttached) = JG_SIMBOLO(h, "SDL_GameControllerGetAttached");
+    *(void **)(&_jg.ControllerJoystick) = JG_SIMBOLO(h, "SDL_GameControllerGetJoystick");
+    *(void **)(&_jg.JoystickInstanceID) = JG_SIMBOLO(h, "SDL_JoystickInstanceID");
+    *(void **)(&_jg.DeviceInstanceID) = JG_SIMBOLO(h, "SDL_JoystickGetDeviceInstanceID");
     *(void **)(&_jg.CreateTexture) = JG_SIMBOLO(h, "SDL_CreateTexture");
     *(void **)(&_jg.SetRenderTarget) = JG_SIMBOLO(h, "SDL_SetRenderTarget");
     *(void **)(&_jg.SetClipRect) = JG_SIMBOLO(h, "SDL_RenderSetClipRect");
@@ -1013,13 +1023,28 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         }
     }
     _jgs.nguion = 0;
+    memset(_jgs.mando_prueba, 0, sizeof _jgs.mando_prueba);
     e = getenv("LINCE_JUEGO_GUION");
     if (e) {
         char buf[4096];
         snprintf(buf, sizeof buf, "%s", e);
         for (char *t = strtok(buf, ","); t && _jgs.nguion < JG_GUION; t = strtok(NULL, ",")) {
-            char tecla[32];
+            char tecla[32], boton[32], msg[200];
             long desde, cuantos = 1;
+            if (strstr(t, ":mando")) {                    /* "30:mando2:a:5": un botón (o eje) de un mando */
+                if (sscanf(t, "%ld:%31[^:]:%31[^:]:%ld", &desde, tecla, boton, &cuantos) < 3 || cuantos < 1) continue;
+                char entrada[80];
+                snprintf(entrada, sizeof entrada, "%s:%s", tecla, boton);
+                JgEntrada me;
+                if (!jg_entrada(entrada, &me, msg, sizeof msg) || (me.tipo != 'b' && me.tipo != 'e')) continue;
+                if (me.mando < 0) me.mando = 0;
+                _jgs.guion[_jgs.nguion].desde = desde;
+                _jgs.guion[_jgs.nguion].cuantos = cuantos;
+                _jgs.guion[_jgs.nguion].mando = me;
+                _jgs.guion[_jgs.nguion++].tecla = -1;
+                _jgs.mando_prueba[me.mando] = 1;
+                continue;
+            }
             if (sscanf(t, "%ld:%31[^:]:%ld", &desde, tecla, &cuantos) < 2) continue;
             int c = jg_tecla_codigo(tecla);
             if (c < 0 || cuantos < 1) continue;
@@ -1575,12 +1600,16 @@ static Valor *fn_jg_vibrar(Valor **a, int n) {
     double s, f = 1;
     if (!jg_num(a, n, 0, &s, "vibrar")) return valor_nulo();
     if (n > 1 && !jg_num(a, n, 1, &f, "vibrar")) return valor_nulo();
+    double solo = 0;                                  /* vibrar(segundos, fuerza, mando): solo ese mando */
+    if (n > 2 && !jg_num(a, n, 2, &solo, "vibrar")) return valor_nulo();
     if (s < 0 || s > 10) return jg_error("ErrorArgumento", "vibrar(): los segundos van de 0 a 10");
     if (f < 0 || f > 1) return jg_error("ErrorArgumento", "vibrar(): la fuerza va de 0 a 1");
+    if (n > 2 && (solo < 1 || solo > JG_MANDOS)) return jg_error("ErrorArgumento", "vibrar(): el mando va de 1 a 4");
     unsigned ms = (unsigned)(s * 1000 + 0.5);
     unsigned short fuerza = (unsigned short)(f * 65535);
     for (int i = 0; i < JG_MANDOS && _jg.Rumble; i++)
-        if (_jgs.mandos[i]) _jg.Rumble(_jgs.mandos[i], fuerza, fuerza, ms);
+        if (_jgs.mandos[i] && (n <= 2 || i == (int)solo - 1)) _jg.Rumble(_jgs.mandos[i], fuerza, fuerza, ms);
+    if (n > 2) return valor_nulo();                   /* el móvil vibra solo cuando es para todos */
 #ifdef __ANDROID__
     /* SDL presenta el vibrador del móvil como un dispositivo háptico más */
     if (!_jgs.vibrador_buscado && _jg.NumHaptics && _jg.HapticOpen && _jg.HapticRumbleInit && _jg.HapticRumblePlay) {
@@ -1771,8 +1800,12 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; _jgs.raton |= 1; }
     } else if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; }
     for (int i = 0; i < _jgs.nguion; i++)
-        if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos)
-            _jgs.teclas[_jgs.guion[i].tecla] = 1;
+        if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos) {
+            const JgEntrada *me = &_jgs.guion[i].mando;
+            if (_jgs.guion[i].tecla >= 0) _jgs.teclas[_jgs.guion[i].tecla] = 1;
+            else if (me->tipo == 'b') _jgs.botones[me->mando][me->codigo] = 1;
+            else _jgs.ejes[me->mando][me->codigo] = (float)me->signo;
+        }
     jg_grabar_guion(0);                  /* LINCE_JUEGO_GRABAR_GUION: las teclas de este fotograma */
     jg_leer_toques();                    /* después de los clics de prueba: también cuentan como dedo */
     jg_leer_inclinacion();
@@ -5070,14 +5103,38 @@ static const char *const JG_NOMBRES_BOTON[JG_BOTONES] = {
     "lb", "rb", "arriba", "abajo", "izquierda", "derecha" };
 static const char *const JG_NOMBRES_EJE[JG_EJES] = {"izq_x", "izq_y", "der_x", "der_y", "lt", "rt"};
 
+/* Al conectar o desconectar uno, cada mando sigue con su número: el que se
+   desconecta deja su hueco libre (y al volver a conectarlo, lo normal es que
+   vuelva a él), así el jugador 2 sigue siendo el jugador 2 */
 static void jg_abrir_mandos(void) {
-    for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
-    int k = 0, total = _jg.NumJoysticks();
-    for (int j = 0; j < total && k < JG_MANDOS; j++)
-        if (_jg.IsGameController(j)) {
-            void *m = _jg.ControllerOpen(j);
-            if (m) _jgs.mandos[k++] = m;
+    int total = _jg.NumJoysticks();
+    if (!_jg.ControllerAttached || !_jg.ControllerJoystick || !_jg.JoystickInstanceID || !_jg.DeviceInstanceID) {
+        for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) { _jg.ControllerClose(_jgs.mandos[i]); _jgs.mandos[i] = NULL; }
+        int k = 0;                                     /* un SDL muy viejo: todos otra vez, seguidos */
+        for (int j = 0; j < total && k < JG_MANDOS; j++)
+            if (_jg.IsGameController(j)) {
+                void *m = _jg.ControllerOpen(j);
+                if (m) _jgs.mandos[k++] = m;
+            }
+        _jgs.njoy = total;
+        return;
+    }
+    for (int i = 0; i < JG_MANDOS; i++)               /* los que se fueron dejan su hueco */
+        if (_jgs.mandos[i] && !_jg.ControllerAttached(_jgs.mandos[i])) {
+            _jg.ControllerClose(_jgs.mandos[i]);
+            _jgs.mandos[i] = NULL;
         }
+    for (int j = 0; j < total; j++) {                  /* los nuevos, al primer hueco libre */
+        if (!_jg.IsGameController(j)) continue;
+        int id = _jg.DeviceInstanceID(j), ya = 0, libre = -1;
+        for (int i = 0; i < JG_MANDOS; i++) {
+            if (_jgs.mandos[i] && _jg.JoystickInstanceID(_jg.ControllerJoystick(_jgs.mandos[i])) == id) ya = 1;
+            if (!_jgs.mandos[i] && libre < 0) libre = i;
+        }
+        if (ya || libre < 0) continue;
+        void *m = _jg.ControllerOpen(j);
+        if (m) _jgs.mandos[libre] = m;
+    }
     _jgs.njoy = total;
 }
 
@@ -5157,8 +5214,17 @@ static int jg_mando_arg(Valor **a, int n, int i) {
 static Valor *fn_jg_mandos(Valor **a, int n) {
     (void)a; (void)n;
     int c = 0;
-    for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i]) c++;
+    for (int i = 0; i < JG_MANDOS; i++) if (_jgs.mandos[i] || _jgs.mando_prueba[i]) c++;
     return valor_numero(c);
+}
+
+/* mando_conectado(n): ¿está el mando n (1 a 4)? Cada mando conserva su número
+   mientras está conectado, aunque se desconecte otro */
+static Valor *fn_jg_mando_conectado(Valor **a, int n) {
+    double m;
+    if (!jg_num(a, n, 0, &m, "mando_conectado")) return valor_nulo();
+    if (m < 1 || m > JG_MANDOS || m != floor(m)) return jg_error("ErrorArgumento", "mando_conectado(): el mando va de 1 a 4");
+    return valor_booleano(_jgs.mandos[(int)m - 1] != NULL || _jgs.mando_prueba[(int)m - 1]);
 }
 
 /* boton(nombre[, mando]) / boton_pulsado(nombre[, mando]); mando = 1..4 */
@@ -5408,7 +5474,7 @@ static Valor *jg_definir(const char *nombre_accion, Valor *entradas) {
     }
     JgAccion *acc = jg_buscar_accion(nombre_accion);
     if (!acc) {
-        if (_jgs.nacciones == JG_ACCIONES) return jg_error("ErrorArgumento", "definir_accion(): como mucho 64 acciones");
+        if (_jgs.nacciones == JG_ACCIONES) return jg_error("ErrorArgumento", "definir_accion(): como mucho 256 acciones (contando las de cada jugador)");
         acc = &_jgs.acciones[_jgs.nacciones++];
         acc->nombre = strdup(nombre_accion);
         acc->desde = acc->soltada = -1; acc->duro = 0;
@@ -5479,13 +5545,19 @@ static Valor *fn_jg_acciones(Valor **a, int n) {
     for (int i = 0; i < _jgs.nacciones; i++) {
         Valor *l = valor_lista_crear();
         for (int k = 0; k < _jgs.acciones[i].n; k++) lista_agregar(l, valor_texto(_jgs.acciones[i].textos[k]));
+        if (strchr(_jgs.acciones[i].nombre, '@')) { valor_destruir(l); continue; }   /* las de cada jugador, no */
         valor_diccionario_agregar(d, _jgs.acciones[i].nombre, l);
     }
     return d;
     return valor_nulo();
 }
 
-static JgAccion *jg_accion_arg(Valor **a, int n, int i, const char *fn) {
+static JgAccion _jg_sin_jugador;            /* la acción de un jugador que no está: nunca se pulsa */
+
+/* La acción del argumento i. Con un número en el argumento j (j >= 0), la de
+   ese jugador (la copia "nombre@j" que hace juego.lince al unirse); si ese
+   jugador no está, una vacía, que nunca está pulsada */
+static JgAccion *jg_accion_jugador(Valor **a, int n, int i, int j, const char *fn) {
     char msg[200];
     if (i >= n || a[i]->tipo != VAL_TEXTO) {
         snprintf(msg, sizeof msg, "%s() espera el nombre de una acción", fn);
@@ -5496,8 +5568,21 @@ static JgAccion *jg_accion_arg(Valor **a, int n, int i, const char *fn) {
     if (!acc) {
         snprintf(msg, sizeof msg, "%s(): la acción '%s' no está definida (usa juego.definir_accion)", fn, a[i]->texto);
         jg_error("ErrorArgumento", msg);
+        return NULL;
     }
-    return acc;
+    if (j < 0 || j >= n || a[j]->tipo == VAL_NULO) return acc;
+    if (a[j]->tipo != VAL_NUMERO || a[j]->numero < 1 || a[j]->numero > 8 || a[j]->numero != floor(a[j]->numero)) {
+        snprintf(msg, sizeof msg, "%s(): el jugador es un número de 1 a 8", fn);
+        jg_error("ErrorArgumento", msg);
+        return NULL;
+    }
+    char nombre[300];
+    snprintf(nombre, sizeof nombre, "%s@%d", a[i]->texto, (int)a[j]->numero);
+    JgAccion *suya = jg_buscar_accion(nombre);
+    if (suya) return suya;
+    memset(&_jg_sin_jugador, 0, sizeof _jg_sin_jugador);
+    _jg_sin_jugador.desde = _jg_sin_jugador.soltada = -1;
+    return &_jg_sin_jugador;
 }
 
 /* La fuerza de una acción es la mayor de sus entradas; activa a partir de 0,5 */
@@ -5510,7 +5595,7 @@ static float jg_accion_fuerza(const JgAccion *acc, int antes) {
 /* modo 0: mantenida; 1: empieza en este fotograma; 2: termina en este fotograma */
 static Valor *jg_accion(Valor **a, int n, int modo, const char *fn) {
     JG_ABIERTA();
-    JgAccion *acc = jg_accion_arg(a, n, 0, fn);
+    JgAccion *acc = jg_accion_jugador(a, n, 0, 1, fn);          /* accion(nombre[, jugador]) */
     if (!acc) return valor_nulo();
     int ahora = jg_accion_fuerza(acc, 0) >= 0.5f, antes = jg_accion_fuerza(acc, 1) >= 0.5f;
     return valor_booleano(modo == 0 ? ahora : modo == 1 ? (ahora && !antes) : (!ahora && antes));
@@ -5592,7 +5677,8 @@ static Valor *fn_jg_gastar(Valor **a, int n) {
 static Valor *fn_jg_estado_accion(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "estado_accion() espera el nombre de una acción");
-    JgAccion *acc = jg_buscar_accion(a[0]->texto);
+    if (!jg_buscar_accion(a[0]->texto)) return valor_nulo();
+    JgAccion *acc = jg_accion_jugador(a, n, 0, 1, "estado_accion");     /* estado_accion(nombre[, jugador]) */
     if (!acc) return valor_nulo();
     double t = jg_reloj_real();
     Valor *d = valor_diccionario_crear();
@@ -5607,11 +5693,12 @@ static Valor *fn_jg_estado_accion(Valor **a, int n) {
    Ejemplo: x = x + juego.direccion("izquierda", "derecha") * velocidad * juego.dt() */
 static Valor *fn_jg_direccion(Valor **a, int n) {
     JG_ABIERTA();
-    JgAccion *neg = jg_accion_arg(a, n, 0, "direccion");
+    JgAccion *neg = jg_accion_jugador(a, n, 0, 2, "direccion");      /* direccion(neg, pos[, jugador]) */
     if (!neg) return valor_nulo();
-    JgAccion *pos = jg_accion_arg(a, n, 1, "direccion");
+    float fn = jg_accion_fuerza(neg, 0);              /* la de un jugador que no está es una sola, compartida */
+    JgAccion *pos = jg_accion_jugador(a, n, 1, 2, "direccion");
     if (!pos) return valor_nulo();
-    return valor_numero(jg_accion_fuerza(pos, 0) - jg_accion_fuerza(neg, 0));
+    return valor_numero(jg_accion_fuerza(pos, 0) - fn);
 }
 
 /* Los 'cuantos' números de los argumentos, donde un punto puede ir en una
@@ -7195,6 +7282,7 @@ static void cargar_juego(Entorno *entorno) {
         {"pantalla_completa", fn_jg_pantalla_completa, -1},
         {"tiempo",          fn_jg_tiempo,           0},
         {"mandos",          fn_jg_mandos,           0},
+        {"mando_conectado", fn_jg_mando_conectado,  1},
         {"boton",           fn_jg_boton,           -1},
         {"boton_pulsado",   fn_jg_boton_pulsado,   -1},
         {"eje",             fn_jg_eje,             -1},
@@ -7211,10 +7299,10 @@ static void cargar_juego(Entorno *entorno) {
         {"posicion_camara", fn_jg_posicion_camara,  0},
         {"tactil",          fn_jg_tactil,           0},
         {"definir_accion",  fn_jg_definir_accion,   2},
-        {"accion",          fn_jg_accion,           1},
-        {"accion_pulsada",  fn_jg_accion_pulsada,   1},
-        {"accion_soltada",  fn_jg_accion_soltada,   1},
-        {"direccion",       fn_jg_direccion,        2},
+        {"accion",          fn_jg_accion,          -1},
+        {"accion_pulsada",  fn_jg_accion_pulsada,  -1},
+        {"accion_soltada",  fn_jg_accion_soltada,  -1},
+        {"direccion",       fn_jg_direccion,       -1},
         {"recargado",       fn_jg_recargado,        0},
         {"colision_circulos", fn_jg_colision_circulos, -1},
         {"colision_circulo_rect", fn_jg_colision_circulo_rect, -1},
@@ -7246,7 +7334,7 @@ static void cargar_juego(Entorno *entorno) {
         {"camino",          fn_jg_camino,          -1},
         {"historial",       fn_jg_historial,       -1},
         {"gastar",          fn_jg_gastar,           1},
-        {"estado_accion",   fn_jg_estado_accion,    1},
+        {"estado_accion",   fn_jg_estado_accion,   -1},
     };
     registrar_modulo_diccionario(entorno, "juego",
         fns, (int)(sizeof(fns) / sizeof(fns[0])), NULL, NULL, 0);

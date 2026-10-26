@@ -1,0 +1,61 @@
+# 1.8: varios jugadores, cada uno con su mando (o el teclado). smoke.sh lo
+# ejecuta con LINCE_JUEGO_GUION, que pulsa botones de mandos de mentira:
+#   5:mando2:a,10:entrar,15:mando1:inicio,20:mando3:a,30:mando2:a,35:espacio,
+#   40:mando2:izq_x+:3,55:espacio,62:mando1:b,72:mando3:a,76:mando3:inicio
+importar "juego"
+juego.abrir("1.8", 200, 100)
+juego.definir_accion("saltar", ["espacio", "mando:a"])
+juego.definir_accion("izquierda", ["a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["d", "mando:derecha", "mando:izq_x+"])
+escribir("mandos: {juego.mandos()} {juego.mando_conectado(2)} {juego.mando_conectado(4)}")
+sea f = 0
+sea saltos = []
+mientras juego.abierto() {
+    juego.limpiar([0, 0, 0])
+    si f < 25 {
+        sea nuevo = juego.unirse({"maximo": 3})
+        si nuevo != nulo { escribir("se une el {nuevo} en {f}") }
+    }
+    si f == 25 { escribir("jugadores: {juego.jugadores()}") }
+    para (j = 1; j <= 3; j++) { si juego.accion_pulsada("saltar", j) { saltos.agregar("{j}@{f}") } }
+    si f == 30 { escribir("saltar (de todos) en 30: {juego.accion("saltar")}") }
+    si f == 41 {
+        escribir("dirección del 1: {juego.direccion("izquierda", "derecha", 1)} del 3: {juego.direccion("izquierda", "derecha", 3)}")
+        escribir("mantenida del 1: {juego.mantenida("derecha", 0, 1) > 0} del 2: {juego.mantenida("derecha", 0, 2)}")
+    }
+    si f == 45 { escribir("combo del 1: {juego.combo(["saltar"], 0.5, 1)} del 3: {juego.combo(["saltar"], 0.5, 3)} del 4: {juego.combo(["saltar"], 0.5, 4)}") }
+    si f == 50 {
+        juego.quitar_jugador(1)
+        escribir("tras quitar al 1: {juego.jugadores()}")
+    }
+    si f == 60 { juego.definir_accion("saltar", ["espacio", "mando:b"]) }      # redefinida: también la de cada uno
+    si f >= 70 {
+        si f == 70 { juego.olvidar_jugadores() }
+        sea r = juego.menu_jugadores({"maximo": 2})
+        si f == 74 { juego.captura("jugadores.bmp") }
+        si r != nulo {
+            escribir("menu_jugadores en {f}: {r}")
+            juego.cerrar()
+            romper
+        }
+    }
+    juego.presentar()
+    f = f + 1
+}
+escribir("saltos: {saltos}")
+escribir("acciones sin copias: {juego.acciones().longitud()}")
+juego.abrir("1.8", 200, 100)
+escribir("partida 2: {juego.pantalla_partida(2)} 3: {juego.pantalla_partida(3).longitud()}")
+escribir("una encima de otra: {juego.pantalla_partida(2, {"lado_a_lado": falso})[1]}")
+juego.vibrar(0.1, 1, 2)
+para cada funcion intento en [
+    funcion(): nulo { juego.accion("saltar", 0) },
+    funcion(): nulo { juego.unirse({"maximo": 9}) },
+    funcion(): nulo { juego.quitar_jugador(7) },
+    funcion(): nulo { juego.pantalla_partida(5) },
+    funcion(): nulo { juego.mando_conectado(5) },
+    funcion(): nulo { juego.vibrar(0.1, 1, 6) },
+    funcion(): nulo { juego.menu_jugadores({"minimo": 5}) }
+] {
+    intentar { intento() } capturar (error e) { escribir("error: {e.mensaje}") }
+}

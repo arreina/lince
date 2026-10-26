@@ -40,6 +40,18 @@ funcion _historial(val numero segundos, val lista acciones, val texto fn): lista
     devolver pulsadas
 }
 
+# El nombre de la copia de esa acción para ese jugador ("saltar@2"), o nulo si
+# ese jugador no se ha unido (para él, nada está pulsado)
+funcion _accion_de(val cualquiera a, val cualquiera jugador, val texto fn): cualquiera {
+    _accion(a, fn)
+    si no (jugador es numero) o jugador < 1 o jugador > 8 o matematica.piso(jugador) != jugador {
+        lanzar ErrorArgumento("{fn}(): el jugador es un número de 1 a 8")
+    }
+    sea suya = "{a}@{jugador}"
+    si juego.estado_accion(suya) == nulo { devolver nulo }
+    devolver suya
+}
+
 # ── Pulsaciones: combos, machacar un botón y golpes cargados ──
 
 # combo(acciones[, segundos]): ¿se han pulsado esas acciones en ese orden en
@@ -47,11 +59,17 @@ funcion _historial(val numero segundos, val lista acciones, val texto fn): lista
 # verdadero, esas pulsaciones se gastan y no valen para otro combo (por eso se
 # pregunta antes por los combos largos). Con una sola acción sirve para no
 # perder una pulsación hecha un poco antes de tiempo: combo(["golpe"], 0.2).
-funcion combo(val cualquiera acciones, val numero segundos = 0.5): logico {
+funcion combo(val cualquiera acciones, val numero segundos = 0.5, val cualquiera jugador = nulo): logico {
     si no (acciones es lista) o acciones.longitud() < 1 o acciones.longitud() > 32 {
-        lanzar ErrorTipo("combo() espera (lista de acciones[, segundos]), por ejemplo ([\"abajo\", \"adelante\", \"golpe\"], 0.5)")
+        lanzar ErrorTipo("combo() espera (lista de acciones[, segundos[, jugador]]), por ejemplo ([\"abajo\", \"adelante\", \"golpe\"], 0.5)")
     }
     _segundos(segundos, "combo")
+    si jugador != nulo {
+        sea suyas = []
+        para cada cualquiera a en acciones { suyas.agregar(_accion_de(a, jugador, "combo")) }
+        si suyas.contiene(nulo) { devolver falso }       # ese jugador no está
+        acciones = suyas
+    }
     sea pulsadas = _historial(segundos, acciones, "combo")
 
     # Se busca de la última acción hacia atrás, cada una antes que la siguiente
@@ -70,8 +88,12 @@ funcion combo(val cualquiera acciones, val numero segundos = 0.5): logico {
 # pulsaciones(accion[, segundos]): cuántas veces se ha pulsado en los últimos
 # 'segundos', también las que ya ha gastado combo(). Para los golpes de
 # machacar un botón y para soltarse de un agarre.
-funcion pulsaciones(val cualquiera accion, val numero segundos = 0.5): numero {
+funcion pulsaciones(val cualquiera accion, val numero segundos = 0.5, val cualquiera jugador = nulo): numero {
     _segundos(segundos, "pulsaciones")
+    si jugador != nulo {
+        accion = _accion_de(accion, jugador, "pulsaciones")
+        si accion == nulo { devolver 0 }
+    }
     devolver _historial(segundos, [accion], "pulsaciones").longitud()
 }
 
@@ -79,7 +101,11 @@ funcion pulsaciones(val cualquiera accion, val numero segundos = 0.5): numero {
 # está). Con 'margen', si se soltó hace menos de esos segundos dice cuánto
 # estuvo pulsada: para los golpes cargados (mantener atrás un segundo y luego
 # adelante y golpe: al pulsar adelante, atrás ya se ha soltado).
-funcion mantenida(val cualquiera accion, val numero margen = 0): numero {
+funcion mantenida(val cualquiera accion, val numero margen = 0, val cualquiera jugador = nulo): numero {
+    si jugador != nulo {
+        accion = _accion_de(accion, jugador, "mantenida")
+        si accion == nulo { devolver 0 }
+    }
     sea estado = _accion(accion, "mantenida")
     si margen < 0 o margen > 10 { lanzar ErrorArgumento("mantenida(): el margen va de 0 a 10 segundos") }
     si estado["pulsada"] { devolver estado["mantenida"] }
@@ -2378,6 +2404,7 @@ sea _ctrl = nulo              # el menú: qué fila está elegida y si espera un
 
 # Lo llama definir_accion() (en C): las entradas que eligió el jugador, o nulo
 funcion _controles_de(val texto nombre, val lista entradas): cualquiera {
+    si nombre.contiene("@") { devolver nulo }          # la copia de un jugador: tal cual
     si no _ctrl_originales.contiene(nombre) o _ctrl_guardados == nulo o no _ctrl_guardados.contiene(nombre) {
         _ctrl_originales[nombre] = entradas
     }
@@ -2385,6 +2412,9 @@ funcion _controles_de(val texto nombre, val lista entradas): cualquiera {
         _ctrl_guardados = juego.cargar("lince_controles", {})
         si no (_ctrl_guardados es diccionario) { _ctrl_guardados = {} }
     }
+    sea finales = entradas
+    si _ctrl_guardados.contiene(nombre) { finales = _ctrl_guardados[nombre] }
+    para cada diccionario j en _jugadores { _definir_suya(nombre, finales, j) }   # y la de cada jugador
     si _ctrl_guardados.contiene(nombre) { devolver _ctrl_guardados[nombre] }
     devolver nulo
 }
@@ -2566,6 +2596,226 @@ funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
     escribir_en(ayuda, col[0], arriba + (filas + 1.5) * paso, gris)
     juego.camara(camara)
     si resultado != nulo { _ctrl = nulo }
+    devolver resultado
+}
+
+# ── Varios jugadores en el mismo equipo ──
+# Cada mando es un jugador (y el teclado, otro): se une pulsando un botón, con
+# unirse() en cada fotograma o con la pantalla de menu_jugadores(). Desde ese
+# momento, juego.accion("saltar", 2) es la acción del jugador 2, que solo mira
+# su mando: las entradas "mando:..." de la acción pasan a ser de su mando, y
+# las del teclado y el ratón solo cuentan para el jugador del teclado. Vale
+# igual en accion, accion_pulsada, accion_soltada, direccion (el tercer
+# argumento), combo, pulsaciones, mantenida y estado_accion. Las acciones se
+# definen una vez, como siempre, con "mando:a"; Lince hace la copia de cada
+# jugador ("saltar@2") y la rehace si se vuelven a definir.
+
+fijo _JUGADORES_OPCIONES = ["maximo", "teclado", "botones", "teclas"]
+sea _jugadores = []     # [{"numero", "dispositivo": "teclado" o "mando", "mando": 1 a 4 o nulo}]
+
+# Las entradas de una acción que son de ese jugador
+funcion _entradas_suyas(val lista entradas, val diccionario j): lista {
+    sea r = []
+    para cada texto e en entradas {
+        sea de_mando = texto.posicion(e, "mando") == 0
+        si j["dispositivo"] == "teclado" {
+            si no de_mando { r.agregar(e) }
+        } sino si texto.posicion(e, "mando:") == 0 {
+            r.agregar("mando{j["mando"]}:" + texto.extraer(e, 6, e.longitud()))
+        } sino si texto.posicion(e, "mando{j["mando"]}:") == 0 {
+            r.agregar(e)
+        }
+    }
+    devolver r
+}
+
+funcion _definir_suya(val texto nombre, val lista entradas, val diccionario j): nulo {
+    juego.definir_accion("{nombre}@{j["numero"]}", _entradas_suyas(entradas, j))
+}
+
+# Rehace las copias de todas las acciones para todos los jugadores; las de un
+# número que ya no tiene jugador se quedan sin entradas (nunca se pulsan)
+funcion _rehacer_jugadores(val numero antes): nulo {
+    sea todas = juego.acciones()
+    para cada texto nombre en todas {
+        para cada diccionario j en _jugadores { _definir_suya(nombre, todas[nombre], j) }
+        para (k = _jugadores.longitud() + 1; k <= antes; k++) { juego.definir_accion("{nombre}@{k}", []) }
+    }
+}
+
+funcion _usado(val texto dispositivo, val cualquiera mando): logico {
+    para cada diccionario j en _jugadores {
+        si j["dispositivo"] == dispositivo y j["mando"] == mando { devolver verdadero }
+    }
+    devolver falso
+}
+
+funcion _nuevo_jugador(val texto dispositivo, val cualquiera mando): numero {
+    sea j = {"numero": _jugadores.longitud() + 1, "dispositivo": dispositivo, "mando": mando}
+    _jugadores.agregar(j)
+    sea todas = juego.acciones()
+    para cada texto nombre en todas { _definir_suya(nombre, todas[nombre], j) }
+    devolver j["numero"]
+}
+
+# unirse([opciones]): en cada fotograma, mientras se espera a los jugadores.
+# Un mando conectado que pulse A o INICIO (o el teclado, con ENTRAR o
+# ESPACIO) que aún no sea de nadie se une como el jugador siguiente. Devuelve
+# el número del que se acaba de unir, o nulo. Opciones: "maximo" (4),
+# "teclado" (verdadero: el teclado también puede ser un jugador), "botones"
+# (["a", "inicio"]) y "teclas" (["entrar", "espacio"]).
+funcion unirse(val cualquiera opciones = nulo): cualquiera {
+    sea op = _ui_opciones(opciones, _JUGADORES_OPCIONES, "unirse")
+    sea maximo = _de(op, "maximo", 4)
+    si no (maximo es numero) o maximo < 1 o maximo > 8 { lanzar ErrorArgumento("unirse(): \"maximo\" va de 1 a 8 jugadores") }
+    si _jugadores.longitud() >= maximo { devolver nulo }
+    para (m = 1; m <= 4; m++) {
+        si _usado("mando", m) o no juego.mando_conectado(m) { continuar }
+        para cada texto b en _de(op, "botones", ["a", "inicio"]) {
+            si juego.boton_pulsado(b, m) { devolver _nuevo_jugador("mando", m) }
+        }
+    }
+    si _de(op, "teclado", verdadero) y no _usado("teclado", nulo) {
+        para cada texto t en _de(op, "teclas", ["entrar", "espacio"]) {
+            si juego.tecla_pulsada(t) { devolver _nuevo_jugador("teclado", nulo) }
+        }
+    }
+    devolver nulo
+}
+
+# jugadores(): los que se han unido, en orden: [{"numero", "dispositivo"
+# ("teclado" o "mando"), "mando" (1 a 4, o nulo), "conectado"}]. Si se
+# desconecta su mando, "conectado" es falso (para pausar) y, al volver a
+# conectarlo, sigue siendo el mismo jugador.
+funcion jugadores(): lista {
+    sea r = []
+    para cada diccionario j en _jugadores {
+        r.agregar({"numero": j["numero"], "dispositivo": j["dispositivo"], "mando": j["mando"],
+            "conectado": j["dispositivo"] == "teclado" o juego.mando_conectado(j["mando"])})
+    }
+    devolver r
+}
+
+# quitar_jugador(n): se va; los de detrás pasan a tener un número menos
+funcion quitar_jugador(val numero n): nulo {
+    si n < 1 o n > _jugadores.longitud() o matematica.piso(n) != n { lanzar ErrorArgumento("quitar_jugador(): no hay jugador {n}") }
+    sea antes = _jugadores.longitud()
+    sea quedan = []
+    para cada diccionario j en _jugadores {
+        si j["numero"] != n {
+            j["numero"] = quedan.longitud() + 1
+            quedan.agregar(j)
+        }
+    }
+    _jugadores = quedan
+    _rehacer_jugadores(antes)
+}
+
+# olvidar_jugadores(): se van todos (para volver a la pantalla de unirse)
+funcion olvidar_jugadores(): nulo {
+    sea antes = _jugadores.longitud()
+    _jugadores = []
+    _rehacer_jugadores(antes)
+}
+
+# pantalla_partida(n): las zonas de la pantalla para n jugadores (de 1 a 4),
+# para la "zona" de camara(): uno, toda; dos, una mitad cada uno (lado a lado,
+# o una encima de otra con "lado_a_lado": falso); tres y cuatro, en cuartos
+funcion pantalla_partida(val numero n, val cualquiera opciones = nulo): lista {
+    sea op = _ui_opciones(opciones, ["lado_a_lado"], "pantalla_partida")
+    si n < 1 o n > 4 o matematica.piso(n) != n { lanzar ErrorArgumento("pantalla_partida(): de 1 a 4 jugadores") }
+    sea w = juego.ancho()
+    sea h = juego.alto()
+    si n == 1 { devolver [[0, 0, w, h]] }
+    si n == 2 {
+        si _de(op, "lado_a_lado", verdadero) { devolver [[0, 0, w / 2, h], [w / 2, 0, w - w / 2, h]] }
+        devolver [[0, 0, w, h / 2], [0, h / 2, w, h - h / 2]]
+    }
+    sea zonas = [[0, 0, w / 2, h / 2], [w / 2, 0, w - w / 2, h / 2], [0, h / 2, w / 2, h - h / 2], [w / 2, h / 2, w - w / 2, h - h / 2]]
+    sea r = []
+    para (k = 0; k < n; k++) { r.agregar(zonas[k]) }
+    devolver r
+}
+
+# menu_jugadores([opciones]): la pantalla de «pulsa un botón para unirte», en
+# cada fotograma (como menu_controles). Enseña un hueco por jugador. El que
+# se ha unido se va con B (o ESCAPE, el del teclado), y cualquiera de ellos
+# empieza con INICIO (o ENTRAR) cuando son al menos "minimo". Devuelve nulo
+# mientras se espera, la lista de jugadores() al empezar, o "volver" si se
+# pulsa B o ESCAPE sin nadie unido. Opciones: las de unirse(), "minimo" (1),
+# "titulo", "escala" (2), "fuente", "color" y "color_elegido".
+sea _mj_listo = 0       # el fotograma en que se unió alguien (para que esa pulsación no empiece ya)
+
+funcion menu_jugadores(val cualquiera opciones = nulo): cualquiera {
+    sea op = _ui_opciones(opciones, ["maximo", "teclado", "botones", "teclas", "minimo", "titulo", "escala", "fuente", "color",
+        "color_elegido"], "menu_jugadores")
+    sea para_unirse = {}
+    para cada texto c en _JUGADORES_OPCIONES { si op.contiene(c) { para_unirse[c] = op[c] } }
+    sea maximo = _de(op, "maximo", 4)
+    sea minimo = _de(op, "minimo", 1)
+    si no (minimo es numero) o minimo < 1 o minimo > maximo { lanzar ErrorArgumento("menu_jugadores(): \"minimo\" va de 1 a \"maximo\"") }
+    sea resultado = nulo
+    sea nuevo = unirse(para_unirse)
+    si nuevo == nulo {
+        # irse (B o ESCAPE) o empezar (INICIO o ENTRAR), cada uno con lo suyo
+        para cada diccionario j en jugadores() {
+            sea m = j["mando"]
+            sea irse = si m == nulo { juego.tecla_pulsada("escape") } sino { juego.boton_pulsado("b", m) }
+            sea empezar = si m == nulo { juego.tecla_pulsada("entrar") } sino { juego.boton_pulsado("inicio", m) }
+            si irse {
+                quitar_jugador(j["numero"])
+                romper
+            }
+            si empezar y _jugadores.longitud() >= minimo { resultado = jugadores() }
+        }
+        si resultado == nulo y _jugadores.longitud() == 0 y (juego.tecla_pulsada("escape") o juego.boton_pulsado("b")) {
+            resultado = "volver"
+        }
+    }
+    # dibujar
+    sea camara = juego.camara_actual()
+    juego.camara()
+    # los textos, y la letra más pequeña si no caben
+    sea hay_teclado = _de(op, "teclado", verdadero)
+    sea titulo = traducir(_de(op, "titulo", "JUGADORES"))
+    sea filas = []
+    para (k = 1; k <= maximo; k++) {
+        si k <= _jugadores.longitud() {
+            sea j = _jugadores[k - 1]
+            sea de = si j["dispositivo"] == "teclado" { traducir("TECLADO") } sino { traducir("MANDO {}", [j["mando"]]) }
+            filas.agregar(traducir("JUGADOR {}: {}", [k, de]))
+        } sino {
+            filas.agregar(traducir(si hay_teclado { "PULSA A O ENTRAR PARA UNIRTE" } sino { "PULSA A PARA UNIRTE" }))
+        }
+    }
+    sea pie = [traducir(si _jugadores.longitud() > 0 { "B O ESCAPE: SALIR" } sino { "B O ESCAPE: VOLVER" })]
+    si _jugadores.longitud() >= minimo { pie = [traducir("INICIO O ENTRAR: EMPEZAR")] + pie }
+    sea escala = _de(op, "escala", 2)
+    sea letra = _ui_letra(op, escala)
+    mientras escala > 1 y no op.contiene("fuente") {
+        sea mayor = 0
+        para cada texto t en filas + pie + [titulo] { mayor = matematica.maximo(mayor, juego.ancho_texto(t, letra)) }
+        si mayor <= juego.ancho() * 0.94 y juego.medir_texto("Ay", letra)[1] * 2 * (maximo + 4) <= juego.alto() * 0.95 { romper }
+        escala = escala - 1
+        letra = _ui_letra(op, escala)
+    }
+    sea alto = juego.medir_texto("Ay", letra)[1]
+    sea gris = [150, 150, 170]
+    sea normal = _de(op, "color", [210, 210, 220])
+    sea amarillo = _de(op, "color_elegido", [255, 220, 80])
+    funcion escribir_en(val texto t, val numero y, val lista color): nulo {
+        sea o2 = {"color": color, "alinear": "centro"}
+        para cada texto c en letra { o2[c] = letra[c] }
+        juego.texto(t, juego.ancho() / 2, y, o2)
+    }
+    sea paso = alto * 2
+    sea arriba = juego.alto() / 2 - paso * (maximo + 4) / 2
+    escribir_en(titulo, arriba, normal)
+    para (k = 1; k <= maximo; k++) {
+        escribir_en(filas[k - 1], arriba + (k + 1) * paso, si k <= _jugadores.longitud() { amarillo } sino { gris })
+    }
+    para (k = 0; k < pie.longitud(); k++) { escribir_en(pie[k], arriba + (maximo + 2.5 + k * 0.7) * paso, gris) }
+    juego.camara(camara)
     devolver resultado
 }
 

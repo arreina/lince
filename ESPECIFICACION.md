@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.6
+# 🐆 Lince — Especificación del Lenguaje v1.8
 
 ## Filosofía
 
@@ -1297,10 +1297,10 @@ minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del j
 |---|---|
 | `tecla(nombre)` · `tecla_pulsada(n)` · `tecla_soltada(n)` | mantenida / pulsada en este fotograma / soltada en este fotograma |
 | `raton()` · `boton_raton(n)` · `clic(n)` · `boton_raton_soltado(n)` · `rueda()` | `[x, y]` · botón mantenido (1 izquierdo, 2 central, 3 derecho) · clic de este fotograma · soltado en este fotograma · giro de la rueda |
-| `mandos()` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `boton_soltado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4) · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
+| `mandos()` · `mando_conectado(mando)` · `boton(nombre[, mando])` · `boton_pulsado(nombre[, mando])` · `boton_soltado(nombre[, mando])` · `eje(nombre[, mando])` | mandos conectados (hasta 4; `mando` va de 1 a 4; cada uno conserva su número aunque se desconecte otro, y al volver a conectarlo suele recuperarlo) · ¿está ese? · botones `a`, `b`, `x`, `y`, `lb`, `rb`, `inicio`, `atras`, `guia`, `arriba`, `abajo`, `izquierda`, `derecha`, `stick_izq`, `stick_der` · ejes `izq_x`, `izq_y`, `der_x`, `der_y` (−1 a 1) y gatillos `lt`, `rt` (0 a 1) |
 | `cursor(visible)` · `capturar_raton(si)` · `movimiento_raton()` | muestra u oculta la flecha · encierra y oculta el ratón para apuntar (devuelve si se pudo) · `[dx, dy]` movido desde el fotograma anterior |
 | `mando_tactil([opciones])` · `mando_tactil(falso)` | el mando de la pantalla táctil, como el de los juegos de móvil: a la izquierda una palanca que aparece donde se apoya el pulgar, y a la derecha los botones. **Sale solo** en un móvil (o con pantalla táctil) si alguna acción usa el mando, con los botones que usan (`"mando:a"`, `"mando:x"`...; `inicio` va arriba) y la palanca si usan la palanca izquierda o la cruceta; **se esconde** mientras haya un mando de verdad conectado (por Bluetooth o cable) y vuelve si se desconecta. Funciona como un mando de verdad (se suma al mando 1), así que un juego hecho para teclado y mando se juega en el móvil sin cambiar nada; la palanca también hace de cruceta. `mando_tactil(opciones)` lo ajusta: `botones`, `palanca`, `alfa` (120), `tamaño` (1) y `siempre` (verdadero: también en el ordenador, con el ratón, y aunque haya mando); `mando_tactil(falso)` lo quita, para un juego con controles propios. Se dibuja encima de todo, sin moverse con la cámara. Está escrito en Lince |
-| `vibrar(segundos[, fuerza])` | hace vibrar el móvil y los mandos conectados (fuerza de 0 a 1): un golpe, una explosión. Donde no se puede, no hace nada |
+| `vibrar(segundos[, fuerza[, mando]])` | hace vibrar el móvil y los mandos conectados (fuerza de 0 a 1): un golpe, una explosión. Con `mando`, solo ese (el de un jugador: `jugadores()[0]["mando"]`). Donde no se puede, no hace nada |
 | `inclinacion()` | `[x, y]` de -1 a 1: hacia dónde rodaría una bola sobre la pantalla del móvil (x a la derecha, y hacia abajo), según cómo se incline; `[0, 0]` sin acelerómetro (en el ordenador) |
 | `acciones()` | `{nombre: [entradas]}`: las acciones definidas, con sus entradas como se escribieron (para enseñar los controles en un menú) |
 | `mando_virtual(botones, ejes)` | para hacer un mando propio: deja pulsados esos botones (`["a"]`) y esos ejes (`{"izq_x": -0.5}`) en el mando 1 hasta que se cambien |
@@ -1321,8 +1321,8 @@ x = x + juego.direccion("izquierda", "derecha") * 200 * juego.dt()   # gradual c
 | Función | Qué hace |
 |---|---|
 | `definir_accion(nombre, entradas)` | crea o sustituye la acción. Entradas: una tecla (`"espacio"`), `"mando:a"` (botón de cualquier mando), `"mando2:a"` (del mando 2), `"mando:izq_x-"` / `"mando:izq_x+"` (eje hacia un lado), `"raton:izquierdo"` / `"raton:central"` / `"raton:derecho"`, `"pantalla:x,y,ancho,alto"` (un botón en la pantalla táctil: cuenta mientras haya un dedo dentro de ese rectángulo; el juego lo dibuja como quiera), `"inclinacion:x-"` / `"inclinacion:x+"` / `"inclinacion:y-"` / `"inclinacion:y+"` (inclinar el móvil hacia ese lado: gradual, entera con media inclinación, y nada si apenas se inclina) |
-| `accion(n)` · `accion_pulsada(n)` · `accion_soltada(n)` | mantenida / empieza en este fotograma / termina en este fotograma |
-| `direccion(negativa, positiva)` | de −1 a 1: entero con teclas, gradual con el stick |
+| `accion(n[, jugador])` · `accion_pulsada(n[, jugador])` · `accion_soltada(n[, jugador])` | mantenida / empieza en este fotograma / termina en este fotograma. Con `jugador`, solo con lo suyo (ver **Varios jugadores**, abajo) |
+| `direccion(negativa, positiva[, jugador])` | de −1 a 1: entero con teclas, gradual con el stick |
 
 Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(nombre, 10)` en cada fotograma y `juego.tecla_pulsada("entrar")` para terminar.
 
@@ -1558,12 +1558,12 @@ si g != nulo {
 |---|---|
 | `golpe(animador, x, y[, opciones])` | la caja `[x, y, ancho, alto]` con la que golpea ahora, o `nulo`. Si en el mismo cuadro hay varias, las junta. Una animación que no se repite deja de golpear al acabar |
 | `libre(animador)` | ¿se puede cambiar ya de animación? (se repite, ha acabado o ha llegado a su `cancelar`) |
-| `combo(acciones[, segundos])` | ¿se han pulsado esas acciones en ese orden en los últimos `segundos` (0,5)? Puede haber otras pulsaciones en medio. Al dar verdadero, esas pulsaciones se gastan y ya no valen para otro combo, así que se pregunta antes por los largos: `["abajo", "adelante", "golpe"]` antes que `["golpe"]`. Con una sola acción sirve para no perder una pulsación que llega un poco antes de que el personaje pueda atacar: `combo(["golpe"], 0.25)` |
+| `combo(acciones[, segundos[, jugador]])` | ¿se han pulsado esas acciones en ese orden en los últimos `segundos` (0,5)? Puede haber otras pulsaciones en medio. Al dar verdadero, esas pulsaciones se gastan y ya no valen para otro combo, así que se pregunta antes por los largos: `["abajo", "adelante", "golpe"]` antes que `["golpe"]`. Con una sola acción sirve para no perder una pulsación que llega un poco antes de que el personaje pueda atacar: `combo(["golpe"], 0.25)` |
 | `congelar(segundos)` | para el juego ese tiempo (de verdad, no del juego): `dt()` da 0, y las animaciones, las partículas, `suavizar()` y `tiempo()` se quedan quietos. Unas centésimas al acertar un golpe (0,05 uno flojo, 0,1 uno fuerte) es lo que hace que se note. Los fundidos de las escenas y el temblor siguen |
 | `velocidad([v])` | lo rápido que pasa el tiempo del juego: 1 normal, 0,3 cámara lenta (el golpe final), 0 pausa. Sin nada, dice la que hay |
 | `temblor(fuerza[, segundos])` | la cámara tiembla hasta `fuerza` píxeles y se calma en `segundos` (0,3). Lo que se dibuja después de `camara()` (el marcador) no tiembla |
-| `mantenida(acción[, margen])` | cuántos segundos lleva pulsada (0 si no lo está). Con `margen`, si se soltó hace menos de esos segundos dice cuánto estuvo pulsada: para los golpes cargados, como «mantener atrás un segundo y luego adelante y patada» (al pulsar adelante, atrás ya se ha soltado): `mantenida("atras", 0.3) >= 1 y combo(["adelante", "patada"], 0.3)`. Se puede volver a definir la acción sin perder la carga |
-| `pulsaciones(acción[, segundos])` | cuántas veces se ha pulsado en los últimos `segundos` (0,5), también las que ya ha gastado `combo()`: para los golpes de machacar un botón (`pulsaciones("puño", 0.6) >= 4`) o para soltarse de un agarre |
+| `mantenida(acción[, margen[, jugador]])` | cuántos segundos lleva pulsada (0 si no lo está). Con `margen`, si se soltó hace menos de esos segundos dice cuánto estuvo pulsada: para los golpes cargados, como «mantener atrás un segundo y luego adelante y patada» (al pulsar adelante, atrás ya se ha soltado): `mantenida("atras", 0.3) >= 1 y combo(["adelante", "patada"], 0.3)`. Se puede volver a definir la acción sin perder la carga |
+| `pulsaciones(acción[, segundos[, jugador]])` | cuántas veces se ha pulsado en los últimos `segundos` (0,5), también las que ya ha gastado `combo()`: para los golpes de machacar un botón (`pulsaciones("puño", 0.6) >= 4`) o para soltarse de un agarre |
 
 `combo()` mira las acciones de `definir_accion()`. «Adelante» depende de hacia dónde mire el
 personaje: `combo(["abajo", "derecha", "golpe"])` si mira a la derecha. Los combos no pierden
@@ -1576,7 +1576,7 @@ también se pueden usar para hacer otras parecidas:
 |---|---|
 | `historial(segundos[, acciones])` | las pulsaciones de los últimos `segundos` (solo las de esas acciones, si se dicen), de la más antigua a la última. Cada una es `{"accion", "hace", "id", "gastada"}`: `hace` son los segundos que han pasado, en tiempo de verdad. Da `nulo` si alguna de las acciones no está definida |
 | `gastar(ids)` | marca esas pulsaciones (por su `id`) como gastadas, como hace `combo()` |
-| `estado_accion(acción)` | `{"pulsada", "mantenida", "soltada_hace", "duro"}`: si está pulsada, cuántos segundos lleva, hace cuánto se soltó (-1 si nunca) y cuánto duró pulsada la última vez. `nulo` si no está definida |
+| `estado_accion(acción[, jugador])` | `{"pulsada", "mantenida", "soltada_hace", "duro"}`: si está pulsada, cuántos segundos lleva, hace cuánto se soltó (-1 si nunca) y cuánto duró pulsada la última vez. `nulo` si no está definida |
 
 La inteligencia de los enemigos se escribe en Lince, normalmente como una máquina de estados: un
 `"estado"` en el diccionario de cada uno (acercarse, atacar, esperar, recibir, por los aires, en el
@@ -1839,6 +1839,33 @@ si juego.menu_controles() == "volver" { ...salir de las opciones... }
 | `restablecer_controles()` | vuelven los controles que definió el juego |
 | `entrada_pulsada()` | lo que se acaba de pulsar (tecla, botón del ratón, botón o dirección de la palanca de un mando), escrito como en `definir_accion` (`"espacio"`, `"mando:a"`, `"mando:izq_x-"`), o `nulo`: para hacer un menú de controles propio |
 
+**Varios jugadores.** Cada mando es un jugador, y el teclado (con el ratón) otro. Se unen pulsando
+un botón: con la pantalla hecha de `menu_jugadores()` o con `unirse()` en cada fotograma. Las
+acciones se definen una vez, como siempre (`"mando:a"`), y con el número de jugador como último
+argumento cada función mira solo lo suyo: las entradas `"mando:..."` pasan a ser de su mando, y las
+de teclado y ratón solo cuentan para el jugador del teclado. Lince hace la copia de cada acción para
+cada jugador y la rehace si el juego la vuelve a definir. Para un jugador que no está, nada está
+pulsado. Con `pantalla_partida(n)` y la `zona` de `camara()`, cada uno ve su trozo de pantalla.
+
+```lince
+sea quienes = juego.menu_jugadores({"maximo": 2})       # en cada fotograma, hasta que no sea nulo
+# ya jugando:
+para cada diccionario j en juego.jugadores() {
+    sea yo = personajes[j["numero"] - 1]
+    yo["vx"] = juego.direccion("izquierda", "derecha", j["numero"]) * 200
+    si juego.accion_pulsada("saltar", j["numero"]) y yo["en_suelo"] { yo["vy"] = -500 }
+    si no j["conectado"] { pausa = verdadero }          # se le ha desconectado el mando
+}
+```
+
+| Función | Qué hace |
+|---|---|
+| `menu_jugadores([opciones])` | la pantalla de «pulsa un botón para unirte», en cada fotograma: un hueco por jugador; A (o ENTRAR) une, B (o ESCAPE) quita al que lo pulsa e INICIO (o ENTRAR) empieza cuando hay al menos `minimo`. Devuelve `nulo` mientras espera, la lista de `jugadores()` al empezar, o `"volver"` con B o ESCAPE sin nadie unido. Opciones: las de `unirse`, `minimo` (1), `titulo`, `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
+| `unirse([opciones])` | para una pantalla propia, en cada fotograma: un mando (o el teclado) que pulse A o INICIO (ENTRAR o ESPACIO) y no sea de nadie se une como el siguiente jugador. Devuelve su número, o `nulo`. Opciones: `maximo` (4), `teclado` (verdadero: el teclado puede ser un jugador), `botones` y `teclas` |
+| `jugadores()` | `[{"numero", "dispositivo" ("mando" o "teclado"), "mando" (1 a 4, o nulo), "conectado"}]`. Si se desconecta su mando, `conectado` es falso (para pausar) y, al volver a conectarlo, sigue siendo el mismo jugador |
+| `quitar_jugador(n)` · `olvidar_jugadores()` | se va ese (los de detrás pasan a tener un número menos) · se van todos |
+| `pantalla_partida(n[, opciones])` | las zonas `[x, y, ancho, alto]` para `n` jugadores (1 a 4): uno, toda; dos, una mitad cada uno (lado a lado, o una encima de otra con `"lado_a_lado": falso`); tres y cuatro, en cuartos |
+
 **Idiomas.** Cada idioma del juego es un archivo `idiomas/<código>.txt` (`en.txt`, `fr.txt`...)
 junto al juego, con una traducción por línea:
 
@@ -1922,7 +1949,8 @@ Para pruebas automáticas (sin pantalla, con `SDL_VIDEODRIVER=dummy`): `LINCE_JU
 cierra el juego tras N fotogramas de 1/60 s; `LINCE_JUEGO_PULSAR=espacio,derecha` y
 `LINCE_JUEGO_CLIC=x,y` pulsan en los fotogramas impares; `LINCE_JUEGO_GUION=30:derecha:20,50:z`
 mantiene derecha desde el fotograma 30 durante 20 y pulsa z en el 50 (un guion de teclas, para
-probar combos); `LINCE_JUEGO_ESCRIBIR=texto` teclea
+probar combos); también con botones y ejes de un mando (`5:mando2:a:1`, `30:mando1:izq_x+:20`), que
+cuenta como conectado: para probar varios jugadores sin mandos; `LINCE_JUEGO_ESCRIBIR=texto` teclea
 (`<` borra); `LINCE_JUEGO_CAPTURA=ruta.bmp` guarda el último fotograma y
 `LINCE_JUEGO_FOTOS=carpeta` todos; `LINCE_JUEGO_AUDIO=ruta.wav` guarda el sonido sincronizado con
 esos fotogramas (para hacer un vídeo con sonido) y `LINCE_JUEGO_SEMILLA=n` hace las partidas repetibles.

@@ -679,4 +679,22 @@ for (x, y), esp, nombre in [((50, 20), (255, 0, 0), "polígono relleno"), ((15, 
     mira(px(x, y) == esp, "píxel: %s %s" % (nombre, "" if px(x, y) == esp else px(x, y)))
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida5b.txt; exit 1; }
+# ── 1.8: varios jugadores (mandos de mentira en el guion) ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=200 \
+    LINCE_JUEGO_GUION="5:mando2:a,10:entrar,15:mando1:inicio,20:mando3:a,30:mando2:a,35:espacio,40:mando2:izq_x+:3,55:espacio,62:mando1:b,72:mando3:a,76:mando3:inicio" \
+    timeout 60 "$LINCE" "$DIR/prueba28.lince" > salida34.txt 2>&1
+for l in "mandos: 3 verdadero falso" "se une el 1 en 5" "se une el 2 en 10" "se une el 3 en 15" \
+         'jugadores: [{"numero": 1, "dispositivo": mando, "mando": 2, "conectado": verdadero}, {"numero": 2, "dispositivo": teclado, "mando": nulo, "conectado": verdadero}, {"numero": 3, "dispositivo": mando, "mando": 1, "conectado": verdadero}]' \
+         "saltar (de todos) en 30: verdadero" "dirección del 1: 1 del 3: 0" "mantenida del 1: verdadero del 2: 0" \
+         "combo del 1: verdadero del 3: falso del 4: falso" \
+         'tras quitar al 1: [{"numero": 1, "dispositivo": teclado, "mando": nulo, "conectado": verdadero}, {"numero": 2, "dispositivo": mando, "mando": 1, "conectado": verdadero}]' \
+         'menu_jugadores en 76: [{"numero": 1, "dispositivo": mando, "mando": 3, "conectado": verdadero}]' \
+         'saltos: ["1@5", "1@30", "2@35", "1@55", "2@62"]' "acciones sin copias: 3" \
+         "partida 2: [[0, 0, 100, 100], [100, 0, 100, 100]] 3: 3" "una encima de otra: [0, 50, 200, 50]" \
+         "error: accion(): el jugador es un número de 1 a 8" 'error: unirse(): "maximo" va de 1 a 8 jugadores' \
+         "error: quitar_jugador(): no hay jugador 7" "error: pantalla_partida(): de 1 a 4 jugadores" \
+         "error: mando_conectado(): el mando va de 1 a 4" "error: vibrar(): el mando va de 1 a 4" \
+         'error: menu_jugadores(): "minimo" va de 1 a "maximo"'; do
+    grep -qxF "$l" salida34.txt && ok "1.8: ${l:0:70}" || mal "falta la línea: $l"
+done
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida5b.txt; exit 1; }
