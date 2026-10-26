@@ -3,6 +3,21 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.5.1
+
+Un arreglo.
+
+- **`texto()` acepta `"capa"`**, como decía la especificación: en la 1.5.0 daba «no conozco la opción 'capa'».
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.5.1-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.5.1-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.5.1.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.5.1.vsix` |
+
 ## 1.5.0
 
 Gráficos y texto en pantalla. Nada de lo que ya funcionaba cambia.

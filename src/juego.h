@@ -4342,7 +4342,7 @@ static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
     JgFuente *f = NULL;
     int es_fuente = op && valor_diccionario_buscar(op, "fuente") >= 0 && op->diccionario.valores[valor_diccionario_buscar(op, "fuente")]->tipo == VAL_NUMERO;
     if (op && !es_fuente) {                     /* unas opciones (no una fuente pasada tal cual) */
-        static const char *const V[] = {"fuente", "escala", "color", "alinear", "ancho", NULL};
+        static const char *const V[] = {"fuente", "escala", "color", "alinear", "ancho", "capa", NULL};
         if (!jg_opciones_validas(op, fn, V)) return valor_nulo();
     }
     if (op && valor_diccionario_buscar(op, "fuente") >= 0) {

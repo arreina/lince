@@ -13,6 +13,7 @@ mientras juego.abierto() {
     juego.capa()
     juego.rectangulo(20, 20, 30, 30, [0, 255, 0])                # capa 0, tras haber capas
     juego.dibujar(PUNTO, 15, 15, {"escala": 10, "capa": 1})
+    juego.texto("x", 5, 90, {"capa": 5, "color": [255, 255, 255]})       # también en texto()
     # cámara con zoom 2 en la zona de la derecha: el cuadro de 10 en el centro mide 20
     juego.camara(0, 0, {"zoom": 2, "zona": [100, 0, 100, 50]})
     juego.rectangulo(-1000, -1000, 3000, 3000, [40, 40, 40])
