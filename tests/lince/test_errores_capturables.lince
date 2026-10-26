@@ -7,13 +7,13 @@
 importar "texto"
 
 clase Caja {
-    funcion crear(val numero v): nulo { mi.v = v }
+    funcion crear(numero v): nulo { mi.v = v }
     funcion dime(): numero { devolver mi.v }
 }
 
-funcion doble(val numero x): numero { devolver x * 2 }
+funcion doble(numero x): numero { devolver x * 2 }
 
-generador cuenta(val numero hasta): numero {
+generador cuenta(numero hasta): numero {
     para (i = 0; i < hasta; i++) { producir i }
 }
 
@@ -310,7 +310,7 @@ importar "texto"
 intentar {
     fallar_aqui()
 } capturar (error e) {
-    escribir("{e.tipo} en línea {e.linea}, de ayuda_falla: {texto.termina_con(e.archivo, "ayuda_falla.lince")}")
+    escribir("{e.tipo} en línea {e.linea}, de ayuda_falla: {e.archivo.termina_con("ayuda_falla.lince")}")
 }
 # 'lanzar' sin capturar dice su línea; capturado, también
 intentar { lanzar Error("me rindo") } capturar (error e) { escribir("lanzado en la línea {e.linea}") }

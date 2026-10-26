@@ -1,7 +1,7 @@
 # @seccion: Funciones
 # @titulo: Closures
 # @nota: Una función recuerda el ámbito donde se creó, así que puede llevar estado.
-funcion contador_desde(val numero inicio): funcion {
+funcion contador_desde(numero inicio): funcion {
     sea n = inicio
     devolver funcion(): numero {
         n = n + 1

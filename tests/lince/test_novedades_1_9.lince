@@ -1,0 +1,24 @@
+# 1.9: lo que se hace con un texto, como métodos suyos (y los avisos de los
+# tipos que en la 2.0 serán un error van a la salida de errores: aquí no salen)
+sea t = "uno,dos,tres"
+escribir(t.dividir(","))
+escribir("hola".posicion("la"))
+escribir("hola".posicion("z"))
+escribir("banana".contar("a"))
+escribir("ñandú".extraer(1, 4))
+escribir("lince".invertir())
+escribir("ñu".a_lista())
+escribir("{"12".es_numero()} {"1a".es_numero()} {"abc".es_letra()}")
+escribir("{"hola".empieza_con("ho")} {"hola".termina_con("la")} {"hola".termina_con("x")}")
+escribir("7".rellenar_izq(3, "0") + "|" + "7".rellenar_der(3, ".") + "|" + "7".centrar(5, "-"))
+sea s = "a-b"
+escribir(s.dividir("-").longitud())
+intentar { sea r = "x".dividir() } capturar (error e) { escribir("{e.tipo}: {e.mensaje}") }
+intentar { sea r = "x".no_existe() } capturar (error e) { escribir("{e.mensaje}") }
+# los parámetros sin 'val' son como siempre
+funcion doble(numero x): numero {
+    x = x * 2
+    devolver x
+}
+sea n = 4
+escribir("{doble(n)} {n}")

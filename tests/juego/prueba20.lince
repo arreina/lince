@@ -4,28 +4,28 @@
 importar "juego"
 juego.abrir("Tiled", 80, 48)
 para cada texto ruta en ["tiled/nivel.tmx", "tiled/nivel.tmj", "tiled/infinito.tmx", "tiled/infinito.tmj"] {
-    sea m = juego.mapa_tiled(ruta)
+    sea m = juego.mapa.tiled(ruta)
     escribir("{ruta}: {m["columnas"]}x{m["filas"]}, casilla {m["tamaño"]}, capas {m["capas"]}")
     escribir("propiedades: {m["propiedades"]["musica"]} {m["propiedades"]["gravedad"]}")
     para cada diccionario obj en m["objetos"] {
         escribir("objeto: {obj["nombre"]} {obj["tipo"]} {obj["x"]},{obj["y"]} {obj["ancho"]}x{obj["alto"]} {obj["forma"]} {obj["propiedades"]}")
     }
-    escribir("casillas: {juego.casilla(m, 0, 5)} {juego.casilla(m, 5, 3)} {juego.casilla(m, 0, 0)} {juego.solido(m, 3, 5)}")
+    escribir("casillas: {juego.mapa.casilla(m, 0, 5)} {juego.mapa.casilla(m, 5, 3)} {juego.mapa.casilla(m, 0, 0)} {juego.mapa.solido(m, 3, 5)}")
     # cae hasta el suelo rojo sin atravesarlo
     sea yo = {"x": 18, "y": 0, "ancho": 6, "alto": 6, "vx": 0, "vy": 0}
     para (i = 0; i < 60; i++) {
         yo["vy"] = yo["vy"] + 900 / 60
-        juego.mover_en_mapa(m, yo, 1 / 60)
+        juego.mapa.mover(m, yo, 1 / 60)
     }
     escribir("cae a y={yo["y"]} en_suelo={yo["en_suelo"]}")
 }
-sea nivel = juego.mapa_tiled("tiled/nivel.tmx")
-intentar { juego.dibujar_tiled(nivel, "NoExiste") } capturar (error e) { escribir("error: {e.mensaje}") }
-intentar { juego.mapa_tiled("tiled/no_esta.tmx") } capturar (error e) { escribir("error: {e.mensaje}") }
-intentar { juego.mapa_tiled("tiled/nivel.tmx", {"solid": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
+sea nivel = juego.mapa.tiled("tiled/nivel.tmx")
+intentar { juego.mapa.dibujar_tiled(nivel, "NoExiste") } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.mapa.tiled("tiled/no_esta.tmx") } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.mapa.tiled("tiled/nivel.tmx", {"solid": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
 mientras juego.abierto() {
     juego.limpiar([0, 0, 0])
-    juego.dibujar_tiled(nivel, "Fondo")
-    juego.dibujar_tiled(nivel, ["Suelo"])
+    juego.mapa.dibujar_tiled(nivel, "Fondo")
+    juego.mapa.dibujar_tiled(nivel, ["Suelo"])
     juego.presentar()
 }

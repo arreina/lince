@@ -55,7 +55,7 @@ mientras juego.abierto() {
     }
     # caen, y las que salen por abajo se quitan de la lista
     para cada diccionario e en estrellas { e["y"] = e["y"] + e["vel"] * dt }
-    estrellas = filtrar(estrellas, funcion(val diccionario e): logico { devolver e["y"] < ALTO + 20 })
+    estrellas = filtrar(estrellas, funcion(diccionario e): logico { devolver e["y"] < ALTO + 20 })
 
     juego.limpiar([20, 24, 48])
     para cada diccionario e en estrellas {

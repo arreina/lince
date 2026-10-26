@@ -23,13 +23,13 @@ sea puntos2 = 0
 sea jugadores = 1
 sea en_juego = falso
 
-funcion limitar(val numero v, val numero minimo, val numero maximo): numero {
+funcion limitar(numero v, numero minimo, numero maximo): numero {
     si v < minimo { devolver minimo }
     si v > maximo { devolver maximo }
     devolver v
 }
 
-funcion sacar(val numero dir): nulo {
+funcion sacar(numero dir): nulo {
     bx = ANCHO / 2
     by = ALTO / 2
     vx = 330 * dir
@@ -76,13 +76,13 @@ mientras juego.abierto() {
             juego.pitido(300, 0.04)
         }
 
-        si vx < 0 y juego.colision(bx - 8, by - 8, 16, 16, 30, y1, PALA_W, PALA_H) {
+        si vx < 0 y juego.colision([bx - 8, by - 8, 16, 16], [30, y1, PALA_W, PALA_H]) {
             bx = 30 + PALA_W + 8
             vx = -vx * 1.06
             vy = vy + ((by - (y1 + PALA_H / 2)) / (PALA_H / 2)) * 160
             juego.pitido(520, 0.06)
         }
-        si vx > 0 y juego.colision(bx - 8, by - 8, 16, 16, ANCHO - 30 - PALA_W, y2, PALA_W, PALA_H) {
+        si vx > 0 y juego.colision([bx - 8, by - 8, 16, 16], [ANCHO - 30 - PALA_W, y2, PALA_W, PALA_H]) {
             bx = ANCHO - 30 - PALA_W - 8
             vx = -vx * 1.06
             vy = vy + ((by - (y2 + PALA_H / 2)) / (PALA_H / 2)) * 160
@@ -108,14 +108,14 @@ mientras juego.abierto() {
     juego.rectangulo(30, y1, PALA_W, PALA_H, CLARO)
     juego.rectangulo(ANCHO - 30 - PALA_W, y2, PALA_W, PALA_H, CLARO)
     juego.circulo(bx, by, 8, [255, 200, 80])
-    juego.texto(a_texto(puntos1), ANCHO / 2 - 80 - juego.ancho_texto(a_texto(puntos1), 6), 24, 6, CLARO)
-    juego.texto(a_texto(puntos2), ANCHO / 2 + 80, 24, 6, CLARO)
+    juego.texto(a_texto(puntos1), ANCHO / 2 - 80 - juego.ancho_texto(a_texto(puntos1), 6), 24, {"escala": 6, "color": CLARO})
+    juego.texto(a_texto(puntos2), ANCHO / 2 + 80, 24, {"escala": 6, "color": CLARO})
     si no en_juego {
         sea msg = "ESPACIO PARA SACAR"
-        juego.texto(msg, (ANCHO - juego.ancho_texto(msg, 3)) / 2, ALTO - 70, 3, [255, 200, 80])
+        juego.texto(msg, (ANCHO - juego.ancho_texto(msg, 3)) / 2, ALTO - 70, {"escala": 3, "color": [255, 200, 80]})
         sea modo = "1 JUGADOR  (1 / 2)"
         si jugadores == 2 { modo = "2 JUGADORES  (1 / 2)" }
-        juego.texto(modo, (ANCHO - juego.ancho_texto(modo, 2)) / 2, ALTO - 40, 2, [120, 126, 150])
+        juego.texto(modo, (ANCHO - juego.ancho_texto(modo, 2)) / 2, ALTO - 40, {"escala": 2, "color": [120, 126, 150]})
     }
     juego.presentar()
 }

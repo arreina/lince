@@ -7,6 +7,6 @@ importar "matematica"
 
 fijo PASO = juego.sonido("paso.wav")
 juego.reproducir(PASO, {"volumen": 0.6, "tono": 0.9 + matematica.aleatorio() * 0.2})
-juego.musica("musica/bosque.ogg", 0.5)          # en bucle
+juego.musica("musica/bosque.ogg", {"volumen": 0.5})          # en bucle
 juego.musica(nulo)                              # la para
 juego.volumen(0.8)                              # el volumen general

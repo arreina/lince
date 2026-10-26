@@ -5,7 +5,7 @@ importar "juego"
 
 juego.abrir("Tiles", 480, 270)
 fijo TILES = juego.hoja("recursos/tiles.png", 16)
-fijo NIVEL = juego.mapa([
+fijo NIVEL = juego.mapa.crear([
     "...............",
     "..c.......c....",
     "...............",
@@ -17,11 +17,11 @@ fijo NIVEL = juego.mapa([
 ], 32)
 mientras juego.abierto() {
     juego.limpiar([120, 190, 240])
-    juego.dibujar_mapa(NIVEL, {
+    juego.mapa.dibujar(NIVEL, {
         "h": [TILES, 0], "t": [TILES, 1], "x": [TILES, 5], "-": [TILES, 12], "c": [TILES, 10],
         "~": [TILES, [3, 4], 0.4],                 # agua: dos cuadros
         "$": [TILES, [6, 7, 8, 9], 0.12]           # monedas que giran
     })
-    juego.texto("MONEDAS: {juego.buscar_en_mapa(NIVEL, "$").longitud()}", 10, 8, 2)
+    juego.texto("MONEDAS: {juego.mapa.buscar(NIVEL, "$").longitud()}", 10, 8, {"escala": 2})
     juego.presentar()
 }

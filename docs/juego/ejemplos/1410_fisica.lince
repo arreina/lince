@@ -6,7 +6,7 @@
 importar "juego"
 
 juego.abrir("Física", 480, 270)
-fijo NIVEL = juego.mapa([
+fijo NIVEL = juego.mapa.crear([
     "###############",
     "#.............#",
     "#.............#",
@@ -17,18 +17,18 @@ fijo NIVEL = juego.mapa([
     "#.............#",
     "###############"
 ], 30)
-sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
+sea mundo = juego.fisica.mundo({"gravedad": 900, "mapa": NIVEL})
 para (i = 0; i < 4; i++) {
-    juego.cuerpo(mundo, {"x": 60 + i * 6, "y": 40 + i * 45, "ancho": 30, "alto": 30})       # una torre que cae
+    juego.fisica.cuerpo(mundo, {"x": 60 + i * 6, "y": 40 + i * 45, "ancho": 30, "alto": 30})       # una torre que cae
 }
-juego.cuerpo(mundo, {"x": 220, "y": 40, "radio": 12, "rebote": 0.8})
-juego.cuerpo(mundo, {"x": 280, "y": 60, "radio": 8, "rebote": 0.9, "masa": 0.5})
-juego.cuerpo(mundo, {"x": 340, "y": 190, "ancho": 70, "alto": 8, "fijo": verdadero, "vy": -40})
-juego.cuerpo(mundo, {"x": 360, "y": 150, "ancho": 24, "alto": 24})
+juego.fisica.cuerpo(mundo, {"x": 220, "y": 40, "radio": 12, "rebote": 0.8})
+juego.fisica.cuerpo(mundo, {"x": 280, "y": 60, "radio": 8, "rebote": 0.9, "masa": 0.5})
+juego.fisica.cuerpo(mundo, {"x": 340, "y": 190, "ancho": 70, "alto": 8, "fijo": verdadero, "vy": -40})
+juego.fisica.cuerpo(mundo, {"x": 360, "y": 150, "ancho": 24, "alto": 24})
 mientras juego.abierto() {
-    juego.avanzar_fisica(mundo)
+    juego.fisica.avanzar(mundo)
     juego.limpiar([25, 30, 45])
-    juego.dibujar_mapa(NIVEL, {"#": [70, 80, 110]})
+    juego.mapa.dibujar(NIVEL, {"#": [70, 80, 110]})
     para cada diccionario c en mundo["cuerpos"] {
         si c.contiene("radio") {
             juego.circulo(c["x"] + c["radio"], c["y"] + c["radio"], c["radio"], [240, 120, 90])

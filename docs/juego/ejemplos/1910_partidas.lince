@@ -5,11 +5,11 @@
 # @captura: no
 importar "juego"
 
-sea opciones = juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})
+sea opciones = juego.cargar_partida("opciones", {"musica": 0.8, "idioma": "es"})
 escribir("la primera vez: {opciones}")
-juego.guardar("opciones", {"musica": 0.3})
-juego.guardar("partida", {"nivel": 4, "vidas": 2, "llaves": ["roja", "azul"]})
-escribir("después: {juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})}")
-escribir("la partida: {juego.cargar("partida")}")
-juego.olvidar("partida")
-escribir("olvidada: {juego.cargar("partida")}")
+juego.guardar_partida("opciones", {"musica": 0.3})
+juego.guardar_partida("partida", {"nivel": 4, "vidas": 2, "llaves": ["roja", "azul"]})
+escribir("después: {juego.cargar_partida("opciones", {"musica": 0.8, "idioma": "es"})}")
+escribir("la partida: {juego.cargar_partida("partida")}")
+juego.olvidar_partida("partida")
+escribir("olvidada: {juego.cargar_partida("partida")}")

@@ -1555,6 +1555,121 @@ static ModuloExterno _modulo_externo = NULL;
 void modulo_fijar_externo(ModuloExterno fn) { _modulo_externo = fn; }
 
 /* Registra un módulo como diccionario en el entorno */
+/* ── Lo que la 2.0 cambiará (ver PENDIENTE.md y PROPUESTA_2.0.md) ──
+   Las funciones de los módulos que tienen otro nombre o forma en la 2.0. En la
+   1.9 siguen funcionando, pero avisan una vez; 'lince migrar' las cambia solas. */
+typedef struct { const char *modulo, *nombre, *mensaje; } Obsoleto;
+static const Obsoleto OBSOLETOS[] = {
+    {"juego", "fisica",         "juego.fisica(opciones) → juego.fisica.mundo(opciones)"},
+    {"juego", "cuerpo",         "juego.cuerpo → juego.fisica.cuerpo"},
+    {"juego", "quitar_cuerpo",  "juego.quitar_cuerpo → juego.fisica.quitar"},
+    {"juego", "avanzar_fisica", "juego.avanzar_fisica → juego.fisica.avanzar"},
+    {"juego", "tocando",        "juego.tocando → juego.fisica.tocando"},
+    {"juego", "empujar",        "juego.empujar → juego.fisica.empujar"},
+    {"juego", "bisagra",        "juego.bisagra → juego.fisica.bisagra"},
+    {"juego", "cuerda",         "juego.cuerda → juego.fisica.cuerda"},
+    {"juego", "quitar_union",   "juego.quitar_union → juego.fisica.quitar_union"},
+    {"juego", "puntos_union",   "juego.puntos_union → juego.fisica.puntos_union"},
+    {"juego", "centro_cuerpo",  "juego.centro_cuerpo → juego.fisica.centro"},
+    {"juego", "puntos_cuerpo",  "juego.puntos_cuerpo → juego.fisica.puntos"},
+    {"juego", "dibujar_cuerpo", "juego.dibujar_cuerpo → juego.fisica.dibujar"},
+    {"juego", "mapa",           "juego.mapa(filas, tamaño) → juego.mapa.crear(filas, tamaño)"},
+    {"juego", "mapa_tiled",     "juego.mapa_tiled → juego.mapa.tiled"},
+    {"juego", "casilla",        "juego.casilla → juego.mapa.casilla"},
+    {"juego", "poner_casilla",  "juego.poner_casilla → juego.mapa.poner"},
+    {"juego", "solido",         "juego.solido → juego.mapa.solido"},
+    {"juego", "casilla_en",     "juego.casilla_en → juego.mapa.casilla_en"},
+    {"juego", "buscar_en_mapa", "juego.buscar_en_mapa → juego.mapa.buscar"},
+    {"juego", "mover_en_mapa",  "juego.mover_en_mapa → juego.mapa.mover"},
+    {"juego", "dibujar_mapa",   "juego.dibujar_mapa → juego.mapa.dibujar"},
+    {"juego", "dibujar_tiled",  "juego.dibujar_tiled → juego.mapa.dibujar_tiled"},
+    {"juego", "camino",         "juego.camino → juego.mapa.camino"},
+    {"juego", "guardar",        "juego.guardar → juego.guardar_partida"},
+    {"juego", "cargar",         "juego.cargar → juego.cargar_partida"},
+    {"juego", "olvidar",        "juego.olvidar → juego.olvidar_partida"},
+    {"juego", "borrar_particulas", "juego.borrar_particulas → juego.quitar_particulas"},
+    {"juego", "colision_circulos", "juego.colision_circulos(x1, y1, r1, x2, y2, r2) → juego.colision({\"centro\": [x1, y1], \"radio\": r1}, {\"centro\": [x2, y2], \"radio\": r2})"},
+    {"juego", "colision_circulo_rect", "juego.colision_circulo_rect(cx, cy, r, x, y, ancho, alto) → juego.colision({\"centro\": [cx, cy], \"radio\": r}, [x, y, ancho, alto])"},
+    {"juego", "dentro",         "juego.dentro(px, py, x, y, ancho, alto) → juego.colision([px, py], [x, y, ancho, alto])"},
+    {"juego", "posicion_camara", "juego.posicion_camara() → juego.camara_actual() (sus \"x\" e \"y\")"},
+    {"texto", "dividir",      "texto.dividir(t, separador) → t.dividir(separador)"},
+    {"texto", "invertir",     "texto.invertir(t) → t.invertir()"},
+    {"texto", "a_lista",      "texto.a_lista(t) → t.a_lista()"},
+    {"texto", "posicion",     "texto.posicion(t, buscado) → t.posicion(buscado)"},
+    {"texto", "contar",       "texto.contar(t, buscado) → t.contar(buscado)"},
+    {"texto", "extraer",      "texto.extraer(t, desde, hasta) → t.extraer(desde, hasta)"},
+    {"texto", "es_numero",    "texto.es_numero(t) → t.es_numero()"},
+    {"texto", "es_letra",     "texto.es_letra(t) → t.es_letra()"},
+    {"texto", "empieza_con",  "texto.empieza_con(t, inicio) → t.empieza_con(inicio)"},
+    {"texto", "termina_con",  "texto.termina_con(t, final) → t.termina_con(final)"},
+    {"texto", "rellenar_izq", "texto.rellenar_izq(t, ancho, relleno) → t.rellenar_izq(ancho, relleno)"},
+    {"texto", "rellenar_der", "texto.rellenar_der(t, ancho, relleno) → t.rellenar_der(ancho, relleno)"},
+    {"texto", "centrar",      "texto.centrar(t, ancho, relleno) → t.centrar(ancho, relleno)"},
+    {"texto", "a_numero",     "texto.a_numero(t) → a_numero(t)"},
+    {"texto", "de_numero",    "texto.de_numero(n) → a_texto(n)"},
+    {"texto", "repetir",      "texto.repetir(t, n) → t * n"},
+    {"texto", "es_vacio",     "texto.es_vacio(t) → t == \"\""},
+};
+#define NUM_OBSOLETOS ((int)(sizeof OBSOLETOS / sizeof OBSOLETOS[0]))
+
+/* Los módulos ya cargados, para saber de cuál es una llamada */
+/* (el mismo módulo puede cargarse varias veces: el del programa y el de
+   juego.lince, que también importa "texto") */
+#define MAX_CONOCIDOS 64
+static struct { char *nombre; Valor *mod; } _modulos_conocidos[MAX_CONOCIDOS];
+static int _nmodulos_conocidos;
+
+static void modulo_conocido(const char *nombre, Valor *mod) {
+    for (int i = 0; i < _nmodulos_conocidos; i++) if (_modulos_conocidos[i].mod == mod) return;
+    int k = _nmodulos_conocidos < MAX_CONOCIDOS ? _nmodulos_conocidos++ : MAX_CONOCIDOS - 1;   /* lleno: el último se reutiliza */
+    if (_modulos_conocidos[k].nombre) free(_modulos_conocidos[k].nombre);
+    _modulos_conocidos[k].nombre = strdup(nombre);
+    _modulos_conocidos[k].mod = mod;
+}
+
+/* Marca las funciones del módulo 'nombre' que van a cambiar (para que llamarlas
+   mire la tabla; las demás no pagan nada) */
+static void modulo_marcar_obsoletas(const char *nombre, Valor *mod) {
+    for (int i = 0; i < NUM_OBSOLETOS; i++) {
+        if (strcmp(OBSOLETOS[i].modulo, nombre)) continue;
+        int k = valor_diccionario_buscar(mod, OBSOLETOS[i].nombre);
+        if (k < 0) continue;
+        Valor *v = mod->diccionario.valores[k];
+        if (v->tipo == VAL_FUNCION && v->funcion) v->funcion->obsoleta = 1;
+        if (v->tipo == VAL_DICCIONARIO) {                   /* una parte que aún se llama como antes */
+            int c = valor_diccionario_buscar(v, "__llamar__");
+            if (c >= 0 && v->diccionario.valores[c]->tipo == VAL_FUNCION) v->diccionario.valores[c]->funcion->obsoleta = 1;
+        }
+    }
+}
+
+static char *_obsoletos_avisados[256];
+static int _nobsoletos_avisados;
+
+void modulo_avisar_obsoleto(const char *clave, const char *mensaje, int linea) {
+    if (interprete_en_biblioteca()) return;           /* juego.lince es cosa de Lince */
+    if (linea < 0) linea = interprete_linea_nativa();
+    const char *e = getenv("LINCE_OBSOLETOS");
+    if (e && !strcmp(e, "0")) return;
+    for (int i = 0; i < _nobsoletos_avisados; i++) if (!strcmp(_obsoletos_avisados[i], clave)) return;
+    if (_nobsoletos_avisados < 256) _obsoletos_avisados[_nobsoletos_avisados++] = strdup(clave);
+    if (linea > 0) fprintf(stderr, "⚠️  Obsoleto en línea %d: %s. En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.\n", linea, mensaje);
+    else fprintf(stderr, "⚠️  Obsoleto: %s. En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.\n", mensaje);
+}
+
+void modulo_obsoleto_llamada(Valor *mod, const char *nombre, int linea) {
+    const char *de = NULL;
+    for (int i = 0; i < _nmodulos_conocidos; i++) if (_modulos_conocidos[i].mod == mod) de = _modulos_conocidos[i].nombre;
+    if (!de) return;
+    for (int i = 0; i < NUM_OBSOLETOS; i++)
+        if (!strcmp(OBSOLETOS[i].modulo, de) && !strcmp(OBSOLETOS[i].nombre, nombre)) {
+            char clave[80];
+            snprintf(clave, sizeof clave, "%s.%s", de, nombre);
+            modulo_avisar_obsoleto(clave, OBSOLETOS[i].mensaje, linea);
+            return;
+        }
+}
+
 static void registrar_modulo_diccionario(Entorno *entorno,
     const char *nombre_mod,
     FuncionNativa *fns, int num_fns,
@@ -1616,6 +1731,14 @@ static void registrar_modulo_diccionario(Entorno *entorno,
     }
 
     entorno_definir(entorno, nombre_mod, modulo, 0);
+    modulo_conocido(nombre_mod, modulo);
+    modulo_marcar_obsoletas(nombre_mod, modulo);
+}
+
+/* El módulo ya cargado con ese nombre, o NULL */
+static Valor *modulo_ya_cargado(const char *nombre) {      /* el último que se cargó con ese nombre */
+    for (int i = _nmodulos_conocidos - 1; i >= 0; i--) if (!strcmp(_modulos_conocidos[i].nombre, nombre)) return _modulos_conocidos[i].mod;
+    return NULL;
 }
 
 /* ─────────────────────────────────────────
@@ -1809,6 +1932,36 @@ static void cargar_texto(Entorno *entorno) {
     };
     registrar_modulo_diccionario(entorno, "texto",
         fns, 21, NULL, NULL, 0);
+}
+
+/* t.dividir(",") y compañía: las funciones del módulo texto que parten de un
+   texto, como métodos suyos (desde la 1.9; en la 2.0, solo así) */
+Valor *modulo_metodo_texto(const char *met, Valor *t, Valor **args, int num_args) {
+    static const FuncionNativa M[] = {
+        {"dividir", fn_txt_dividir, 2}, {"invertir", fn_txt_invertir, 1}, {"a_lista", fn_txt_a_lista, 1},
+        {"posicion", fn_txt_posicion, 2}, {"contar", fn_txt_contar, 2}, {"extraer", fn_txt_extraer, -1},
+        {"es_numero", fn_txt_es_numero, 1}, {"es_letra", fn_txt_es_letra, 1},
+        {"empieza_con", fn_txt_empieza_con, 2}, {"termina_con", fn_txt_termina_con, 2},
+        {"rellenar_izq", fn_txt_rellenar_izq, 3}, {"rellenar_der", fn_txt_rellenar_der, 3},
+        {"centrar", fn_txt_centrar, 3},
+    };
+    for (size_t i = 0; i < sizeof M / sizeof M[0]; i++) {
+        if (strcmp(M[i].nombre, met)) continue;
+        if (M[i].num_args >= 0 && num_args + 1 != M[i].num_args) {
+            hay_error = 1;
+            char msg[160];
+            snprintf(msg, sizeof msg, "'%s' de un texto necesita %d argumento%s.", met, M[i].num_args - 1,
+                     M[i].num_args - 1 == 1 ? "" : "s");
+            valor_error = valor_error_nuevo("ErrorArgumento", msg, 0);
+            return valor_nulo();
+        }
+        Valor *todos[8];
+        if (num_args > 7) num_args = 7;
+        todos[0] = t;
+        for (int k = 0; k < num_args; k++) todos[k + 1] = args[k];
+        return M[i].fn(todos, num_args + 1);
+    }
+    return NULL;
 }
 
 static void cargar_archivos(Entorno *entorno) {

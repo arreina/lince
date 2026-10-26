@@ -4,7 +4,7 @@
 importar "juego"
 
 juego.abrir("Camino", 480, 270)
-fijo LAB = juego.mapa([
+fijo LAB = juego.mapa.crear([
     "###############",
     "#.....#.......#",
     "#.###.#.#####.#",
@@ -16,8 +16,8 @@ fijo LAB = juego.mapa([
 ], 32)
 mientras juego.abierto() {
     juego.limpiar([20, 20, 30])
-    juego.dibujar_mapa(LAB, {"#": [70, 70, 100]})
-    para cada lista c en juego.camino(LAB, [1, 1], [13, 6]) {
+    juego.mapa.dibujar(LAB, {"#": [70, 70, 100]})
+    para cada lista c en juego.mapa.camino(LAB, [1, 1], [13, 6]) {
         juego.circulo(c[0] * 32 + 16, c[1] * 32 + 16, 5, [255, 210, 70])
     }
     juego.circulo(48, 48, 12, [240, 90, 90])

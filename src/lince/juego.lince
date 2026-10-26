@@ -18,12 +18,12 @@ importar "archivos"
 
 # ── Comprobaciones con el mismo mensaje en todas las funciones ──
 
-funcion _segundos(val numero s, val texto fn): nulo {
+funcion _segundos(numero s, texto fn): nulo {
     si s < 0 o s > 10 { lanzar ErrorArgumento("{fn}(): los segundos van de 0 a 10") }
 }
 
 # El estado de una acción definida con juego.definir_accion
-funcion _accion(val cualquiera a, val texto fn): diccionario {
+funcion _accion(cualquiera a, texto fn): diccionario {
     si no (a es texto) { lanzar ErrorTipo("{fn}() espera el nombre de una acción") }
     sea estado = juego.estado_accion(a)
     si estado == nulo { lanzar ErrorArgumento("{fn}(): la acción '{a}' no está definida (usa juego.definir_accion)") }
@@ -32,7 +32,7 @@ funcion _accion(val cualquiera a, val texto fn): diccionario {
 
 # Las pulsaciones de esas acciones en los últimos 'segundos'. historial() da
 # nulo si alguna no es una acción definida: entonces se mira cuál, para decirlo.
-funcion _historial(val numero segundos, val lista acciones, val texto fn): lista {
+funcion _historial(numero segundos, lista acciones, texto fn): lista {
     sea pulsadas = juego.historial(segundos, acciones)
     si pulsadas == nulo {
         para cada cualquiera a en acciones { _accion(a, fn) }
@@ -42,7 +42,7 @@ funcion _historial(val numero segundos, val lista acciones, val texto fn): lista
 
 # El nombre de la copia de esa acción para ese jugador ("saltar@2"), o nulo si
 # ese jugador no se ha unido (para él, nada está pulsado)
-funcion _accion_de(val cualquiera a, val cualquiera jugador, val texto fn): cualquiera {
+funcion _accion_de(cualquiera a, cualquiera jugador, texto fn): cualquiera {
     _accion(a, fn)
     si no (jugador es numero) o jugador < 1 o jugador > 8 o matematica.piso(jugador) != jugador {
         lanzar ErrorArgumento("{fn}(): el jugador es un número de 1 a 8")
@@ -59,7 +59,7 @@ funcion _accion_de(val cualquiera a, val cualquiera jugador, val texto fn): cual
 # verdadero, esas pulsaciones se gastan y no valen para otro combo (por eso se
 # pregunta antes por los combos largos). Con una sola acción sirve para no
 # perder una pulsación hecha un poco antes de tiempo: combo(["golpe"], 0.2).
-funcion combo(val cualquiera acciones, val numero segundos = 0.5, val cualquiera jugador = nulo): logico {
+funcion combo(cualquiera acciones, numero segundos = 0.5, cualquiera jugador = nulo): logico {
     si no (acciones es lista) o acciones.longitud() < 1 o acciones.longitud() > 32 {
         lanzar ErrorTipo("combo() espera (lista de acciones[, segundos[, jugador]]), por ejemplo ([\"abajo\", \"adelante\", \"golpe\"], 0.5)")
     }
@@ -88,7 +88,7 @@ funcion combo(val cualquiera acciones, val numero segundos = 0.5, val cualquiera
 # pulsaciones(accion[, segundos]): cuántas veces se ha pulsado en los últimos
 # 'segundos', también las que ya ha gastado combo(). Para los golpes de
 # machacar un botón y para soltarse de un agarre.
-funcion pulsaciones(val cualquiera accion, val numero segundos = 0.5, val cualquiera jugador = nulo): numero {
+funcion pulsaciones(cualquiera accion, numero segundos = 0.5, cualquiera jugador = nulo): numero {
     _segundos(segundos, "pulsaciones")
     si jugador != nulo {
         accion = _accion_de(accion, jugador, "pulsaciones")
@@ -101,7 +101,7 @@ funcion pulsaciones(val cualquiera accion, val numero segundos = 0.5, val cualqu
 # está). Con 'margen', si se soltó hace menos de esos segundos dice cuánto
 # estuvo pulsada: para los golpes cargados (mantener atrás un segundo y luego
 # adelante y golpe: al pulsar adelante, atrás ya se ha soltado).
-funcion mantenida(val cualquiera accion, val numero margen = 0, val cualquiera jugador = nulo): numero {
+funcion mantenida(cualquiera accion, numero margen = 0, cualquiera jugador = nulo): numero {
     si jugador != nulo {
         accion = _accion_de(accion, jugador, "mantenida")
         si accion == nulo { devolver 0 }
@@ -123,15 +123,15 @@ funcion mantenida(val cualquiera accion, val numero margen = 0, val cualquiera j
 
 fijo _CURVAS = ["lineal", "suave", "entrar", "salir", "rebote", "elastico", "atras"]
 
-funcion _nombre_curva(val cualquiera c, val texto fn): texto {
+funcion _nombre_curva(cualquiera c, texto fn): texto {
     si c == nulo { devolver "suave" }
     si c es texto y _CURVAS.contiene(c) { devolver c }
     lanzar ErrorArgumento(fn + "(): la curva es \"lineal\", \"suave\", \"entrar\", \"salir\", \"rebote\", \"elastico\" o \"atras\"")
 }
 
-funcion _al_cubo(val numero v): numero { devolver v * v * v }
+funcion _al_cubo(numero v): numero { devolver v * v * v }
 
-funcion _curva(val texto c, val numero t): numero {
+funcion _curva(texto c, numero t): numero {
     si t < 0 { t = 0 }
     si t > 1 { t = 1 }
     elegir c {
@@ -165,7 +165,7 @@ funcion _curva(val texto c, val numero t): numero {
 }
 
 # desde + (hasta - desde) * f, con números o con listas de números (posiciones, colores)
-funcion _interpolar(val cualquiera desde, val cualquiera hasta, val numero f, val texto fn): cualquiera {
+funcion _interpolar(cualquiera desde, cualquiera hasta, numero f, texto fn): cualquiera {
     si desde es numero y hasta es numero { devolver desde + (hasta - desde) * f }
     sea bien = desde es lista y hasta es lista y desde.longitud() == hasta.longitud()
     para (i = 0; bien y i < desde.longitud(); i++) {
@@ -180,15 +180,15 @@ funcion _interpolar(val cualquiera desde, val cualquiera hasta, val numero f, va
 }
 
 # curva(nombre, t): cuánto del camino se ha hecho en el momento t (de 0 a 1)
-funcion curva(val texto nombre, val numero t): numero {
+funcion curva(texto nombre, numero t): numero {
     devolver _curva(_nombre_curva(nombre, "curva"), t)
 }
 
 # suavizar(desde, hasta, segundos, inicio[, curva]): el valor que toca ahora
 # en un cambio de 'desde' a 'hasta' que empezó en 'inicio' (un juego.tiempo())
 # y dura 'segundos'; antes de empezar, 'desde', y al acabar, 'hasta'
-funcion suavizar(val cualquiera desde, val cualquiera hasta, val numero segundos, val numero inicio,
-        val cualquiera nombre_curva = nulo): cualquiera {
+funcion suavizar(cualquiera desde, cualquiera hasta, numero segundos, numero inicio,
+        cualquiera nombre_curva = nulo): cualquiera {
     sea c = _nombre_curva(nombre_curva, "suavizar")
     sea t = si segundos > 0 { (juego.tiempo() - inicio) / segundos } sino { 1 }
     devolver _interpolar(desde, hasta, _curva(c, t), "suavizar")
@@ -199,7 +199,7 @@ funcion suavizar(val cualquiera desde, val cualquiera hasta, val numero segundos
 # recorre en una décima de segundo unos dos tercios de lo que le falta, vaya
 # el juego a los fotogramas que vaya. Para una cámara que sigue al jugador,
 # una barra de vida que baja...
-funcion acercar(val cualquiera actual, val cualquiera objetivo, val numero rapidez): cualquiera {
+funcion acercar(cualquiera actual, cualquiera objetivo, numero rapidez): cualquiera {
     si rapidez < 0 { lanzar ErrorArgumento("acercar(): la rapidez no es negativa") }
     devolver _interpolar(actual, objetivo, 1 - matematica.potencia(matematica.E, -rapidez * juego.dt()), "acercar")
 }
@@ -232,14 +232,14 @@ funcion _aplicar_forzada(): nulo {
     }
 }
 
-funcion _poner_escena(val texto nombre): nulo {
+funcion _poner_escena(texto nombre): nulo {
     _escena = nombre
     _nueva = verdadero
     _desde = juego.tiempo()
 }
 
 # cambiar_escena(nombre[, fundido]): fundido en segundos (0 = de golpe)
-funcion cambiar_escena(val cualquiera nombre, val cualquiera fundido = 0): nulo {
+funcion cambiar_escena(cualquiera nombre, cualquiera fundido = 0): nulo {
     si no juego.abierto() { lanzar ErrorJuego("la ventana no está abierta: llama a juego.abrir() primero") }
     si no (nombre es texto) { lanzar ErrorTipo("cambiar_escena() espera (nombre[, segundos de fundido])") }
     si no (fundido es numero) { lanzar ErrorTipo("cambiar_escena(): el argumento 2 debe ser un número") }
@@ -322,18 +322,18 @@ funcion _fundido_escenas(): nulo {
 
 fijo _OPCIONES_ANIMACION = ["fila", "cuadros", "por_segundo", "repetir", "siguiente", "pisadas", "golpes", "cancelar", "hoja"]
 
-funcion _es_hoja(val cualquiera h): logico {
+funcion _es_hoja(cualquiera h): logico {
     devolver h es diccionario y h.contiene("hoja") y h["hoja"] es numero
 }
 
-funcion _es_animador(val cualquiera pj, val texto fn): diccionario {
+funcion _es_animador(cualquiera pj, texto fn): diccionario {
     si no (pj es diccionario) o no pj.contiene("animador") {
         lanzar ErrorTipo("{fn}() espera un animador de juego.animador()")
     }
     devolver pj
 }
 
-funcion _son_numeros(val cualquiera l): logico {
+funcion _son_numeros(cualquiera l): logico {
     si no (l es lista) { devolver falso }
     para cada cualquiera v en l {
         si no (v es numero) { devolver falso }
@@ -342,8 +342,8 @@ funcion _son_numeros(val cualquiera l): logico {
 }
 
 # Comprueba una opción de una animación; devuelve el mensaje si está mal, o nulo
-funcion _opcion_mala(val texto nombre, val texto c, val cualquiera v, val diccionario hoja,
-        val diccionario animaciones): cualquiera {
+funcion _opcion_mala(texto nombre, texto c, cualquiera v, diccionario hoja,
+        diccionario animaciones): cualquiera {
     elegir c {
         caso "fila" {
             si v es numero y v >= 0 y v < hoja["filas"] y v == matematica.piso(v) { devolver nulo }
@@ -387,7 +387,7 @@ funcion _opcion_mala(val texto nombre, val texto c, val cualquiera v, val diccio
 }
 
 # animador(hoja, animaciones[, inicial])
-funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera inicial = nulo): diccionario {
+funcion animador(cualquiera hoja, cualquiera animaciones, cualquiera inicial = nulo): diccionario {
     si no _es_hoja(hoja) o no (animaciones es diccionario) o animaciones.longitud() == 0 {
         lanzar ErrorTipo("animador() espera (hoja, \{nombre: \{\"fila\": n, \"por_segundo\": n, ...}, ...}[, inicial])")
     }
@@ -441,7 +441,7 @@ funcion animador(val cualquiera hoja, val cualquiera animaciones, val cualquiera
 # y el cuadro, cuántos han pasado (k), en qué posición de la secuencia va
 # (pos, de n)... Si la que había acabó y tiene "siguiente", pasa a esa como si
 # hubiera empezado justo al acabar.
-funcion _estado(val diccionario pj): cualquiera {
+funcion _estado(diccionario pj): cualquiera {
     sea animaciones = pj["animaciones"]
     para (vueltas = 0; vueltas < 8; vueltas++) {
         sea actual = pj["actual"]
@@ -472,7 +472,7 @@ funcion _estado(val diccionario pj): cualquiera {
 }
 
 # Para dibujar() y caja(): [hoja, fila, cuadro] de lo que toca, o nulo
-funcion _cuadro(val diccionario pj): cualquiera {
+funcion _cuadro(diccionario pj): cualquiera {
     sea e = _estado(pj)
     si e == nulo { devolver nulo }
     devolver [e["hoja"], e["fila"], e["cuadro"]]
@@ -480,7 +480,7 @@ funcion _cuadro(val diccionario pj): cualquiera {
 
 # animacion(animador, nombre[, desde_el_principio]): pone esa animación; si ya
 # estaba puesta sigue por donde iba, salvo que se pida empezar de nuevo
-funcion animacion(val cualquiera pj, val cualquiera nombre, val cualquiera desde_el_principio = falso): nulo {
+funcion animacion(cualquiera pj, cualquiera nombre, cualquiera desde_el_principio = falso): nulo {
     _es_animador(pj, "animacion")
     sea animaciones = pj["animaciones"]
     si no (nombre es texto) { lanzar ErrorTipo("animacion() espera (animador, nombre)") }
@@ -502,7 +502,7 @@ funcion animacion(val cualquiera pj, val cualquiera nombre, val cualquiera desde
 }
 
 # acabada(animador): ¿ha llegado al final una animación que no se repite?
-funcion acabada(val cualquiera pj): logico {
+funcion acabada(cualquiera pj): logico {
     sea e = _estado(_es_animador(pj, "acabada"))
     devolver e != nulo y e["acabada"]
 }
@@ -510,7 +510,7 @@ funcion acabada(val cualquiera pj): logico {
 # libre(animador): ¿se puede pasar ya a otra animación? Sí si la actual se
 # repite, si ha acabado o si ha llegado a su cuadro "cancelar" (así se
 # encadenan los golpes de un combo sin esperar a que acabe cada uno)
-funcion libre(val cualquiera pj): logico {
+funcion libre(cualquiera pj): logico {
     sea e = _estado(_es_animador(pj, "libre"))
     si e == nulo o e["repetir"] o e["acabada"] { devolver verdadero }
     devolver e["cfg"].contiene("cancelar") y e["k"] >= matematica.truncar(e["cfg"]["cancelar"])
@@ -520,7 +520,7 @@ funcion libre(val cualquiera pj): logico {
 # golpea ahora (la de "golpes" del cuadro que toca), puesta como se dibuja (las
 # mismas opciones que dibujar: escala, centrado, espejo...); nulo si en este
 # cuadro no golpea. Varias cajas en el mismo cuadro se juntan.
-funcion golpe(val cualquiera pj, val cualquiera px, val cualquiera py, val cualquiera opciones = nulo): cualquiera {
+funcion golpe(cualquiera pj, cualquiera px, cualquiera py, cualquiera opciones = nulo): cualquiera {
     _es_animador(pj, "golpe")
     si opciones != nulo y no (opciones es diccionario) {
         lanzar ErrorTipo("golpe(): las opciones van en un diccionario, como en dibujar()")
@@ -555,7 +555,7 @@ funcion golpe(val cualquiera pj, val cualquiera px, val cualquiera py, val cualq
 
 # Los cuadros con pisada de la animación actual (posiciones en su secuencia):
 # los que diga su "pisadas", o los que se ven en la hoja si se repite
-funcion _pisadas(val diccionario e): lista {
+funcion _pisadas(diccionario e): lista {
     sea cfg = e["cfg"]
     si cfg.contiene("pisadas") y cfg["pisadas"] es lista { devolver cfg["pisadas"] }
     sea calcular = si cfg.contiene("pisadas") { cfg["pisadas"] } sino { e["repetir"] }
@@ -566,7 +566,7 @@ funcion _pisadas(val diccionario e): lista {
 
 # pisada(animador): ¿ha tocado un pie el suelo desde la última vez que se
 # preguntó? (llámala una vez por fotograma)
-funcion pisada(val cualquiera pj): logico {
+funcion pisada(cualquiera pj): logico {
     sea e = _estado(_es_animador(pj, "pisada"))
     si e == nulo { devolver falso }
     # desde dónde mirar: lo último visto de esta misma animación, o justo antes de empezar
@@ -622,7 +622,7 @@ fijo _MT_MENSAJES = {
     "tamaño": "\"tamaño\" es un número mayor que 0 (1 es el tamaño normal)"
 }
 
-funcion _mt_bien(val texto c, val cualquiera v): logico {
+funcion _mt_bien(texto c, cualquiera v): logico {
     elegir c {
         caso "botones" {
             si no (v es lista) { devolver falso }
@@ -640,7 +640,7 @@ funcion _mt_bien(val texto c, val cualquiera v): logico {
 }
 
 # mando_tactil([opciones]) · mando_tactil(falso)
-funcion mando_tactil(val cualquiera opciones = nulo): nulo {
+funcion mando_tactil(cualquiera opciones = nulo): nulo {
     si opciones == falso {
         _mt = nulo
         _mt_quitado = verdadero
@@ -673,7 +673,7 @@ funcion _mt_lo_que_usan(): diccionario {
     sea acciones = juego.acciones()
     para cada texto nombre en acciones {
         para cada texto entrada en acciones[nombre] {
-            sea partes = texto.dividir(entrada, ":")
+            sea partes = entrada.dividir(":")
             si partes.longitud() == 2 y partes[0].contiene("mando") {
                 sea parte = partes[1]
                 si _MT_BOTONES.contiene(parte) y no usados.contiene(parte) { usados.agregar(parte) }
@@ -720,7 +720,7 @@ funcion _mt_medidas(): diccionario {
 
 # Dónde va cada botón: en rombo como en un mando (A abajo, B a la derecha, X a
 # la izquierda, Y arriba); con dos o menos, A y B en diagonal; "inicio", arriba
-funcion _mt_sitio(val texto b, val diccionario m): lista {
+funcion _mt_sitio(texto b, diccionario m): lista {
     sea c = m["centro"]
     sea d = m["boton"] * 1.35
     si b == "inicio" { devolver [m["ancho"] - m["boton"] * 1.6, m["boton"] * 1.4] }
@@ -740,7 +740,7 @@ funcion _mt_sitio(val texto b, val diccionario m): lista {
     devolver [c[0], c[1] - d]
 }
 
-funcion _mt_dentro(val diccionario t, val lista sitio, val numero radio): logico {
+funcion _mt_dentro(diccionario t, lista sitio, numero radio): logico {
     devolver matematica.distancia(t["x"], t["y"], sitio[0], sitio[1]) <= radio
 }
 
@@ -882,7 +882,7 @@ funcion _ui_atras(): logico {
 
 # El error de una opción mal escrita, como en las funciones de C:
 # «fn(): no conozco la opción 'x' (hay "a", "b" y "c")»
-funcion _no_conozco(val texto fn, val texto c, val lista validas): nulo {
+funcion _no_conozco(texto fn, texto c, lista validas): nulo {
     sea partes = []
     para cada texto v en validas { partes.agregar("\"" + v + "\"") }
     sea hay = partes[0]
@@ -893,17 +893,17 @@ funcion _no_conozco(val texto fn, val texto c, val lista validas): nulo {
 }
 
 # opciones[c], o 'defecto' si no está
-funcion _de(val diccionario opciones, val texto c, val cualquiera defecto): cualquiera {
+funcion _de(diccionario opciones, texto c, cualquiera defecto): cualquiera {
     si opciones.contiene(c) { devolver opciones[c] }
     devolver defecto
 }
 
-funcion _ui_sonar(val cualquiera opciones, val texto cual): nulo {
+funcion _ui_sonar(cualquiera opciones, texto cual): nulo {
     si opciones.contiene(cual) y opciones[cual] != nulo { juego.reproducir(opciones[cual]) }
 }
 
 # Las opciones de letra para texto() y ancho_texto()
-funcion _ui_letra(val diccionario opciones, val numero escala): diccionario {
+funcion _ui_letra(diccionario opciones, numero escala): diccionario {
     sea r = {"escala": escala}
     si opciones.contiene("fuente") { r["fuente"] = opciones["fuente"] }
     devolver r
@@ -912,7 +912,7 @@ funcion _ui_letra(val diccionario opciones, val numero escala): diccionario {
 fijo _MENU_OPCIONES = ["x", "y", "escala", "fuente", "color", "color_elegido", "separacion", "atras",
     "sonido_mover", "sonido_elegir"]
 
-funcion _ui_opciones(val cualquiera opciones, val lista validos, val texto fn): diccionario {
+funcion _ui_opciones(cualquiera opciones, lista validos, texto fn): diccionario {
     si opciones == nulo { devolver {} }
     si no (opciones es diccionario) { lanzar ErrorTipo("{fn}() espera un diccionario de opciones") }
     para cada texto c en opciones {
@@ -932,7 +932,7 @@ funcion _ui_opciones(val cualquiera opciones, val lista validos, val texto fn): 
 # pantalla), escala (3), fuente, color, color_elegido, separacion, atras (lo
 # que devuelve con escape o B: "Continuar" en una pausa), sonido_mover y
 # sonido_elegir. Vuelve a la primera opción si deja de verse un rato.
-funcion menu(val cualquiera textos, val cualquiera opciones = nulo): cualquiera {
+funcion menu(cualquiera textos, cualquiera opciones = nulo): cualquiera {
     si no (textos es lista) o textos.longitud() == 0 {
         lanzar ErrorTipo("menu() espera una lista de textos, como [\"Jugar\", \"Salir\"]")
     }
@@ -1020,11 +1020,11 @@ fijo _DIALOGO_OPCIONES = ["escala", "fuente", "color", "fondo", "borde", "veloci
 fijo _PAGINA_CAMPOS = ["texto", "nombre", "retrato", "respuestas"]
 
 # Un texto partido en líneas que no pasen de 'ancho'
-funcion _partir_lineas(val texto t, val numero ancho, val diccionario letra): lista {
+funcion _partir_lineas(texto t, numero ancho, diccionario letra): lista {
     sea lineas = []
-    para cada texto parrafo en texto.dividir(t, "\n") {
+    para cada texto parrafo en t.dividir("\n") {
         sea linea = ""
-        para cada texto palabra en texto.dividir(parrafo, " ") {
+        para cada texto palabra en parrafo.dividir(" ") {
             sea con = si linea == "" { palabra } sino { linea + " " + palabra }
             si linea != "" y juego.ancho_texto(con, letra) > ancho {
                 lineas.agregar(linea)
@@ -1039,7 +1039,7 @@ funcion _partir_lineas(val texto t, val numero ancho, val diccionario letra): li
 }
 
 # Las medidas de la caja
-funcion _dl_medidas(val diccionario aj, val logico con_retrato, val numero filas = 0): diccionario {
+funcion _dl_medidas(diccionario aj, logico con_retrato, numero filas = 0): diccionario {
     sea letra = _ui_letra(aj, _de(aj, "escala", 2))
     sea alto_letra = juego.medir_texto("Ay", letra)[1]
     sea margen = matematica.maximo(8, juego.ancho() / 50)
@@ -1053,7 +1053,7 @@ funcion _dl_medidas(val diccionario aj, val logico con_retrato, val numero filas
         "ancho_texto": juego.ancho() - margen * 2 - relleno * 2 - (si con_retrato { retrato + relleno } sino { 0 })}
 }
 
-funcion dialogo(val cualquiera paginas, val cualquiera opciones = nulo): nulo {
+funcion dialogo(cualquiera paginas, cualquiera opciones = nulo): nulo {
     sea aj = _ui_opciones(opciones, _DIALOGO_OPCIONES, "dialogo")
     si paginas es texto o paginas es diccionario { paginas = [paginas] }
     si no (paginas es lista) o paginas.longitud() == 0 {
@@ -1098,7 +1098,7 @@ funcion dialogo_abierto(): logico { devolver _dl != nulo o _dl_cerrando }
 funcion respuesta(): cualquiera { devolver _dl_respuesta }
 funcion cerrar_dialogo(): nulo { _dl = nulo }
 
-funcion _dl_total(val diccionario trozo): numero {
+funcion _dl_total(diccionario trozo): numero {
     sea n = 0
     para cada texto l en trozo["lineas"] { n = n + l.longitud() }
     devolver n
@@ -1256,7 +1256,7 @@ funcion _dibujar_dialogo(): nulo {
 fijo _FISICA_OPCIONES = ["gravedad", "mapa", "pasos", "iteraciones"]
 sea _cuerpos_creados = 0
 
-funcion fisica(val cualquiera opciones = nulo): diccionario {
+funcion fisica(cualquiera opciones = nulo): diccionario {
     sea op = _ui_opciones(opciones, _FISICA_OPCIONES, "fisica")
     sea g = _de(op, "gravedad", 900)
     si g es numero { g = [0, g] }
@@ -1268,7 +1268,7 @@ funcion fisica(val cualquiera opciones = nulo): diccionario {
         "_sin_choque": {}}
 }
 
-funcion _es_mundo(val cualquiera m, val texto fn): nulo {
+funcion _es_mundo(cualquiera m, texto fn): nulo {
     si no (m es diccionario) o no m.contiene("cuerpos") {
         lanzar ErrorTipo("{fn}() espera un mundo de juego.fisica()")
     }
@@ -1279,7 +1279,7 @@ funcion _es_mundo(val cualquiera m, val texto fn): nulo {
 # su esquina, como en las cajas). "fijo": no lo mueven los choques ni la
 # gravedad (suelos, paredes, plataformas que se mueven con su vx, vy).
 # "sensor": no choca, solo cuenta lo que toca (monedas, zonas).
-funcion cuerpo(val cualquiera mundo, val cualquiera datos): diccionario {
+funcion cuerpo(cualquiera mundo, cualquiera datos): diccionario {
     _es_mundo(mundo, "cuerpo")
     si no (datos es diccionario) { lanzar ErrorTipo("cuerpo() espera (mundo, \{\"x\": ..., \"y\": ..., \"ancho\": ..., \"alto\": ...})") }
     si datos.contiene("radio") {
@@ -1307,7 +1307,7 @@ funcion cuerpo(val cualquiera mundo, val cualquiera datos): diccionario {
     devolver datos
 }
 
-funcion quitar_cuerpo(val cualquiera mundo, val cualquiera c): nulo {
+funcion quitar_cuerpo(cualquiera mundo, cualquiera c): nulo {
     _es_mundo(mundo, "quitar_cuerpo")
     sea quedan = []
     para cada diccionario vecino en mundo["cuerpos"] {
@@ -1325,7 +1325,7 @@ funcion quitar_cuerpo(val cualquiera mundo, val cualquiera c): nulo {
 
 # empujar(cuerpo, fx, fy[, punto]): un golpe: cambia su velocidad según su
 # masa. Si gira y el golpe es en un punto [x, y] que no es su centro, gira.
-funcion empujar(val cualquiera c, val numero fx, val numero fy, val cualquiera punto = nulo): nulo {
+funcion empujar(cualquiera c, numero fx, numero fy, cualquiera punto = nulo): nulo {
     si c["fijo"] { devolver nulo }
     c["vx"] = c["vx"] + fx / c["masa"]
     c["vy"] = c["vy"] + fy / c["masa"]
@@ -1339,14 +1339,14 @@ funcion empujar(val cualquiera c, val numero fx, val numero fy, val cualquiera p
 }
 
 # tocando(mundo, cuerpo): los cuerpos que tocaba en el último avanzar_fisica()
-funcion tocando(val cualquiera mundo, val cualquiera c): lista {
+funcion tocando(cualquiera mundo, cualquiera c): lista {
     _es_mundo(mundo, "tocando")
     sea clave = "{c["id_fisica"]}"
     si mundo["toques"].contiene(clave) { devolver mundo["toques"][clave] }
     devolver []
 }
 
-funcion _apunta_toque(val diccionario mundo, val diccionario a, val diccionario b): nulo {
+funcion _apunta_toque(diccionario mundo, diccionario a, diccionario b): nulo {
     sea ka = "{a["id_fisica"]}"
     si no mundo["toques"].contiene(ka) { mundo["toques"][ka] = [] }
     sea ya = falso
@@ -1355,7 +1355,7 @@ funcion _apunta_toque(val diccionario mundo, val diccionario a, val diccionario 
 }
 
 # Mueve un cuerpo (dx, dy) sin meterlo en las paredes del mapa
-funcion _desplazar(val cualquiera mapa, val diccionario c, val numero dx, val numero dy): nulo {
+funcion _desplazar(cualquiera mapa, diccionario c, numero dx, numero dy): nulo {
     si mapa == nulo o c["sensor"] {
         c["x"] = c["x"] + dx
         c["y"] = c["y"] + dy
@@ -1366,14 +1366,14 @@ funcion _desplazar(val cualquiera mapa, val diccionario c, val numero dx, val nu
     sea suelo = c["en_suelo"]
     c["vx"] = dx
     c["vy"] = dy
-    juego.mover_en_mapa(mapa, c, 1)
+    juego.mapa.mover(mapa, c, 1)
     c["vx"] = vx
     c["vy"] = vy
     c["en_suelo"] = suelo o c["en_suelo"]
 }
 
 # ¿se tocan? Si sí, [nx, ny, cuanto]: hacia dónde hay que mover 'a' para separarlos
-funcion _solape(val diccionario a, val diccionario b): cualquiera {
+funcion _solape(diccionario a, diccionario b): cualquiera {
     sea ax = a["x"] + a["ancho"] / 2
     sea ay = a["y"] + a["alto"] / 2
     sea bx = b["x"] + b["ancho"] / 2
@@ -1411,7 +1411,7 @@ funcion _solape(val diccionario a, val diccionario b): cualquiera {
     devolver [0, si dy < 0 { -1 } sino { 1 }, py]
 }
 
-funcion _paso_fisica(val diccionario mundo, val numero dt): nulo {
+funcion _paso_fisica(diccionario mundo, numero dt): nulo {
     sea g = mundo["gravedad"]
     sea mapa = mundo["mapa"]
     sea cuerpos = mundo["cuerpos"]
@@ -1440,7 +1440,7 @@ funcion _paso_fisica(val diccionario mundo, val numero dt): nulo {
         si mapa != nulo y no c["sensor"] {
             sea vx = c["vx"]
             sea vy = c["vy"]
-            juego.mover_en_mapa(mapa, c, dt)
+            juego.mapa.mover(mapa, c, dt)
             sea e = c["rebote"]
             si c["en_suelo"] y vy > 0 {
                 c["vy"] = si vy * e > 40 { -vy * e } sino { 0 }
@@ -1514,7 +1514,7 @@ funcion _paso_fisica(val diccionario mundo, val numero dt): nulo {
 
 # avanzar_fisica(mundo[, dt]): mueve todo lo de un fotograma (en pasos
 # pequeños, para que nada atraviese nada)
-funcion avanzar_fisica(val cualquiera mundo, val cualquiera dt = nulo): nulo {
+funcion avanzar_fisica(cualquiera mundo, cualquiera dt = nulo): nulo {
     _es_mundo(mundo, "avanzar_fisica")
     si dt == nulo { dt = juego.dt() }
     mundo["toques"] = {}
@@ -1533,7 +1533,7 @@ funcion avanzar_fisica(val cualquiera mundo, val cualquiera dt = nulo): nulo {
     # al acabar, en_suelo dice si está apoyado en algo
     para cada diccionario c en mundo["cuerpos"] {
         si no c["fijo"] y no c["en_suelo"] y mundo["mapa"] != nulo y no c["sensor"] y no c.contiene("_forma") {
-            c["en_suelo"] = juego.solido(mundo["mapa"], matematica.piso((c["x"] + c["ancho"] / 2) / mundo["mapa"]["tamaño"]),
+            c["en_suelo"] = juego.mapa.solido(mundo["mapa"], matematica.piso((c["x"] + c["ancho"] / 2) / mundo["mapa"]["tamaño"]),
                 matematica.piso((c["y"] + c["alto"] + 0.5) / mundo["mapa"]["tamaño"]))
         }
     }
@@ -1561,7 +1561,7 @@ fijo _CORREGIR_UNION = 0.3     # en las uniones, algo más
 fijo _SIN_BOTE = 40        # por debajo de esta velocidad (píxeles por segundo) no rebota
 
 # ancho y alto de un polígono, por sus puntos
-funcion _medir_puntos(val diccionario c): nulo {
+funcion _medir_puntos(diccionario c): nulo {
     sea ps = c["puntos"]
     sea uso = "cuerpo(): \"puntos\" es una lista de puntos [[x, y], [x, y], [x, y], ...] (al menos 3), desde (x, y)"
     si no (ps es lista) o ps.longitud() < 3 { lanzar ErrorTipo(uso) }
@@ -1579,7 +1579,7 @@ funcion _medir_puntos(val diccionario c): nulo {
 
 # La forma del cuerpo desde su centro de masas: {"radio"} o {"puntos", "normales"},
 # con "cm" (dónde está el centro desde (x, y)) e "inercia" (por unidad de masa)
-funcion _preparar_rigido(val diccionario c): nulo {
+funcion _preparar_rigido(diccionario c): nulo {
     si no c.contiene("angulo") { c["angulo"] = 0 }
     si no c.contiene("vgiro") { c["vgiro"] = 0 }
     si no c.contiene("gira") { c["gira"] = verdadero }
@@ -1638,14 +1638,14 @@ funcion _preparar_rigido(val diccionario c): nulo {
 }
 
 # El centro de masas de un cuerpo, [x, y] (en uno que no gira, el de su caja)
-funcion centro_cuerpo(val cualquiera c): lista {
+funcion centro_cuerpo(cualquiera c): lista {
     si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("centro_cuerpo() espera un cuerpo de juego.cuerpo()") }
     si c.contiene("_forma") { devolver [c["x"] + c["_forma"]["cm"][0], c["y"] + c["_forma"]["cm"][1]] }
     devolver [c["x"] + c["ancho"] / 2, c["y"] + c["alto"] / 2]
 }
 
 # puntos_cuerpo(c): su contorno en el mundo, ya girado (para poligono())
-funcion puntos_cuerpo(val cualquiera c): lista {
+funcion puntos_cuerpo(cualquiera c): lista {
     sea centro = centro_cuerpo(c)
     sea a = 0
     si c.contiene("_forma") { a = matematica.radianes(c["angulo"]) }
@@ -1672,7 +1672,7 @@ funcion puntos_cuerpo(val cualquiera c): lista {
 # dibujar_cuerpo(c[, color[, opciones]]): lo dibuja tal cual es (para probar,
 # o para juegos de formas). Opciones: las de poligono() ("relleno", "capa").
 # Con relleno, el borde va algo más oscuro (para que se distingan dos cajas juntas).
-funcion dibujar_cuerpo(val cualquiera c, val cualquiera color = [220, 220, 220], val cualquiera opciones = nulo): nulo {
+funcion dibujar_cuerpo(cualquiera c, cualquiera color = [220, 220, 220], cualquiera opciones = nulo): nulo {
     sea ps = puntos_cuerpo(c)
     sea op = {}
     si opciones != nulo {
@@ -1696,7 +1696,7 @@ funcion dibujar_cuerpo(val cualquiera c, val cualquiera color = [220, 220, 220],
 }
 
 # Pasa lo que puso el juego (x, y, angulo, vgiro) a lo de dentro (centro, radianes)
-funcion _rigidos_leer(val diccionario mundo): nulo {
+funcion _rigidos_leer(diccionario mundo): nulo {
     para cada diccionario c en mundo["cuerpos"] {
         si c.contiene("_forma") {
             sea f = c["_forma"]
@@ -1716,7 +1716,7 @@ funcion _rigidos_leer(val diccionario mundo): nulo {
     }
 }
 
-funcion _rigidos_escribir(val diccionario mundo): nulo {
+funcion _rigidos_escribir(diccionario mundo): nulo {
     para cada diccionario c en mundo["cuerpos"] {
         si c.contiene("_forma") {
             sea f = c["_forma"]
@@ -1730,7 +1730,7 @@ funcion _rigidos_escribir(val diccionario mundo): nulo {
 }
 
 # Dónde está cada cuerpo en este paso: centro, esquinas y normales giradas, y su caja
-funcion _geometria(val diccionario c): nulo {
+funcion _geometria(diccionario c): nulo {
     si c.contiene("_forma") {
         sea f = c["_forma"]
         si f.contiene("radio") {
@@ -1777,7 +1777,7 @@ funcion _geometria(val diccionario c): nulo {
     }
 }
 
-funcion _radio_de(val diccionario c): cualquiera {
+funcion _radio_de(diccionario c): cualquiera {
     si c.contiene("_forma") {
         si c["_forma"].contiene("radio") { devolver c["_forma"]["radio"] }
         devolver nulo
@@ -1788,7 +1788,7 @@ funcion _radio_de(val diccionario c): cualquiera {
 
 # Los puntos de contacto entre a y b: [nx, ny, separacion, x, y, clave] con la
 # normal de a hacia b y la separación negativa si se han metido uno en otro
-funcion _contactos(val diccionario a, val diccionario b): lista {
+funcion _contactos(diccionario a, diccionario b): lista {
     sea ra = _radio_de(a)
     sea rb = _radio_de(b)
     si ra != nulo y rb != nulo {
@@ -1819,7 +1819,7 @@ funcion _contactos(val diccionario a, val diccionario b): lista {
 }
 
 # Polígono p contra el círculo c (normal de p hacia c)
-funcion _poligono_circulo(val diccionario p, val diccionario c, val numero r): lista {
+funcion _poligono_circulo(diccionario p, diccionario c, numero r): lista {
     sea vs = p["_v"]
     sea ns = p["_n"]
     sea cx = c["_px"]
@@ -1858,7 +1858,7 @@ funcion _poligono_circulo(val diccionario p, val diccionario c, val numero r): l
 }
 
 # La cara de 'a' que más separa a 'b': [separacion, cual]
-funcion _mas_separados(val diccionario a, val diccionario b): lista {
+funcion _mas_separados(diccionario a, diccionario b): lista {
     sea va = a["_v"]
     sea na = a["_n"]
     sea vb = b["_v"]
@@ -1885,7 +1885,7 @@ funcion _mas_separados(val diccionario a, val diccionario b): lista {
 }
 
 # Deja de un segmento lo que queda del lado positivo de t (t·p >= d)
-funcion _recortar(val lista p1, val lista p2, val numero tx, val numero ty, val numero d, val texto corte): lista {
+funcion _recortar(lista p1, lista p2, numero tx, numero ty, numero d, texto corte): lista {
     sea d1 = p1[0] * tx + p1[1] * ty - d
     sea d2 = p2[0] * tx + p2[1] * ty - d
     sea r = []
@@ -1900,7 +1900,7 @@ funcion _recortar(val lista p1, val lista p2, val numero tx, val numero ty, val 
 
 # Dos polígonos: la cara que menos se mete de uno de ellos (la de referencia)
 # y la cara del otro que da contra ella, recortada por los lados de la primera
-funcion _poligonos(val diccionario a, val diccionario b): lista {
+funcion _poligonos(diccionario a, diccionario b): lista {
     sea sa = _mas_separados(a, b)
     si sa[0] > 0 { devolver [] }
     sea sb = _mas_separados(b, a)
@@ -1958,7 +1958,7 @@ funcion _poligonos(val diccionario a, val diccionario b): lista {
 }
 
 # Una casilla sólida del mapa, como un cuerpo fijo (se guarda para la próxima vez)
-funcion _casilla_cuerpo(val diccionario mundo, val numero col, val numero fila, val numero t): diccionario {
+funcion _casilla_cuerpo(diccionario mundo, numero col, numero fila, numero t): diccionario {
     sea k = "{col},{fila}"
     si mundo["_casillas"].contiene(k) { devolver mundo["_casillas"][k] }
     sea x = col * t
@@ -1977,7 +1977,7 @@ funcion _casilla_cuerpo(val diccionario mundo, val numero col, val numero fila, 
 
 # Prepara un contacto para resolverlo: masas efectivas, cuánto corregir y el
 # impulso del paso anterior (que se aplica ya: así empieza casi resuelto)
-funcion _preparar_contacto(val lista k, val numero dt, val diccionario cache): nulo {
+funcion _preparar_contacto(lista k, numero dt, diccionario cache): nulo {
     sea a = k[0]
     sea b = k[1]
     sea nx = k[2]
@@ -2028,7 +2028,7 @@ funcion _preparar_contacto(val lista k, val numero dt, val diccionario cache): n
     }
 }
 
-funcion _resolver_contacto(val lista k): nulo {
+funcion _resolver_contacto(lista k): nulo {
     sea a = k[0]
     sea b = k[1]
     sea nx = k[2]
@@ -2079,7 +2079,7 @@ funcion _resolver_contacto(val lista k): nulo {
     b["_w"] = bw + iib * (rbx * py - rby * px)
 }
 
-funcion _apuntar_contactos(val lista lista_k, val lista cs, val diccionario a, val diccionario b, val numero mu, val numero e): nulo {
+funcion _apuntar_contactos(lista lista_k, lista cs, diccionario a, diccionario b, numero mu, numero e): nulo {
     para cada lista c en cs {
         lista_k.agregar([a, b, c[0], c[1], c[2], c[3], c[4], "{a["id_fisica"]}:{b["id_fisica"]}:{c[5]}", mu, e])
         si c[1] > 0.5 { a["en_suelo"] = verdadero }
@@ -2087,7 +2087,7 @@ funcion _apuntar_contactos(val lista lista_k, val lista cs, val diccionario a, v
     }
 }
 
-funcion _paso_rigido(val diccionario mundo, val numero dt): nulo {
+funcion _paso_rigido(diccionario mundo, numero dt): nulo {
     sea g = mundo["gravedad"]
     sea cuerpos = mundo["cuerpos"]
     sea mapa = mundo["mapa"]
@@ -2126,7 +2126,7 @@ funcion _paso_rigido(val diccionario mundo, val numero dt): nulo {
             sea t = mapa["tamaño"]
             para (fila = matematica.piso(ca[1] / t); fila <= matematica.piso(ca[3] / t); fila++) {
                 para (col = matematica.piso(ca[0] / t); col <= matematica.piso(ca[2] / t); col++) {
-                    si no juego.solido(mapa, col, fila) { continuar }
+                    si no juego.mapa.solido(mapa, col, fila) { continuar }
                     sea casilla = _casilla_cuerpo(mundo, col, fila, t)
                     sea cs = _contactos(a, casilla)
                     # sin tropezar con la junta entre dos casillas: la normal no
@@ -2134,9 +2134,9 @@ funcion _paso_rigido(val diccionario mundo, val numero dt): nulo {
                     sea buenos = []
                     para cada lista c en cs {
                         sea vecina = si matematica.abs(c[0]) > matematica.abs(c[1]) {
-                            juego.solido(mapa, col - (si c[0] > 0 { 1 } sino { -1 }), fila)
+                            juego.mapa.solido(mapa, col - (si c[0] > 0 { 1 } sino { -1 }), fila)
                         } sino {
-                            juego.solido(mapa, col, fila - (si c[1] > 0 { 1 } sino { -1 }))
+                            juego.mapa.solido(mapa, col, fila - (si c[1] > 0 { 1 } sino { -1 }))
                         }
                         si no vecina { buenos.agregar(c) }
                     }
@@ -2182,13 +2182,13 @@ funcion _paso_rigido(val diccionario mundo, val numero dt): nulo {
 
 sea _uniones_creadas = 0
 
-funcion _sitio_cuerpo(val diccionario c): lista {
+funcion _sitio_cuerpo(diccionario c): lista {
     si c.contiene("_forma") { devolver [c["x"] + c["_forma"]["cm"][0], c["y"] + c["_forma"]["cm"][1], matematica.radianes(c["angulo"])] }
     devolver [c["x"] + c["ancho"] / 2, c["y"] + c["alto"] / 2, 0]
 }
 
 # De un punto del mundo a cómo se ve desde el cuerpo (sin girar)
-funcion _a_local(val diccionario c, val lista p): lista {
+funcion _a_local(diccionario c, lista p): lista {
     sea s = _sitio_cuerpo(c)
     sea dx = p[0] - s[0]
     sea dy = p[1] - s[1]
@@ -2197,14 +2197,14 @@ funcion _a_local(val diccionario c, val lista p): lista {
     devolver [dx * co + dy * se, -dx * se + dy * co]
 }
 
-funcion _es_cuerpo_de(val diccionario mundo, val cualquiera c, val texto fn): nulo {
+funcion _es_cuerpo_de(diccionario mundo, cualquiera c, texto fn): nulo {
     si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("{fn}() espera cuerpos de juego.cuerpo()") }
     sea esta = falso
     para cada diccionario cuerpo_o en mundo["cuerpos"] { si cuerpo_o["id_fisica"] == c["id_fisica"] { esta = verdadero } }
     si no esta { lanzar ErrorArgumento("{fn}(): ese cuerpo no está en este mundo") }
 }
 
-funcion bisagra(val cualquiera mundo, val cualquiera a, val cualquiera b, val cualquiera punto): diccionario {
+funcion bisagra(cualquiera mundo, cualquiera a, cualquiera b, cualquiera punto): diccionario {
     _es_mundo(mundo, "bisagra")
     _es_cuerpo_de(mundo, a, "bisagra")
     sea p = _punto(punto, nulo, "bisagra")
@@ -2223,7 +2223,7 @@ funcion bisagra(val cualquiera mundo, val cualquiera a, val cualquiera b, val cu
     devolver u
 }
 
-funcion cuerda(val cualquiera mundo, val cualquiera a, val cualquiera b, val cualquiera opciones = nulo): diccionario {
+funcion cuerda(cualquiera mundo, cualquiera a, cualquiera b, cualquiera opciones = nulo): diccionario {
     _es_mundo(mundo, "cuerda")
     _es_cuerpo_de(mundo, a, "cuerda")
     sea op = _ui_opciones(opciones, ["largo", "en_a", "en_b", "rigida"], "cuerda")
@@ -2248,7 +2248,7 @@ funcion cuerda(val cualquiera mundo, val cualquiera a, val cualquiera b, val cua
     devolver u
 }
 
-funcion quitar_union(val cualquiera mundo, val cualquiera u): nulo {
+funcion quitar_union(cualquiera mundo, cualquiera u): nulo {
     _es_mundo(mundo, "quitar_union")
     si no (u es diccionario) o no u.contiene("id_union") { lanzar ErrorTipo("quitar_union() espera una unión de cuerda() o bisagra()") }
     sea quedan = []
@@ -2272,7 +2272,7 @@ funcion quitar_union(val cualquiera mundo, val cualquiera u): nulo {
 }
 
 # puntos_union(u): [[x, y] en a, [x, y] en b]: por dónde va la cuerda o dónde está la bisagra
-funcion puntos_union(val cualquiera u): lista {
+funcion puntos_union(cualquiera u): lista {
     si no (u es diccionario) o no u.contiene("union") { lanzar ErrorTipo("puntos_union() espera una unión de cuerda() o bisagra()") }
     sea r = []
     para cada texto lado en ["a", "b"] {
@@ -2291,7 +2291,7 @@ funcion puntos_union(val cualquiera u): lista {
 }
 
 # El brazo (del centro al punto de la unión) ya girado; [0, 0] si es el fondo
-funcion _brazo(val cualquiera c, val lista en): lista {
+funcion _brazo(cualquiera c, lista en): lista {
     si c == nulo { devolver [0, 0] }
     sea co = matematica.coseno(c["_a"])
     sea se = matematica.seno(c["_a"])
@@ -2300,7 +2300,7 @@ funcion _brazo(val cualquiera c, val lista en): lista {
 
 fijo _FONDO = {"vx": 0, "vy": 0, "_w": 0, "_im": 0, "_ii": 0}
 
-funcion _preparar_union(val diccionario u, val numero dt): nulo {
+funcion _preparar_union(diccionario u, numero dt): nulo {
     sea a = u["a"]
     sea b = si u["b"] == nulo { _FONDO } sino { u["b"] }
     _geometria(a)
@@ -2350,7 +2350,7 @@ funcion _preparar_union(val diccionario u, val numero dt): nulo {
 }
 
 # Un impulso (px, py) a b en su punto, y el contrario a a
-funcion _empujar_union(val diccionario a, val diccionario b, val lista r1, val lista r2, val numero px, val numero py): nulo {
+funcion _empujar_union(diccionario a, diccionario b, lista r1, lista r2, numero px, numero py): nulo {
     si px == 0 y py == 0 { devolver nulo }
     a["vx"] = a["vx"] - px * a["_im"]
     a["vy"] = a["vy"] - py * a["_im"]
@@ -2362,7 +2362,7 @@ funcion _empujar_union(val diccionario a, val diccionario b, val lista r1, val l
     }
 }
 
-funcion _resolver_union(val diccionario u): nulo {
+funcion _resolver_union(diccionario u): nulo {
     si no u["activa"] { devolver nulo }
     sea a = u["a"]
     sea b = si u["b"] == nulo { _FONDO } sino { u["b"] }
@@ -2403,13 +2403,13 @@ sea _ctrl_originales = {}     # {acción: [entradas]} como las definió el juego
 sea _ctrl = nulo              # el menú: qué fila está elegida y si espera una entrada
 
 # Lo llama definir_accion() (en C): las entradas que eligió el jugador, o nulo
-funcion _controles_de(val texto nombre, val lista entradas): cualquiera {
+funcion _controles_de(texto nombre, lista entradas): cualquiera {
     si nombre.contiene("@") { devolver nulo }          # la copia de un jugador: tal cual
     si no _ctrl_originales.contiene(nombre) o _ctrl_guardados == nulo o no _ctrl_guardados.contiene(nombre) {
         _ctrl_originales[nombre] = entradas
     }
     si _ctrl_guardados == nulo {
-        _ctrl_guardados = juego.cargar("lince_controles", {})
+        _ctrl_guardados = juego.cargar_partida("lince_controles", {})
         si no (_ctrl_guardados es diccionario) { _ctrl_guardados = {} }
     }
     sea finales = entradas
@@ -2420,17 +2420,17 @@ funcion _controles_de(val texto nombre, val lista entradas): cualquiera {
 }
 
 # "tecla", "raton", "boton", "eje" u "otra" (pantalla, inclinación)
-funcion _clase_entrada(val texto e): texto {
-    si texto.posicion(e, "raton:") == 0 { devolver "raton" }
-    si texto.posicion(e, "pantalla:") == 0 o texto.posicion(e, "inclinacion:") == 0 { devolver "otra" }
-    si texto.posicion(e, "mando") == 0 {
+funcion _clase_entrada(texto e): texto {
+    si e.posicion("raton:") == 0 { devolver "raton" }
+    si e.posicion("pantalla:") == 0 o e.posicion("inclinacion:") == 0 { devolver "otra" }
+    si e.posicion("mando") == 0 {
         sea ultima = e[e.longitud() - 1]
         devolver si ultima == "+" o ultima == "-" { "eje" } sino { "boton" }
     }
     devolver "tecla"
 }
 
-funcion _cambiar_control(val texto nombre, val texto nueva): nulo {
+funcion _cambiar_control(texto nombre, texto nueva): nulo {
     sea actuales = juego.acciones()
     sea tipo_nueva = _clase_entrada(nueva)
     sea viejas = []
@@ -2454,25 +2454,25 @@ funcion _cambiar_control(val texto nombre, val texto nueva): nulo {
     }
     _ctrl_guardados[nombre] = quedan
     juego.definir_accion(nombre, quedan)
-    juego.guardar("lince_controles", _ctrl_guardados)
+    juego.guardar_partida("lince_controles", _ctrl_guardados)
 }
 
 # restablecer_controles(): vuelven los controles del juego y se olvidan los del jugador
 funcion restablecer_controles(): nulo {
     _ctrl_guardados = {}
-    juego.olvidar("lince_controles")
+    juego.olvidar_partida("lince_controles")
     para cada texto nombre en _ctrl_originales { juego.definir_accion(nombre, _ctrl_originales[nombre]) }
 }
 
 # Cómo se enseña una entrada: "ESPACIO", "A", "IZQ X-"
-funcion _ver_entrada(val texto e): texto {
+funcion _ver_entrada(texto e): texto {
     sea t = e
-    si texto.posicion(t, "mando") == 0 { t = texto.dividir(t, ":")[1] }
-    sino si texto.posicion(t, "raton:") == 0 { t = "ratón " + texto.dividir(t, ":")[1] }
+    si t.posicion("mando") == 0 { t = t.dividir(":")[1] }
+    sino si t.posicion("raton:") == 0 { t = "ratón " + t.dividir(":")[1] }
     devolver t.reemplazar("_", " ").mayusculas()
 }
 
-funcion _ver_entradas(val lista entradas, val lista clases): texto {
+funcion _ver_entradas(lista entradas, lista clases): texto {
     sea partes = []
     para cada texto e en entradas {
         si clases.contiene(_clase_entrada(e)) { partes.agregar(_ver_entrada(e)) }
@@ -2487,7 +2487,7 @@ fijo _CONTROLES_OPCIONES = ["acciones", "nombres", "escala", "fuente", "color", 
 # Volver, escape o B). Opciones: acciones (cuáles y en qué orden; todas por
 # defecto), nombres ({acción: cómo se enseña}), escala (2), fuente, color y
 # color_elegido.
-funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
+funcion menu_controles(cualquiera opciones = nulo): cualquiera {
     sea aj = _ui_opciones(opciones, _CONTROLES_OPCIONES, "menu_controles")
     sea todas = juego.acciones()
     sea nombres = []
@@ -2563,7 +2563,7 @@ funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
     sea gris = [150, 150, 170]
     sea normal = _de(aj, "color", [210, 210, 220])
     sea amarillo = _de(aj, "color_elegido", [255, 220, 80])
-    funcion escribir_en(val texto t, val numero x, val numero fila_y, val lista color): nulo {
+    funcion escribir_en(texto t, numero x, numero fila_y, lista color): nulo {
         sea op = {"color": color}
         para cada texto c en letra { op[c] = letra[c] }
         juego.texto(t, x, fila_y, op)
@@ -2614,28 +2614,28 @@ fijo _JUGADORES_OPCIONES = ["maximo", "teclado", "botones", "teclas"]
 sea _jugadores = []     # [{"numero", "dispositivo": "teclado" o "mando", "mando": 1 a 4 o nulo}]
 
 # Las entradas de una acción que son de ese jugador
-funcion _entradas_suyas(val lista entradas, val diccionario j): lista {
+funcion _entradas_suyas(lista entradas, diccionario j): lista {
     sea r = []
     para cada texto e en entradas {
-        sea de_mando = texto.posicion(e, "mando") == 0
+        sea de_mando = e.posicion("mando") == 0
         si j["dispositivo"] == "teclado" {
             si no de_mando { r.agregar(e) }
-        } sino si texto.posicion(e, "mando:") == 0 {
-            r.agregar("mando{j["mando"]}:" + texto.extraer(e, 6, e.longitud()))
-        } sino si texto.posicion(e, "mando{j["mando"]}:") == 0 {
+        } sino si e.posicion("mando:") == 0 {
+            r.agregar("mando{j["mando"]}:" + e.extraer(6, e.longitud()))
+        } sino si e.posicion("mando{j["mando"]}:") == 0 {
             r.agregar(e)
         }
     }
     devolver r
 }
 
-funcion _definir_suya(val texto nombre, val lista entradas, val diccionario j): nulo {
+funcion _definir_suya(texto nombre, lista entradas, diccionario j): nulo {
     juego.definir_accion("{nombre}@{j["numero"]}", _entradas_suyas(entradas, j))
 }
 
 # Rehace las copias de todas las acciones para todos los jugadores; las de un
 # número que ya no tiene jugador se quedan sin entradas (nunca se pulsan)
-funcion _rehacer_jugadores(val numero antes): nulo {
+funcion _rehacer_jugadores(numero antes): nulo {
     sea todas = juego.acciones()
     para cada texto nombre en todas {
         para cada diccionario j en _jugadores { _definir_suya(nombre, todas[nombre], j) }
@@ -2643,14 +2643,14 @@ funcion _rehacer_jugadores(val numero antes): nulo {
     }
 }
 
-funcion _usado(val texto dispositivo, val cualquiera mando): logico {
+funcion _usado(texto dispositivo, cualquiera mando): logico {
     para cada diccionario j en _jugadores {
         si j["dispositivo"] == dispositivo y j["mando"] == mando { devolver verdadero }
     }
     devolver falso
 }
 
-funcion _nuevo_jugador(val texto dispositivo, val cualquiera mando): numero {
+funcion _nuevo_jugador(texto dispositivo, cualquiera mando): numero {
     sea j = {"numero": _jugadores.longitud() + 1, "dispositivo": dispositivo, "mando": mando}
     _jugadores.agregar(j)
     sea todas = juego.acciones()
@@ -2664,7 +2664,7 @@ funcion _nuevo_jugador(val texto dispositivo, val cualquiera mando): numero {
 # el número del que se acaba de unir, o nulo. Opciones: "maximo" (4),
 # "teclado" (verdadero: el teclado también puede ser un jugador), "botones"
 # (["a", "inicio"]) y "teclas" (["entrar", "espacio"]).
-funcion unirse(val cualquiera opciones = nulo): cualquiera {
+funcion unirse(cualquiera opciones = nulo): cualquiera {
     sea op = _ui_opciones(opciones, _JUGADORES_OPCIONES, "unirse")
     sea maximo = _de(op, "maximo", 4)
     si no (maximo es numero) o maximo < 1 o maximo > 8 { lanzar ErrorArgumento("unirse(): \"maximo\" va de 1 a 8 jugadores") }
@@ -2697,7 +2697,7 @@ funcion jugadores(): lista {
 }
 
 # quitar_jugador(n): se va; los de detrás pasan a tener un número menos
-funcion quitar_jugador(val numero n): nulo {
+funcion quitar_jugador(numero n): nulo {
     si n < 1 o n > _jugadores.longitud() o matematica.piso(n) != n { lanzar ErrorArgumento("quitar_jugador(): no hay jugador {n}") }
     sea antes = _jugadores.longitud()
     sea quedan = []
@@ -2721,7 +2721,7 @@ funcion olvidar_jugadores(): nulo {
 # pantalla_partida(n): las zonas de la pantalla para n jugadores (de 1 a 4),
 # para la "zona" de camara(): uno, toda; dos, una mitad cada uno (lado a lado,
 # o una encima de otra con "lado_a_lado": falso); tres y cuatro, en cuartos
-funcion pantalla_partida(val numero n, val cualquiera opciones = nulo): lista {
+funcion pantalla_partida(numero n, cualquiera opciones = nulo): lista {
     sea op = _ui_opciones(opciones, ["lado_a_lado"], "pantalla_partida")
     si n < 1 o n > 4 o matematica.piso(n) != n { lanzar ErrorArgumento("pantalla_partida(): de 1 a 4 jugadores") }
     sea w = juego.ancho()
@@ -2746,7 +2746,7 @@ funcion pantalla_partida(val numero n, val cualquiera opciones = nulo): lista {
 # "titulo", "escala" (2), "fuente", "color" y "color_elegido".
 sea _mj_listo = 0       # el fotograma en que se unió alguien (para que esa pulsación no empiece ya)
 
-funcion menu_jugadores(val cualquiera opciones = nulo): cualquiera {
+funcion menu_jugadores(cualquiera opciones = nulo): cualquiera {
     sea op = _ui_opciones(opciones, ["maximo", "teclado", "botones", "teclas", "minimo", "titulo", "escala", "fuente", "color",
         "color_elegido"], "menu_jugadores")
     sea para_unirse = {}
@@ -2803,7 +2803,7 @@ funcion menu_jugadores(val cualquiera opciones = nulo): cualquiera {
     sea gris = [150, 150, 170]
     sea normal = _de(op, "color", [210, 210, 220])
     sea amarillo = _de(op, "color_elegido", [255, 220, 80])
-    funcion escribir_en(val texto t, val numero y, val lista color): nulo {
+    funcion escribir_en(texto t, numero y, lista color): nulo {
         sea o2 = {"color": color, "alinear": "centro"}
         para cada texto c en letra { o2[c] = letra[c] }
         juego.texto(t, juego.ancho() / 2, y, o2)
@@ -2823,38 +2823,38 @@ funcion menu_jugadores(val cualquiera opciones = nulo): cualquiera {
 # Con la cámara de ahora (camara_actual(): zoom, giro y zona incluidos), sin el
 # temblor. El zoom y el giro van alrededor del centro de la zona.
 
-funcion _punto(val cualquiera x, val cualquiera y, val texto fn): lista {
+funcion _punto(cualquiera x, cualquiera y, texto fn): lista {
     si x es lista y y == nulo y x.longitud() >= 2 { devolver [x[0], x[1]] }
     si no (x es numero) o no (y es numero) { lanzar ErrorTipo("{fn}() espera (x, y) o una lista [x, y]") }
     devolver [x, y]
 }
 
-funcion _zona_camara(val diccionario c): lista {
+funcion _zona_camara(diccionario c): lista {
     si c["zona"] != nulo { devolver c["zona"] }
     devolver [0, 0, juego.ancho(), juego.alto()]
 }
 
 # a_mundo(x, y): el punto del mundo que se ve en (x, y) de la pantalla; para
 # saber dónde ha tocado o hecho clic el jugador: juego.a_mundo(juego.raton())
-funcion a_mundo(val cualquiera x, val cualquiera y = nulo): lista {
+funcion a_mundo(cualquiera x, cualquiera y = nulo): lista {
     sea p = _punto(x, y, "a_mundo")
     sea c = juego.camara_actual()
     sea z = _zona_camara(c)
     sea dx = p[0] - (z[0] + z[2] / 2)
     sea dy = p[1] - (z[1] + z[3] / 2)
-    sea g = matematica.radianes(c["giro"])
+    sea g = matematica.radianes(c["angulo"])
     devolver [c["x"] + z[2] / 2 + (dx * matematica.coseno(g) + dy * matematica.seno(g)) / c["zoom"],
         c["y"] + z[3] / 2 + (dy * matematica.coseno(g) - dx * matematica.seno(g)) / c["zoom"]]
 }
 
 # a_pantalla(x, y): dónde se ve en la pantalla el punto (x, y) del mundo
-funcion a_pantalla(val cualquiera x, val cualquiera y = nulo): lista {
+funcion a_pantalla(cualquiera x, cualquiera y = nulo): lista {
     sea p = _punto(x, y, "a_pantalla")
     sea c = juego.camara_actual()
     sea z = _zona_camara(c)
     sea dx = (p[0] - c["x"] - z[2] / 2) * c["zoom"]
     sea dy = (p[1] - c["y"] - z[3] / 2) * c["zoom"]
-    sea g = matematica.radianes(c["giro"])
+    sea g = matematica.radianes(c["angulo"])
     devolver [z[0] + z[2] / 2 + dx * matematica.coseno(g) - dy * matematica.seno(g),
         z[1] + z[3] / 2 + dx * matematica.seno(g) + dy * matematica.coseno(g)]
 }
@@ -2869,7 +2869,7 @@ funcion a_pantalla(val cualquiera x, val cualquiera y = nulo): lista {
 
 sea _voces_en = {}    # {voz: {"volumen", "alcance"}} de lo que salió de reproducir_en()
 
-funcion _oido(val numero x, val numero y, val numero alcance): lista {
+funcion _oido(numero x, numero y, numero alcance): lista {
     sea p = a_pantalla(x, y)
     sea z = _zona_camara(juego.camara_actual())
     sea mitad = z[2] / 2
@@ -2880,7 +2880,7 @@ funcion _oido(val numero x, val numero y, val numero alcance): lista {
     devolver [matematica.maximo(0, 1 - d / alcance), lado]
 }
 
-funcion reproducir_en(val cualquiera sonido, val numero x, val numero y, val cualquiera opciones = nulo): numero {
+funcion reproducir_en(cualquiera sonido, numero x, numero y, cualquiera opciones = nulo): numero {
     sea op = {}
     si opciones != nulo {
         si no (opciones es diccionario) { lanzar ErrorTipo("reproducir_en(): las opciones son un diccionario, como las de reproducir()") }
@@ -2903,7 +2903,7 @@ funcion reproducir_en(val cualquiera sonido, val numero x, val numero y, val cua
 }
 
 # mover_voz(voz, x, y): devuelve si sigue sonando
-funcion mover_voz(val numero voz, val numero x, val numero y): logico {
+funcion mover_voz(numero voz, numero x, numero y): logico {
     sea k = "{voz}"
     si no _voces_en.contiene(k) {
         si juego.sonando(voz) { lanzar ErrorArgumento("mover_voz(): esa voz no salió de reproducir_en()") }
@@ -2924,8 +2924,8 @@ funcion mover_voz(val numero voz, val numero x, val numero y): logico {
 # Opciones: las de texto() (fuente, escala, color, alinear, capa) y vertical
 # ("arriba", "centro" o "abajo": dónde va el texto dentro de la caja). Con
 # "medir": verdadero no escribe nada: solo devuelve lo que faltaría.
-funcion texto_caja(val texto t, val numero x, val numero y, val numero ancho, val numero alto,
-        val cualquiera opciones = nulo): texto {
+funcion texto_caja(texto t, numero x, numero y, numero ancho, numero alto,
+        cualquiera opciones = nulo): texto {
     sea aj = _ui_opciones(opciones, ["fuente", "escala", "color", "alinear", "capa", "vertical", "medir"], "texto_caja")
     sea letra = {}
     para cada texto c en aj {
@@ -2946,14 +2946,14 @@ funcion texto_caja(val texto t, val numero x, val numero y, val numero ancho, va
         si caben > 0 {
             sea u = lineas[caben - 1]
             mientras u != "" y juego.ancho_texto(u + "...", letra) > ancho {
-                sea palabras = texto.dividir(u, " ")
+                sea palabras = u.dividir(" ")
                 si palabras.longitud() > 1 {
                     # la última palabra pasa a la página siguiente
                     resto = palabras[palabras.longitud() - 1] + " " + resto
                     palabras.eliminar(palabras.longitud() - 1)
                     u = texto.unir(palabras, " ")
                 } sino {
-                    u = texto.extraer(u, 0, u.longitud() - 1)
+                    u = u.extraer(0, u.longitud() - 1)
                 }
             }
             lineas[caben - 1] = u + "..."
@@ -2983,30 +2983,30 @@ sea _idioma = nulo                # el código del idioma elegido, o nulo
 sea _traducciones = {}
 sea _idioma_elegido = falso       # ya se ha elegido (o mirado) el idioma
 
-funcion _leer_idioma(val texto codigo): cualquiera {
+funcion _leer_idioma(texto codigo): cualquiera {
     sea ruta = "idiomas/" + codigo + ".txt"
     si no archivos.existe(ruta) { devolver nulo }
     sea d = {}
-    para cada texto linea en texto.dividir(archivos.leer(ruta), "\n") {
+    para cada texto linea en archivos.leer(ruta).dividir("\n") {
         sea l = linea.recortar()
-        si l == "" o texto.empieza_con(l, "#") { continuar }
-        sea i = texto.posicion(l, " = ")
+        si l == "" o l.empieza_con("#") { continuar }
+        sea i = l.posicion(" = ")
         sea salto = 3
         si i < 0 {
-            i = texto.posicion(l, "=")
+            i = l.posicion("=")
             salto = 1
         }
         si i <= 0 { continuar }
-        sea clave = texto.extraer(l, 0, i).recortar().reemplazar("\\n", "\n")
-        d[clave] = texto.extraer(l, i + salto, l.longitud()).recortar().reemplazar("\\n", "\n")
+        sea clave = l.extraer(0, i).recortar().reemplazar("\\n", "\n")
+        d[clave] = l.extraer(i + salto, l.longitud()).recortar().reemplazar("\\n", "\n")
     }
     devolver d
 }
 
-funcion _codigo_idioma_bien(val cualquiera c): logico {
+funcion _codigo_idioma_bien(cualquiera c): logico {
     si no (c es texto) o c == "" o c.longitud() > 16 { devolver falso }
     para cada texto letra en c {
-        si no texto.es_letra(letra) y no texto.es_numero(letra) y letra != "_" y letra != "-" { devolver falso }
+        si no letra.es_letra() y no letra.es_numero() y letra != "_" y letra != "-" { devolver falso }
     }
     devolver verdadero
 }
@@ -3017,7 +3017,7 @@ funcion _elegir_idioma_inicial(): nulo {
     sea hay = idiomas()
     si hay.longitud() == 0 { devolver nulo }
     sea guardado = nulo
-    intentar { guardado = juego.cargar("lince_idioma") } capturar (error e) { guardado = nulo }
+    intentar { guardado = juego.cargar_partida("lince_idioma") } capturar (error e) { guardado = nulo }
     si guardado es texto y hay.contiene(guardado) {
         idioma(guardado)
         devolver nulo
@@ -3028,7 +3028,7 @@ funcion _elegir_idioma_inicial(): nulo {
 
 # idioma(código): elige el idioma ("" o nulo: los textos como están escritos);
 # idioma(): el que hay, o nulo
-funcion idioma(val cualquiera codigo = "?"): cualquiera {
+funcion idioma(cualquiera codigo = "?"): cualquiera {
     si codigo == "?" {
         _elegir_idioma_inicial()
         devolver _idioma
@@ -3058,8 +3058,8 @@ funcion idiomas(): diccionario {
     sea nombres = archivos.listar("idiomas")
     nombres.ordenar()
     para cada texto a en nombres {
-        si texto.termina_con(a, ".txt") {
-            sea c = texto.extraer(a, 0, a.longitud() - 4)
+        si a.termina_con(".txt") {
+            sea c = a.extraer(0, a.longitud() - 4)
             si _codigo_idioma_bien(c) {
                 sea d = _leer_idioma(c)
                 si d != nulo { r[c] = _de(d, "idioma", c) }
@@ -3072,15 +3072,15 @@ funcion idiomas(): diccionario {
 # traducir(t[, valores]): la traducción de t en el idioma elegido (o t, si no
 # la hay), con cada {} cambiado por un valor, en orden: valores es uno solo o
 # una lista. traducir("Vidas: {}", vidas), traducir("{} de {}", [a, b])
-funcion traducir(val texto t, val cualquiera valores = nulo): texto {
+funcion traducir(texto t, cualquiera valores = nulo): texto {
     si no _idioma_elegido { _elegir_idioma_inicial() }
     sea r = si _traducciones.contiene(t) { _traducciones[t] } sino { t }
     si valores == nulo { devolver r }
     si no (valores es lista) { valores = [valores] }
     para cada cualquiera v en valores {
-        sea i = texto.posicion(r, "{}")
+        sea i = r.posicion("{}")
         si i < 0 { romper }
-        r = texto.extraer(r, 0, i) + a_texto(v) + texto.extraer(r, i + 2, r.longitud())
+        r = r.extraer(0, i) + a_texto(v) + r.extraer(i + 2, r.longitud())
     }
     devolver r
 }
@@ -3091,7 +3091,7 @@ fijo _IDIOMAS_OPCIONES = ["x", "y", "escala", "fuente", "color", "color_elegido"
 # y «Volver». Elegir uno lo pone y lo guarda para la próxima vez. Se llama en
 # cada fotograma mientras se vea; devuelve el código elegido, "volver" al
 # salir (también con escape o B), o nulo. Opciones: las de menu().
-funcion menu_idiomas(val cualquiera opciones = nulo): cualquiera {
+funcion menu_idiomas(cualquiera opciones = nulo): cualquiera {
     sea aj = _ui_opciones(opciones, _IDIOMAS_OPCIONES, "menu_idiomas")
     sea hay = idiomas()
     sea codigos = []
@@ -3107,7 +3107,7 @@ funcion menu_idiomas(val cualquiera opciones = nulo): cualquiera {
     para (i = 0; i < codigos.longitud(); i++) {
         si textos[i] == e {
             idioma(codigos[i])
-            intentar { juego.guardar("lince_idioma", codigos[i]) } capturar (error x) {}
+            intentar { juego.guardar_partida("lince_idioma", codigos[i]) } capturar (error x) {}
             devolver codigos[i]
         }
     }

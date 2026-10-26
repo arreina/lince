@@ -3,6 +3,6 @@
 # su nombre.
 fijo FACTOR = 10
 
-funcion escala(val numero x): numero {
+funcion escala(numero x): numero {
     devolver x * FACTOR
 }

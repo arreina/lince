@@ -3,73 +3,73 @@
 # graba el sonido (LINCE_JUEGO_AUDIO) y mide cada trozo.
 importar "juego"
 importar "matematica"
-funcion r(val numero v): numero { devolver matematica.redondear(v) }
+funcion r(numero v): numero { devolver matematica.redondear(v) }
 
 # ── Física ──
-sea m = juego.fisica({"gravedad": 900})
-juego.cuerpo(m, {"x": 0, "y": 400, "ancho": 640, "alto": 20, "fijo": verdadero})
+sea m = juego.fisica.mundo({"gravedad": 900})
+juego.fisica.cuerpo(m, {"x": 0, "y": 400, "ancho": 640, "alto": 20, "fijo": verdadero})
 sea pila = []
-para (i = 0; i < 4; i++) { pila.agregar(juego.cuerpo(m, {"x": 100 + i, "y": 370 - i * 31, "ancho": 30, "alto": 30, "gira": verdadero})) }
-sea tumbada = juego.cuerpo(m, {"x": 300, "y": 200, "ancho": 40, "alto": 20, "gira": verdadero, "angulo": 30})
-para (f = 0; f < 240; f++) { juego.avanzar_fisica(m, 1 / 60) }
+para (i = 0; i < 4; i++) { pila.agregar(juego.fisica.cuerpo(m, {"x": 100 + i, "y": 370 - i * 31, "ancho": 30, "alto": 30, "gira": verdadero})) }
+sea tumbada = juego.fisica.cuerpo(m, {"x": 300, "y": 200, "ancho": 40, "alto": 20, "gira": verdadero, "angulo": 30})
+para (f = 0; f < 240; f++) { juego.fisica.avanzar(m, 1 / 60) }
 sea quieta = verdadero
 para cada diccionario c en pila { si matematica.abs(c["angulo"]) > 1 o matematica.abs(c["vy"]) > 1 { quieta = falso } }
 escribir("pila: {r(pila[3]["y"])} quieta: {quieta}")
 escribir("cae de esquina y queda plana: {r(tumbada["y"])} {matematica.abs(tumbada["angulo"]) < 1}")
-sea m5 = juego.fisica({"gravedad": 900})
-juego.cuerpo(m5, {"x": 400, "y": 300, "puntos": [[0, 100], [200, 0], [200, 100]], "fijo": verdadero})    # rampa hacia la izquierda
-sea bola = juego.cuerpo(m5, {"x": 580, "y": 270, "radio": 10, "gira": verdadero})
-para (f = 0; f < 60; f++) { juego.avanzar_fisica(m5, 1 / 60) }
+sea m5 = juego.fisica.mundo({"gravedad": 900})
+juego.fisica.cuerpo(m5, {"x": 400, "y": 300, "puntos": [[0, 100], [200, 0], [200, 100]], "fijo": verdadero})    # rampa hacia la izquierda
+sea bola = juego.fisica.cuerpo(m5, {"x": 580, "y": 270, "radio": 10, "gira": verdadero})
+para (f = 0; f < 60; f++) { juego.fisica.avanzar(m5, 1 / 60) }
 # rodando sin resbalar: lo que gira (en radianes) por el radio es lo que avanza
 escribir("la bola baja rodando: {bola["vx"] < -200} {matematica.abs(matematica.radianes(bola["vgiro"]) * 10 * 0.894 - bola["vx"]) < 15}")
 escribir("en_suelo: {pila[0]["en_suelo"]} {tumbada["en_suelo"]}")
 
 # círculo contra caja de verdad (sin girar): por la esquina, una pelota no se apoya en el aire
-sea m2 = juego.fisica({"gravedad": 900})
-juego.cuerpo(m2, {"x": 100, "y": 200, "ancho": 40, "alto": 40, "fijo": verdadero})
-sea p2 = juego.cuerpo(m2, {"x": 132, "y": 150, "radio": 10})
-para (f = 0; f < 60; f++) { juego.avanzar_fisica(m2, 1 / 60) }
+sea m2 = juego.fisica.mundo({"gravedad": 900})
+juego.fisica.cuerpo(m2, {"x": 100, "y": 200, "ancho": 40, "alto": 40, "fijo": verdadero})
+sea p2 = juego.fisica.cuerpo(m2, {"x": 132, "y": 150, "radio": 10})
+para (f = 0; f < 60; f++) { juego.fisica.avanzar(m2, 1 / 60) }
 escribir("la pelota resbala por la esquina: {p2["x"] > 140}")
 
 # bisagra y cuerda
-sea m3 = juego.fisica({"gravedad": 900})
-sea barra = juego.cuerpo(m3, {"x": 200, "y": 98, "ancho": 100, "alto": 4, "gira": verdadero})
-sea clavo = juego.bisagra(m3, barra, nulo, [200, 100])
-sea peso = juego.cuerpo(m3, {"x": 500, "y": 100, "ancho": 20, "alto": 20, "gira": verdadero})
-sea cuerda = juego.cuerda(m3, peso, [600, 110], {"largo": 120})
+sea m3 = juego.fisica.mundo({"gravedad": 900})
+sea barra = juego.fisica.cuerpo(m3, {"x": 200, "y": 98, "ancho": 100, "alto": 4, "gira": verdadero})
+sea clavo = juego.fisica.bisagra(m3, barra, nulo, [200, 100])
+sea peso = juego.fisica.cuerpo(m3, {"x": 500, "y": 100, "ancho": 20, "alto": 20, "gira": verdadero})
+sea cuerda = juego.fisica.cuerda(m3, peso, [600, 110], {"largo": 120})
 sea suelta = 0
 sea largo = 0
 sea giro_max = 0
 para (f = 0; f < 120; f++) {
-    juego.avanzar_fisica(m3, 1 / 60)
-    sea pu = juego.puntos_union(clavo)
+    juego.fisica.avanzar(m3, 1 / 60)
+    sea pu = juego.fisica.puntos_union(clavo)
     suelta = matematica.maximo(suelta, matematica.abs(pu[0][0] - pu[1][0]) + matematica.abs(pu[0][1] - pu[1][1]))
     giro_max = matematica.maximo(giro_max, barra["angulo"])
-    sea c = juego.centro_cuerpo(peso)
+    sea c = juego.fisica.centro(peso)
     largo = matematica.maximo(largo, matematica.raiz((c[0] - 600) * (c[0] - 600) + (c[1] - 110) * (c[1] - 110)))
 }
 escribir("bisagra: no se suelta: {suelta < 2} y cae girando: {giro_max > 80}")
 escribir("cuerda: no se estira: {largo < 122}")
-juego.quitar_cuerpo(m3, peso)
-juego.quitar_union(m3, clavo)
+juego.fisica.quitar(m3, peso)
+juego.fisica.quitar_union(m3, clavo)
 escribir("uniones tras quitar el peso: {m3["uniones"].longitud()}")
 
 # con un mapa
-sea nivel = juego.mapa(["..........", "..........", "..........", "##########"], 32)
-sea m4 = juego.fisica({"gravedad": 900, "mapa": nivel})
-sea c4 = juego.cuerpo(m4, {"x": 50, "y": 10, "ancho": 30, "alto": 30, "gira": verdadero, "angulo": 20, "vx": 120})
-para (f = 0; f < 240; f++) { juego.avanzar_fisica(m4, 1 / 60) }
+sea nivel = juego.mapa.crear(["..........", "..........", "..........", "##########"], 32)
+sea m4 = juego.fisica.mundo({"gravedad": 900, "mapa": nivel})
+sea c4 = juego.fisica.cuerpo(m4, {"x": 50, "y": 10, "ancho": 30, "alto": 30, "gira": verdadero, "angulo": 20, "vx": 120})
+para (f = 0; f < 240; f++) { juego.fisica.avanzar(m4, 1 / 60) }
 escribir("mapa: {r(c4["y"])} {c4["en_suelo"]}")
-escribir("puntos_cuerpo: {juego.puntos_cuerpo(juego.cuerpo(juego.fisica(), {"x": 0, "y": 0, "ancho": 10, "alto": 4}))}")
+escribir("puntos_cuerpo: {juego.fisica.puntos(juego.fisica.cuerpo(juego.fisica.mundo(), {"x": 0, "y": 0, "ancho": 10, "alto": 4}))}")
 
 para cada funcion intento en [
-    funcion(): nulo { juego.cuerpo(m, {"x": 0, "y": 0, "puntos": [[0, 0], [10, 10]]}) },
-    funcion(): nulo { juego.cuerpo(m, {"x": 0, "y": 0, "puntos": [[0, 0], [10, 0], [5, 2], [10, 10], [0, 10]]}) },
-    funcion(): nulo { juego.cuerpo(m, {"x": 0, "y": 0, "puntos": [[0, 0], [5, 5], [10, 10]]}) },
-    funcion(): nulo { juego.cuerda(m, pila[0], pila[0]) },
-    funcion(): nulo { juego.cuerda(m, pila[0], [0, 0], {"largo": -1}) },
-    funcion(): nulo { juego.bisagra(m, pila[0], peso, [0, 0]) },
-    funcion(): nulo { juego.fisica({"iteraciones": 0}) }
+    funcion(): nulo { juego.fisica.cuerpo(m, {"x": 0, "y": 0, "puntos": [[0, 0], [10, 10]]}) },
+    funcion(): nulo { juego.fisica.cuerpo(m, {"x": 0, "y": 0, "puntos": [[0, 0], [10, 0], [5, 2], [10, 10], [0, 10]]}) },
+    funcion(): nulo { juego.fisica.cuerpo(m, {"x": 0, "y": 0, "puntos": [[0, 0], [5, 5], [10, 10]]}) },
+    funcion(): nulo { juego.fisica.cuerda(m, pila[0], pila[0]) },
+    funcion(): nulo { juego.fisica.cuerda(m, pila[0], [0, 0], {"largo": -1}) },
+    funcion(): nulo { juego.fisica.bisagra(m, pila[0], peso, [0, 0]) },
+    funcion(): nulo { juego.fisica.mundo({"iteraciones": 0}) }
 ] {
     intentar { intento() } capturar (error e) { escribir("error: {e.mensaje}") }
 }

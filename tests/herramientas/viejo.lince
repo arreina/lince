@@ -1,0 +1,28 @@
+# Formas de la 1.x que la 2.0 cambia: lince migrar las pasa a nuevo.esperado (no se ejecuta)
+importar "juego"
+importar "texto"
+fijo LETRA = juego.fuente("x.ttf", 20)
+funcion f(val numero a, ref numero b, val texto c): nulo {
+    escribir(texto.dividir(c + "x", ","))   # un comentario
+}
+sea m = juego.fisica({"gravedad": 900})
+sea c = juego.cuerpo(m, {"x": 1})
+juego.avanzar_fisica(m)
+sea mp = juego.mapa(["#"], 16)
+si juego.solido(mp, 0, 0) y juego.colision(1, 2, 3, 4,
+        5, 6, 7, 8) { escribir("sí") }
+si juego.dentro(1, 2, 0, 0, 10, 10) o juego.colision_circulos(0, 0, 1, 2, 2, 1) { escribir("x") }
+juego.reproducir(s, 0.5, verdadero)
+juego.reproducir(s, vol)
+juego.musica("a.ogg", 0.4)
+juego.texto("Hola", 1, 2, 3, [255, 0, 0])
+juego.texto("Hola", 1, 2, LETRA)
+juego.texto(texto.extraer(t, 0, 3), 1, 2, 2)
+juego.camara(0, 0, {"zoom": 2, "giro": 15})
+sea cam = juego.camara_actual()
+escribir(cam["giro"] + juego.camara_actual()["giro"])
+escribir(juego.posicion_camara())
+juego.guardar("p", 1)
+escribir(texto.repetir("ab", 2 + 1) + texto.de_numero(3))
+si texto.es_vacio(nombre) { }
+juego.borrar_particulas()

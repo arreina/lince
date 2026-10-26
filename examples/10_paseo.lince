@@ -115,9 +115,9 @@ sea estado = "quieto"                   # "quieto", "andar" o "correr"
 
 # ── Dibujo ──────────────────────────────────────────────────────────
 # Resto siempre positivo (para repetir el paisaje)
-funcion ciclo(val numero a, val numero m): numero { devolver ((a % m) + m) % m }
+funcion ciclo(numero a, numero m): numero { devolver ((a % m) + m) % m }
 
-funcion dibujar_campo(val numero cam): nulo {
+funcion dibujar_campo(numero cam): nulo {
     juego.limpiar([140, 200, 240])
     # nubes y colinas lejanas: se mueven más despacio que el suelo (parece que están lejos)
     para cada numero i en rango(0, 8) {
@@ -147,16 +147,16 @@ funcion dibujar_campo(val numero cam): nulo {
 }
 
 # La hoja que se está usando, arriba a la izquierda, con el cuadro actual marcado
-funcion dibujar_hoja(val diccionario hoja, val numero actual): nulo {
+funcion dibujar_hoja(diccionario hoja, numero actual): nulo {
     juego.camara()
     sea n = hoja["cuadros"]
     sea cw = hoja["celda"][0] * 2
     sea ch = hoja["celda"][1] * 2
     juego.rectangulo(8, 8, n * (cw + 4) + 132, ch + 34, [0, 0, 0, 120])
-    juego.texto("1 DIBUJO", 16, 14, 2, [255, 255, 255])
+    juego.texto("1 DIBUJO", 16, 14, {"escala": 2, "color": [255, 255, 255]})
     juego.dibujar(PERSONAJE, 40, 34, {"escala": 2})
-    juego.texto(">", 96, 46, 3, [255, 220, 120])
-    juego.texto(a_texto(n) + " CUADROS: " + estado, 124, 14, 2, [255, 220, 120])
+    juego.texto(">", 96, 46, {"escala": 3, "color": [255, 220, 120]})
+    juego.texto(a_texto(n) + " CUADROS: " + estado, 124, 14, {"escala": 2, "color": [255, 220, 120]})
     para cada numero i en rango(0, n) {
         sea fx = 124 + i * (cw + 4)
         si i == actual { juego.rectangulo(fx - 2, 32, cw + 4, ch + 4, [255, 220, 120, 160]) }

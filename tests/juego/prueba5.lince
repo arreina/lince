@@ -1,7 +1,7 @@
 # Prueba de los mapas de casillas: plataformas y vista cenital
 importar "juego"
 juego.abrir("Mapas", 160, 128)
-sea m = juego.mapa([
+sea m = juego.mapa.crear([
     "########",
     "#......#",
     "#..==..#",
@@ -12,49 +12,49 @@ sea m = juego.mapa([
     "########"
 ], 16, {"plataformas": "="})
 escribir("tamaño: " + a_texto(m["columnas"]) + "x" + a_texto(m["filas"]) + " " + a_texto(m["ancho"]))
-escribir("casilla: " + juego.casilla(m, 0, 0) + juego.casilla(m, 1, 1) + juego.casilla(m, 3, 2) + "[" + juego.casilla(m, 99, 0) + "]")
-escribir("solido: " + a_texto(juego.solido(m, 0, 0)) + " " + a_texto(juego.solido(m, 1, 1)) + " " + a_texto(juego.solido(m, -1, 3)) + " " + a_texto(juego.solido(m, 3, -1)))
-juego.poner_casilla(m, 1, 1, "o")
-escribir("buscar: " + a_texto(juego.buscar_en_mapa(m, "o=").longitud()))
-sea en = juego.casilla_en(m, 40, 20)
+escribir("casilla: " + juego.mapa.casilla(m, 0, 0) + juego.mapa.casilla(m, 1, 1) + juego.mapa.casilla(m, 3, 2) + "[" + juego.mapa.casilla(m, 99, 0) + "]")
+escribir("solido: " + a_texto(juego.mapa.solido(m, 0, 0)) + " " + a_texto(juego.mapa.solido(m, 1, 1)) + " " + a_texto(juego.mapa.solido(m, -1, 3)) + " " + a_texto(juego.mapa.solido(m, 3, -1)))
+juego.mapa.poner(m, 1, 1, "o")
+escribir("buscar: " + a_texto(juego.mapa.buscar(m, "o=").longitud()))
+sea en = juego.mapa.casilla_en(m, 40, 20)
 escribir("casilla_en: " + a_texto(en[0]) + " " + a_texto(en[1]))
 
 # con gravedad: cae y se queda en el suelo (fila 6, arriba en y = 96)
 sea p = {"x": 20, "y": 20, "ancho": 10, "alto": 12, "vx": 0, "vy": 0}
 para cada numero i en rango(0, 120) {
     p["vy"] = p["vy"] + 900 / 60
-    juego.mover_en_mapa(m, p, 1 / 60)
+    juego.mapa.mover(m, p, 1 / 60)
 }
 escribir("cae: " + a_texto(p["y"] + p["alto"]) + " " + a_texto(p["en_suelo"]) + " " + a_texto(p["vy"]))
 # contra una pared: se arrima
 p["vx"] = 500
-juego.mover_en_mapa(m, p, 0.2)
+juego.mapa.mover(m, p, 0.2)
 escribir("pared: " + a_texto(p["x"] + p["ancho"]) + " " + a_texto(p["pared"]))
 # plataforma: desde abajo la atraviesa; al caer, se queda encima (arriba en y = 32)
 sea q = {"x": 50, "y": 50, "ancho": 10, "alto": 10, "vx": 0, "vy": -300}
-juego.mover_en_mapa(m, q, 0.1)
+juego.mapa.mover(m, q, 0.1)
 escribir("atraviesa: " + a_texto(q["y"] < 32) + " " + a_texto(q["techo"]))
 q["vy"] = 200
-juego.mover_en_mapa(m, q, 0.1)
+juego.mapa.mover(m, q, 0.1)
 escribir("pisa: " + a_texto(q["y"] + q["alto"]) + " " + a_texto(q["en_suelo"]))
 
 # vista cenital: sin gravedad, choca en las dos direcciones
 sea r = {"x": 18, "y": 100, "ancho": 12, "alto": 12, "vx": 0, "vy": -400}
-juego.mover_en_mapa(m, r, 0.5)
+juego.mapa.mover(m, r, 0.5)
 escribir("cenital: " + a_texto(r["y"]) + " " + a_texto(r["techo"]))
 
 # camino: rodea las paredes
-sea c = juego.camino(m, [1, 5], [6, 5])
+sea c = juego.mapa.camino(m, [1, 5], [6, 5])
 escribir("camino: " + a_texto(c.longitud()) + " termina en " + a_texto(c[c.longitud() - 1][0]))
-escribir("sin camino: " + a_texto(juego.camino(m, [1, 1], [0, 0]).longitud()))
-escribir("diagonal: " + a_texto(juego.camino(m, [1, 1], [6, 1], verdadero).longitud()))
+escribir("sin camino: " + a_texto(juego.mapa.camino(m, [1, 1], [0, 0]).longitud()))
+escribir("diagonal: " + a_texto(juego.mapa.camino(m, [1, 1], [6, 1], verdadero).longitud()))
 
 juego.limpiar([0, 0, 0])
-juego.dibujar_mapa(m, {"#": [255, 0, 0], "=": [0, 0, 255]})
+juego.mapa.dibujar(m, {"#": [255, 0, 0], "=": [0, 0, 255]})
 juego.captura("mapa.bmp")
 juego.presentar()
 intentar {
-    juego.mapa(["ñ"], 16)
+    juego.mapa.crear(["ñ"], 16)
 } capturar (error e) {
     escribir("no ascii: " + e.mensaje)
 }
@@ -68,13 +68,13 @@ fijo HOJA = juego.hoja(juego.sprite([
     "BB.YY"
 ], {"R": [255, 0, 0], "G": [0, 255, 0], "B": [0, 0, 255], "Y": [255, 255, 0]}), 2, {"separacion": 1})
 escribir("hoja: " + a_texto(HOJA["columnas"]) + " " + a_texto(HOJA["cuadros"]))
-sea t = juego.mapa(["ABCDE"], 16)
+sea t = juego.mapa.crear(["ABCDE"], 16)
 juego.limpiar([0, 0, 0])
-juego.dibujar_mapa(t, {"A": [HOJA, 0], "B": [HOJA, 1], "C": [HOJA, 2], "D": [HOJA, -1], "E": [HOJA, [1, 2], 0.5]})
+juego.mapa.dibujar(t, {"A": [HOJA, 0], "B": [HOJA, 1], "C": [HOJA, 2], "D": [HOJA, -1], "E": [HOJA, [1, 2], 0.5]})
 juego.dibujar(HOJA, 0, 20, {"cuadro": 2, "escala": 4})
 juego.captura("tiles.bmp")
 intentar {
-    juego.dibujar_mapa(t, {"A": HOJA})
+    juego.mapa.dibujar(t, {"A": HOJA})
 } capturar (error e) {
     escribir("hoja sin cuadro: " + e.mensaje)
 }

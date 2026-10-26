@@ -87,19 +87,19 @@ mientras juego.abierto() {
     juego.rectangulo(0, SUELO, ANCHO, ALTO - SUELO, [50, 70, 60])
     si brillo > 0 { juego.circulo(440, 40, 10, [255, 240, 120]) } sino { juego.circulo(440, 40, 4, [200, 190, 120]) }
     juego.dibujar(LINCE, px, py - 18, {"escala": 4, "centrado": verdadero, "espejo": mira_izquierda})
-    juego.texto("LINCE EN EL MÓVIL", 12, 10, 2, [255, 200, 80])
-    juego.texto("ABIERTO {veces} VECES - SALTOS: {saltos}", 12, 32, 1, [220, 220, 230])
-    juego.texto("TÁCTIL: {si juego.tactil() { "SÍ" } sino { "NO" }} - {matematica.redondear(juego.fps())} FPS", 12, 44, 1, [220, 220, 230])
+    juego.texto("LINCE EN EL MÓVIL", 12, 10, {"escala": 2, "color": [255, 200, 80]})
+    juego.texto("ABIERTO {veces} VECES - SALTOS: {saltos}", 12, 32, {"escala": 1, "color": [220, 220, 230]})
+    juego.texto("TÁCTIL: {si juego.tactil() { "SÍ" } sino { "NO" }} - {matematica.redondear(juego.fps())} FPS", 12, 44, {"escala": 1, "color": [220, 220, 230]})
 
     # cada dedo, con su número
     sea dedos = juego.toques()
     para cada diccionario t en dedos {
         juego.circulo(t["x"], t["y"], 18, [120, 200, 255, 120])
-        juego.texto(a_texto(t["id"] % 100), t["x"] - 4, t["y"] - 4, 1, [255, 255, 255])
+        juego.texto(a_texto(t["id"] % 100), t["x"] - 4, t["y"] - 4, {"escala": 1, "color": [255, 255, 255]})
     }
     sea incl = juego.inclinacion()
-    juego.texto("INCLINACIÓN: {matematica.redondear(incl[0] * 10) / 10}, {matematica.redondear(incl[1] * 10) / 10}", 12, 68, 1, [220, 220, 230])
+    juego.texto("INCLINACIÓN: {matematica.redondear(incl[0] * 10) / 10}, {matematica.redondear(incl[1] * 10) / 10}", 12, 68, {"escala": 1, "color": [220, 220, 230]})
     juego.texto("DEDOS: {dedos.longitud()} - PALANCA: {matematica.redondear(juego.eje("izq_x") * 10) / 10}" +
-            "{si juego.accion("correr") { " - CORRE" } sino { "" }}", 12, 56, 1, [220, 220, 230])
+            "{si juego.accion("correr") { " - CORRE" } sino { "" }}", 12, 56, {"escala": 1, "color": [220, 220, 230]})
     juego.presentar()
 }

@@ -6,7 +6,7 @@ fijo DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 sea muro = []
 para (i = 0; i < N * N; i++) { muro.agregar(i % 7 == 3 y i % N != 0) }
 
-funcion buscar(val numero desde): numero {
+funcion buscar(numero desde): numero {
     sea visto = []
     para (i = 0; i < N * N; i++) { visto.agregar(falso) }
     sea cola = [desde]

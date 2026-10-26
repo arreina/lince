@@ -9,7 +9,7 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-1.8-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-1.9-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-38%2F38-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows%20·%20Android-6A2D72.svg)]()
 
@@ -33,7 +33,7 @@ mientras juego.abierto() {
 
     juego.limpiar([20, 20, 30])
     juego.circulo(x, 300, 20, "#ffc850")
-    juego.texto("Flechas para mover", 10, 10, 3)
+    juego.texto("Flechas para mover", 10, 10, {"escala": 3})
     juego.presentar()          # muestra, espera a 60 fps y lee el teclado
 }
 ```
@@ -117,6 +117,7 @@ lince repartir juego.lince        # carpeta y .zip para compartir el juego
 lince depurar programa.lince      # depurar paso a paso
 lince comprobar programa.lince    # sin ejecutar: la sintaxis y avisos de descuidos
 lince formatear programa.lince    # dejarlo con el estilo de Lince
+lince migrar .                    # pasar el código a la forma de la 2.0 (--comprobar: solo decir qué)
 lince documentar libreria.lince   # la ayuda de sus comentarios, en Markdown
 lince probar                      # las pruebas (prueba_*.lince) y qué código recorren
 lince perfil juego.lince          # en qué se va el tiempo de cada fotograma
@@ -140,19 +141,19 @@ sea diccionario config = {"debug": verdadero, "version": 2}
 ### Funciones y closures
 
 ```lince
-funcion factorial(val numero n): numero {
+funcion factorial(numero n): numero {
     si n <= 1 { devolver 1 }
     devolver n * factorial(n - 1)
 }
 
 # Valores por defecto
-funcion saludar(val texto nombre, val texto saludo = "Hola"): texto {
+funcion saludar(texto nombre, texto saludo = "Hola"): texto {
     devolver saludo + ", " + nombre
 }
 
 # Closures
-funcion multiplicador(val numero factor): funcion {
-    devolver funcion(val numero x): numero { devolver x * factor }
+funcion multiplicador(numero factor): funcion {
+    devolver funcion(numero x): numero { devolver x * factor }
 }
 sea doble = multiplicador(2)
 escribir(doble(5))   # 10
@@ -166,7 +167,7 @@ interfaz Forma {
 }
 
 clase Rectangulo implementa Forma {
-    funcion crear(val numero ancho, val numero alto): nulo {
+    funcion crear(numero ancho, numero alto): nulo {
         mi.ancho = ancho
         mi.alto  = alto
     }
@@ -174,7 +175,7 @@ clase Rectangulo implementa Forma {
 }
 
 clase Cuadrado extiende Rectangulo {
-    funcion crear(val numero lado): nulo {
+    funcion crear(numero lado): nulo {
         padre(lado, lado)
     }
 }
@@ -183,7 +184,7 @@ clase Cuadrado extiende Rectangulo {
 ### Generadores
 
 ```lince
-generador pares(val numero hasta): numero {
+generador pares(numero hasta): numero {
     para cada numero n en rango(hasta) {
         si n % 2 == 0 { producir n }
     }

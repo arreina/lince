@@ -1,7 +1,7 @@
 # @seccion: Funciones
 # @titulo: Valores por defecto
 # @nota: Los parámetros con valor por defecto van al final.
-funcion saludo(val texto nombre, val texto trato = "Hola"): texto {
+funcion saludo(texto nombre, texto trato = "Hola"): texto {
     devolver trato + ", " + nombre
 }
 

@@ -16,6 +16,6 @@ mientras juego.abierto() {
     juego.limpiar([30, 30, 45])
     juego.rectangulo(x, 180, 40, 40, [230, 140, 60])
     para cada lista m en marcas { juego.circulo(m[0], m[1], 10, [120, 200, 255]) }
-    juego.texto("RATÓN: {juego.raton()}", 20, 20, 2)
+    juego.texto("RATÓN: {juego.raton()}", 20, 20, {"escala": 2})
     juego.presentar()
 }

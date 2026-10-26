@@ -1,6 +1,6 @@
 # @oculto: si
 clase Cuadrado {
-    funcion crear(val numero lado): nulo {
+    funcion crear(numero lado): nulo {
         mi.lado = lado
     }
     funcion area(): numero {

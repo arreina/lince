@@ -3,7 +3,7 @@
 # @nota: Pruebas unitarias para tus programas: `afirmar` comprueba una condición, `igual` compara valores (también listas y diccionarios), `lanza` comprueba que una función da error y `resumen` imprime el total y termina con código 1 si algo falló, ideal para la integración continua.
 importar "pruebas"
 
-funcion doble(val numero n): numero {
+funcion doble(numero n): numero {
     devolver n * 2
 }
 

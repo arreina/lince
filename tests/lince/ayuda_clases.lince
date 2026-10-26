@@ -1,5 +1,5 @@
 clase Punto {
-    funcion crear(val numero a, val numero b): nulo {
+    funcion crear(numero a, numero b): nulo {
         mi.a = a
         mi.b = b
     }

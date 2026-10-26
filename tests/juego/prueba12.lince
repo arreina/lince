@@ -28,7 +28,7 @@ juego.definir_accion("abajo", ["abajo"])
 juego.definir_accion("adelante", ["derecha"])
 juego.definir_accion("golpe", ["z"])
 
-funcion caja(val lista c): texto {
+funcion caja(lista c): texto {
     devolver a_texto(c[0]) + " " + a_texto(c[1]) + " " + a_texto(c[2]) + " " + a_texto(c[3])
 }
 

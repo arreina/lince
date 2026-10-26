@@ -45,7 +45,7 @@ intentar {
 }
 
 # Recursión infinita capturada
-funcion inf(val numero n): numero {
+funcion inf(numero n): numero {
     devolver inf(n + 1)
 }
 intentar {
@@ -55,7 +55,7 @@ intentar {
 }
 
 # Error de tipo en parámetro capturado
-funcion solo_numeros(val numero n): numero {
+funcion solo_numeros(numero n): numero {
     devolver n * 2
 }
 intentar {
@@ -67,7 +67,7 @@ intentar {
 
 # Un error al evaluar la expresión de 'devolver' debe caer en el
 # 'capturar' que lo envuelve, no escapar como nulo.
-funcion dividir_seguro(val numero a, val numero b): numero {
+funcion dividir_seguro(numero a, numero b): numero {
     intentar {
         devolver a / b
     } capturar (ErrorMatematico e) {

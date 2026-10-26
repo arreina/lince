@@ -57,6 +57,6 @@ si x == 3 y
 sea dentro = x > 0
     y y < 10
 escribir(dentro)
-funcion mover(val numero x, val numero y): lista { devolver [x + 1, y + 1] }
+funcion mover(numero x, numero y): lista { devolver [x + 1, y + 1] }
 escribir(mover(x, y))
 intentar { escribir(5 % 0) } capturar (error e) { escribir(e.tipo) }

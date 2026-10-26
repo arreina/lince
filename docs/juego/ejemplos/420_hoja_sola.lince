@@ -11,8 +11,8 @@ mientras juego.abierto() {
     juego.dibujar(juego.imagen("recursos/figuras.png"), 20, 20, {"escala": 2})
     para (i = 0; i < FIGURAS["cuadros"]; i++) {
         juego.dibujar(FIGURAS, 290 + (i % 3) * 60, 30 + matematica.piso(i / 3) * 70, {"cuadro": i})
-        juego.texto("{i}", 290 + (i % 3) * 60, 30 + matematica.piso(i / 3) * 70 + 50, 1)
+        juego.texto("{i}", 290 + (i % 3) * 60, 30 + matematica.piso(i / 3) * 70 + 50, {"escala": 1})
     }
-    juego.texto("{FIGURAS["cuadros"]} FIGURAS, {FIGURAS["filas"]} FILAS", 20, 230, 2)
+    juego.texto("{FIGURAS["cuadros"]} FIGURAS, {FIGURAS["filas"]} FILAS", 20, 230, {"escala": 2})
     juego.presentar()
 }

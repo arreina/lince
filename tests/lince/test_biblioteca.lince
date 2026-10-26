@@ -2,14 +2,14 @@
 importar "juego"
 
 # 'cualquiera' acepta lo que sea; con 'es' se mira qué es
-funcion describir(val cualquiera v): texto {
+funcion describir(cualquiera v): texto {
     si v es numero { devolver "número" }
     si v es texto { devolver "texto" }
     si v es lista { devolver "lista de {v.longitud()}" }
     devolver "otra cosa"
 }
 escribir(describir(3) + ", " + describir("a") + ", " + describir([1, 2]) + ", " + describir(nulo))
-funcion lo_mismo(val cualquiera v): cualquiera { devolver v }
+funcion lo_mismo(cualquiera v): cualquiera { devolver v }
 escribir(lo_mismo([1, "dos"]))
 # 'cualquiera' no es palabra reservada: fuera de un tipo es un nombre normal
 sea cualquiera = 5

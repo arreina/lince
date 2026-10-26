@@ -11,8 +11,8 @@ mientras juego.abierto() {
     juego.limpiar([25, 25, 35])
     para cada diccionario dedo en juego.toques() {
         juego.circulo(dedo["x"], dedo["y"], 30, [255, 255, 255, 120])
-        juego.texto("DEDO {dedo["id"]}", dedo["x"] + 36, dedo["y"] - 6, 2)
+        juego.texto("DEDO {dedo["id"]}", dedo["x"] + 36, dedo["y"] - 6, {"escala": 2})
     }
-    juego.texto("TÁCTIL: {juego.tactil()}   INCLINACIÓN: {juego.inclinacion()}", 20, 20, 1)
+    juego.texto("TÁCTIL: {juego.tactil()}   INCLINACIÓN: {juego.inclinacion()}", 20, 20, {"escala": 1})
     juego.presentar()
 }

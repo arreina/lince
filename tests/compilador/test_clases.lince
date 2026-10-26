@@ -1,6 +1,6 @@
 # TEST COMPILADOR: clases y herencia
 clase Animal {
-    funcion crear(val texto nombre, val texto sonido): nulo {
+    funcion crear(texto nombre, texto sonido): nulo {
         mi.nombre = nombre
         mi.sonido = sonido
     }
@@ -13,7 +13,7 @@ clase Animal {
 }
 
 clase Perro extiende Animal {
-    funcion crear(val texto nombre): nulo {
+    funcion crear(texto nombre): nulo {
         padre(nombre, "guau")
         mi.raza = "mestizo"
     }
@@ -26,7 +26,7 @@ clase Perro extiende Animal {
 }
 
 clase Labrador extiende Perro {
-    funcion crear(val texto nombre): nulo {
+    funcion crear(texto nombre): nulo {
         padre(nombre)
         mi.raza = "Labrador"
     }

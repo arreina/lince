@@ -92,7 +92,7 @@ sea reloj = 0
 sea invulnerable = 0
 
 funcion volver_a_salir(): nulo {
-    sea salida = juego.buscar_en_mapa(NIVEL, "P")[0]
+    sea salida = juego.mapa.buscar(NIVEL, "P")[0]
     yo["x"] = salida[0] * CASILLA + 5
     yo["y"] = salida[1] * CASILLA + 6
     yo["vx"] = 0
@@ -102,10 +102,10 @@ funcion volver_a_salir(): nulo {
 funcion empezar(): nulo {
     monedas = []
     enemigos = []
-    para cada lista p en juego.buscar_en_mapa(NIVEL, "o") {
+    para cada lista p en juego.mapa.buscar(NIVEL, "o") {
         monedas.agregar({"x": p[0] * CASILLA + 10, "y": p[1] * CASILLA + 10, "viva": verdadero})
     }
-    para cada lista p en juego.buscar_en_mapa(NIVEL, "E") {
+    para cada lista p en juego.mapa.buscar(NIVEL, "E") {
         enemigos.agregar({"x": p[0] * CASILLA + 4, "y": p[1] * CASILLA + 20, "dir": -1, "vivo": verdadero})
     }
     recogidas = 0
@@ -130,11 +130,11 @@ funcion herido(): nulo {
 
 # ── Física ───────────────────────────────────────────────────────────
 # ¿Se puede andar por encima de esta casilla? (suelo o plataforma)
-funcion pisable(val numero c, val numero f): logico {
-    devolver juego.solido(NIVEL, c, f) o juego.casilla(NIVEL, c, f) == "="
+funcion pisable(numero c, numero f): logico {
+    devolver juego.mapa.solido(NIVEL, c, f) o juego.mapa.casilla(NIVEL, c, f) == "="
 }
 
-funcion mover_jugador(val numero dt): nulo {
+funcion mover_jugador(numero dt): nulo {
     yo["vx"] = juego.direccion("izquierda", "derecha") * VELOCIDAD
     si yo["vx"] < 0 { mira_izquierda = verdadero }
     si yo["vx"] > 0 { mira_izquierda = falso }
@@ -148,10 +148,10 @@ funcion mover_jugador(val numero dt): nulo {
     # el mapa lo mueve sin atravesar paredes y dice si está en el suelo
     sea cayendo = yo["vy"]
     sea estaba_en_suelo = yo["en_suelo"]
-    juego.mover_en_mapa(NIVEL, yo, dt)
+    juego.mapa.mover(NIVEL, yo, dt)
     si yo["en_suelo"] y no estaba_en_suelo y cayendo > 400 { polvo() }      # aterriza de una buena caída
     si yo["y"] > FILAS * CASILLA { herido() }
-    si juego.casilla(NIVEL, matematica.piso((yo["x"] + JW / 2) / CASILLA), matematica.piso((yo["y"] + JH / 2) / CASILLA)) == "M" {
+    si juego.mapa.casilla(NIVEL, matematica.piso((yo["x"] + JW / 2) / CASILLA), matematica.piso((yo["y"] + JH / 2) / CASILLA)) == "M" {
         estado = "ganado"
         juego.efecto("subir")
         juego.particulas(yo["x"] + JW / 2, yo["y"], {"cantidad": 120, "color": [255, 220, 80], "color_final": [255, 80, 80, 0],
@@ -160,7 +160,7 @@ funcion mover_jugador(val numero dt): nulo {
     }
 }
 
-funcion mover_enemigos(val numero dt): nulo {
+funcion mover_enemigos(numero dt): nulo {
     para cada diccionario bicho en enemigos {
         si bicho["vivo"] {
             # anda hasta una pared o un borde, y se da la vuelta
@@ -169,13 +169,13 @@ funcion mover_enemigos(val numero dt): nulo {
             si bicho["dir"] > 0 { delante = nx + 24 }
             sea c = matematica.piso(delante / CASILLA)
             sea f = matematica.piso((bicho["y"] + 6) / CASILLA)
-            si juego.solido(NIVEL, c, f) o no pisable(c, f + 1) {
+            si juego.mapa.solido(NIVEL, c, f) o no pisable(c, f + 1) {
                 bicho["dir"] = -bicho["dir"]
             } sino {
                 bicho["x"] = nx
             }
             # ¿choca con el lince? Si cae encima, lo aplasta
-            si juego.colision(yo["x"], yo["y"], JW, JH, bicho["x"], bicho["y"], 24, 12) {
+            si juego.colision([yo["x"], yo["y"], JW, JH], [bicho["x"], bicho["y"], 24, 12]) {
                 si yo["vy"] > 0 y yo["y"] + JH - bicho["y"] < 14 {
                     bicho["vivo"] = falso
                     yo["vy"] = SALTO * 0.6
@@ -189,7 +189,7 @@ funcion mover_enemigos(val numero dt): nulo {
         }
     }
     para cada diccionario m en monedas {
-        si m["viva"] y juego.colision(yo["x"], yo["y"], JW, JH, m["x"], m["y"], 12, 12) {
+        si m["viva"] y juego.colision([yo["x"], yo["y"], JW, JH], [m["x"], m["y"], 12, 12]) {
             m["viva"] = falso
             recogidas = recogidas + 1
             juego.efecto("moneda", {"volumen": 0.35})
@@ -212,12 +212,12 @@ funcion portada(): nulo {
     juego.rectangulo(0, ALTO - 96, ANCHO, 96, [150, 95, 55])
     juego.rectangulo(0, ALTO - 96, ANCHO, 12, [90, 180, 70])
     sea t = "EL LINCE SALTARIN"
-    juego.texto(t, (ANCHO - juego.ancho_texto(t, 5)) / 2, 120, 5, [255, 255, 255])
+    juego.texto(t, (ANCHO - juego.ancho_texto(t, 5)) / 2, 120, {"escala": 5, "color": [255, 255, 255]})
     # el lince corre en el sitio: cuadros 1 y 2 de la hoja, 10 por segundo
     juego.dibujar(LINCE, ANCHO / 2 - 36, ALTO - 96 - 78, {"celda": [12, 13], "cuadro": 1 + juego.cuadro(2, 10), "escala": 6})
     si juego.cuadro(2, 2) == 0 {
         sea p = "PULSA ESPACIO PARA EMPEZAR"
-        juego.texto(p, (ANCHO - juego.ancho_texto(p, 2)) / 2, 220, 2, [255, 240, 200])
+        juego.texto(p, (ANCHO - juego.ancho_texto(p, 2)) / 2, 220, {"escala": 2, "color": [255, 240, 200]})
     }
     si juego.accion_pulsada("empezar") {
         empezar()
@@ -226,7 +226,7 @@ funcion portada(): nulo {
 }
 
 # ── Un fotograma del nivel ────────────────────────────────────────────
-funcion nivel(val numero dt): nulo {
+funcion nivel(numero dt): nulo {
     si estado == "jugando" {
         reloj = reloj + dt
         invulnerable = matematica.maximo(0, invulnerable - dt)
@@ -243,16 +243,16 @@ funcion nivel(val numero dt): nulo {
     sea c_ini = matematica.piso(cam_x / CASILLA)
     para cada numero f en rango(0, FILAS) {
         para cada numero c en rango(c_ini, c_ini + ANCHO / CASILLA + 2) {
-            sea t = juego.casilla(NIVEL, c, f)
+            sea t = juego.mapa.casilla(NIVEL, c, f)
             sea x = c * CASILLA
             sea arriba = f * CASILLA
             si t == "#" {
                 juego.rectangulo(x, arriba, CASILLA, CASILLA, [150, 95, 55])
-                si no juego.solido(NIVEL, c, f - 1) { juego.rectangulo(x, arriba, CASILLA, 8, [90, 180, 70]) }
+                si no juego.mapa.solido(NIVEL, c, f - 1) { juego.rectangulo(x, arriba, CASILLA, 8, [90, 180, 70]) }
             } sino si t == "=" {
                 juego.rectangulo(x, arriba, CASILLA, 12, [180, 130, 80])
                 juego.contorno(x, arriba, CASILLA, 12, [120, 80, 45])
-            } sino si t == "M" y juego.casilla(NIVEL, c, f - 1) != "M" {
+            } sino si t == "M" y juego.mapa.casilla(NIVEL, c, f - 1) != "M" {
                 juego.rectangulo(x + 14, arriba, 4, CASILLA * 5, [240, 240, 240])
                 juego.rectangulo(x + 18, arriba + 2, 26, 18, [230, 60, 60])
             }
@@ -281,17 +281,17 @@ funcion nivel(val numero dt): nulo {
     # ── marcador, fijo en pantalla ──
     juego.camara()
     juego.dibujar(MONEDA, 12, 12, {"escala": 2})
-    juego.texto("x " + a_texto(recogidas), 32, 14, 2, [255, 255, 255])
-    juego.texto("VIDAS " + a_texto(vidas), 120, 14, 2, [255, 255, 255])
+    juego.texto("x " + a_texto(recogidas), 32, 14, {"escala": 2, "color": [255, 255, 255]})
+    juego.texto("VIDAS " + a_texto(vidas), 120, 14, {"escala": 2, "color": [255, 255, 255]})
     sea t = "TIEMPO " + a_texto(matematica.piso(reloj))
-    juego.texto(t, ANCHO - juego.ancho_texto(t, 2) - 12, 14, 2, [255, 255, 255])
+    juego.texto(t, ANCHO - juego.ancho_texto(t, 2) - 12, 14, {"escala": 2, "color": [255, 255, 255]})
     si estado != "jugando" {
         juego.rectangulo(0, 180, ANCHO, 110, [0, 0, 0, 160])
         sea m = "HAS LLEGADO!"
         si estado == "perdido" { m = "FIN DEL JUEGO" }
-        juego.texto(m, (ANCHO - juego.ancho_texto(m, 4)) / 2, 200, 4, [255, 220, 80])
+        juego.texto(m, (ANCHO - juego.ancho_texto(m, 4)) / 2, 200, {"escala": 4, "color": [255, 220, 80]})
         sea r = a_texto(recogidas) + " MONEDAS EN " + a_texto(matematica.piso(reloj)) + " S - ESPACIO PARA REPETIR"
-        juego.texto(r, (ANCHO - juego.ancho_texto(r, 2)) / 2, 250, 2, [255, 255, 255])
+        juego.texto(r, (ANCHO - juego.ancho_texto(r, 2)) / 2, 250, {"escala": 2, "color": [255, 255, 255]})
     }
 }
 
@@ -303,7 +303,7 @@ juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"
 juego.definir_accion("saltar", ["espacio", "arriba", "w", "mando:a"])
 juego.definir_accion("empezar", ["espacio", "entrar", "mando:a", "mando:inicio"])
 # El nivel como mapa de casillas: '#' es pared y '=' plataforma (se atraviesa desde abajo)
-fijo NIVEL = juego.mapa(MAPA, CASILLA, {"plataformas": "="})
+fijo NIVEL = juego.mapa.crear(MAPA, CASILLA, {"plataformas": "="})
 
 fijo LINCE = juego.sprite(hoja_del_lince(), COLORES_LINCE)
 fijo ESCARABAJO = juego.sprite([

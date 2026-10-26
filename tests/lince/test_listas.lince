@@ -41,7 +41,7 @@ escribir(desordenada)
 escribir(desordenada.invertir())
 sea lista frutas = ["pera", "manzana", "uva"]
 escribir(frutas.ordenar())
-escribir(desordenada.ordenar(funcion(val numero a, val numero b): numero {
+escribir(desordenada.ordenar(funcion(numero a, numero b): numero {
     devolver b - a
 }))
 escribir(desordenada.posicion(19))

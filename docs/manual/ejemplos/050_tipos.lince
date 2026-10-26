@@ -4,7 +4,7 @@
 sea lista notas = [9, 7, 10]
 sea diccionario ficha = {"nombre": "Ana"}
 
-funcion presentar(val texto quien, val numero anios): texto {
+funcion presentar(texto quien, numero anios): texto {
     devolver quien + " tiene " + anios + " años"
 }
 

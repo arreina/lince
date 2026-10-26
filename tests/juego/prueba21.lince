@@ -2,7 +2,7 @@
 importar "juego"
 importar "matematica"
 juego.abrir("Física", 320, 240)
-fijo NIVEL = juego.mapa([
+fijo NIVEL = juego.mapa.crear([
     "##########",
     "#........#",
     "#........#",
@@ -12,22 +12,22 @@ fijo NIVEL = juego.mapa([
     "#........#",
     "##########"
 ], 32)
-sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
-sea caja = juego.cuerpo(mundo, {"x": 40, "y": 40, "ancho": 20, "alto": 20})
-sea pelota = juego.cuerpo(mundo, {"x": 100, "y": 40, "radio": 8, "rebote": 0.7})
-sea abajo = juego.cuerpo(mundo, {"x": 150, "y": 150, "ancho": 20, "alto": 20, "masa": 2})
-sea encima = juego.cuerpo(mundo, {"x": 152, "y": 100, "ancho": 20, "alto": 20})
-sea moneda = juego.cuerpo(mundo, {"x": 40, "y": 180, "ancho": 10, "alto": 10, "sensor": verdadero, "gravedad": 0})
-sea ascensor = juego.cuerpo(mundo, {"x": 220, "y": 200, "ancho": 40, "alto": 8, "fijo": verdadero, "vy": -30})
-sea pasajero = juego.cuerpo(mundo, {"x": 230, "y": 180, "ancho": 16, "alto": 16})
+sea mundo = juego.fisica.mundo({"gravedad": 900, "mapa": NIVEL})
+sea caja = juego.fisica.cuerpo(mundo, {"x": 40, "y": 40, "ancho": 20, "alto": 20})
+sea pelota = juego.fisica.cuerpo(mundo, {"x": 100, "y": 40, "radio": 8, "rebote": 0.7})
+sea abajo = juego.fisica.cuerpo(mundo, {"x": 150, "y": 150, "ancho": 20, "alto": 20, "masa": 2})
+sea encima = juego.fisica.cuerpo(mundo, {"x": 152, "y": 100, "ancho": 20, "alto": 20})
+sea moneda = juego.fisica.cuerpo(mundo, {"x": 40, "y": 180, "ancho": 10, "alto": 10, "sensor": verdadero, "gravedad": 0})
+sea ascensor = juego.fisica.cuerpo(mundo, {"x": 220, "y": 200, "ancho": 40, "alto": 8, "fijo": verdadero, "vy": -30})
+sea pasajero = juego.fisica.cuerpo(mundo, {"x": 230, "y": 180, "ancho": 16, "alto": 16})
 sea toco_moneda = falso
 sea botes = 0
 sea vy_antes = 0
 para (i = 0; i < 300; i++) {
-    juego.avanzar_fisica(mundo, 1 / 60)
+    juego.fisica.avanzar(mundo, 1 / 60)
     si vy_antes > 0 y pelota["vy"] < 0 { botes = botes + 1 }
     vy_antes = pelota["vy"]
-    para cada diccionario t en juego.tocando(mundo, moneda) {
+    para cada diccionario t en juego.fisica.tocando(mundo, moneda) {
         si t["id_fisica"] == caja["id_fisica"] { toco_moneda = verdadero }
     }
 }
@@ -37,12 +37,12 @@ escribir("apiladas: {matematica.redondear(abajo["y"])} {matematica.redondear(enc
 escribir("la moneda no cae y avisa: {moneda["y"]} {toco_moneda}")
 escribir("el pasajero sube con el ascensor: {matematica.redondear(ascensor["y"] - pasajero["y"])} {ascensor["y"] < 200}")
 # empujar: la caja ligera se mueve más que la pesada
-sea ligera = juego.cuerpo(mundo, {"x": 60, "y": 204, "ancho": 20, "alto": 20, "masa": 1})
-sea pesada = juego.cuerpo(mundo, {"x": 160, "y": 204, "ancho": 20, "alto": 20, "masa": 10})
-juego.empujar(ligera, 200, 0)
-juego.empujar(pesada, 200, 0)
+sea ligera = juego.fisica.cuerpo(mundo, {"x": 60, "y": 204, "ancho": 20, "alto": 20, "masa": 1})
+sea pesada = juego.fisica.cuerpo(mundo, {"x": 160, "y": 204, "ancho": 20, "alto": 20, "masa": 10})
+juego.fisica.empujar(ligera, 200, 0)
+juego.fisica.empujar(pesada, 200, 0)
 escribir("empujar: {ligera["vx"]} {pesada["vx"]}")
-juego.quitar_cuerpo(mundo, pesada)
+juego.fisica.quitar(mundo, pesada)
 escribir("cuerpos: {mundo["cuerpos"].longitud()}")
-intentar { juego.cuerpo(mundo, {"x": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
-intentar { juego.avanzar_fisica({}) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.fisica.cuerpo(mundo, {"x": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.fisica.avanzar({}) } capturar (error e) { escribir("error: {e.mensaje}") }

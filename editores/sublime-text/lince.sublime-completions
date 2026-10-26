@@ -19,7 +19,7 @@
     },
     {
       "trigger": "fun\tDefine una función",
-      "contents": "funcion ${1:nombre}(val ${2:numero} ${3:param}): ${4:nulo} {\n\t$0\n}"
+      "contents": "funcion ${1:nombre}(${2:numero} ${3:param}): ${4:nulo} {\n\t$0\n}"
     },
     {
       "trigger": "fun0\tDefine una función sin parámetros",
@@ -27,11 +27,11 @@
     },
     {
       "trigger": "lambda\tFunción anónima",
-      "contents": "sea ${1:f} = funcion(val ${2:numero} ${3:x}): ${4:numero} {\n\tdevolver ${5:x}\n}"
+      "contents": "sea ${1:f} = funcion(${2:numero} ${3:x}): ${4:numero} {\n\tdevolver ${5:x}\n}"
     },
     {
       "trigger": "generador\tFunción generadora",
-      "contents": "generador ${1:contar}(val numero ${2:n}): numero {\n\tpara (${3:i} = 0; ${3:i} < ${2:n}; ${3:i}++) {\n\t\tproducir ${3:i}\n\t}\n}"
+      "contents": "generador ${1:contar}(numero ${2:n}): numero {\n\tpara (${3:i} = 0; ${3:i} < ${2:n}; ${3:i}++) {\n\t\tproducir ${3:i}\n\t}\n}"
     },
     {
       "trigger": "tarea\tCódigo que se para a esperar sin parar el juego",
@@ -67,11 +67,11 @@
     },
     {
       "trigger": "clase\tDefine una clase",
-      "contents": "clase ${1:Nombre} {\n\tfuncion crear(val ${2:numero} ${3:param}): nulo {\n\t\tmi.${3:param} = ${3:param}\n\t}\n\t$0\n}"
+      "contents": "clase ${1:Nombre} {\n\tfuncion crear(${2:numero} ${3:param}): nulo {\n\t\tmi.${3:param} = ${3:param}\n\t}\n\t$0\n}"
     },
     {
       "trigger": "clasex\tClase que extiende a otra",
-      "contents": "clase ${1:Nombre} extiende ${2:Padre} {\n\tfuncion crear(val ${3:numero} ${4:param}): nulo {\n\t\tpadre(${4:param})\n\t}\n\t$0\n}"
+      "contents": "clase ${1:Nombre} extiende ${2:Padre} {\n\tfuncion crear(${3:numero} ${4:param}): nulo {\n\t\tpadre(${4:param})\n\t}\n\t$0\n}"
     },
     {
       "trigger": "abstracta\tClase que no se instancia",
@@ -87,7 +87,7 @@
     },
     {
       "trigger": "propiedad\tPareja obtener / fijar",
-      "contents": "obtener ${1:valor}(): ${2:numero} {\n\tdevolver mi._${1:valor}\n}\nfijar ${1:valor}(val ${2:numero} ${3:v}): nulo {\n\tmi._${1:valor} = ${3:v}\n}"
+      "contents": "obtener ${1:valor}(): ${2:numero} {\n\tdevolver mi._${1:valor}\n}\nfijar ${1:valor}(${2:numero} ${3:v}): nulo {\n\tmi._${1:valor} = ${3:v}\n}"
     },
     {
       "trigger": "interfaz\tDefine una interfaz",

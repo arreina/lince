@@ -34,7 +34,7 @@ escribir(d)
 clase Nave {
     sea vida = 10
     sea puntos = 0
-    funcion dano(val numero n): nulo {
+    funcion dano(numero n): nulo {
         mi.vida -= n
     }
 }
@@ -52,7 +52,7 @@ escribir(naves[1].vida)
 clase Termometro {
     sea grados = 20
     obtener kelvin(): numero { devolver mi.grados + 273 }
-    fijar kelvin(val numero k): nulo { mi.grados = k - 273 }
+    fijar kelvin(numero k): nulo { mi.grados = k - 273 }
 }
 sea term = Termometro()
 term.kelvin += 5
@@ -62,11 +62,11 @@ escribir(term.grados)
 clase Vector {
     sea vx = 0
     sea vy = 0
-    funcion crear(val numero a, val numero b): nulo {
+    funcion crear(numero a, numero b): nulo {
         mi.vx = a
         mi.vy = b
     }
-    funcion sumar(val Vector v): Vector { devolver Vector(mi.vx + v.vx, mi.vy + v.vy) }
+    funcion sumar(Vector v): Vector { devolver Vector(mi.vx + v.vx, mi.vy + v.vy) }
     funcion a_texto(): texto { devolver "(" + mi.vx + ", " + mi.vy + ")" }
 }
 sea pos = Vector(1, 2)

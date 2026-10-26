@@ -30,7 +30,7 @@
   "Función": {
     "prefix": "fun",
     "body": [
-      "funcion ${1:nombre}(val ${2:numero} ${3:param}): ${4:nulo} {",
+      "funcion ${1:nombre}(${2:numero} ${3:param}): ${4:nulo} {",
       "\t$0",
       "}"
     ],
@@ -48,7 +48,7 @@
   "Lambda": {
     "prefix": "lambda",
     "body": [
-      "sea ${1:f} = funcion(val ${2:numero} ${3:x}): ${4:numero} {",
+      "sea ${1:f} = funcion(${2:numero} ${3:x}): ${4:numero} {",
       "\tdevolver ${5:x}",
       "}"
     ],
@@ -57,7 +57,7 @@
   "Generador": {
     "prefix": "generador",
     "body": [
-      "generador ${1:contar}(val numero ${2:n}): numero {",
+      "generador ${1:contar}(numero ${2:n}): numero {",
       "\tpara (${3:i} = 0; ${3:i} < ${2:n}; ${3:i}++) {",
       "\t\tproducir ${3:i}",
       "\t}",
@@ -150,7 +150,7 @@
     "prefix": "clase",
     "body": [
       "clase ${1:Nombre} {",
-      "\tfuncion crear(val ${2:numero} ${3:param}): nulo {",
+      "\tfuncion crear(${2:numero} ${3:param}): nulo {",
       "\t\tmi.${3:param} = ${3:param}",
       "\t}",
       "\t$0",
@@ -162,7 +162,7 @@
     "prefix": "clasex",
     "body": [
       "clase ${1:Nombre} extiende ${2:Padre} {",
-      "\tfuncion crear(val ${3:numero} ${4:param}): nulo {",
+      "\tfuncion crear(${3:numero} ${4:param}): nulo {",
       "\t\tpadre(${4:param})",
       "\t}",
       "\t$0",
@@ -202,7 +202,7 @@
       "obtener ${1:valor}(): ${2:numero} {",
       "\tdevolver mi._${1:valor}",
       "}",
-      "fijar ${1:valor}(val ${2:numero} ${3:v}): nulo {",
+      "fijar ${1:valor}(${2:numero} ${3:v}): nulo {",
       "\tmi._${1:valor} = ${3:v}",
       "}"
     ],

@@ -1,0 +1,28 @@
+# Formas de la 1.x que la 2.0 cambia: lince migrar las pasa a nuevo.esperado (no se ejecuta)
+importar "juego"
+importar "texto"
+fijo LETRA = juego.fuente("x.ttf", 20)
+funcion f(numero a, ref numero b, texto c): nulo {
+    escribir((c + "x").dividir(","))   # un comentario
+}
+sea m = juego.fisica.mundo({"gravedad": 900})
+sea c = juego.fisica.cuerpo(m, {"x": 1})
+juego.fisica.avanzar(m)
+sea mp = juego.mapa.crear(["#"], 16)
+si juego.mapa.solido(mp, 0, 0) y juego.colision([1, 2, 3, 4],
+        [5, 6, 7, 8]) { escribir("sí") }
+si juego.colision([1, 2], [0, 0, 10, 10]) o juego.colision({"centro": [0, 0], "radio": 1}, {"centro": [2, 2], "radio": 1}) { escribir("x") }
+juego.reproducir(s, {"volumen": 0.5, "bucle": verdadero})
+juego.reproducir(s, vol)
+juego.musica("a.ogg", {"volumen": 0.4})
+juego.texto("Hola", 1, 2, {"escala": 3, "color": [255, 0, 0]})
+juego.texto("Hola", 1, 2, {"fuente": LETRA})
+juego.texto(t.extraer(0, 3), 1, 2, {"escala": 2})
+juego.camara(0, 0, {"zoom": 2, "angulo": 15})
+sea cam = juego.camara_actual()
+escribir(cam["angulo"] + juego.camara_actual()["angulo"])
+escribir([juego.camara_actual()["x"], juego.camara_actual()["y"]])
+juego.guardar_partida("p", 1)
+escribir(("ab" * (2 + 1)) + a_texto(3))
+si (nombre == "") { }
+juego.quitar_particulas()

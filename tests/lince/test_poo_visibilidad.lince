@@ -5,7 +5,7 @@ clase Cuenta {
     privado sea saldo = 0
     sea titular = "anon"
 
-    funcion crear(val texto t, val numero s): nulo {
+    funcion crear(texto t, numero s): nulo {
         mi.titular = t
         mi.saldo = s
         Cuenta.total = Cuenta.total + 1
@@ -13,16 +13,16 @@ clase Cuenta {
     privado funcion secreto(): numero { devolver mi.saldo * 2 }
     funcion doble(): numero { devolver mi.secreto() }
     estatico funcion cuantas(): numero { devolver Cuenta.total }
-    estatico funcion nueva(val texto t): Cuenta { devolver Cuenta(t, 10) }
+    estatico funcion nueva(texto t): Cuenta { devolver Cuenta(t, 10) }
     obtener dinero(): numero { devolver mi.saldo }
-    fijar dinero(val numero v): nulo {
+    fijar dinero(numero v): nulo {
         si v < 0 { lanzar Error("negativo") }
         mi.saldo = v
     }
     funcion a_texto(): texto { devolver "Cuenta(" + mi.titular + ")" }
-    funcion sumar(val Cuenta otra): numero { devolver mi.saldo + otra.dinero }
-    funcion igual(val Cuenta otra): logico { devolver mi.saldo == otra.dinero }
-    funcion menor(val Cuenta otra): logico { devolver mi.saldo < otra.dinero }
+    funcion sumar(Cuenta otra): numero { devolver mi.saldo + otra.dinero }
+    funcion igual(Cuenta otra): logico { devolver mi.saldo == otra.dinero }
+    funcion menor(Cuenta otra): logico { devolver mi.saldo < otra.dinero }
 }
 sea a = Cuenta("ana", 5)
 sea b = Cuenta.nueva("luis")

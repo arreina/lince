@@ -6,8 +6,8 @@ importar "texto"
 sea frase = "año de la cigüeña"
 escribir(frase.longitud())
 escribir(frase.mayusculas())
-escribir(texto.dividir("a,b,c", ","))
-escribir(texto.repetir("ab", 3))
+escribir("a,b,c".dividir(","))
+escribir(("ab" * 3))
 
 # Sobre un texto escrito tal cual, sin guardarlo en una variable
 escribir("hola".mayusculas())

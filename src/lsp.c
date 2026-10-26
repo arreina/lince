@@ -18,6 +18,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "lsp.h"
+#include "migrar.h"
 #include "revisor.h"
 #include "formatear.h"
 #include "documentar.h"
@@ -77,6 +78,7 @@ void lsp_analizar(const char *texto) {
     lsp_conocer_importados(p, texto, _ruta_analizada);
     parser_avisos(p, avisar_stderr);
     revisar(programa, _ruta_analizada, avisar_stderr);
+    migrar_avisos(texto, avisar_stderr);         /* lo que la 2.0 cambia */
     fflush(stderr);
 }
 
@@ -142,8 +144,9 @@ static int analizar_aparte(const char *texto, char *buf, size_t max) {
     GetExitCodeProcess(pi.hProcess, &codigo);
     size_t total = 0;
     DWORD r;
-    while (total < max - 1 && ReadFile(lee, buf + total, (DWORD)(max - 1 - total), &r, NULL) && r > 0)
-        total += r;
+    char resto[4096];
+    while (ReadFile(lee, total < max - 1 ? buf + total : resto, total < max - 1 ? (DWORD)(max - 1 - total) : (DWORD)sizeof resto, &r, NULL) && r > 0)
+        if (total < max - 1) total += r;          /* lo que no cabe se lee y se tira */
     buf[total] = '\0';
     CloseHandle(lee);
     CloseHandle(pi.hProcess);
@@ -172,10 +175,10 @@ static int analizar_aparte(const char *texto, char *buf, size_t max) {
     close(fds[1]);
     size_t total = 0;
     ssize_t r;
-    while ((r = read(fds[0], buf + total, max - 1 - total)) > 0) {
-        total += (size_t)r;
-        if (total >= max - 1) break;
-    }
+    char resto[4096];
+    while ((r = read(fds[0], total < max - 1 ? buf + total : resto,
+                     total < max - 1 ? max - 1 - total : sizeof resto)) > 0)
+        if (total < max - 1) total += (size_t)r;    /* lo que no cabe se lee y se tira: si no, el hijo se queda esperando */
     buf[total] = '\0';
     close(fds[0]);
     int estado = 0;

@@ -1,4 +1,4 @@
-funcion fib(val numero n): numero {
+funcion fib(numero n): numero {
     si n < 2 { devolver n }
     devolver fib(n - 1) + fib(n - 2)
 }

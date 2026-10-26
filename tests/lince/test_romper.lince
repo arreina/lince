@@ -73,7 +73,7 @@ para cada numero v en [1, 2] {
 }
 
 # En una función, con 'devolver' después
-funcion primero_par(val lista l): numero {
+funcion primero_par(lista l): numero {
     sea encontrado = -1
     para cada numero x en l {
         si x % 2 == 0 {
@@ -97,7 +97,7 @@ escribir("vueltas: " + vueltas)
 # que está dentro de un bucle (no puede romper el bucle de quien la llama)
 fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
 fijo TMP = "test_romper_tmp.lince"
-funcion comprobar(val texto codigo): nulo {
+funcion comprobar(texto codigo): nulo {
     archivos.escribir(TMP, codigo)
     sea salida = sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1")
     escribir(salida.contiene("solo puede ir dentro de un bucle"))

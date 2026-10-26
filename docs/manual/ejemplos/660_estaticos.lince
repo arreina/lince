@@ -5,11 +5,11 @@ clase Pedido {
     estatico sea creados = 0
     estatico fijo IVA = 21
 
-    funcion crear(val numero base): nulo {
+    funcion crear(numero base): nulo {
         mi.base = base
         Pedido.creados = Pedido.creados + 1
     }
-    estatico funcion con_iva(val numero base): numero {
+    estatico funcion con_iva(numero base): numero {
         devolver base + base * Pedido.IVA / 100
     }
 }

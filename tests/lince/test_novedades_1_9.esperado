@@ -1,0 +1,14 @@
+["uno", "dos", "tres"]
+2
+-1
+3
+and
+ecnil
+["ñ", "u"]
+verdadero falso verdadero
+verdadero verdadero falso
+007|7..|--7--
+2
+ErrorArgumento: 'dividir' de un texto necesita 1 argumento.
+El texto no tiene el método 'no_existe'.
+8 4

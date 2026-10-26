@@ -146,7 +146,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.8</span>
+  <span class="version">v1.9</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag" href="juego.html">Módulo juego</a>
@@ -186,7 +186,7 @@
 <span class="linea"> </span>
 <span class="linea"><span class="k">mientras</span> juego.abierto() {</span>
 <span class="linea">    juego.limpiar([<span class="n">20</span>, <span class="n">24</span>, <span class="n">48</span>])</span>
-<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;HOLA&quot;</span>, <span class="n">272</span>, <span class="n">220</span>, <span class="n">4</span>, [<span class="n">255</span>, <span class="n">220</span>, <span class="n">120</span>])</span>
+<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;HOLA&quot;</span>, <span class="n">272</span>, <span class="n">220</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">220</span>, <span class="n">120</span>]})</span>
 <span class="linea">    juego.presentar()</span>
 <span class="linea">}</span></code></pre></div><span class="fuente">docs/tutorial/pasos/1_ventana.lince</span></section>
 <section class="paso" id="paso2"><h2>Paso 2 · El lince</h2><p>Ahora el protagonista. <code>juego.sprite</code> convierte un dibujo hecho con letras en una imagen: cada letra es un píxel del color que le des, y el punto es transparente. <code>juego.dibujar</code> lo pinta cuatro veces más grande.</p><p>Para moverlo, si la flecha está pulsada se suma o se resta a <code>x</code>. Se multiplica por <code>juego.dt()</code>, los segundos que ha durado el último fotograma, para que vaya a 320 píxeles por segundo en cualquier ordenador, sea rápido o lento. <code>matematica.limitar</code> impide que se salga por los lados.</p><p><strong>Prueba la recarga en caliente:</strong> deja el juego abierto, cambia <code>VELOCIDAD</code> o un color del sprite y guarda. El juego se actualiza al momento sin cerrarse. Por eso lo que quieras retocar va en un <code>fijo</code>: las constantes se toman del código nuevo, mientras que las variables <code>sea</code>, como <code>x</code>, conservan su valor.</p><figure><img src="img/tutorial/paso2.png" alt="Captura del paso 2: El lince" loading="lazy" width="640" height="480"><figcaption>Captura real del paso 2, sacada al generar esta página.</figcaption></figure><p class="leyenda">En <b>amarillo</b>, lo nuevo de este paso.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="linea"><span class="k">importar</span> <span class="s">&quot;juego&quot;</span></span>
@@ -273,7 +273,7 @@
 <span class="linea nueva">    }</span>
 <span class="linea nueva">    <span class="c"># caen, y las que salen por abajo se quitan de la lista</span></span>
 <span class="linea nueva">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> estrellas { e[<span class="s">&quot;y&quot;</span>] = e[<span class="s">&quot;y&quot;</span>] + e[<span class="s">&quot;vel&quot;</span>] * dt }</span>
-<span class="linea nueva">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> e): <span class="t">logico</span> { <span class="k">devolver</span> e[<span class="s">&quot;y&quot;</span>] &lt; ALTO + <span class="n">20</span> })</span>
+<span class="linea nueva">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="t">diccionario</span> e): <span class="t">logico</span> { <span class="k">devolver</span> e[<span class="s">&quot;y&quot;</span>] &lt; ALTO + <span class="n">20</span> })</span>
 <span class="linea"> </span>
 <span class="linea">    juego.limpiar([<span class="n">20</span>, <span class="n">24</span>, <span class="n">48</span>])</span>
 <span class="linea nueva">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> estrellas {</span>
@@ -335,7 +335,7 @@
 <span class="linea nueva">    <span class="c"># caen; si tocan al lince, punto, pitido y chispas</span></span>
 <span class="linea nueva">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> estrellas {</span>
 <span class="linea nueva">        e[<span class="s">&quot;y&quot;</span>] = e[<span class="s">&quot;y&quot;</span>] + e[<span class="s">&quot;vel&quot;</span>] * dt</span>
-<span class="linea nueva">        <span class="k">si</span> juego.colision(x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>, e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>) {</span>
+<span class="linea nueva">        <span class="k">si</span> juego.colision([x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>], [e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>]) {</span>
 <span class="linea nueva">            e[<span class="s">&quot;cogida&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea nueva">            puntos = puntos + <span class="n">1</span></span>
 <span class="linea nueva">            juego.pitido(<span class="n">880</span>, <span class="n">0.06</span>, <span class="n">0.2</span>)</span>
@@ -343,7 +343,7 @@
 <span class="linea nueva">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">200</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.3</span>, <span class="n">0.6</span>]})</span>
 <span class="linea nueva">        }</span>
 <span class="linea nueva">    }</span>
-<span class="linea nueva">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> e): <span class="t">logico</span> {</span>
+<span class="linea nueva">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="t">diccionario</span> e): <span class="t">logico</span> {</span>
 <span class="linea nueva">        <span class="k">devolver</span> <span class="k">no</span> e[<span class="s">&quot;cogida&quot;</span>] <span class="k">y</span> e[<span class="s">&quot;y&quot;</span>] &lt; ALTO + <span class="n">20</span></span>
 <span class="linea nueva">    })</span>
 <span class="linea"> </span>
@@ -353,7 +353,7 @@
 <span class="linea">    }</span>
 <span class="linea">    juego.dibujar(LINCE, x, ALTO - <span class="n">40</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;centrado&quot;</span>: <span class="k">verdadero</span>})</span>
 <span class="linea nueva">    juego.dibujar_particulas()</span>
-<span class="linea nueva">    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS &quot;</span> + a_texto(puntos), <span class="n">16</span>, <span class="n">16</span>, <span class="n">3</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>])</span>
+<span class="linea nueva">    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS &quot;</span> + a_texto(puntos), <span class="n">16</span>, <span class="n">16</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>]})</span>
 <span class="linea">    juego.presentar()</span>
 <span class="linea">}</span></code></pre></div><span class="fuente">docs/tutorial/pasos/4_atrapar.lince</span></section>
 <section class="paso" id="paso5"><h2>Paso 5 · Rocas y vidas</h2><p>Un juego necesita algo que lo complique. Las rocas caen igual que las estrellas, pero son círculos: <code>juego.colision_circulo_rect</code> comprueba si un círculo toca un rectángulo.</p><p>La dificultad sube sola: <code>reloj</code> cuenta los segundos de partida y la pausa entre rocas se acorta con él, hasta un mínimo de 0,4 segundos que marca <code>matematica.maximo</code>.</p><p>Al quedarse sin vidas, <code>dt</code> pasa a valer 0: todo lo que se mueve con <code>dt</code> se detiene sin necesidad de más código.</p><figure><img src="img/tutorial/paso5.png" alt="Captura del paso 5: Rocas y vidas" loading="lazy" width="640" height="480"><figcaption>Captura real del paso 5, sacada al generar esta página.</figcaption></figure><p class="leyenda">En <b>amarillo</b>, lo nuevo de este paso.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="linea"><span class="k">importar</span> <span class="s">&quot;juego&quot;</span></span>
@@ -415,7 +415,7 @@
 <span class="linea">    <span class="c"># caen; si tocan al lince, punto, pitido y chispas</span></span>
 <span class="linea">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> estrellas {</span>
 <span class="linea">        e[<span class="s">&quot;y&quot;</span>] = e[<span class="s">&quot;y&quot;</span>] + e[<span class="s">&quot;vel&quot;</span>] * dt</span>
-<span class="linea">        <span class="k">si</span> juego.colision(x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>, e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>) {</span>
+<span class="linea">        <span class="k">si</span> juego.colision([x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>], [e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>]) {</span>
 <span class="linea">            e[<span class="s">&quot;cogida&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea">            puntos = puntos + <span class="n">1</span></span>
 <span class="linea">            juego.pitido(<span class="n">880</span>, <span class="n">0.06</span>, <span class="n">0.2</span>)</span>
@@ -423,7 +423,7 @@
 <span class="linea">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">200</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.3</span>, <span class="n">0.6</span>]})</span>
 <span class="linea">        }</span>
 <span class="linea">    }</span>
-<span class="linea">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> e): <span class="t">logico</span> {</span>
+<span class="linea">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="t">diccionario</span> e): <span class="t">logico</span> {</span>
 <span class="linea">        <span class="k">devolver</span> <span class="k">no</span> e[<span class="s">&quot;cogida&quot;</span>] <span class="k">y</span> e[<span class="s">&quot;y&quot;</span>] &lt; ALTO + <span class="n">20</span></span>
 <span class="linea">    })</span>
 <span class="linea"> </span>
@@ -436,7 +436,7 @@
 <span class="linea nueva">    }</span>
 <span class="linea nueva">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> r <span class="k">en</span> rocas {</span>
 <span class="linea nueva">        r[<span class="s">&quot;y&quot;</span>] = r[<span class="s">&quot;y&quot;</span>] + r[<span class="s">&quot;vel&quot;</span>] * dt</span>
-<span class="linea nueva">        <span class="k">si</span> vidas &gt; <span class="n">0</span> <span class="k">y</span> juego.colision_circulo_rect(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], <span class="n">14</span>, x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>) {</span>
+<span class="linea nueva">        <span class="k">si</span> vidas &gt; <span class="n">0</span> <span class="k">y</span> juego.colision({<span class="s">&quot;centro&quot;</span>: [r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>]], <span class="s">&quot;radio&quot;</span>: <span class="n">14</span>}, [x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>]) {</span>
 <span class="linea nueva">            r[<span class="s">&quot;choca&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea nueva">            vidas = vidas - <span class="n">1</span></span>
 <span class="linea nueva">            juego.pitido(<span class="n">110</span>, <span class="n">0.25</span>)</span>
@@ -444,7 +444,7 @@
 <span class="linea nueva">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">80</span>, <span class="n">260</span>], <span class="s">&quot;gravedad&quot;</span>: <span class="n">500</span>})</span>
 <span class="linea nueva">        }</span>
 <span class="linea nueva">    }</span>
-<span class="linea nueva">    rocas = filtrar(rocas, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> r): <span class="t">logico</span> {</span>
+<span class="linea nueva">    rocas = filtrar(rocas, <span class="k">funcion</span>(<span class="t">diccionario</span> r): <span class="t">logico</span> {</span>
 <span class="linea nueva">        <span class="k">devolver</span> <span class="k">no</span> r[<span class="s">&quot;choca&quot;</span>] <span class="k">y</span> r[<span class="s">&quot;y&quot;</span>] &lt; ALTO + <span class="n">20</span></span>
 <span class="linea nueva">    })</span>
 <span class="linea"> </span>
@@ -455,11 +455,11 @@
 <span class="linea">    juego.dibujar(LINCE, x, ALTO - <span class="n">40</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;centrado&quot;</span>: <span class="k">verdadero</span>})</span>
 <span class="linea nueva">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> r <span class="k">en</span> rocas { juego.circulo(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], <span class="n">14</span>, [<span class="n">120</span>, <span class="n">110</span>, <span class="n">120</span>]) }</span>
 <span class="linea">    juego.dibujar_particulas()</span>
-<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS &quot;</span> + a_texto(puntos), <span class="n">16</span>, <span class="n">16</span>, <span class="n">3</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>])</span>
-<span class="linea nueva">    juego.<span class="t">texto</span>(<span class="s">&quot;VIDAS &quot;</span> + a_texto(vidas), ANCHO - <span class="n">150</span>, <span class="n">16</span>, <span class="n">3</span>, [<span class="n">255</span>, <span class="n">120</span>, <span class="n">120</span>])</span>
+<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS &quot;</span> + a_texto(puntos), <span class="n">16</span>, <span class="n">16</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>]})</span>
+<span class="linea nueva">    juego.<span class="t">texto</span>(<span class="s">&quot;VIDAS &quot;</span> + a_texto(vidas), ANCHO - <span class="n">150</span>, <span class="n">16</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">120</span>, <span class="n">120</span>]})</span>
 <span class="linea nueva">    <span class="k">si</span> vidas == <span class="n">0</span> {</span>
 <span class="linea nueva">        <span class="k">sea</span> fin = <span class="s">&quot;HAS PERDIDO&quot;</span></span>
-<span class="linea nueva">        juego.<span class="t">texto</span>(fin, (ANCHO - juego.ancho_texto(fin, <span class="n">5</span>)) / <span class="n">2</span>, <span class="n">200</span>, <span class="n">5</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>])</span>
+<span class="linea nueva">        juego.<span class="t">texto</span>(fin, (ANCHO - juego.ancho_texto(fin, <span class="n">5</span>)) / <span class="n">2</span>, <span class="n">200</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">5</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>]})</span>
 <span class="linea nueva">    }</span>
 <span class="linea">    juego.presentar()</span>
 <span class="linea">}</span></code></pre></div><span class="fuente">docs/tutorial/pasos/5_rocas.lince</span></section>
@@ -515,11 +515,11 @@
 <span class="linea nueva">    puntos = <span class="n">0</span></span>
 <span class="linea nueva">    vidas = <span class="n">3</span></span>
 <span class="linea nueva">    reloj = <span class="n">0</span></span>
-<span class="linea nueva">    juego.borrar_particulas()</span>
+<span class="linea nueva">    juego.quitar_particulas()</span>
 <span class="linea nueva">}</span>
 <span class="linea"> </span>
 <span class="linea nueva"><span class="c"># Un paso de la partida: lo mismo que antes, ahora dentro de una función</span></span>
-<span class="linea nueva"><span class="k">funcion</span> mover(<span class="k">val</span> <span class="t">numero</span> dt): <span class="k">nulo</span> {</span>
+<span class="linea nueva"><span class="k">funcion</span> mover(<span class="t">numero</span> dt): <span class="k">nulo</span> {</span>
 <span class="linea">    reloj = reloj + dt</span>
 <span class="linea">    <span class="k">si</span> juego.tecla(<span class="s">&quot;izquierda&quot;</span>) { x = x - VELOCIDAD * dt }</span>
 <span class="linea">    <span class="k">si</span> juego.tecla(<span class="s">&quot;derecha&quot;</span>) { x = x + VELOCIDAD * dt }</span>
@@ -535,7 +535,7 @@
 <span class="linea">    <span class="c"># caen; si tocan al lince, punto, pitido y chispas</span></span>
 <span class="linea">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> e <span class="k">en</span> estrellas {</span>
 <span class="linea">        e[<span class="s">&quot;y&quot;</span>] = e[<span class="s">&quot;y&quot;</span>] + e[<span class="s">&quot;vel&quot;</span>] * dt</span>
-<span class="linea">        <span class="k">si</span> juego.colision(x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>, e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>) {</span>
+<span class="linea">        <span class="k">si</span> juego.colision([x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>], [e[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, e[<span class="s">&quot;y&quot;</span>] - <span class="n">10</span>, <span class="n">20</span>, <span class="n">20</span>]) {</span>
 <span class="linea">            e[<span class="s">&quot;cogida&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea">            puntos = puntos + <span class="n">1</span></span>
 <span class="linea">            juego.pitido(<span class="n">880</span>, <span class="n">0.06</span>, <span class="n">0.2</span>)</span>
@@ -543,7 +543,7 @@
 <span class="linea">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">60</span>, <span class="n">200</span>], <span class="s">&quot;vida&quot;</span>: [<span class="n">0.3</span>, <span class="n">0.6</span>]})</span>
 <span class="linea">        }</span>
 <span class="linea">    }</span>
-<span class="linea">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> e): <span class="t">logico</span> {</span>
+<span class="linea">    estrellas = filtrar(estrellas, <span class="k">funcion</span>(<span class="t">diccionario</span> e): <span class="t">logico</span> {</span>
 <span class="linea">        <span class="k">devolver</span> <span class="k">no</span> e[<span class="s">&quot;cogida&quot;</span>] <span class="k">y</span> e[<span class="s">&quot;y&quot;</span>] &lt; ALTO + <span class="n">20</span></span>
 <span class="linea">    })</span>
 <span class="linea"> </span>
@@ -556,7 +556,7 @@
 <span class="linea">    }</span>
 <span class="linea">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> r <span class="k">en</span> rocas {</span>
 <span class="linea">        r[<span class="s">&quot;y&quot;</span>] = r[<span class="s">&quot;y&quot;</span>] + r[<span class="s">&quot;vel&quot;</span>] * dt</span>
-<span class="linea nueva">        <span class="k">si</span> juego.colision_circulo_rect(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], <span class="n">14</span>, x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>) {</span>
+<span class="linea nueva">        <span class="k">si</span> juego.colision({<span class="s">&quot;centro&quot;</span>: [r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>]], <span class="s">&quot;radio&quot;</span>: <span class="n">14</span>}, [x - <span class="n">24</span>, ALTO - <span class="n">60</span>, <span class="n">48</span>, <span class="n">40</span>]) {</span>
 <span class="linea">            r[<span class="s">&quot;choca&quot;</span>] = <span class="k">verdadero</span></span>
 <span class="linea">            vidas = vidas - <span class="n">1</span></span>
 <span class="linea">            juego.pitido(<span class="n">110</span>, <span class="n">0.25</span>)</span>
@@ -564,7 +564,7 @@
 <span class="linea">                                              <span class="s">&quot;velocidad&quot;</span>: [<span class="n">80</span>, <span class="n">260</span>], <span class="s">&quot;gravedad&quot;</span>: <span class="n">500</span>})</span>
 <span class="linea">        }</span>
 <span class="linea">    }</span>
-<span class="linea">    rocas = filtrar(rocas, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">diccionario</span> r): <span class="t">logico</span> {</span>
+<span class="linea">    rocas = filtrar(rocas, <span class="k">funcion</span>(<span class="t">diccionario</span> r): <span class="t">logico</span> {</span>
 <span class="linea">        <span class="k">devolver</span> <span class="k">no</span> r[<span class="s">&quot;choca&quot;</span>] <span class="k">y</span> r[<span class="s">&quot;y&quot;</span>] &lt; ALTO + <span class="n">20</span></span>
 <span class="linea">    })</span>
 <span class="linea"> </span>
@@ -582,13 +582,13 @@
 <span class="linea">    juego.dibujar(LINCE, x, ALTO - <span class="n">40</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;centrado&quot;</span>: <span class="k">verdadero</span>})</span>
 <span class="linea">    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> r <span class="k">en</span> rocas { juego.circulo(r[<span class="s">&quot;x&quot;</span>], r[<span class="s">&quot;y&quot;</span>], <span class="n">14</span>, [<span class="n">120</span>, <span class="n">110</span>, <span class="n">120</span>]) }</span>
 <span class="linea">    juego.dibujar_particulas()</span>
-<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS &quot;</span> + a_texto(puntos), <span class="n">16</span>, <span class="n">16</span>, <span class="n">3</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>])</span>
-<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;VIDAS &quot;</span> + a_texto(vidas), ANCHO - <span class="n">150</span>, <span class="n">16</span>, <span class="n">3</span>, [<span class="n">255</span>, <span class="n">120</span>, <span class="n">120</span>])</span>
+<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS &quot;</span> + a_texto(puntos), <span class="n">16</span>, <span class="n">16</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>]})</span>
+<span class="linea">    juego.<span class="t">texto</span>(<span class="s">&quot;VIDAS &quot;</span> + a_texto(vidas), ANCHO - <span class="n">150</span>, <span class="n">16</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">120</span>, <span class="n">120</span>]})</span>
 <span class="linea nueva">}</span>
 <span class="linea"> </span>
 <span class="linea nueva"><span class="c"># Escribe un texto centrado</span></span>
-<span class="linea nueva"><span class="k">funcion</span> centrado(<span class="k">val</span> <span class="t">texto</span> t, <span class="k">val</span> <span class="t">numero</span> arriba, <span class="k">val</span> <span class="t">numero</span> escala, <span class="k">val</span> <span class="t">lista</span> color): <span class="k">nulo</span> {</span>
-<span class="linea nueva">    juego.<span class="t">texto</span>(t, (ANCHO - juego.ancho_texto(t, escala)) / <span class="n">2</span>, arriba, escala, color)</span>
+<span class="linea nueva"><span class="k">funcion</span> centrado(<span class="t">texto</span> t, <span class="t">numero</span> arriba, <span class="t">numero</span> escala, <span class="t">lista</span> color): <span class="k">nulo</span> {</span>
+<span class="linea nueva">    juego.<span class="t">texto</span>(t, (ANCHO - juego.ancho_texto(t, escala)) / <span class="n">2</span>, arriba, {<span class="s">&quot;escala&quot;</span>: escala, <span class="s">&quot;color&quot;</span>: color})</span>
 <span class="linea nueva">}</span>
 <span class="linea"> </span>
 <span class="linea nueva"><span class="k">funcion</span> portada(): <span class="k">nulo</span> {</span>

@@ -1,5 +1,5 @@
 # TEST COMPILADOR: generadores
-generador contar(val numero hasta): numero {
+generador contar(numero hasta): numero {
     sea i = 0
     mientras i < hasta {
         producir i
@@ -27,7 +27,7 @@ para cada numero n en rango(0, 10, 3) {
 }
 
 # Generador con filtro
-generador multiplos(val numero base, val numero hasta): numero {
+generador multiplos(numero base, numero hasta): numero {
     para cada numero n en rango(hasta) {
         si n % base == 0 {
             producir n

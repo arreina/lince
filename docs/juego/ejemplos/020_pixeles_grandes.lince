@@ -10,6 +10,6 @@ mientras juego.abierto() {
     juego.rectangulo(0, 70, 160, 20, [70, 140, 70])
     juego.circulo(130, 20, 9, [250, 220, 100])
     juego.rectangulo(30, 54, 10, 16, [230, 120, 60])
-    juego.texto("160 X 90", 4, 4, 1)
+    juego.texto("160 X 90", 4, 4, {"escala": 1})
     juego.presentar()
 }

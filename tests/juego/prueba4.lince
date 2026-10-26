@@ -2,9 +2,9 @@
 importar "juego"
 importar "matematica"
 juego.abrir("Utilidades", 100, 80)
-escribir("circulos: " + a_texto(juego.colision_circulos(0, 0, 5, 8, 0, 4)) + " " + a_texto(juego.colision_circulos(0, 0, 5, 10, 0, 4)))
-escribir("circulo_rect: " + a_texto(juego.colision_circulo_rect(5, 5, 3, 7, 0, 10, 10)) + " " + a_texto(juego.colision_circulo_rect(0, 0, 3, 5, 5, 10, 10)))
-escribir("dentro: " + a_texto(juego.dentro(10, 10, 10, 10, 5, 5)) + " " + a_texto(juego.dentro(15, 10, 10, 10, 5, 5)))
+escribir("circulos: " + a_texto(juego.colision({"centro": [0, 0], "radio": 5}, {"centro": [8, 0], "radio": 4})) + " " + a_texto(juego.colision({"centro": [0, 0], "radio": 5}, {"centro": [10, 0], "radio": 4})))
+escribir("circulo_rect: " + a_texto(juego.colision({"centro": [5, 5], "radio": 3}, [7, 0, 10, 10])) + " " + a_texto(juego.colision({"centro": [0, 0], "radio": 3}, [5, 5, 10, 10])))
+escribir("dentro: " + a_texto(juego.colision([10, 10], [10, 10, 5, 5])) + " " + a_texto(juego.colision([15, 10], [10, 10, 5, 5])))
 intentar {
     juego.particulas(0, 0, {"cantida": 3})
 } capturar (error e) {

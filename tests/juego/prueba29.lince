@@ -1,0 +1,43 @@
+# 1.9: lo nuevo de la 2.0 ya funciona (colision única, juego.fisica.*, juego.mapa.*,
+# partidas, "angulo" de la cámara) y lo de antes también, avisando una vez
+importar "juego"
+# colision(a, b) con puntos, cajas, círculos y diccionarios
+sea caja = [0, 0, 10, 10]
+sea bola = {"centro": [12, 5], "radio": 3}
+escribir("caja-caja: {juego.colision(caja, [5, 5, 10, 10])} {juego.colision(caja, [20, 0, 5, 5])}")
+escribir("punto-caja: {juego.colision([5, 5], caja)} {juego.colision(caja, [10, 5])} {juego.colision([-1, 5], caja)}")
+escribir("círculo-caja: {juego.colision(bola, caja)} {juego.colision({"centro": [15, 5], "radio": 3}, caja)}")
+escribir("círculo-círculo: {juego.colision(bola, {"centro": [16, 5], "radio": 2})} {juego.colision(bola, {"centro": [18, 5], "radio": 2})}")
+escribir("punto-círculo: {juego.colision([12, 6], bola)} {juego.colision(bola, [20, 20])}")
+escribir("diccionario: {juego.colision({"x": 2, "y": 2, "ancho": 3, "alto": 3}, caja)}")
+intentar { juego.colision(caja, "hola") } capturar (error e) { escribir("error: {e.mensaje}") }
+# las partes nuevas
+sea nivel = juego.mapa.crear(["#..", "..."], 10)
+escribir("mapa: {juego.mapa.solido(nivel, 0, 0)} {juego.mapa.casilla(nivel, 1, 0)} {juego.mapa.buscar(nivel, "#")}")
+sea m = juego.fisica.mundo({"gravedad": 100})
+sea c = juego.fisica.cuerpo(m, {"x": 0, "y": 0, "ancho": 4, "alto": 4})
+juego.fisica.avanzar(m, 0.5)
+escribir("física: {c["y"] > 0} {juego.fisica.centro(c)[0]}")
+# lo de antes sigue y avisa (una vez)
+sea viejo = juego.mapa(["#"], 8)
+sea viejo2 = juego.mapa(["."], 8)
+escribir("viejos: {juego.solido(viejo, 0, 0)} {juego.colision(0, 0, 4, 4, 2, 2, 4, 4)} {juego.dentro(1, 1, 0, 0, 2, 2)}")
+# con ventana: partidas, cámara y partículas
+juego.abrir("1.9", 100, 60)
+juego.camara(0, 0, {"angulo": 30})
+sea cam = juego.camara_actual()
+escribir("cámara: {cam["angulo"]} {cam["giro"]}")
+juego.camara(cam)
+juego.camara(0, 0, {"giro": 45})
+escribir("giro de antes: {juego.camara_actual()["angulo"]}")
+juego.camara()
+juego.guardar_partida("prueba19", {"vidas": 3})
+escribir("partida: {juego.cargar_partida("prueba19")} {juego.cargar("prueba19")["vidas"]} {juego.olvidar_partida("prueba19")}")
+juego.particulas(10, 10, {"cantidad": 3})
+juego.quitar_particulas()
+escribir("partículas: {juego.dibujar_particulas()}")
+juego.texto("A", 1, 1, {"escala": 2})
+juego.texto("B", 1, 1, 2)
+juego.texto("C", 1, 1, 3)
+juego.presentar()
+juego.cerrar()

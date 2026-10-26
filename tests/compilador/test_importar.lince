@@ -11,7 +11,7 @@ importar "./lib_apoyo"
 
 fijo PROPIO = 5
 
-funcion suma_con_propio(val numero x): numero {
+funcion suma_con_propio(numero x): numero {
     devolver x + PROPIO
 }
 

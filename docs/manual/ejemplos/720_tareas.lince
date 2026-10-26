@@ -1,7 +1,7 @@
 # @seccion: Tareas
 # @titulo: Esperar sin parar el juego
 # @nota: Una `tarea` se escribe como una función y empieza a correr al llamarla. `esperar()` la deja aparcada en esa línea hasta el fotograma siguiente; `esperar(segundos)`, hasta que pase ese tiempo, y `esperar(otra)`, hasta que otra tarea acabe (y da lo que devolvió). Mientras, todo lo demás sigue. En un juego avanzan solas en cada `juego.presentar()`; aquí, sin juego, avanzan mientras el programa espera.
-tarea parpadear(val texto quien, val numero veces) {
+tarea parpadear(texto quien, numero veces) {
     para (i = 0; i < veces; i++) {
         escribir(quien + ": brilla")
         esperar()

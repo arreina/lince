@@ -10,7 +10,7 @@ enumeracion Direccion {
     Derecha = [1, 0]
 }
 
-funcion animacion(val Estado e): texto {
+funcion animacion(Estado e): texto {
     elegir e {
         caso Estado.Quieto { devolver "respirar" }
         caso Estado.Andando { devolver "andar" }

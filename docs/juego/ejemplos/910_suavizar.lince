@@ -15,8 +15,8 @@ mientras juego.abierto() {
             sea v = juego.curva(CURVAS[i], k / 50)
             juego.rectangulo(x0 + 3 + k, 190 - v * 110, 2, 2, [255, 200, 70])
         }
-        juego.texto(CURVAS[i].mayusculas(), x0, 222, 1)
+        juego.texto(CURVAS[i].mayusculas(), x0, 222, {"escala": 1})
     }
-    juego.texto("CURVA(NOMBRE, T)", 12, 20, 2)
+    juego.texto("CURVA(NOMBRE, T)", 12, 20, {"escala": 2})
     juego.presentar()
 }

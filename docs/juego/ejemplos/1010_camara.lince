@@ -19,6 +19,6 @@ mientras juego.abierto() {
     }
     juego.rectangulo(jugador, 170, 30, 30, [230, 140, 60])
     juego.camara()                                                # el marcador, quieto
-    juego.texto("CÁMARA X: {matematica.redondear(cam)}", 20, 20, 2)
+    juego.texto("CÁMARA X: {matematica.redondear(cam)}", 20, 20, {"escala": 2})
     juego.presentar()
 }

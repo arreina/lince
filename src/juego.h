@@ -1293,6 +1293,7 @@ static Valor *fn_jg_texto(Valor **a, int n) {
     if (n < 3 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "texto() espera (contenido, x, y[, escala[, color]]) o (contenido, x, y, opciones)");
     JG_DIBUJO(fn_jg_texto);
     if (n > 3 && a[3]->tipo == VAL_DICCIONARIO) return jg_texto_opciones(a, n, 0);
+    if (n > 3) modulo_avisar_obsoleto("juego.texto(escala)", "juego.texto(t, x, y, escala, color) → juego.texto(t, x, y, {\"escala\": escala, \"color\": color})", -1);
     double x, y, esc = 2;
     if (!jg_num(a, n, 1, &x, "texto") || !jg_num(a, n, 2, &y, "texto")) return valor_nulo();
     if (n > 3 && !jg_num(a, n, 3, &esc, "texto")) return valor_nulo();
@@ -2525,6 +2526,7 @@ static Valor *fn_jg_reproducir(Valor **a, int n) {
         return valor_numero(id);
     }
     int bucle = n > 2 && a[2]->tipo == VAL_BOOLEANO && a[2]->booleano;
+    if (n > 1) modulo_avisar_obsoleto("juego.reproducir(volumen)", "juego.reproducir(s, volumen, bucle) → juego.reproducir(s, {\"volumen\": volumen, \"bucle\": bucle})", -1);
     return valor_numero(jg_sonar(s->datos, s->muestras, jg_volumen_arg(a, n, 1, 1), bucle, NULL));
 }
 
@@ -2603,6 +2605,8 @@ static int jg_voz_suena(int id, const short *datos) {
 static Valor *fn_jg_musica(Valor **a, int n) {
     JG_ABIERTA();
     float vol = jg_volumen_arg(a, n, 1, 0.6f);
+    if (n > 1 && a[1]->tipo == VAL_NUMERO)
+        modulo_avisar_obsoleto("juego.musica(volumen)", "juego.musica(ruta, volumen) → juego.musica(ruta, {\"volumen\": volumen})", -1);
     double seg = 0;
     if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
         static const char *const V[] = {"volumen", "fundido", NULL};
@@ -4711,6 +4715,8 @@ static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
     }
     JgFuente *f = NULL;
     int es_fuente = op && valor_diccionario_buscar(op, "fuente") >= 0 && op->diccionario.valores[valor_diccionario_buscar(op, "fuente")]->tipo == VAL_NUMERO;
+    if (es_fuente && !medir && valor_diccionario_buscar(op, "alto") >= 0)     /* la fuente tal cual */
+        modulo_avisar_obsoleto("juego.texto(fuente)", "juego.texto(t, x, y, FUENTE) → juego.texto(t, x, y, {\"fuente\": FUENTE})", -1);
     if (op && !es_fuente) {                     /* unas opciones (no una fuente pasada tal cual) */
         static const char *const V[] = {"fuente", "escala", "color", "alinear", "ancho", "capa", NULL};
         if (!jg_opciones_validas(op, fn, V)) return valor_nulo();
@@ -4971,7 +4977,7 @@ static Valor *fn_jg_camara(Valor **a, int n) {
         }
     } else return jg_error("ErrorTipo", "camara() espera (x, y), (x, y, opciones), un diccionario de opciones o nada");
     if (op) {
-        static const char *const V[] = {"x", "y", "zoom", "giro", "zona", "temblor", NULL};
+        static const char *const V[] = {"x", "y", "zoom", "angulo", "giro", "zona", "temblor", NULL};
         if (!jg_opciones_validas(op, "camara", V)) return valor_nulo();
         double v;
         if (n == 1) { jg_opcion(op, "x", &c.cu_x); jg_opcion(op, "y", &c.cu_y); }
@@ -4979,7 +4985,11 @@ static Valor *fn_jg_camara(Valor **a, int n) {
             if (!(v > 0) || v > 64) return jg_error("ErrorArgumento", "camara(): \"zoom\" es mayor que 0 (2: todo el doble de grande; 0.5: se ve el doble de mundo)");
             c.zoom = v;
         }
-        if (jg_opcion(op, "giro", &v)) c.giro = fmod(v, 360);
+        if (jg_opcion(op, "angulo", &v)) c.giro = fmod(v, 360);
+        else if (jg_opcion(op, "giro", &v)) {
+            c.giro = fmod(v, 360);
+            modulo_avisar_obsoleto("juego.camara(giro)", "juego.camara(x, y, {\"giro\": g}) → juego.camara(x, y, {\"angulo\": g}), como en dibujar", -1);
+        }
         Valor *t = jg_opcion_valor(op, "temblor");
         if (t && t->tipo == VAL_BOOLEANO) c.quieta = !t->booleano;
         Valor *z = jg_opcion_valor(op, "zona");
@@ -5007,7 +5017,8 @@ static Valor *fn_jg_camara_actual(Valor **a, int n) {
     jg_dic_poner(d, "x", valor_numero(_jgs.cu_x));
     jg_dic_poner(d, "y", valor_numero(_jgs.cu_y));
     jg_dic_poner(d, "zoom", valor_numero(_jgs.cam_zoom > 0 ? _jgs.cam_zoom : 1));
-    jg_dic_poner(d, "giro", valor_numero(_jgs.cam_giro));
+    jg_dic_poner(d, "angulo", valor_numero(_jgs.cam_giro));
+    jg_dic_poner(d, "giro", valor_numero(_jgs.cam_giro));          /* el de antes; en la 2.0, solo "angulo" */
     if (_jgs.cam_hay_zona) {
         Valor *z = valor_lista_crear();
         for (int i = 0; i < 4; i++) lista_agregar(z, valor_numero(_jgs.cam_zona[i]));
@@ -5735,11 +5746,74 @@ static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, 
     return 0;
 }
 
-/* colision(x1, y1, w1, h1, x2, y2, w2, h2): ¿se solapan los dos rectángulos?
-   También colision(caja1, caja2), con listas [x, y, ancho, alto]. */
+/* Una forma para colision(): un punto [x, y], una caja [x, y, ancho, alto] (o
+   un diccionario con x, y, ancho y alto: un personaje, un cuerpo), o un círculo
+   {"centro": [x, y], "radio": r}. tipo: 'p', 'c' (caja) o 'o' (círculo); 0 si no es nada */
+typedef struct { char tipo; double v[4]; } JgForma;
+static int jg_forma(Valor *a, JgForma *f) {
+    f->tipo = 0;
+    if (a->tipo == VAL_LISTA && (a->lista.cantidad == 2 || a->lista.cantidad == 4)) {
+        for (int i = 0; i < a->lista.cantidad; i++) {
+            if (a->lista.elementos[i]->tipo != VAL_NUMERO) return 0;
+            f->v[i] = a->lista.elementos[i]->numero;
+        }
+        f->tipo = a->lista.cantidad == 2 ? 'p' : 'c';
+        return 1;
+    }
+    if (a->tipo != VAL_DICCIONARIO) return 0;
+    Valor *centro = jg_dic(a, "centro"), *radio = jg_dic(a, "radio");
+    if (centro && radio) {
+        if (centro->tipo != VAL_LISTA || centro->lista.cantidad != 2 || radio->tipo != VAL_NUMERO ||
+            centro->lista.elementos[0]->tipo != VAL_NUMERO || centro->lista.elementos[1]->tipo != VAL_NUMERO) return 0;
+        f->v[0] = centro->lista.elementos[0]->numero;
+        f->v[1] = centro->lista.elementos[1]->numero;
+        f->v[2] = radio->numero;
+        f->tipo = 'o';
+        return 1;
+    }
+    static const char *const C[] = {"x", "y", "ancho", "alto"};
+    for (int i = 0; i < 4; i++) {
+        Valor *e = jg_dic(a, C[i]);
+        if (!e || e->tipo != VAL_NUMERO) return 0;
+        f->v[i] = e->numero;
+    }
+    f->tipo = 'c';
+    return 1;
+}
+
+/* ¿Se tocan? El punto más cercano de la caja al círculo o al punto decide */
+static int jg_se_tocan(const JgForma *a, const JgForma *b) {
+    if (a->tipo == 'c' && b->tipo != 'c') return jg_se_tocan(b, a);
+    if (a->tipo == 'o' && b->tipo == 'p') return jg_se_tocan(b, a);
+    if (a->tipo == 'c')                                          /* dos cajas */
+        return a->v[0] < b->v[0] + b->v[2] && a->v[0] + a->v[2] > b->v[0] &&
+               a->v[1] < b->v[1] + b->v[3] && a->v[1] + a->v[3] > b->v[1];
+    double ra = a->tipo == 'o' ? a->v[2] : 0;
+    if (b->tipo == 'c') {                                         /* punto o círculo contra caja */
+        if (a->tipo == 'p') return a->v[0] >= b->v[0] && a->v[0] < b->v[0] + b->v[2] && a->v[1] >= b->v[1] && a->v[1] < b->v[1] + b->v[3];
+        double px = a->v[0] < b->v[0] ? b->v[0] : a->v[0] > b->v[0] + b->v[2] ? b->v[0] + b->v[2] : a->v[0];
+        double py = a->v[1] < b->v[1] ? b->v[1] : a->v[1] > b->v[1] + b->v[3] ? b->v[1] + b->v[3] : a->v[1];
+        double dx = a->v[0] - px, dy = a->v[1] - py;
+        return dx * dx + dy * dy < ra * ra;
+    }
+    double rb = b->tipo == 'o' ? b->v[2] : 0;                    /* puntos y círculos */
+    double dx = a->v[0] - b->v[0], dy = a->v[1] - b->v[1], r = ra + rb;
+    if (r == 0) return dx == 0 && dy == 0;
+    return dx * dx + dy * dy < r * r;
+}
+
+/* colision(a, b): ¿se tocan? Cada uno, un punto [x, y], una caja [x, y, ancho,
+   alto] (o un diccionario con x, y, ancho y alto) o un círculo {"centro": [x,
+   y], "radio": r}. La forma de antes, con 8 números, sigue valiendo (y avisa). */
 static Valor *fn_jg_colision(Valor **a, int n) {
+    JgForma fa, fb;
+    if (n == 2 && jg_forma(a[0], &fa) && jg_forma(a[1], &fb)) return valor_booleano(jg_se_tocan(&fa, &fb));
+    if (n == 2)
+        return jg_error("ErrorTipo", "colision() espera dos formas: un punto [x, y], una caja [x, y, ancho, alto] "
+                        "(o un diccionario con x, y, ancho y alto) o un círculo {\"centro\": [x, y], \"radio\": r}");
     double v[8];
     if (!jg_numeros(a, n, v, 8, "colision", "(x1, y1, ancho1, alto1, x2, y2, ancho2, alto2)")) return valor_nulo();
+    modulo_avisar_obsoleto("juego.colision(8)", "juego.colision(x1, y1, ancho1, alto1, x2, y2, ancho2, alto2) → juego.colision([x1, y1, ancho1, alto1], [x2, y2, ancho2, alto2])", -1);
     return valor_booleano(v[0] < v[4] + v[6] && v[0] + v[2] > v[4] &&
                           v[1] < v[5] + v[7] && v[1] + v[3] > v[5]);
 }
@@ -7222,6 +7296,23 @@ static Valor *fn_jg_camino(Valor **a, int n) {
     return res;
 }
 
+/* Hace la parte 'parte' del módulo (juego.fisica) con lo que ya tiene con
+   otro nombre: {nombre nuevo, nombre de antes}. Si había una función con el
+   nombre de la parte, se sigue pudiendo llamar (juego.mapa(filas)). */
+static void jg_parte(Valor *mod, const char *parte, const char *const (*nombres)[2]) {
+    Valor *d = valor_diccionario_crear();
+    d->es_modulo = 1;
+    for (int i = 0; nombres[i][0]; i++) {
+        int k = valor_diccionario_buscar(mod, nombres[i][1]);
+        if (k >= 0) { Valor *v = mod->diccionario.valores[k]; v->refs++; valor_diccionario_agregar(d, nombres[i][0], v); }
+    }
+    int k = valor_diccionario_buscar(mod, parte);
+    if (k >= 0) {
+        valor_diccionario_agregar(d, "__llamar__", mod->diccionario.valores[k]);   /* se queda con su referencia */
+        mod->diccionario.valores[k] = d;
+    } else valor_diccionario_agregar(mod, parte, d);
+}
+
 static void cargar_juego(Entorno *entorno) {
     FuncionNativa fns[] = {
         {"abrir",           fn_jg_abrir,           -1},
@@ -7318,6 +7409,10 @@ static void cargar_juego(Entorno *entorno) {
         {"crear_efecto",    fn_jg_crear_efecto,    -1},
         {"guardar_sonido",  fn_jg_guardar_sonido,   2},
         {"guardar",         fn_jg_guardar,          2},
+        {"guardar_partida", fn_jg_guardar,          2},
+        {"cargar_partida",  fn_jg_cargar,          -1},
+        {"olvidar_partida", fn_jg_olvidar,          1},
+        {"quitar_particulas", fn_jg_borrar_particulas, 0},
         {"entrada_pulsada", fn_jg_entrada_pulsada,  0},
         {"mapa_tiled",      fn_jg_mapa_tiled,      -1},
         {"dibujar_tiled",   fn_jg_dibujar_tiled,   -1},
@@ -7341,4 +7436,19 @@ static void cargar_juego(Entorno *entorno) {
     /* Y lo que está escrito en Lince: combo, pulsaciones, mantenida, curva,
        suavizar, acercar y las escenas */
     interprete_biblioteca(entorno, "juego", BIBLIOTECA_JUEGO);
+    /* Las partes de la 2.0 (ya en la 1.9): juego.fisica.cuerpo... */
+    Valor *mod = modulo_ya_cargado("juego");
+    if (!mod || hay_error) return;
+    static const char *const FISICA[][2] = {
+        {"mundo", "fisica"}, {"cuerpo", "cuerpo"}, {"quitar", "quitar_cuerpo"}, {"avanzar", "avanzar_fisica"},
+        {"tocando", "tocando"}, {"empujar", "empujar"}, {"bisagra", "bisagra"}, {"cuerda", "cuerda"},
+        {"quitar_union", "quitar_union"}, {"puntos_union", "puntos_union"}, {"centro", "centro_cuerpo"},
+        {"puntos", "puntos_cuerpo"}, {"dibujar", "dibujar_cuerpo"}, {NULL, NULL}};
+    static const char *const MAPA[][2] = {
+        {"crear", "mapa"}, {"tiled", "mapa_tiled"}, {"casilla", "casilla"}, {"poner", "poner_casilla"},
+        {"solido", "solido"}, {"casilla_en", "casilla_en"}, {"buscar", "buscar_en_mapa"}, {"mover", "mover_en_mapa"},
+        {"dibujar", "dibujar_mapa"}, {"dibujar_tiled", "dibujar_tiled"}, {"camino", "camino"}, {NULL, NULL}};
+    jg_parte(mod, "fisica", FISICA);
+    jg_parte(mod, "mapa", MAPA);
+    modulo_marcar_obsoletas("juego", mod);      /* las de juego.lince también */
 }

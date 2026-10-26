@@ -1,4 +1,4 @@
 fijo FACTOR = 3
-funcion escala(val numero x): numero {
+funcion escala(numero x): numero {
     devolver x * FACTOR
 }

@@ -12,14 +12,14 @@ fijo ANCHO = 480
 fijo ALTO = 640
 
 clase Objeto {
-    funcion crear(val numero px, val numero py, val numero radio, val numero velocidad): nulo {
+    funcion crear(numero px, numero py, numero radio, numero velocidad): nulo {
         mi.px = px
         mi.py = py
         mi.radio = radio
         mi.velocidad = velocidad
     }
 
-    funcion mover(val numero dt): nulo {
+    funcion mover(numero dt): nulo {
         mi.py = mi.py + mi.velocidad * dt
     }
 
@@ -27,7 +27,7 @@ clase Objeto {
         devolver mi.py > ALTO + mi.radio
     }
 
-    funcion toca(val numero nx, val numero ny, val numero nradio): logico {
+    funcion toca(numero nx, numero ny, numero nradio): logico {
         sea dx = mi.px - nx
         sea dy = mi.py - ny
         devolver dx * dx + dy * dy < (mi.radio + nradio) * (mi.radio + nradio)
@@ -39,7 +39,7 @@ clase Objeto {
 }
 
 clase Meteorito extiende Objeto {
-    funcion crear(val numero velocidad): nulo {
+    funcion crear(numero velocidad): nulo {
         padre(matematica.aleatorio(20, ANCHO - 20), -30, matematica.aleatorio(12, 26), velocidad)
     }
     funcion dibujar(): nulo {
@@ -49,7 +49,7 @@ clase Meteorito extiende Objeto {
 }
 
 clase Estrella extiende Objeto {
-    funcion crear(val numero velocidad): nulo {
+    funcion crear(numero velocidad): nulo {
         padre(matematica.aleatorio(20, ANCHO - 20), -30, 11, velocidad)
     }
     funcion dibujar(): nulo {
@@ -140,12 +140,12 @@ mientras juego.abierto() {
         juego.rectangulo(nave_x - 16, ALTO - 38, 32, 14, [120, 200, 240])
         juego.rectangulo(nave_x - 6, ALTO - 62, 12, 26, [190, 230, 250])
     }
-    juego.texto("PUNTOS " + a_texto(matematica.piso(puntos)), 10, 10, 2, [230, 230, 245])
+    juego.texto("PUNTOS " + a_texto(matematica.piso(puntos)), 10, 10, {"escala": 2, "color": [230, 230, 245]})
     sea v = "VIDAS " + a_texto(vidas)
-    juego.texto(v, ANCHO - juego.ancho_texto(v, 2) - 10, 10, 2, [255, 200, 80])
+    juego.texto(v, ANCHO - juego.ancho_texto(v, 2) - 10, 10, {"escala": 2, "color": [255, 200, 80]})
     si vidas == 0 {
-        juego.texto("FIN DEL JUEGO", (ANCHO - juego.ancho_texto("FIN DEL JUEGO", 4)) / 2, 260, 4, [255, 255, 255])
-        juego.texto("ESPACIO PARA REINTENTAR", (ANCHO - juego.ancho_texto("ESPACIO PARA REINTENTAR", 2)) / 2, 320, 2, [180, 180, 200])
+        juego.texto("FIN DEL JUEGO", (ANCHO - juego.ancho_texto("FIN DEL JUEGO", 4)) / 2, 260, {"escala": 4, "color": [255, 255, 255]})
+        juego.texto("ESPACIO PARA REINTENTAR", (ANCHO - juego.ancho_texto("ESPACIO PARA REINTENTAR", 2)) / 2, 320, {"escala": 2, "color": [180, 180, 200]})
     }
     juego.presentar()
 }

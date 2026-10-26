@@ -10,7 +10,7 @@ abstracta clase Figura {
 }
 
 clase Cuadrado extiende Figura {
-    funcion crear(val numero lado): nulo {
+    funcion crear(numero lado): nulo {
         mi.lado = lado
     }
     sobrescribe funcion area(): numero {

@@ -21,8 +21,8 @@ escribir(c1())
 escribir(c2())
 
 # Closure con parámetro capturado
-funcion multiplicador(val numero factor): funcion {
-    devolver funcion(val numero x): numero {
+funcion multiplicador(numero factor): funcion {
+    devolver funcion(numero x): numero {
         devolver x * factor
     }
 }
@@ -34,15 +34,15 @@ escribir(triple(5))
 escribir(doble(10))
 
 # Closure en variable y uso
-sea suma1 = funcion(val numero x): numero { devolver x + 1 }
-sea doble2 = funcion(val numero x): numero { devolver x * 2 }
-sea cuad  = funcion(val numero x): numero { devolver x * x }
+sea suma1 = funcion(numero x): numero { devolver x + 1 }
+sea doble2 = funcion(numero x): numero { devolver x * 2 }
+sea cuad  = funcion(numero x): numero { devolver x * x }
 escribir(suma1(4))
 escribir(doble2(4))
 escribir(cuad(4))
 
 # Closure que usa variable capturada (solo lectura)
-funcion saludador(val texto nombre): funcion {
+funcion saludador(texto nombre): funcion {
     devolver funcion(): texto {
         devolver "Hola, " + nombre
     }

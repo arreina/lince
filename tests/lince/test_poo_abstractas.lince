@@ -6,11 +6,11 @@ abstracta clase Figura {
 }
 clase Cuadrado extiende Figura {
     privado sea lado = 0
-    funcion crear(val numero l): nulo { mi.lado = l
+    funcion crear(numero l): nulo { mi.lado = l
         mi.nombre = "cuadrado" }
     sobrescribe funcion area(): numero { devolver mi.lado * mi.lado }
     funcion con_lambda(): numero {
-        sea f = funcion(val numero k): numero { devolver mi.lado * k }
+        sea f = funcion(numero k): numero { devolver mi.lado * k }
         devolver f(3)
     }
 }

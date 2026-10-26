@@ -1,7 +1,7 @@
 # @seccion: Errores
 # @titulo: Lanzar errores propios
 # @nota: Tipos predefinidos: Error, ErrorTipo, ErrorRango, ErrorNulo, ErrorMatematico, ErrorArgumento.
-funcion raiz_entera(val numero n): numero {
+funcion raiz_entera(numero n): numero {
     si n < 0 {
         lanzar ErrorArgumento("no hay raíz real de un número negativo")
     }

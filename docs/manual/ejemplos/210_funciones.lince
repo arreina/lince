@@ -1,7 +1,7 @@
 # @seccion: Funciones
 # @titulo: Declarar y llamar
 # @nota: Cada parámetro lleva su tipo y su nombre (delante puede ir `val`, que es lo normal, o `ref`: ver «val y ref»).
-funcion area(val numero base, val numero altura): numero {
+funcion area(numero base, numero altura): numero {
     devolver base * altura / 2
 }
 

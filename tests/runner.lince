@@ -27,16 +27,16 @@ fijo CYAN     = "\e[36m"
 fijo GRIS     = "\e[90m"
 fijo NEGRITA  = "\e[1m"
 
-funcion color(val texto c, val texto t): texto {
+funcion color(texto c, texto t): texto {
     devolver c + t + RESET
 }
 
 # ── Funciones auxiliares ───────────────────────────────────────
-funcion recortar_salida(val texto s): texto {
+funcion recortar_salida(texto s): texto {
     devolver s.recortar()
 }
 
-funcion ejecutar_test(val texto nombre): nulo {
+funcion ejecutar_test(texto nombre): nulo {
     sea archivo  = DIR_TESTS + "/" + nombre + ".lince"
     sea esperado = DIR_TESTS + "/" + nombre + ".esperado"
 
@@ -67,9 +67,9 @@ funcion ejecutar_test(val texto nombre): nulo {
     }
 }
 
-funcion mostrar_diff(val texto esperada, val texto real): nulo {
-    sea lineas_esp  = texto.dividir(esperada, "\n")
-    sea lineas_real = texto.dividir(real, "\n")
+funcion mostrar_diff(texto esperada, texto real): nulo {
+    sea lineas_esp  = esperada.dividir("\n")
+    sea lineas_real = real.dividir("\n")
     sea max_len = lineas_esp.longitud()
     si lineas_real.longitud() > max_len {
         max_len = lineas_real.longitud()
@@ -133,7 +133,8 @@ sea lista tests = [
     "test_biblioteca",
     "test_tareas",
     "test_novedades_1_2",
-    "test_tipos"
+    "test_tipos",
+    "test_novedades_1_9"
 ]
 
 # ── Cabecera ───────────────────────────────────────────────────

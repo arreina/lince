@@ -119,9 +119,9 @@ fijo ROCA = juego.sprite([
 
 # Los mapas de Tiled
 fijo MAPAS = {
-    "pueblo": juego.mapa_tiled("mapas/pueblo.tmx"),
-    "bosque": juego.mapa_tiled("mapas/bosque.tmx"),
-    "fortaleza": juego.mapa_tiled("mapas/fortaleza.tmx")
+    "pueblo": juego.mapa.tiled("mapas/pueblo.tmx"),
+    "bosque": juego.mapa.tiled("mapas/bosque.tmx"),
+    "fortaleza": juego.mapa.tiled("mapas/fortaleza.tmx")
 }
 
 # ── La partida (lo que se guarda) ────────────────────────────────────
@@ -133,7 +133,7 @@ funcion partida_nueva(): diccionario {
 }
 sea partida = partida_nueva()
 
-funcion guardar_partida(): nulo { juego.guardar("partida", partida) }
+funcion guardar_partida(): nulo { juego.guardar_partida("partida", partida) }
 
 # ── Lo que hay en el mapa en que se está ─────────────────────────────
 sea mapa = nulo
@@ -169,23 +169,23 @@ sea en_controles = falso
 sea muerto = 0
 sea jefe_despierto = falso
 
-funcion centro_x(val diccionario c): numero { devolver c["x"] + c["ancho"] / 2 }
-funcion centro_y(val diccionario c): numero { devolver c["y"] + c["alto"] / 2 }
+funcion centro_x(diccionario c): numero { devolver c["x"] + c["ancho"] / 2 }
+funcion centro_y(diccionario c): numero { devolver c["y"] + c["alto"] / 2 }
 
-funcion bloquear(val numero x, val numero y, val numero ancho, val numero alto, val texto como): nulo {
+funcion bloquear(numero x, numero y, numero ancho, numero alto, texto como): nulo {
     para (f = matematica.piso(y / 16); f < matematica.techo((y + alto) / 16); f++) {
         para (c = matematica.piso(x / 16); c < matematica.techo((x + ancho) / 16); c++) {
-            juego.poner_casilla(mapa, c, f, como)
+            juego.mapa.poner(mapa, c, f, como)
         }
     }
 }
 
-funcion propiedad(val diccionario ob, val texto nombre, val cualquiera defecto): cualquiera {
+funcion propiedad(diccionario ob, texto nombre, cualquiera defecto): cualquiera {
     si ob["propiedades"].contiene(nombre) { devolver ob["propiedades"][nombre] }
     devolver defecto
 }
 
-funcion nuevo_enemigo(val texto tipo, val numero x, val numero y, val texto sala): diccionario {
+funcion nuevo_enemigo(texto tipo, numero x, numero y, texto sala): diccionario {
     sea d = ENEMIGOS[tipo]
     devolver {"tipo": tipo, "x": x + (16 - d["ancho"]) / 2, "y": y + 16 - d["alto"], "ancho": d["ancho"], "alto": d["alto"],
         "vx": 0, "vy": 0, "vida": d["vida"], "golpe": -1, "flash": 0, "t": matematica.aleatorio() * 1.5,
@@ -193,7 +193,7 @@ funcion nuevo_enemigo(val texto tipo, val numero x, val numero y, val texto sala
 }
 
 # Entrar en un mapa: se colocan sus cosas según cómo va la partida
-funcion entrar_mapa(val texto nombre): nulo {
+funcion entrar_mapa(texto nombre): nulo {
     nombre_mapa = nombre
     mapa = MAPAS[nombre]
     gente = []
@@ -213,7 +213,7 @@ funcion entrar_mapa(val texto nombre): nulo {
     ataque = 0
     empuje = [0, 0]
     saliendo = falso
-    juego.borrar_particulas()
+    juego.quitar_particulas()
     para cada diccionario ob en mapa["objetos"] {
         sea x = ob["x"]
         sea y = ob["y"]
@@ -280,28 +280,28 @@ funcion entrar_mapa(val texto nombre): nulo {
         para cada diccionario p en gente { si p["nombre"] == "sabia" { hablar(p) } }
         mira = "arriba"
     }
-    juego.musica(MUSICA[mapa["propiedades"]["musica"]], 0.5)
+    juego.musica(MUSICA[mapa["propiedades"]["musica"]], {"volumen": 0.5})
     cartel_nombre = 2.5
     colocar_camara(verdadero)
 }
 
 # ── Diálogos ─────────────────────────────────────────────────────────
-funcion decir(val cualquiera paginas): nulo {
+funcion decir(cualquiera paginas): nulo {
     juego.dialogo(paginas, {"fuente": LETRA, "escala": 1, "sonido": LETRITA, "velocidad": 45})
 }
 
-funcion pagina(val texto quien, val cualquiera cara, val texto t): diccionario {
+funcion pagina(texto quien, cualquiera cara, texto t): diccionario {
     sea p = {"nombre": quien, "texto": t}
     si cara != nulo { p["retrato"] = [TM, cara] }
     devolver p
 }
 
-funcion obtener(val cualquiera hoja, val numero cuadro, val texto que): nulo {
+funcion obtener(cualquiera hoja, numero cuadro, texto que): nulo {
     obtenido = {"hoja": hoja, "cuadro": cuadro, "texto": que, "t": 0}
     juego.efecto("subir", {"volumen": 0.4})
 }
 
-funcion hablar(val diccionario p): nulo {
+funcion hablar(diccionario p): nulo {
     sea c = p["cara"]
     elegir p["nombre"] {
         caso "sabia" {
@@ -369,8 +369,8 @@ funcion atender_respuestas(): nulo {
     si despues == "final" {
         despues = nulo
         partida["mision"] = 3
-        juego.olvidar("partida")
-        juego.guardar("logros", {"terminado": verdadero})
+        juego.olvidar_partida("partida")
+        juego.guardar_partida("logros", {"terminado": verdadero})
         juego.cambiar_escena("fin", 1.2)
         devolver nulo
     }
@@ -430,8 +430,8 @@ funcion delante(): lista {
     devolver [x + 12, y]
 }
 
-funcion cerca_de(val lista punto, val numero x, val numero y, val numero ancho, val numero alto): logico {
-    devolver juego.dentro(punto[0], punto[1], [x - 3, y - 3, ancho + 6, alto + 6])
+funcion cerca_de(lista punto, numero x, numero y, numero ancho, numero alto): logico {
+    devolver juego.colision([punto[0], punto[1]], [x - 3, y - 3, ancho + 6, alto + 6])
 }
 
 funcion usar(): logico {
@@ -466,7 +466,7 @@ funcion usar(): logico {
             partida["puerta"] = verdadero
             bloquear(puerta["x"], puerta["y"], puerta["ancho"], puerta["alto"], ".")
             juego.reproducir(SONIDO["llave"])
-            juego.reproducir(SONIDO["puerta"], 0.8)
+            juego.reproducir(SONIDO["puerta"], {"volumen": 0.8})
             juego.temblor(2, 0.3)
             decir("La llave gira con un chasquido. ¡La reja se levanta!")
         } sino {
@@ -477,7 +477,7 @@ funcion usar(): logico {
     devolver falso
 }
 
-funcion abrir_cofre(val diccionario c): nulo {
+funcion abrir_cofre(diccionario c): nulo {
     c["abierto"] = verdadero
     partida["cofres"].agregar(c["nombre"])
     juego.reproducir(SONIDO["cofre"])
@@ -504,7 +504,7 @@ funcion abrir_cofre(val diccionario c): nulo {
 }
 
 # ── El héroe ─────────────────────────────────────────────────────────
-funcion mover_heroe(val numero dt): nulo {
+funcion mover_heroe(numero dt): nulo {
     sea dx = juego.direccion("izquierda", "derecha")
     sea dy = juego.direccion("arriba", "abajo")
     si ataque > 0 {                       # mientras da el espadazo, va más despacio
@@ -524,7 +524,7 @@ funcion mover_heroe(val numero dt): nulo {
     yo["vx"] = dx * VELOCIDAD + empuje[0]
     yo["vy"] = dy * VELOCIDAD + empuje[1]
     empuje = [matematica.acercar(empuje[0], 0, 900 * dt), matematica.acercar(empuje[1], 0, 900 * dt)]
-    juego.mover_en_mapa(mapa, yo, dt)
+    juego.mapa.mover(mapa, yo, dt)
     # los pasos
     si largo > 0.1 {
         t_paso = t_paso - dt
@@ -559,13 +559,13 @@ funcion alcance(): lista {
     devolver [x + 8, y - 10, 18, 20]
 }
 
-funcion herir_heroe(val numero dano, val numero desde_x, val numero desde_y): nulo {
+funcion herir_heroe(numero dano, numero desde_x, numero desde_y): nulo {
     si invencible > 0 o obtenido != nulo { devolver nulo }
     partida["vida"] = partida["vida"] - dano
     invencible = 1.0
     sea dir = matematica.normalizar(centro_x(yo) - desde_x, centro_y(yo) - desde_y)
     empuje = [dir[0] * 220, dir[1] * 220]
-    juego.reproducir(SONIDO["dano"], 0.7)
+    juego.reproducir(SONIDO["dano"], {"volumen": 0.7})
     juego.temblor(3, 0.2)
     si partida["vida"] <= 0 {
         partida["vida"] = 0
@@ -576,13 +576,13 @@ funcion herir_heroe(val numero dano, val numero desde_x, val numero desde_y): nu
 }
 
 # ── Los enemigos ─────────────────────────────────────────────────────
-funcion soltar(val numero x, val numero y): nulo {
+funcion soltar(numero x, numero y): nulo {
     sea r = matematica.aleatorio()
     si r < 0.35 { sueltos.agregar({"tipo": "moneda", "x": x, "y": y, "t": 0}) }
     sino si r < 0.55 y partida["vida"] < partida["maximo"] { sueltos.agregar({"tipo": "corazon", "x": x, "y": y, "t": 0}) }
 }
 
-funcion herir_enemigo(val diccionario e, val numero dano): nulo {
+funcion herir_enemigo(diccionario e, numero dano): nulo {
     e["vida"] = e["vida"] - dano
     e["golpe"] = golpe_id
     e["flash"] = 0.2
@@ -599,14 +599,14 @@ funcion herir_enemigo(val diccionario e, val numero dano): nulo {
         "vida": [0.1, 0.3], "tamaño": 2})
 }
 
-funcion morir_enemigo(val diccionario e): nulo {
+funcion morir_enemigo(diccionario e): nulo {
     juego.particulas(centro_x(e), centro_y(e), {"cantidad": 24, "color": [255, 240, 200], "color_final": [120, 90, 160, 0],
         "velocidad": [30, 110], "vida": [0.3, 0.7], "tamaño": 3, "tamaño_final": 0})
     juego.efecto("explosion", {"volumen": 0.25, "tono": 1.6, "largo": 0.5})
     soltar(e["x"], e["y"])
 }
 
-funcion pensar_enemigo(val diccionario e, val numero dt): nulo {
+funcion pensar_enemigo(diccionario e, numero dt): nulo {
     sea dx = centro_x(yo) - centro_x(e)
     sea dy = centro_y(yo) - centro_y(e)
     sea d = matematica.longitud(dx, dy)
@@ -682,14 +682,14 @@ funcion pensar_enemigo(val diccionario e, val numero dt): nulo {
         e["x"] = matematica.limitar(e["x"] + e["vx"] * dt, 0, mapa["ancho"] - e["ancho"])
         e["y"] = matematica.limitar(e["y"] + e["vy"] * dt, 0, mapa["alto"] - e["alto"])
     } sino {
-        juego.mover_en_mapa(mapa, e, dt)
+        juego.mapa.mover(mapa, e, dt)
     }
     # ¿te toca?
     si juego.colision(e, yo) { herir_heroe(ENEMIGOS[e["tipo"]]["dano"], centro_x(e), centro_y(e)) }
 }
 
 # Grum: anda hacia ti, se para y lanza rocas; con la mitad de la vida, más deprisa y más rocas
-funcion pensar_jefe(val numero dt): nulo {
+funcion pensar_jefe(numero dt): nulo {
     sea e = jefe
     e["flash"] = matematica.maximo(0, e["flash"] - dt)
     e["inv"] = matematica.maximo(0, e["inv"] - dt)
@@ -699,7 +699,7 @@ funcion pensar_jefe(val numero dt): nulo {
             e["estado"] = "despierta"
             e["t"] = 1.0
             jefe_despierto = verdadero
-            juego.musica(MUSICA["jefe"], 0.6)
+            juego.musica(MUSICA["jefe"], {"volumen": 0.6})
             juego.temblor(3, 0.6)
             decir(pagina("Grum", 109, "¡GRRR! ¿Quién se atreve a despertar a Grum? ¡La piedra es MÍA!"))
         }
@@ -733,7 +733,7 @@ funcion pensar_jefe(val numero dt): nulo {
                     sea v = matematica.vector(base + (i - (cuantas - 1) / 2) * 18, si furioso { 105 } sino { 85 })
                     rocas.agregar({"x": centro_x(e), "y": centro_y(e) - 6, "vx": v[0], "vy": v[1], "t": 3})
                 }
-                juego.reproducir(SONIDO["roca"], 0.6)
+                juego.reproducir(SONIDO["roca"], {"volumen": 0.6})
                 si furioso y no e.contiene("llamo") {      # llama a sus murciélagos
                     e["llamo"] = verdadero
                     para (i = 0; i < 2; i++) { enemigos.agregar(nuevo_enemigo("murcielago", e["x"] - 30 + i * 60, e["y"] - 20, "")) }
@@ -755,17 +755,17 @@ funcion pensar_jefe(val numero dt): nulo {
             }
         }
     }
-    juego.mover_en_mapa(mapa, e, dt)
+    juego.mapa.mover(mapa, e, dt)
     si juego.colision(e, yo) { herir_heroe(1, centro_x(e), centro_y(e)) }
 }
 
-funcion mover_enemigos(val numero dt): nulo {
+funcion mover_enemigos(numero dt): nulo {
     sea golpe = alcance()
     para cada diccionario e en enemigos {
         pensar_enemigo(e, dt)
         si ataque > 0 y e["golpe"] != golpe_id y juego.colision(golpe, e) { herir_enemigo(e, 1) }
     }
-    sea vivos = filtrar(enemigos, funcion(val diccionario e): logico { devolver e["vida"] > 0 })
+    sea vivos = filtrar(enemigos, funcion(diccionario e): logico { devolver e["vida"] > 0 })
     si vivos.longitud() != enemigos.longitud() {
         para cada diccionario e en enemigos { si e["vida"] <= 0 { morir_enemigo(e) } }
         enemigos = vivos
@@ -784,20 +784,20 @@ funcion mover_enemigos(val numero dt): nulo {
         r["x"] = r["x"] + r["vx"] * dt
         r["y"] = r["y"] + r["vy"] * dt
         r["t"] = r["t"] - dt
-        si juego.solido(mapa, matematica.piso(r["x"] / 16), matematica.piso(r["y"] / 16)) { r["t"] = 0 }
-        si juego.colision_circulo_rect([r["x"], r["y"], 3], yo) {
+        si juego.mapa.solido(mapa, matematica.piso(r["x"] / 16), matematica.piso(r["y"] / 16)) { r["t"] = 0 }
+        si juego.colision({"centro": [r["x"], r["y"]], "radio": 3}, yo) {
             herir_heroe(1, r["x"], r["y"])
             r["t"] = 0
         }
-        si ataque > 0 y juego.colision_circulo_rect([r["x"], r["y"], 3], golpe) {      # se pueden devolver... o romper
+        si ataque > 0 y juego.colision({"centro": [r["x"], r["y"]], "radio": 3}, golpe) {      # se pueden devolver... o romper
             r["t"] = 0
             juego.particulas(r["x"], r["y"], {"cantidad": 6, "color": [170, 110, 40], "velocidad": [30, 90], "vida": [0.2, 0.4], "tamaño": 2})
         }
     }
-    rocas = filtrar(rocas, funcion(val diccionario r): logico { devolver r["t"] > 0 })
+    rocas = filtrar(rocas, funcion(diccionario r): logico { devolver r["t"] > 0 })
     # la reja: se abre cuando no queda nadie en su sala
     si reja != nulo y no partida["reja"] {
-        sea quedan = filtrar(enemigos, funcion(val diccionario e): logico { devolver e["sala"] == reja["sala"] })
+        sea quedan = filtrar(enemigos, funcion(diccionario e): logico { devolver e["sala"] == reja["sala"] })
         si quedan.longitud() == 0 {
             partida["reja"] = verdadero
             bloquear(reja["x"], reja["y"], reja["ancho"], reja["alto"], ".")
@@ -819,25 +819,25 @@ funcion vencer_jefe(): nulo {
     jefe = nulo
     rocas = []
     enemigos = []
-    juego.musica(MUSICA["mazmorra"], 0.5)
+    juego.musica(MUSICA["mazmorra"], {"volumen": 0.5})
 }
 
 # ── Lo que se coge del suelo ─────────────────────────────────────────
-funcion recoger(val numero dt): nulo {
+funcion recoger(numero dt): nulo {
     para cada diccionario s en sueltos {
         s["t"] = s["t"] + dt
         si juego.colision([s["x"] + 4, s["y"] + 4, 8, 8], yo) {
             s["t"] = 99
             si s["tipo"] == "moneda" {
                 partida["monedas"] = partida["monedas"] + 1
-                juego.reproducir(SONIDO["moneda"], 0.5)
+                juego.reproducir(SONIDO["moneda"], {"volumen": 0.5})
             } sino {
                 partida["vida"] = matematica.minimo(partida["maximo"], partida["vida"] + 2)
                 juego.efecto("moneda", {"volumen": 0.3, "tono": 1.5})
             }
         }
     }
-    sueltos = filtrar(sueltos, funcion(val diccionario s): logico { devolver s["t"] < 9 })
+    sueltos = filtrar(sueltos, funcion(diccionario s): logico { devolver s["t"] < 9 })
     # la piedra, cuando Grum ya no está
     si piedra != nulo y partida["jefe"] y no partida["piedra"] y juego.colision([piedra["x"], piedra["y"], 16, 16], yo) {
         partida["piedra"] = verdadero
@@ -854,7 +854,7 @@ funcion cortar_arbustos(): nulo {
     para cada diccionario a en arbustos {
         si juego.colision(golpe, [a["x"] + 2, a["y"] + 2, 12, 12]) {
             bloquear(a["x"], a["y"], 16, 16, ".")
-            juego.reproducir(SONIDO["arbusto"], 0.6)
+            juego.reproducir(SONIDO["arbusto"], {"volumen": 0.6})
             juego.particulas(a["x"] + 8, a["y"] + 8, {"cantidad": 14, "color": [80, 170, 70], "color_final": [40, 100, 40, 0],
                 "velocidad": [30, 100], "vida": [0.3, 0.6], "tamaño": 3, "gravedad": 120})
             soltar(a["x"], a["y"])
@@ -878,19 +878,19 @@ funcion mirar_salidas(): nulo {
 }
 
 # ── La cámara y el dibujo ────────────────────────────────────────────
-funcion colocar_camara(val logico de_golpe): nulo {
+funcion colocar_camara(logico de_golpe): nulo {
     sea ox = matematica.limitar(centro_x(yo) - ANCHO / 2, 0, matematica.maximo(0, mapa["ancho"] - ANCHO))
     sea oy = matematica.limitar(centro_y(yo) - ALTO / 2, 0, matematica.maximo(0, mapa["alto"] - ALTO))
     si de_golpe { cam = [ox, oy] } sino { cam = [juego.acercar(cam[0], ox, 10), juego.acercar(cam[1], oy, 10)] }
 }
 
-funcion dibujar_tile(val cualquiera hoja, val numero cuadro, val numero x, val numero y, val cualquiera mas = nulo): nulo {
+funcion dibujar_tile(cualquiera hoja, numero cuadro, numero x, numero y, cualquiera mas = nulo): nulo {
     sea op = {"cuadro": cuadro}
     si mas != nulo { para cada texto c en mas { op[c] = mas[c] } }
     juego.dibujar(hoja, matematica.redondear(x), matematica.redondear(y), op)
 }
 
-funcion sombra(val numero x, val numero y, val numero ancho): nulo {
+funcion sombra(numero x, numero y, numero ancho): nulo {
     juego.rectangulo(matematica.redondear(x - ancho / 2), matematica.redondear(y - 1), ancho, 3, [0, 0, 0, 60])
 }
 
@@ -916,7 +916,7 @@ funcion dibujar_espada(): nulo {
         {"cuadro": ESPADA, "angulo": ang + 90, "centrado": verdadero})
 }
 
-funcion dibujar_enemigo(val diccionario e): nulo {
+funcion dibujar_enemigo(diccionario e): nulo {
     sea d = ENEMIGOS[e["tipo"]]
     sea x = centro_x(e) - 8
     sea y = e["y"] + e["alto"] - 16
@@ -957,7 +957,7 @@ funcion dibujar_jefe(): nulo {
 funcion dibujar_mundo(): nulo {
     juego.limpiar([20, 12, 18])
     juego.camara(matematica.redondear(cam[0]), matematica.redondear(cam[1]))
-    juego.dibujar_tiled(mapa, ["Suelo", "Decorado"])
+    juego.mapa.dibujar_tiled(mapa, ["Suelo", "Decorado"])
     # la puerta y la reja, cerradas
     si puerta != nulo y no partida["puerta"] {
         dibujar_tile(TP, 111, puerta["x"], puerta["y"] - 16)
@@ -979,7 +979,7 @@ funcion dibujar_mundo(): nulo {
     si jefe != nulo { cosas.agregar({"y": jefe["y"] + jefe["alto"], "que": "jefe", "c": jefe}) }
     si piedra != nulo y partida["jefe"] y no partida["piedra"] { cosas.agregar({"y": piedra["y"] + 16, "que": "piedra", "c": piedra}) }
     si muerto <= 0 o juego.cuadro(2, 10) == 0 { cosas.agregar({"y": yo["y"] + yo["alto"], "que": "heroe", "c": yo}) }
-    cosas.ordenar(funcion(val diccionario a, val diccionario b): numero { devolver a["y"] - b["y"] })
+    cosas.ordenar(funcion(diccionario a, diccionario b): numero { devolver a["y"] - b["y"] })
     para cada diccionario k en cosas {
         sea c = k["c"]
         elegir k["que"] {
@@ -1125,17 +1125,17 @@ sea terminado = falso
 
 funcion portada(): nulo {
     si juego.escena_nueva() {
-        guardada = juego.cargar("partida")
-        terminado = juego.cargar("logros", {"terminado": falso})["terminado"]
+        guardada = juego.cargar_partida("partida")
+        terminado = juego.cargar_partida("logros", {"terminado": falso})["terminado"]
         mapa = MAPAS["pueblo"]
-        juego.musica(MUSICA["pueblo"], 0.5)
-        juego.borrar_particulas()
+        juego.musica(MUSICA["pueblo"], {"volumen": 0.5})
+        juego.quitar_particulas()
     }
     # de fondo, el pueblo, de un lado a otro muy despacio
     sea t = juego.tiempo_escena()
     juego.limpiar([0, 0, 0])
     juego.camara(matematica.redondear((mapa["ancho"] - ANCHO) * (0.5 + 0.5 * matematica.seno(t * 0.08))), 60)
-    juego.dibujar_tiled(mapa, ["Suelo", "Decorado"])
+    juego.mapa.dibujar_tiled(mapa, ["Suelo", "Decorado"])
     juego.camara()
     juego.cubrir([10, 14, 30, 150])
     # el título
@@ -1181,7 +1181,7 @@ funcion empezar_partida(): nulo {
 }
 
 funcion derrota(): nulo {
-    si juego.escena_nueva() { guardada = juego.cargar("partida") }
+    si juego.escena_nueva() { guardada = juego.cargar_partida("partida") }
     juego.limpiar([12, 6, 10])
     juego.texto("HAS CAÍDO", ANCHO / 2, 50, {"fuente": GRANDE, "alinear": "centro", "color": [230, 80, 80]})
     juego.texto("Pero un héroe siempre se levanta.", ANCHO / 2, 76, {"fuente": LETRA, "alinear": "centro", "color": [200, 190, 200]})
@@ -1228,12 +1228,12 @@ fijo CREDITOS = [
 funcion final(): nulo {
     si juego.escena_nueva() {
         mapa = MAPAS["pueblo"]
-        juego.musica(MUSICA["pueblo"], 0.6)
+        juego.musica(MUSICA["pueblo"], {"volumen": 0.6})
     }
     sea t = juego.tiempo_escena()
     juego.limpiar([0, 0, 0])
     juego.camara(matematica.redondear((mapa["ancho"] - ANCHO) / 2), matematica.redondear(matematica.minimo(mapa["alto"] - ALTO, t * 3)))
-    juego.dibujar_tiled(mapa, ["Suelo", "Decorado"])
+    juego.mapa.dibujar_tiled(mapa, ["Suelo", "Decorado"])
     juego.camara()
     juego.cubrir([5, 8, 20, 170])
     sea y = ALTO + 10 - t * 18

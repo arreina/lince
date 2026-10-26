@@ -3,6 +3,32 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.9.0
+
+Prepara la 2.0. Todo lo de antes sigue funcionando; lo que la 2.0 cambiará avisa, y `lince migrar` lo
+cambia solo. Es la última versión que añade cosas: desde aquí, la 1.x solo recibe arreglos.
+
+- **Lo de la 2.0, ya en la 1.9** (lo decidido está en `PROPUESTA_2.0.md`):
+  - `juego.fisica.*` (`juego.fisica.mundo`, `.cuerpo`, `.avanzar`…) y `juego.mapa.*` (`juego.mapa.crear`, `.mover`, `.dibujar`…).
+  - Una sola `juego.colision(a, b)` para puntos `[x, y]`, cajas `[x, y, ancho, alto]` y círculos `{"centro": [x, y], "radio": r}`.
+  - `guardar_partida`, `cargar_partida`, `olvidar_partida` y `quitar_particulas`.
+  - `"angulo"` en la cámara, como en `dibujar`.
+  - Lo que se hace con un texto, como método suyo: `t.dividir(",")`, `t.posicion("a")`, `t.extraer(0, 3)`…
+- **Lo viejo avisa**: al ejecutar, una vez por cada cosa (`⚠️ Obsoleto en línea 12: juego.cuerpo → juego.fisica.cuerpo`), y en `lince comprobar` y el editor sin ejecutar. Con `LINCE_OBSOLETOS=0` no avisa.
+- **`lince migrar`**: pasa el código a la forma de la 2.0, tocando solo lo que cambia (los comentarios y los espacios se quedan). Con `--comprobar` dice qué cambiaría y sale con 1 si hay algo; lo que no puede saber solo lo marca con ✋. Los ejemplos, el juego, la web y las pruebas de Lince ya están migrados con él.
+- **`val` ya no hace falta**: es lo mismo que no poner nada, avisa y `lince migrar` lo quita.
+- **Los tipos que en la 2.0 serán un error**, avisando: darle a una variable con tipo un valor de otro tipo, un campo con tipo, y los tipos de clase (`sea Punto p = Otra()`).
+- Arreglado: `lince comprobar` y el editor creían ver un error de sintaxis en los archivos con muchos avisos.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.9.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.9.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.9.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.9.0.vsix` |
+
 ## 1.8.0
 
 Varios jugadores en el mismo equipo. Nada de lo que ya funcionaba cambia. (No hay 1.7: era la de

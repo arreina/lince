@@ -3,12 +3,12 @@
 # quien la importa — sólo a través del alias.
 fijo FACTOR = 3
 
-funcion escala(val numero x): numero {
+funcion escala(numero x): numero {
     devolver x * FACTOR
 }
 
 # Una función que llama a otra de la misma librería: tiene que verla, porque
 # el fichero corre en su propio ámbito y las funciones lo retienen.
-funcion escala_doble(val numero x): numero {
+funcion escala_doble(numero x): numero {
     devolver escala(x) + escala(x)
 }

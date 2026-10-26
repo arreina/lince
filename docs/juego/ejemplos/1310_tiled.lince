@@ -9,7 +9,7 @@ importar "juego"
 juego.abrir("Tiled", 480, 240)
 juego.definir_accion("izquierda", ["izquierda", "a", "mando:izq_x-"])
 juego.definir_accion("derecha", ["derecha", "d", "mando:izq_x+"])
-fijo NIVEL = juego.mapa_tiled("recursos/nivel.tmx")
+fijo NIVEL = juego.mapa.tiled("recursos/nivel.tmx")
 fijo LINCE = juego.hoja("recursos/lince.png", 16)
 sea yo = {"x": 0, "y": 0, "ancho": 14, "alto": 12, "vx": 0, "vy": 0}
 sea monedas = []
@@ -23,14 +23,14 @@ para cada diccionario cosa en NIVEL["objetos"] {
 mientras juego.abierto() {
     yo["vx"] = juego.direccion("izquierda", "derecha") * 120
     yo["vy"] = yo["vy"] + 900 * juego.dt()
-    juego.mover_en_mapa(NIVEL, yo)
+    juego.mapa.mover(NIVEL, yo)
     juego.camara(yo["x"] - 120, 0)
-    juego.dibujar_tiled(NIVEL)
+    juego.mapa.dibujar_tiled(NIVEL)
     para cada diccionario m en monedas {
         juego.circulo(m["x"] + 8, m["y"] + 8, 5, [250, 210, 60])
     }
     juego.dibujar(LINCE, yo["x"] - 1, yo["y"] - 4, {"fila": 1, "cuadro": juego.cuadro(4, 10)})
     juego.camara()
-    juego.texto("{NIVEL["propiedades"]["nombre"]}  CAPAS: {NIVEL["capas"]}", 8, 8, 1)
+    juego.texto("{NIVEL["propiedades"]["nombre"]}  CAPAS: {NIVEL["capas"]}", 8, 8, {"escala": 1})
     juego.presentar()
 }

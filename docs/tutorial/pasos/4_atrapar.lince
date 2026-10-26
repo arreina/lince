@@ -57,7 +57,7 @@ mientras juego.abierto() {
     # caen; si tocan al lince, punto, pitido y chispas
     para cada diccionario e en estrellas {
         e["y"] = e["y"] + e["vel"] * dt
-        si juego.colision(x - 24, ALTO - 60, 48, 40, e["x"] - 10, e["y"] - 10, 20, 20) {
+        si juego.colision([x - 24, ALTO - 60, 48, 40], [e["x"] - 10, e["y"] - 10, 20, 20]) {
             e["cogida"] = verdadero
             puntos = puntos + 1
             juego.pitido(880, 0.06, 0.2)
@@ -65,7 +65,7 @@ mientras juego.abierto() {
                                               "velocidad": [60, 200], "vida": [0.3, 0.6]})
         }
     }
-    estrellas = filtrar(estrellas, funcion(val diccionario e): logico {
+    estrellas = filtrar(estrellas, funcion(diccionario e): logico {
         devolver no e["cogida"] y e["y"] < ALTO + 20
     })
 
@@ -75,6 +75,6 @@ mientras juego.abierto() {
     }
     juego.dibujar(LINCE, x, ALTO - 40, {"escala": 4, "centrado": verdadero})
     juego.dibujar_particulas()
-    juego.texto("PUNTOS " + a_texto(puntos), 16, 16, 3, [255, 255, 255])
+    juego.texto("PUNTOS " + a_texto(puntos), 16, 16, {"escala": 3, "color": [255, 255, 255]})
     juego.presentar()
 }

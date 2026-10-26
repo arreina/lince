@@ -108,15 +108,25 @@ está en `juego.lince`.
 - [ ] Probarlo con varios mandos de verdad, conectando y desconectando (lo hace el autor).
 
 ### 1.9 — Preparar la 2.0
-- [ ] Lo que vaya a cambiar avisa «obsoleto: usa X».
-- [ ] `lince migrar --comprobar` (qué cambiaría) y `lince migrar` (lo cambia solo).
-- [ ] Última versión que añade cosas; después, solo arreglos.
+- [x] Lo nuevo de la 2.0 (ver abajo) ya funciona, y lo que va a cambiar avisa «obsoleto: usa X»
+  (al ejecutar, en `lince comprobar` y en el editor).
+- [x] `lince migrar --comprobar` (qué cambiaría) y `lince migrar` (lo cambia solo). Los ejemplos,
+  el juego, la web y las pruebas ya están migrados con él.
+- [x] Última versión que añade cosas; después, solo arreglos.
+- [ ] Probar `lince migrar` con lince-motor y con los juegos de otros (el autor).
 
 ### 2.0 — Limpieza, no un lenguaje nuevo
-Cada cambio que rompa, aprobado por el autor uno por uno:
-- [ ] Ordenar el módulo `juego` en partes (`juego.fisica.cuerpo`, `juego.sonido.reproducir`…) con nombres y opciones coherentes.
-- [ ] Quitar las formas duplicadas de hacer lo mismo.
-- [ ] Las anotaciones de tipo, comprobadas también al ejecutar (cuando se ponen).
+Cada cambio que rompa, aprobado por el autor uno por uno. **Aprobados el 2026-10-26**; el
+detalle de cada uno está en PROPUESTA_2.0.md:
+- [ ] A1 `juego.fisica.*` (mundo, cuerpo, avanzar, quitar, tocando, empujar, bisagra, cuerda…).
+- [ ] A2 `juego.mapa.*` (crear, tiled, casilla, poner, solido, casilla_en, buscar, mover, dibujar, dibujar_tiled, camino).
+- [ ] B1 `reproducir`, B2 `musica` y B3 `texto`, solo con opciones (sin volumen, bucle, escala, color ni fuente sueltos).
+- [ ] B5 una sola `colision(a, b)` (cajas, puntos, círculos y cuerpos); fuera `colision_circulos`, `colision_circulo_rect` y `dentro`.
+- [ ] B6 fuera `posicion_camara()`.
+- [ ] C1 `guardar_partida` / `cargar_partida` / `olvidar_partida`; C2 `quitar_particulas`; C3 `"angulo"` en la cámara.
+- [ ] D1 fuera `val`; D2 lo de un texto, como métodos (`t.dividir(",")`); D3 fuera `texto.a_numero`, `de_numero`, `repetir` y `es_vacio`.
+- [ ] D4 las anotaciones de tipo, comprobadas también al ejecutar.
+- No: el sonido en partes (A3), quitar `ancho_texto` (B4) ni cambiar `clic` (C4).
 - [ ] La 2.x se congela igual que la 1.x.
 
 Fuera del plan (decisión del autor): juego en red (se quitó a propósito), consolas (depende de

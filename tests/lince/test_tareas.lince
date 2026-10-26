@@ -3,7 +3,7 @@ importar "archivos"
 importar "sistema"
 
 # Dos tareas a la vez: cada esperar() deja pasar un fotograma
-tarea contar(val texto nombre, val numero veces) {
+tarea contar(texto nombre, numero veces) {
     para (i = 1; i <= veces; i++) {
         escribir("{nombre} {i}")
         esperar()
@@ -20,10 +20,10 @@ para (k = 0; k < 4; k++) {
 escribir("a terminada: {a.terminada()}")
 
 # Se puede esperar desde una función que llama la tarea, y a otra tarea
-funcion pasos(val numero n): nulo {
+funcion pasos(numero n): nulo {
     para (i = 0; i < n; i++) { esperar() }
 }
-tarea calcular(val numero x): numero {
+tarea calcular(numero x): numero {
     pasos(2)
     devolver x * 10
 }
@@ -66,7 +66,7 @@ escribir("sola terminada: {guardadas[0].terminada()}")
 # Un método puede ser una tarea, con 'mi'
 clase Moneda {
     sea brillo = 0
-    tarea parpadear(val numero veces) {
+    tarea parpadear(numero veces) {
         para (i = 0; i < veces; i++) {
             mi.brillo += 1
             esperar()
@@ -107,7 +107,7 @@ tarea con_tipo(): numero { devolver "no" }
 intentar { esperar(con_tipo()) } capturar (error e) { escribir(e.mensaje) }
 
 # Tareas sin nombre, como las lambdas; y el tipo 'tarea' en un parámetro
-sea parpadeo = tarea(val numero veces) {
+sea parpadeo = tarea(numero veces) {
     para (i = 0; i < veces; i++) {
         escribir("brilla {i}")
         esperar()
@@ -116,11 +116,11 @@ sea parpadeo = tarea(val numero veces) {
 sea tp = parpadeo(2)
 escribir(tp)
 esperar(tp)
-sea doble = tarea(val numero x): numero {
+sea doble = tarea(numero x): numero {
     esperar()
     devolver x * 2
 }
-funcion esperar_a(val tarea t): cualquiera { devolver esperar(t) }
+funcion esperar_a(tarea t): cualquiera { devolver esperar(t) }
 escribir(esperar_a(doble(21)))
 intentar { esperar_a(3) } capturar (error e) { escribir(e.mensaje) }
 
@@ -131,7 +131,7 @@ escribir(tarea)
 # Errores de sintaxis
 fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
 fijo TMP = "test_tareas_tmp.lince"
-funcion comprobar(val texto codigo, val texto pista): nulo {
+funcion comprobar(texto codigo, texto pista): nulo {
     archivos.escribir(TMP, codigo)
     escribir(sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1").contiene(pista))
 }

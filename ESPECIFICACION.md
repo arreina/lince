@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.8
+# 🐆 Lince — Especificación del Lenguaje v1.9
 
 ## Filosofía
 
@@ -43,7 +43,7 @@ Lince es un lenguaje de programación **para videojuegos, en español**, impleme
 | `nulo` | null |
 | `escribir` | print |
 | `leer` | leer del teclado |
-| `val` / `ref` | parámetro por valor / referencia |
+| `ref` | parámetro por referencia (`val`, por valor, es lo mismo que no poner nada: obsoleto desde la 1.9) |
 | `intentar` / `capturar` / `finalmente` | try / catch / finally |
 | `lanzar` | throw |
 | `importar` | import |
@@ -90,8 +90,9 @@ sea Arma arma = nulo
 sea geo.Punto centro = geo.Punto(0, 0)
 ```
 
-- Al ejecutar, el valor inicial tiene que ser de ese tipo (si no, `ErrorTipo`). Los tipos de
-  clase no se comprueban al ejecutar, igual que en los parámetros.
+- Al ejecutar, el valor inicial tiene que ser de ese tipo (si no, `ErrorTipo`). Darle luego un
+  valor de otro tipo, o uno que no es de la clase en un tipo de clase, avisa al ejecutar desde la
+  1.9 («En la 2.0 será un ErrorTipo»): en la 2.0 será un error, como el valor inicial.
 - `lince comprobar` y el editor avisan, sin ejecutar, cuando más adelante se le da un valor de
   otro tipo (`vida = "mucha"`). A una variable de un tipo de clase se le puede dar `nulo`.
 - El tipo y el nombre van en la misma línea.
@@ -198,7 +199,7 @@ vacío `""` y una lista, un diccionario o unos bytes vacíos; todo lo demás cue
 ## Funciones
 
 ```lince
-funcion nombre([val|ref] tipo param, ...): tipo_retorno {
+funcion nombre([ref] tipo param, ...): tipo_retorno {
     devolver valor
 }
 ```
@@ -206,7 +207,7 @@ funcion nombre([val|ref] tipo param, ...): tipo_retorno {
 ### Con valores por defecto
 
 ```lince
-funcion saludar(val texto nombre, val texto saludo = "Hola"): texto {
+funcion saludar(texto nombre, texto saludo = "Hola"): texto {
     devolver saludo + ", " + nombre
 }
 saludar("Ana")                # "Hola, Ana"
@@ -216,14 +217,14 @@ saludar("Ana", "Buenos días") # "Buenos días, Ana"
 ### Lambdas
 
 ```lince
-sea doble = funcion(val numero x): numero { devolver x * 2 }
+sea doble = funcion(numero x): numero { devolver x * 2 }
 escribir(doble(5))  # 10
 ```
 
 ### Funciones como argumentos
 
 ```lince
-funcion aplicar(val numero x, val funcion f): numero { devolver f(x) }
+funcion aplicar(numero x, funcion f): numero { devolver f(x) }
 escribir(aplicar(5, doble))  # 10
 ```
 
@@ -266,9 +267,10 @@ da `ErrorRango`.
 - Todo parámetro tiene tipo declarado; `cualquiera` acepta un valor de cualquier tipo
   (`cualquiera v`, y también como tipo de retorno), y con `es` se mira cuál es
 - Toda función declara su tipo de retorno
-- Un parámetro puede llevar delante `val` (lo normal; es lo mismo que no poner nada) o `ref`.
-  Con `val`, asignar al parámetro dentro de la función no cambia nada fuera. Con `ref`,
-  lo que valga al acabar la función pasa a la variable que se le dio:
+- Asignar a un parámetro dentro de la función no cambia nada fuera, salvo si lleva delante
+  `ref`: entonces lo que valga al acabar la función pasa a la variable que se le dio. (`val`
+  delante, que es lo mismo que no poner nada, está obsoleto desde la 1.9: avisa, y `lince
+  migrar` lo quita.)
 
   ```lince
   funcion intercambiar(ref numero a, ref numero b): nulo {
@@ -280,8 +282,8 @@ da `ErrorRango`.
   ```
 
   Si a un `ref` se le da algo que no es una variable (un número, una expresión), no hay
-  dónde devolverlo y se queda como `val`.
-- Las listas, los diccionarios y los objetos se comparten siempre, con `val` o con `ref`:
+  dónde devolverlo y se queda como uno normal.
+- Las listas, los diccionarios y los objetos se comparten siempre, con `ref` o sin él:
   si la función añade algo a una lista, se ve fuera (para no tocarla, `l.copiar()`)
 - Parámetros con valor por defecto van al final
 - Recursión limitada a 500 niveles → `ErrorRecursion` capturable
@@ -443,7 +445,7 @@ si va después y cero si da igual:
 
 ```lince
 # De mayor a menor
-nums.ordenar(funcion(val numero a, val numero b): numero {
+nums.ordenar(funcion(numero a, numero b): numero {
     devolver b - a
 })
 ```
@@ -525,9 +527,22 @@ s.minusculas()
 s.recortar()            # sin espacios, tabuladores ni saltos de línea en los extremos
 s.contiene("algo")
 s.reemplazar("a", "b")
+s.dividir(",")          # "a,b".dividir(",") es ["a", "b"]
+s.posicion("ol")        # dónde está (en caracteres), o -1
+s.contar("a")           # cuántas veces está
+s.extraer(1, 3)         # los caracteres del 1 al 3 (sin el 3)
+s.empieza_con("ho")     # también s.termina_con("la")
+s.invertir()            # "aloh"
+s.a_lista()             # ["h", "o", "l", "a"]
+s.es_numero()           # "12" sí, "1a" no; también s.es_letra()
+s.rellenar_izq(5, "0")  # "00042"; también s.rellenar_der(5, ".") y s.centrar(9, "-")
 s[0]                    # carácter por índice
 s[-1]                   # último carácter
 ```
+
+Desde la 1.9 todo lo que se hace con un texto es un método suyo. Las funciones del módulo `texto`
+que hacían lo mismo (`texto.dividir(s, ",")`...) siguen funcionando, pero avisan: en la 2.0 ya
+no estarán, y `lince migrar` las cambia solas.
 
 El texto se guarda en UTF-8 y se trabaja **por caracteres, no por
 bytes**, que es lo que se espera escribiendo en español:
@@ -569,7 +584,7 @@ por un índice de la línea de arriba.
 
 ```lince
 clase Persona {
-    funcion crear(val texto nombre, val numero edad): nulo {
+    funcion crear(texto nombre, numero edad): nulo {
         mi.nombre = nombre
         mi.edad   = edad
     }
@@ -586,7 +601,7 @@ escribir(p.saludar())
 
 ```lince
 clase Empleado extiende Persona {
-    funcion crear(val texto nombre, val numero edad, val texto empresa): nulo {
+    funcion crear(texto nombre, numero edad, texto empresa): nulo {
         padre(nombre, edad)
         mi.empresa = empresa
     }
@@ -691,7 +706,7 @@ la clase: así una errata en el nombre no crea un método nuevo en silencio.
 clase Persona {
     privado sea _edad = 0
     obtener edad(): numero { devolver mi._edad }
-    fijar edad(val numero v): nulo {
+    fijar edad(numero v): nulo {
         si v < 0 { lanzar Error("edad negativa") }
         mi._edad = v
     }
@@ -747,7 +762,7 @@ interfaz Forma {
 }
 
 clase Rectangulo implementa Forma {
-    funcion crear(val numero ancho, val numero alto): nulo {
+    funcion crear(numero ancho, numero alto): nulo {
         mi.ancho = ancho
         mi.alto  = alto
     }
@@ -829,7 +844,7 @@ para cada Direccion dir en Direccion {
   `e == "Estado.Quieto"`. Así un valor guardado se sigue reconociendo tras recargar el
   programa en caliente
 - `e es Estado` dice si `e` es un valor de esa enumeración. Un parámetro puede declararse
-  `val Estado e`, y `val texto e` también lo acepta
+  `Estado e`, y `texto e` también lo acepta
 - Como clave de un diccionario cuenta su texto: `veces[Estado.Quieto] = 1` es la clave
   `"Estado.Quieto"`
 - **Aviso de `elegir`**: si un `elegir` sin `otro` tiene todos sus casos de la misma
@@ -848,7 +863,7 @@ para cada Direccion dir en Direccion {
 ## Generadores
 
 ```lince
-generador contar(val numero hasta): numero {
+generador contar(numero hasta): numero {
     sea i = 0
     mientras i < hasta {
         producir i
@@ -920,7 +935,7 @@ ataque_jefe()                    # empieza ya, y sigue sola en cada fotograma
   tarea larga en trozos:
 
   ```lince
-  funcion caminar_hasta(ref Enemigo e, val numero x): nulo {
+  funcion caminar_hasta(ref Enemigo e, numero x): nulo {
       mientras e.x < x {
           e.x += 60 * juego.dt()
           esperar()
@@ -939,8 +954,8 @@ ataque_jefe()                    # empieza ya, y sigue sola en cada fotograma
 - Un método también puede ser una tarea, con `mi`: `tarea patrullar() { ... }` dentro de la
   clase, y `enemigo.patrullar()` la empieza (`crear` no puede serlo)
 - Una tarea **sin nombre** se escribe como una lambda, y se empieza al llamarla:
-  `sea parpadeo = tarea(val numero veces) { ... }` y luego `parpadeo(3)`
-- En un parámetro, `val tarea t` solo acepta una tarea
+  `sea parpadeo = tarea(numero veces) { ... }` y luego `parpadeo(3)`
+- En un parámetro, `tarea t` solo acepta una tarea
 - `t.terminada()` dice si ha acabado; `t.parar()` la para: se deshace desde donde esperaba,
   ejecutando sus `finalmente` (un `capturar` no lo captura). `t es tarea` comprueba el tipo
 - Un error dentro de una tarea, antes de su primer `esperar`, le llega a quien la llamó;
@@ -1069,14 +1084,15 @@ matematica.TAU                # 6.28318...
 ### `texto`
 
 ```lince
-texto.dividir("a,b,c", ",")   # ["a", "b", "c"]
 texto.unir(["a","b"], "-")    # "a-b"
-texto.invertir("hola")        # "aloh"
-texto.posicion("hola", "ol")  # 1
+texto.formato("{} de {}", [1, 3])   # "1 de 3": cada {} por un valor
 texto.decimales(3.5, 2)       # "3.50": siempre con esos decimales (de 0 a 20), redondeando
 texto.miles(1234567)          # "1.234.567"; con decimales, "1.234,5", como en español
 texto.miles(1234567, ",")     # "1,234,567"; con otro separador, los decimales tras un punto
 ```
+
+El módulo se queda con lo que no parte de un texto. Lo que sí (dividir, buscar, extraer...) son
+métodos del texto (ver **Texto — métodos**).
 
 ### `archivos`
 
@@ -1181,7 +1197,7 @@ mientras juego.abierto() {
     si juego.tecla("derecha") { x = x + 300 * juego.dt() }     # dt: segundos del último fotograma
     juego.limpiar([20, 20, 30])
     juego.circulo(x, 300, 20, "#ffc850")
-    juego.texto("Hola", 10, 10, 3)
+    juego.texto("Hola", 10, 10, {"escala": 3})
     juego.presentar()                                          # muestra, espera a 60 fps y lee la entrada
 }
 ```
@@ -1206,11 +1222,10 @@ mientras juego.abierto() {
 | `rectangulo(x, y, ancho, alto[, color])` · `contorno(...)` | rectángulo relleno / solo borde |
 | `circulo(x, y, radio[, color])` · `linea(x1, y1, x2, y2[, color])` | |
 | `poligono(puntos[, color[, opciones]])` | rellena el polígono de esos puntos `[[x, y], [x, y], ...]` (también con entrantes). Opciones: `relleno` (falso: solo el borde) y `capa` |
-| `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
+| `texto(t, x, y[, opciones])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
 | `texto(t, x, y, opciones)` · `ancho_texto(t, opciones)` · `medir_texto(t[, opciones])` | con otra fuente, alineado o partido en líneas (ver **Letras**, abajo). `medir_texto` da `[ancho, alto]` |
-| `posicion_camara()` | `[x, y]` de la cámara (sin el temblor) |
-| `camara(x, y[, opciones])` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador, que tampoco tiembla con `temblor()`. Opciones: `zoom` (2: todo el doble de grande; 0,5: se ve el doble de mundo), `giro` (grados) y `zona` (`[x, y, ancho, alto]`: la parte de la pantalla donde se ve, para la pantalla partida); ver **Cámara**, abajo |
-| `camara_actual()` · `camara(guardada)` | `{"x", "y", "zoom", "giro", "zona", "temblor"}` de la cámara de ahora, y volver a ella |
+| `camara(x, y[, opciones])` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador, que tampoco tiembla con `temblor()`. Opciones: `zoom` (2: todo el doble de grande; 0,5: se ve el doble de mundo), `angulo` (grados, como en `dibujar`) y `zona` (`[x, y, ancho, alto]`: la parte de la pantalla donde se ve, para la pantalla partida); ver **Cámara**, abajo |
+| `camara_actual()` · `camara(guardada)` | `{"x", "y", "zoom", "angulo", "zona", "temblor"}` de la cámara de ahora, y volver a ella |
 | `a_mundo(x, y)` · `a_pantalla(x, y)` | el punto del mundo que se ve en (x, y) de la pantalla, y al revés, con la cámara de ahora (zoom, giro y zona incluidos): `juego.a_mundo(juego.raton())` es dónde hace clic el jugador. Están escritas en Lince |
 | `capa(n)` · `capa()` | lo que se dibuje desde ahora va en la capa `n` (ver **Capas**, abajo) / vuelve a la 0; devuelve la de antes |
 | `captura(ruta)` | guarda la ventana como `.bmp` |
@@ -1262,7 +1277,7 @@ imagen (pixel art):
 fijo LETRA = juego.fuente("redondita.ttf", 28)         # 28 píxeles de alto
 fijo PIXEL = juego.fuente("letras.png", "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ0123456789.,!?")
 
-juego.texto("¡Hola, Ñandú!", 20, 20, LETRA)
+juego.texto("¡Hola, Ñandú!", 20, 20, {"fuente": LETRA})
 juego.texto("PUNTOS: 120", 400, 20, {"fuente": PIXEL, "escala": 3, "color": [255, 220, 0], "alinear": "centro"})
 juego.texto(dialogo, 40, 300, {"fuente": LETRA, "ancho": 560})     # parte las líneas por los espacios
 ```
@@ -1275,8 +1290,7 @@ juego.texto(dialogo, 40, 300, {"fuente": LETRA, "ancho": 560})     # parte las l
 Con un diccionario de opciones en lugar de la escala, `texto()` admite `fuente`, `escala`, `color`
 (con alfa: `[255, 255, 255, 128]`), `alinear` (`"izquierda"`, `"centro"` o `"derecha"`: `x` es
 entonces el centro o el borde derecho) y `ancho` (parte en líneas para no pasar de ese ancho; los
-saltos de línea `\n` también cuentan). También se le puede pasar la fuente tal cual, como en la
-primera línea. Si a la fuente le falta una letra usa la más parecida: la mayúscula si no tiene
+saltos de línea `\n` también cuentan). Si a la fuente le falta una letra usa la más parecida: la mayúscula si no tiene
 minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del juego al hacer
 `lince compilar` o `lince repartir`, como las imágenes.
 
@@ -1331,11 +1345,11 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | Función | Qué hace |
 |---|---|
 | `sonido(ruta)` | carga un `.wav` o un `.ogg` (Ogg Vorbis, mucho más pequeño: mejor para la música); devuelve `{"sonido", "duracion", "ruta"}` |
-| `reproducir(sonido[, volumen[, bucle]])` · `reproducir(sonido, opciones)` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz. Opciones: `volumen` (0 a 1), `bucle`, `lado` (−1 izquierda, 0 en medio, 1 derecha: que suene de donde pasa), `tono` (1 normal, 2 una octava más agudo y el doble de rápido, 0,5 más grave; variarlo un poco, de 0,9 a 1,1, hace que un golpe repetido no suene siempre igual), `grupo` (`"efectos"`, el de siempre; `"voces"` o `"musica"`) y `fundido` (segundos que tarda en subir desde 0) |
+| `reproducir(sonido[, opciones])` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz. Opciones: `volumen` (0 a 1), `bucle`, `lado` (−1 izquierda, 0 en medio, 1 derecha: que suene de donde pasa), `tono` (1 normal, 2 una octava más agudo y el doble de rápido, 0,5 más grave; variarlo un poco, de 0,9 a 1,1, hace que un golpe repetido no suene siempre igual), `grupo` (`"efectos"`, el de siempre; `"voces"` o `"musica"`) y `fundido` (segundos que tarda en subir desde 0) |
 | `reproducir_en(sonido, x, y[, opciones])` · `mover_voz(voz, x, y)` | como `reproducir`, pero suena por la izquierda o por la derecha según dónde se ve el punto (x, y) del mundo, y más bajo cuanto más lejos queda de la pantalla: a `alcance` píxeles fuera (la mitad del ancho de la pantalla) ya no se oye. `mover_voz` lo vuelve a calcular, para lo que suena mientras se mueve; devuelve si sigue sonando |
 | `cambiar_voz(voz, opciones)` · `sonando(voz)` | cambia lo que ya suena (`volumen`, `lado`, `tono`, `grupo`, y `fundido`: los segundos en que cambia el volumen) y devuelve si sigue sonando · ¿sigue sonando? |
 | `detener([voz[, segundos]])` | para esa voz (con segundos, bajando poco a poco) o, sin argumento, todo |
-| `musica(ruta o sonido[, volumen o opciones])` · `musica(nulo[, opciones])` | suena en bucle y sustituye a la anterior / la para. Opciones: `volumen` (0,6) y `fundido` (los segundos en que la anterior se va bajando mientras la nueva entra subiendo; con `nulo`, lo que tarda en apagarse). Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
+| `musica(ruta o sonido[, opciones])` · `musica(nulo[, opciones])` | suena en bucle y sustituye a la anterior / la para. Opciones: `volumen` (0,6) y `fundido` (los segundos en que la anterior se va bajando mientras la nueva entra subiendo; con `nulo`, lo que tarda en apagarse). Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
 | `volumen([v])` · `volumen(grupo[, v])` | volumen general de 0 a 1 · el de un grupo (`"efectos"`, `"musica"` o `"voces"`), que se multiplica por el general: para el menú de opciones (`juego.volumen("musica", 0.5)`). Los diálogos suenan en `"voces"` |
 | `pitido(frecuencia, segundos[, volumen])` | tono sencillo, sin archivos: `pitido(440, 0.1)` |
 | `efecto(tipo[, opciones])` | genera y hace sonar un efecto al estilo de los juegos de 8 bits, sin archivos: `"moneda"`, `"salto"`, `"disparo"`, `"explosion"`, `"golpe"`, `"subir"`, `"clic"` o `"perder"`. Cada vez suena un poco distinto. Opciones: `volumen` (0,5), `tono` y `largo` (multiplican la frecuencia y la duración: `{"tono": 1.5}` más agudo) y `semilla` (siempre el mismo sonido) |
@@ -1346,16 +1360,13 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 
 | Función | Qué hace |
 |---|---|
-| `colision(x1, y1, w1, h1, x2, y2, w2, h2)` · `colision(caja1, caja2)` | ¿se solapan dos rectángulos? |
-| `colision_circulos(x1, y1, r1, x2, y2, r2)` · `colision_circulo_rect(cx, cy, r, x, y, w, h)` | ¿se tocan dos círculos? · ¿toca el círculo al rectángulo? |
-| `dentro(px, py, x, y, w, h)` | ¿está el punto dentro del rectángulo? (botones, clics) |
+| `colision(a, b)` | ¿se tocan? Cada uno es un punto `[x, y]`, una caja `[x, y, ancho, alto]` (o un diccionario con `x`, `y`, `ancho` y `alto`: un personaje, un cuerpo de la física) o un círculo `{"centro": [x, y], "radio": r}` |
 | `caja(cosa, x, y[, opciones])` | el rectángulo `[x, y, ancho, alto]` de lo que se ve de verdad al dibujar `cosa` (una imagen, una hoja o un animador) con esas mismas `x`, `y` y opciones, sin el hueco transparente de alrededor (ver abajo) |
 
-En `colision`, `colision_circulos`, `colision_circulo_rect` y `dentro`, cada rectángulo puede ir en cuatro
-números o en una lista `[x, y, ancho, alto]`, como las que da `caja()`, o en un diccionario con
-`x`, `y`, `ancho` y `alto` (lo que mueve `mover_en_mapa`, un cuerpo de la física): `juego.colision(yo,
-enemigo)`. Cada círculo va en tres números o en `[x, y, radio]`, y el punto de `dentro` en dos o en `[x, y]`:
-`juego.dentro(juego.raton(), boton)`.
+Las cajas pueden ser las que da `caja()`, o lo que mueve `juego.mapa.mover` (un diccionario con
+`x`, `y`, `ancho` y `alto`): `juego.colision(yo, enemigo)`. Un clic en un botón es un punto en una
+caja: `juego.colision(juego.raton(), boton)`; y una bala redonda, un círculo:
+`juego.colision({"centro": [bala["x"], bala["y"]], "radio": 4}, enemigo)`.
 | `cuadro(cuadros, por_segundo[, desde[, repetir]])` | el cuadro de una animación que toca ahora: de 0 a `cuadros` − 1, o el elemento que toca si `cuadros` es una lista (`[0, 1, 2, 1]`). `desde` es el `tiempo()` en que empezó; con `repetir` falso se queda en el último |
 
 **Movimiento suave.** Para que las cosas no aparezcan de golpe: un menú que entra desde un lado,
@@ -1622,7 +1633,7 @@ las dos maneras (el personaje, generado; los pájaros, con una hoja dibujada a m
 plataformas, vista cenital (mazmorras, laberintos, RPG), puzles por casillas...
 
 ```lince
-fijo NIVEL = juego.mapa([
+fijo NIVEL = juego.mapa.crear([
     "##########",
     "#P...*...#",
     "#..####..#",
@@ -1632,26 +1643,26 @@ sea yo = {"x": 40, "y": 40, "ancho": 20, "alto": 20, "vx": 0, "vy": 0}
 # en cada fotograma:
 yo["vx"] = juego.direccion("izquierda", "derecha") * 150
 yo["vy"] = juego.direccion("arriba", "abajo") * 150      # o, en un juego de plataformas, gravedad
-juego.mover_en_mapa(NIVEL, yo)                            # se mueve sin atravesar las paredes
-juego.dibujar_mapa(NIVEL, {"#": [80, 70, 100]})
+juego.mapa.mover(NIVEL, yo)                            # se mueve sin atravesar las paredes
+juego.mapa.dibujar(NIVEL, {"#": [80, 70, 100]})
 ```
 
 | Función | Qué hace |
 |---|---|
-| `mapa(filas, tamaño[, opciones])` | crea el mapa (un carácter ASCII por casilla; `tamaño` en píxeles). Opciones: `"solidos"` (los caracteres que son pared; `"#"` por defecto), `"plataformas"` (se atraviesan desde abajo y se pisan desde arriba, como en los juegos de plataformas) y `"bordes"`: fuera del mapa es pared por los `"lados"` (por defecto: se puede caer por un hoyo), por `"todos"` o por `"ninguno"`. Devuelve `{"mapa", "columnas", "filas", "tamaño", "ancho", "alto"}` |
-| `mover_en_mapa(mapa, cosa[, dt])` | mueve `cosa` (un diccionario con `x`, `y`, `ancho`, `alto`, `vx`, `vy`) según su velocidad sin atravesar paredes: al chocar se arrima y esa velocidad pasa a 0. Deja en `cosa` `"en_suelo"` y `"techo"` (lógicos) y `"pared"` (−1 izquierda, 1 derecha, 0). La gravedad, si la hay, la sumas tú a `vy` |
-| `casilla(mapa, c, f)` · `poner_casilla(mapa, c, f, carácter)` | lee o cambia una casilla (coger una gema, abrir una puerta, romper un bloque); fuera del mapa `casilla` da `""` |
-| `solido(mapa, c, f)` · `casilla_en(mapa, x, y)` | ¿es pared? · `[columna, fila]` de un punto en píxeles |
-| `buscar_en_mapa(mapa, caracteres)` | lista de `[columna, fila]` con esos caracteres: dónde empieza el jugador, dónde están las monedas o los enemigos |
-| `camino(mapa, [c1, f1], [c2, f2][, diagonales])` | el camino más corto sin atravesar paredes, como lista de `[columna, fila]` sin la de salida (`[]` si no hay). Para enemigos que persiguen |
-| `dibujar_mapa(mapa, aspecto)` | dibuja las casillas que se ven (respeta la cámara); `aspecto` da a cada carácter un color, una imagen o un tile de una hoja (ver abajo). Los caracteres que no aparecen no se dibujan |
+| `mapa.crear(filas, tamaño[, opciones])` | crea el mapa (un carácter ASCII por casilla; `tamaño` en píxeles). Opciones: `"solidos"` (los caracteres que son pared; `"#"` por defecto), `"plataformas"` (se atraviesan desde abajo y se pisan desde arriba, como en los juegos de plataformas) y `"bordes"`: fuera del mapa es pared por los `"lados"` (por defecto: se puede caer por un hoyo), por `"todos"` o por `"ninguno"`. Devuelve `{"mapa", "columnas", "filas", "tamaño", "ancho", "alto"}` |
+| `mapa.mover(mapa, cosa[, dt])` | mueve `cosa` (un diccionario con `x`, `y`, `ancho`, `alto`, `vx`, `vy`) según su velocidad sin atravesar paredes: al chocar se arrima y esa velocidad pasa a 0. Deja en `cosa` `"en_suelo"` y `"techo"` (lógicos) y `"pared"` (−1 izquierda, 1 derecha, 0). La gravedad, si la hay, la sumas tú a `vy` |
+| `mapa.casilla(mapa, c, f)` · `mapa.poner(mapa, c, f, carácter)` | lee o cambia una casilla (coger una gema, abrir una puerta, romper un bloque); fuera del mapa `mapa.casilla` da `""` |
+| `mapa.solido(mapa, c, f)` · `mapa.casilla_en(mapa, x, y)` | ¿es pared? · `[columna, fila]` de un punto en píxeles |
+| `mapa.buscar(mapa, caracteres)` | lista de `[columna, fila]` con esos caracteres: dónde empieza el jugador, dónde están las monedas o los enemigos |
+| `mapa.camino(mapa, [c1, f1], [c2, f2][, diagonales])` | el camino más corto sin atravesar paredes, como lista de `[columna, fila]` sin la de salida (`[]` si no hay). Para enemigos que persiguen |
+| `mapa.dibujar(mapa, aspecto)` | dibuja las casillas que se ven (respeta la cámara); `aspecto` da a cada carácter un color, una imagen o un tile de una hoja (ver abajo). Los caracteres que no aparecen no se dibujan |
 
 **Tiles.** Lo normal es dibujar los niveles con una hoja de tiles (un PNG con todos los tiles en
 rejilla, hecho con cualquier editor o descargado) y decir qué tile toca a cada carácter:
 
 ```lince
 fijo TILES = juego.hoja("tiles.png", 16)            # tiles de 16×16 (se ajustan al tamaño de la casilla)
-juego.dibujar_mapa(NIVEL, {
+juego.mapa.dibujar(NIVEL, {
     "#": [TILES, 0],                               # el tile 0
     ".": [TILES, 5],
     "~": [TILES, [8, 9, 10, 9]],                   # animado: agua (0,25 s cada cuadro)
@@ -1669,7 +1680,7 @@ fantasmas que te persiguen).
 editor de mapas gratuito más usado, y cargarlos tal cual:
 
 ```lince
-fijo NIVEL = juego.mapa_tiled("niveles/uno.tmx")
+fijo NIVEL = juego.mapa.tiled("niveles/uno.tmx")
 para cada diccionario cosa en NIVEL["objetos"] {          # los objetos que pusiste en Tiled
     si cosa["tipo"] == "jugador" {
         yo["x"] = cosa["x"]
@@ -1677,16 +1688,16 @@ para cada diccionario cosa en NIVEL["objetos"] {          # los objetos que pusi
     }
 }
 # en cada fotograma:
-juego.mover_en_mapa(NIVEL, yo)                            # choca con lo que es sólido
-juego.dibujar_tiled(NIVEL, ["Fondo", "Suelo"])            # lo de detrás del personaje
+juego.mapa.mover(NIVEL, yo)                            # choca con lo que es sólido
+juego.mapa.dibujar_tiled(NIVEL, ["Fondo", "Suelo"])            # lo de detrás del personaje
 juego.dibujar(personaje, yo["x"], yo["y"])
-juego.dibujar_tiled(NIVEL, "Delante")                     # lo de delante
+juego.mapa.dibujar_tiled(NIVEL, "Delante")                     # lo de delante
 ```
 
 | Función | Qué hace |
 |---|---|
-| `mapa_tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa()`, así que `mover_en_mapa`, `casilla`, `solido`, `buscar_en_mapa` y `camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`) y `"propiedades"` (las del mapa). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa()`) |
-| `dibujar_tiled(mapa[, capas])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan |
+| `mapa.tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa.crear()`, así que `mapa.mover`, `mapa.casilla`, `mapa.solido`, `mapa.buscar` y `mapa.camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`) y `"propiedades"` (las del mapa). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa.crear()`) |
+| `mapa.dibujar_tiled(mapa[, capas])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan |
 
 Qué es sólido se dice en Tiled de tres maneras: una capa que se llama **Colisiones** (o Sólidos o
 Paredes), una capa o un tile del tileset con la propiedad `solido` (lógica, verdadera), o la
@@ -1705,26 +1716,26 @@ cajas, pelotas, plataformas que se mueven y el propio personaje. Las que llevan 
 `"puntos"`) giran al chocar (ver **Física con giros**, abajo). Está escrita en Lince.
 
 ```lince
-sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
-sea yo = juego.cuerpo(mundo, {"x": 40, "y": 300, "ancho": 22, "alto": 30, "friccion": 0})
-sea caja = juego.cuerpo(mundo, {"x": 200, "y": 300, "ancho": 30, "alto": 30, "masa": 2})
-sea pelota = juego.cuerpo(mundo, {"x": 300, "y": 50, "radio": 10, "rebote": 0.8})
-juego.cuerpo(mundo, {"x": 400, "y": 200, "radio": 8, "sensor": verdadero, "gravedad": 0, "tipo": "moneda"})
+sea mundo = juego.fisica.mundo({"gravedad": 900, "mapa": NIVEL})
+sea yo = juego.fisica.cuerpo(mundo, {"x": 40, "y": 300, "ancho": 22, "alto": 30, "friccion": 0})
+sea caja = juego.fisica.cuerpo(mundo, {"x": 200, "y": 300, "ancho": 30, "alto": 30, "masa": 2})
+sea pelota = juego.fisica.cuerpo(mundo, {"x": 300, "y": 50, "radio": 10, "rebote": 0.8})
+juego.fisica.cuerpo(mundo, {"x": 400, "y": 200, "radio": 8, "sensor": verdadero, "gravedad": 0, "tipo": "moneda"})
 # en cada fotograma:
 yo["vx"] = juego.direccion("izquierda", "derecha") * 200
 si juego.accion_pulsada("saltar") y yo["en_suelo"] { yo["vy"] = -500 }
-juego.avanzar_fisica(mundo)
-para cada diccionario t en juego.tocando(mundo, yo) {
-    si t["tipo"] == "moneda" { juego.quitar_cuerpo(mundo, t) }
+juego.fisica.avanzar(mundo)
+para cada diccionario t en juego.fisica.tocando(mundo, yo) {
+    si t["tipo"] == "moneda" { juego.fisica.quitar(mundo, t) }
 }
 ```
 
 | Función | Qué hace |
 |---|---|
-| `fisica([opciones])` | un mundo: `gravedad` (900 hacia abajo, o `[x, y]`), `mapa` (un mapa de `mapa()` o `mapa_tiled()` con el que chocar), `pasos` (cuántas veces por segundo se calcula, para que nada atraviese nada: 120, o 60 si hay cuerpos que giran o uniones) e `iteraciones` (8: cuántas veces se ajustan los choques de los cuerpos que giran en cada paso; más, pilas más quietas, pero más lento) |
-| `cuerpo(mundo, datos)` | añade un cuerpo y lo devuelve: el mismo diccionario, con lo que falte puesto. `x`, `y` (la esquina), `ancho` y `alto`, o `radio` (un círculo); `vx`, `vy`; `masa` (1: el más pesado empuja más y lo empujan menos); `rebote` (0 a 1); `friccion` (0,5: cómo frena en el suelo); `gravedad` (1; 0 para que flote); `fijo` (no lo mueven ni la gravedad ni los choques: suelos, muros y, con `vx` o `vy`, plataformas y ascensores, que llevan lo que tengan encima); `sensor` (no choca, solo cuenta lo que toca: monedas, zonas). Puede llevar más datos tuyos (`"tipo": "caja"`) |
-| `avanzar_fisica(mundo[, dt])` | mueve todo lo de un fotograma: gravedad, mapa y choques. Deja en cada cuerpo `en_suelo` (apoyado en el mapa o en otro cuerpo), y `techo` y `pared` si hay mapa |
-| `tocando(mundo, cuerpo)` · `empujar(cuerpo, fx, fy[, punto])` · `quitar_cuerpo(mundo, cuerpo)` | los cuerpos que tocaba en el último `avanzar_fisica` · un golpe que cambia su velocidad según su masa (y, si gira y se da el `punto` `[x, y]` donde le dan, lo hace girar) · lo quita del mundo (y lo que lo unía a otros) |
+| `fisica.mundo([opciones])` | un mundo: `gravedad` (900 hacia abajo, o `[x, y]`), `mapa` (un mapa de `mapa.crear()` o `mapa.tiled()` con el que chocar), `pasos` (cuántas veces por segundo se calcula, para que nada atraviese nada: 120, o 60 si hay cuerpos que giran o uniones) e `iteraciones` (8: cuántas veces se ajustan los choques de los cuerpos que giran en cada paso; más, pilas más quietas, pero más lento) |
+| `fisica.cuerpo(mundo, datos)` | añade un cuerpo y lo devuelve: el mismo diccionario, con lo que falte puesto. `x`, `y` (la esquina), `ancho` y `alto`, o `radio` (un círculo); `vx`, `vy`; `masa` (1: el más pesado empuja más y lo empujan menos); `rebote` (0 a 1); `friccion` (0,5: cómo frena en el suelo); `gravedad` (1; 0 para que flote); `fijo` (no lo mueven ni la gravedad ni los choques: suelos, muros y, con `vx` o `vy`, plataformas y ascensores, que llevan lo que tengan encima); `sensor` (no choca, solo cuenta lo que toca: monedas, zonas). Puede llevar más datos tuyos (`"tipo": "caja"`) |
+| `fisica.avanzar(mundo[, dt])` | mueve todo lo de un fotograma: gravedad, mapa y choques. Deja en cada cuerpo `en_suelo` (apoyado en el mapa o en otro cuerpo), y `techo` y `pared` si hay mapa |
+| `fisica.tocando(mundo, cuerpo)` · `fisica.empujar(cuerpo, fx, fy[, punto])` · `fisica.quitar(mundo, cuerpo)` | los cuerpos que tocaba en el último `fisica.avanzar` · un golpe que cambia su velocidad según su masa (y, si gira y se da el `punto` `[x, y]` donde le dan, lo hace girar) · lo quita del mundo (y lo que lo unía a otros) |
 
 Los cuerpos son diccionarios normales: para moverlos se cambian `vx` y `vy` (o `x` e `y`), y se
 dibujan como cada uno quiera. `examples/13_fisica.lince` lo usa todo. Un círculo que no gira choca
@@ -1740,20 +1751,20 @@ mueve al girar), así que una imagen se dibuja con `juego.dibujar(imagen, c["x"]
 y los fijos que giran (`"vgiro"`) son aspas y molinos.
 
 ```lince
-sea rampa = juego.cuerpo(mundo, {"x": 0, "y": 200, "puntos": [[0, 0], [300, 100], [0, 100]], "fijo": verdadero})
-sea caja = juego.cuerpo(mundo, {"x": 200, "y": 50, "ancho": 30, "alto": 30, "gira": verdadero})
-sea rueda = juego.cuerpo(mundo, {"x": 20, "y": 150, "radio": 15, "gira": verdadero})
-juego.bisagra(mundo, puerta, nulo, [300, 100])                    # la puerta gira clavada en ese punto
-juego.cuerda(mundo, farol, [200, 0], {"largo": 80})               # cuelga del techo
+sea rampa = juego.fisica.cuerpo(mundo, {"x": 0, "y": 200, "puntos": [[0, 0], [300, 100], [0, 100]], "fijo": verdadero})
+sea caja = juego.fisica.cuerpo(mundo, {"x": 200, "y": 50, "ancho": 30, "alto": 30, "gira": verdadero})
+sea rueda = juego.fisica.cuerpo(mundo, {"x": 20, "y": 150, "radio": 15, "gira": verdadero})
+juego.fisica.bisagra(mundo, puerta, nulo, [300, 100])                    # la puerta gira clavada en ese punto
+juego.fisica.cuerda(mundo, farol, [200, 0], {"largo": 80})               # cuelga del techo
 ```
 
 | Función | Qué hace |
 |---|---|
-| `bisagra(mundo, a, b, punto)` | clava `a` y `b` por ese punto `[x, y]` del mundo y los deja girar alrededor de él: puertas, péndulos, ruedas, los eslabones de una cadena o las tablas de un puente. Con `b` nulo, `a` queda clavado al fondo. Lo unido por una bisagra no choca entre sí |
-| `cuerda(mundo, a, b[, opciones])` | `a` y `b` no se pueden alejar más que el largo de la cuerda, pero sí acercarse. `b` es un cuerpo o un punto fijo `[x, y]`. Opciones: `largo` (lo que estén separados ahora), `en_a` y `en_b` (dónde se ata: `[x, y]` desde el centro, sin girar) y `rigida` (una barra: tampoco se acercan) |
-| `quitar_union(mundo, union)` · `puntos_union(union)` | la quita (y lo que unía vuelve a chocar) · `[[x, y], [x, y]]`: por dónde dibujar la cuerda, o dónde está la bisagra |
-| `centro_cuerpo(c)` · `puntos_cuerpo(c)` | `[x, y]` de su centro · su contorno en el mundo, ya girado (para `poligono()`) |
-| `dibujar_cuerpo(c[, color[, opciones]])` | lo dibuja tal cual es, relleno y con el borde más oscuro (un círculo, con una raya para que se vea girar); opciones de `poligono` |
+| `fisica.bisagra(mundo, a, b, punto)` | clava `a` y `b` por ese punto `[x, y]` del mundo y los deja girar alrededor de él: puertas, péndulos, ruedas, los eslabones de una cadena o las tablas de un puente. Con `b` nulo, `a` queda clavado al fondo. Lo unido por una bisagra no choca entre sí |
+| `fisica.cuerda(mundo, a, b[, opciones])` | `a` y `b` no se pueden alejar más que el largo de la cuerda, pero sí acercarse. `b` es un cuerpo o un punto fijo `[x, y]`. Opciones: `largo` (lo que estén separados ahora), `en_a` y `en_b` (dónde se ata: `[x, y]` desde el centro, sin girar) y `rigida` (una barra: tampoco se acercan) |
+| `fisica.quitar_union(mundo, union)` · `fisica.puntos_union(union)` | la quita (y lo que unía vuelve a chocar) · `[[x, y], [x, y]]`: por dónde dibujar la cuerda, o dónde está la bisagra |
+| `fisica.centro(c)` · `fisica.puntos(c)` | `[x, y]` de su centro · su contorno en el mundo, ya girado (para `poligono()`) |
+| `fisica.dibujar(c[, color[, opciones]])` | lo dibuja tal cual es, relleno y con el borde más oscuro (un círculo, con una raya para que se vea girar); opciones de `poligono` |
 
 Se resuelve como Box2D Lite: en cada paso se buscan los puntos de contacto y se ajustan las
 velocidades con impulsos, empezando por los del paso anterior, para que las pilas se queden quietas.
@@ -1762,7 +1773,7 @@ ordenador normal); con muchas más, menos `iteraciones` o menos cuerpos que gira
 
 **Partículas.** Chispas, polvo, explosiones: `particulas(x, y[, opciones])` lanza un puñado y
 `dibujar_particulas()` las mueve y las dibuja (llámala en cada fotograma, después de lo que deban
-tapar; respeta la cámara y devuelve cuántas quedan). `borrar_particulas()` las quita todas.
+tapar; respeta la cámara y devuelve cuántas quedan). `quitar_particulas()` las quita todas.
 
 ```lince
 juego.particulas(x, y, {"cantidad": 30, "color": [255, 200, 50], "velocidad": [50, 200], "gravedad": 400})
@@ -1899,17 +1910,17 @@ repartir`. Está escrito en Lince.
 **Partidas guardadas.** Récords, opciones y avances que siguen ahí al volver a abrir el juego:
 
 ```lince
-sea opciones = juego.cargar("opciones", {"musica": 0.8, "idioma": "es"})
-sea partida = juego.cargar("partida")           # nulo si no hay nada guardado
-juego.guardar("partida", {"nivel": 3, "vidas": 2, "llaves": ["roja"]})
-juego.olvidar("partida")                         # empezar de cero
+sea opciones = juego.cargar_partida("opciones", {"musica": 0.8, "idioma": "es"})
+sea partida = juego.cargar_partida("partida")           # nulo si no hay nada guardado
+juego.guardar_partida("partida", {"nivel": 3, "vidas": 2, "llaves": ["roja"]})
+juego.olvidar_partida("partida")                         # empezar de cero
 ```
 
 | Función | Qué hace |
 |---|---|
-| `guardar(nombre, datos)` | guarda `datos` (números, textos, lógicos, nulo, listas y diccionarios) con ese nombre; lo de antes con el mismo nombre se cambia. Si el juego se cierra a medias, lo guardado antes sigue entero |
-| `cargar(nombre[, por_defecto])` | lo guardado con ese nombre, o `por_defecto` (`nulo` si no se da) si no hay nada. Si los dos son diccionarios, lo que falte en lo guardado se toma de `por_defecto`: así una opción nueva de una versión posterior del juego tiene valor desde el principio |
-| `olvidar(nombre)` | borra lo guardado; verdadero si había algo |
+| `guardar_partida(nombre, datos)` | guarda `datos` (números, textos, lógicos, nulo, listas y diccionarios) con ese nombre; lo de antes con el mismo nombre se cambia. Si el juego se cierra a medias, lo guardado antes sigue entero |
+| `cargar_partida(nombre[, por_defecto])` | lo guardado con ese nombre, o `por_defecto` (`nulo` si no se da) si no hay nada. Si los dos son diccionarios, lo que falte en lo guardado se toma de `por_defecto`: así una opción nueva de una versión posterior del juego tiene valor desde el principio |
+| `olvidar_partida(nombre)` | borra lo guardado; verdadero si había algo |
 | `carpeta_guardado()` | la carpeta donde se guarda |
 
 Cada nombre es un archivo JSON en una carpeta del usuario para cada juego, que se llama como el programa
@@ -2241,6 +2252,44 @@ archivo, y cuentan también los campos que se crean con `objeto.campo = ...` en 
 
 ---
 
+## De la 1.x a la 2.0 (`lince migrar`)
+
+La 2.0 será una limpieza: algunas cosas cambian de nombre o de forma, y lo duplicado se queda en
+una sola manera (lo decidido está en `PROPUESTA_2.0.md`). La 1.9 ya tiene lo nuevo, y lo viejo
+sigue funcionando pero **avisa**:
+
+- **Al ejecutar**, una vez por cada cosa: `⚠️ Obsoleto en línea 12: juego.cuerpo → juego.fisica.cuerpo`.
+  Con `LINCE_OBSOLETOS=0` no avisa.
+- **En `lince comprobar` y en el editor**, sin ejecutar.
+- Las **anotaciones de tipo** que no se cumplen al darle a una variable otro valor, en un campo
+  con tipo o en un tipo de clase avisan al ejecutar: «En la 2.0 será un ErrorTipo».
+
+```bash
+lince migrar --comprobar .        # qué cambiaría, archivo por archivo; sale con 1 si hay algo
+lince migrar .                    # lo cambia (una carpeta y sus subcarpetas, o unos archivos)
+lince migrar --mostrar juego.lince # el resultado, a la salida, sin tocar el archivo
+```
+
+`lince migrar` solo toca lo que cambia: los comentarios, los espacios y los saltos de línea se
+quedan como estaban. Lo que no puede saber solo lo marca con ✋, por ejemplo
+`juego.reproducir(s, vol)` (¿`vol` es el volumen o unas opciones?); eso lo avisa el programa al
+ejecutarse, que sí lo sabe.
+
+| Antes (1.x) | En la 2.0 |
+|---|---|
+| `juego.fisica(op)` · `juego.cuerpo` · `juego.avanzar_fisica` · `juego.quitar_cuerpo` · `juego.tocando` · `juego.empujar` · `juego.bisagra` · `juego.cuerda` · `juego.quitar_union` · `juego.puntos_union` · `juego.centro_cuerpo` · `juego.puntos_cuerpo` · `juego.dibujar_cuerpo` | `juego.fisica.mundo(op)` · `.cuerpo` · `.avanzar` · `.quitar` · `.tocando` · `.empujar` · `.bisagra` · `.cuerda` · `.quitar_union` · `.puntos_union` · `.centro` · `.puntos` · `.dibujar` |
+| `juego.mapa(filas, t)` · `juego.mapa_tiled` · `juego.casilla` · `juego.poner_casilla` · `juego.solido` · `juego.casilla_en` · `juego.buscar_en_mapa` · `juego.mover_en_mapa` · `juego.dibujar_mapa` · `juego.dibujar_tiled` · `juego.camino` | `juego.mapa.crear(filas, t)` · `.tiled` · `.casilla` · `.poner` · `.solido` · `.casilla_en` · `.buscar` · `.mover` · `.dibujar` · `.dibujar_tiled` · `.camino` |
+| `reproducir(s, 0.5, verdadero)` · `musica(ruta, 0.5)` | `reproducir(s, {"volumen": 0.5, "bucle": verdadero})` · `musica(ruta, {"volumen": 0.5})` |
+| `texto(t, x, y, 2, color)` · `texto(t, x, y, FUENTE)` | `texto(t, x, y, {"escala": 2, "color": color})` · `texto(t, x, y, {"fuente": FUENTE})` |
+| `colision(x1, y1, w1, h1, x2, y2, w2, h2)` · `colision_circulos(...)` · `colision_circulo_rect(...)` · `dentro(px, py, x, y, w, h)` | `colision(a, b)` con puntos, cajas y círculos `{"centro": [x, y], "radio": r}` |
+| `posicion_camara()` · `camara(x, y, {"giro": g})` | `camara_actual()` · `camara(x, y, {"angulo": g})` |
+| `guardar` · `cargar` · `olvidar` · `borrar_particulas` | `guardar_partida` · `cargar_partida` · `olvidar_partida` · `quitar_particulas` |
+| `funcion f(val numero x)` | `funcion f(numero x)` |
+| `texto.dividir(t, ",")` · `texto.posicion(t, x)` · `texto.extraer(t, a, b)` … | `t.dividir(",")` · `t.posicion(x)` · `t.extraer(a, b)` … |
+| `texto.a_numero(t)` · `texto.de_numero(n)` · `texto.repetir(t, n)` · `texto.es_vacio(t)` | `a_numero(t)` · `a_texto(n)` · `t * n` · `t == ""` |
+
+---
+
 ## Formatear (`lince formatear`)
 
 ```bash
@@ -2488,6 +2537,7 @@ lince/
 │   ├── paquetes.c/h    # gestor de paquetes (y lince.paquetes)
 │   ├── revisor.c/h     # avisos sin ejecutar (lince comprobar, el editor)
 │   ├── formatear.c/h   # lince formatear
+│   ├── migrar.c/h      # lince migrar (y los avisos de «obsoleto» de comprobar)
 │   ├── documentar.c/h  # la ayuda de los comentarios (lince documentar, el editor)
 │   ├── probar.c/h      # lince probar: las pruebas y su cobertura
 │   ├── zstd.c/h        # descomprimir zstd (capas de Tiled)

@@ -1,5 +1,5 @@
 # TEST: generadores
-generador contar(val numero hasta): numero {
+generador contar(numero hasta): numero {
     sea i = 0
     mientras i < hasta {
         producir i
@@ -50,7 +50,7 @@ para cada numero n en vacio() {
 escribir(r.longitud())
 
 # Generador con parámetro y filtro
-generador multiplos(val numero base, val numero hasta): numero {
+generador multiplos(numero base, numero hasta): numero {
     para cada numero n en rango(hasta) {
         si n % base == 0 {
             producir n
@@ -80,7 +80,7 @@ para cada numero n en naturales() {
     escribir("usa {n}")
     si n == 2 { romper }
 }
-funcion primero_mayor(val numero x): numero {
+funcion primero_mayor(numero x): numero {
     para cada numero n en naturales() {
         si n > x { devolver n }
     }
@@ -89,7 +89,7 @@ funcion primero_mayor(val numero x): numero {
 escribir(primero_mayor(1))
 
 # Uno dentro de otro
-generador dobles(val numero hasta): numero {
+generador dobles(numero hasta): numero {
     para cada numero p en multiplos(2, hasta) { producir p * 2 }
 }
 para cada numero d en dobles(7) { escribir(d) }
@@ -156,13 +156,13 @@ sea yo = propio()
 intentar { para cada numero x en yo { escribir(x) } } capturar (error e) { escribir(e.mensaje) }
 
 # mapear, filtrar y reducir también con generadores (y rango)
-generador cubos(val numero n): numero {
+generador cubos(numero n): numero {
     para (i = 1; i <= n; i++) { producir i * i * i }
 }
-escribir(filtrar(rango(10), funcion(val numero x): logico { devolver x % 3 == 0 }))
-escribir(mapear(cubos(3), funcion(val numero x): numero { devolver x + 1 }))
-escribir(reducir(rango(1, 11), 0, funcion(val numero a, val numero x): numero { devolver a + x }))
+escribir(filtrar(rango(10), funcion(numero x): logico { devolver x % 3 == 0 }))
+escribir(mapear(cubos(3), funcion(numero x): numero { devolver x + 1 }))
+escribir(reducir(rango(1, 11), 0, funcion(numero a, numero x): numero { devolver a + x }))
 generador sin_fin(): numero {
     mientras verdadero { producir 1 }
 }
-intentar { reducir(sin_fin(), 0, funcion(val numero a, val numero x): numero { devolver a + x }) } capturar (error e) { escribir(e.mensaje) }
+intentar { reducir(sin_fin(), 0, funcion(numero a, numero x): numero { devolver a + x }) } capturar (error e) { escribir(e.mensaje) }

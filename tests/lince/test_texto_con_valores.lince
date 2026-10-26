@@ -11,7 +11,7 @@ escribir("{vidas}")
 escribir("sin nada dentro")
 
 # Cualquier expresión: llamadas, índices, métodos, diccionarios
-funcion doble(val numero n): numero { devolver n * 2 }
+funcion doble(numero n): numero { devolver n * 2 }
 sea l = [10, 20, 30]
 sea d = {"x": 5}
 escribir("doble: {doble(vidas)}, último: {l[-1]}, x: {d["x"]}, largo: {nombre.longitud()}")
@@ -49,7 +49,7 @@ intentar { escribir("{no_existe}") } capturar (error e) { escribir("error: " + e
 # Errores de sintaxis con un mensaje que explica lo de las llaves
 fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
 fijo TMP = "test_texto_tmp.lince"
-funcion comprobar(val texto codigo): nulo {
+funcion comprobar(texto codigo): nulo {
     archivos.escribir(TMP, codigo)
     sea salida = sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1")
     escribir(salida.contiene("para escribir una llave tal cual") o salida.contiene("Para escribir una llave tal cual"))

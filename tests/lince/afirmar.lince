@@ -6,12 +6,12 @@ sea _tests_ok       = 0
 sea _tests_fallidos = 0
 sea _suite_actual   = ""
 
-funcion suite(val texto nombre): nulo {
+funcion suite(texto nombre): nulo {
     _suite_actual = nombre
     escribir("  ▶ " + nombre)
 }
 
-funcion afirmar(val texto descripcion, val logico condicion): nulo {
+funcion afirmar(texto descripcion, logico condicion): nulo {
     _tests_total = _tests_total + 1
     si condicion {
         _tests_ok = _tests_ok + 1
@@ -22,19 +22,19 @@ funcion afirmar(val texto descripcion, val logico condicion): nulo {
     }
 }
 
-funcion afirmar_igual(val texto descripcion, val numero a, val numero b): nulo {
+funcion afirmar_igual(texto descripcion, numero a, numero b): nulo {
     afirmar(descripcion + " (" + a + " == " + b + ")", a == b)
 }
 
-funcion afirmar_texto(val texto descripcion, val texto a, val texto b): nulo {
+funcion afirmar_texto(texto descripcion, texto a, texto b): nulo {
     afirmar(descripcion + " (\"" + a + "\" == \"" + b + "\")", a == b)
 }
 
-funcion afirmar_logico(val texto descripcion, val logico a, val logico b): nulo {
+funcion afirmar_logico(texto descripcion, logico a, logico b): nulo {
     afirmar(descripcion, a == b)
 }
 
-funcion afirmar_error(val texto descripcion, val logico se_lanzo): nulo {
+funcion afirmar_error(texto descripcion, logico se_lanzo): nulo {
     afirmar(descripcion, se_lanzo)
 }
 

@@ -14,8 +14,8 @@ juego.particulas(380, 80, {"cantidad": 40, "color": [120, 200, 255], "velocidad"
 mientras juego.abierto() {
     juego.limpiar([15, 15, 25])
     juego.dibujar_particulas()
-    juego.texto("CHISPAS", 70, 240, 2)
-    juego.texto("POLVO", 215, 240, 2)
-    juego.texto("AGUA", 350, 240, 2)
+    juego.texto("CHISPAS", 70, 240, {"escala": 2})
+    juego.texto("POLVO", 215, 240, {"escala": 2})
+    juego.texto("AGUA", 350, 240, {"escala": 2})
     juego.presentar()
 }

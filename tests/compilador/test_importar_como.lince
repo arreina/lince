@@ -31,7 +31,7 @@ escribir(uno.nombre_modo(uno.Modo.Resta))
 
 # Los nombres propios no chocan con los de la librería
 fijo FACTOR = 99
-funcion escala(val numero x): numero {
+funcion escala(numero x): numero {
     devolver x + FACTOR
 }
 escribir(escala(1))

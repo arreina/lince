@@ -1,4 +1,4 @@
-funcion suma(val numero a, val numero b): numero {
+funcion suma(numero a, numero b): numero {
     sea r = a + b
     devolver r
 }

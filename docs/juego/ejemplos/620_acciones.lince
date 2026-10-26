@@ -23,6 +23,6 @@ mientras juego.abierto() {
     juego.limpiar([30, 35, 50])
     juego.rectangulo(0, suelo + 30, 480, 40, [80, 140, 80])
     juego.rectangulo(x, yy, 30, 30, [230, 140, 60])
-    juego.texto("SALTAR: {juego.acciones()["saltar"]}", 20, 20, 2)
+    juego.texto("SALTAR: {juego.acciones()["saltar"]}", 20, 20, {"escala": 2})
     juego.presentar()
 }

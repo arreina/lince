@@ -1,6 +1,6 @@
 # TEST: clases y herencia
 clase Figura {
-    funcion crear(val texto nombre): nulo {
+    funcion crear(texto nombre): nulo {
         mi.nombre = nombre
     }
     funcion describir(): texto {
@@ -9,7 +9,7 @@ clase Figura {
 }
 
 clase Rectangulo extiende Figura {
-    funcion crear(val numero ancho, val numero alto): nulo {
+    funcion crear(numero ancho, numero alto): nulo {
         padre("Rectangulo")
         mi.ancho = ancho
         mi.alto  = alto
@@ -23,7 +23,7 @@ clase Rectangulo extiende Figura {
 }
 
 clase Cuadrado extiende Rectangulo {
-    funcion crear(val numero lado): nulo {
+    funcion crear(numero lado): nulo {
         padre(lado, lado)
     }
 }

@@ -4,6 +4,6 @@
 # encuentra si 'importar "./x"' se resuelve junto al fichero que importa.
 fijo ORIGEN = "tests/lince"
 
-funcion doble(val numero x): numero {
+funcion doble(numero x): numero {
     devolver x * 2
 }

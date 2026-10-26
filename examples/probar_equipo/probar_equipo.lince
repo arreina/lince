@@ -50,38 +50,38 @@ sea aviso = ""             # lo último que se ha hecho en la página de sonido
 sea aviso_t = 0
 
 # ── Utilidades ───────────────────────────────────────────────────────
-funcion escribe(val texto t, val numero x, val numero y, val cualquiera color = nulo): nulo {
+funcion escribe(texto t, numero x, numero y, cualquiera color = nulo): nulo {
     juego.texto(t, x, y, {"fuente": LETRA, "color": si color == nulo { BLANCO } sino { color }})
 }
 
-funcion caja(val numero x, val numero y, val numero ancho, val numero alto, val cualquiera borde = nulo): nulo {
+funcion caja(numero x, numero y, numero ancho, numero alto, cualquiera borde = nulo): nulo {
     juego.rectangulo(x, y, ancho, alto, CAJA)
     juego.contorno(x, y, ancho, alto, si borde == nulo { [60, 66, 96] } sino { borde })
 }
 
 # ¿se ha pinchado o tocado este rectángulo en este fotograma?
-funcion tocado(val numero x, val numero y, val numero ancho, val numero alto): logico {
-    si juego.clic(1) y juego.dentro(juego.raton(), [x, y, ancho, alto]) { devolver verdadero }
+funcion tocado(numero x, numero y, numero ancho, numero alto): logico {
+    si juego.clic(1) y juego.colision(juego.raton(), [x, y, ancho, alto]) { devolver verdadero }
     para cada diccionario t en juego.toques() {
-        si t["nuevo"] y juego.dentro(t["x"], t["y"], x, y, ancho, alto) { devolver verdadero }
+        si t["nuevo"] y juego.colision([t["x"], t["y"]], [x, y, ancho, alto]) { devolver verdadero }
     }
     devolver falso
 }
 
-funcion boton(val texto t, val numero x, val numero y, val numero ancho): logico {
-    sea encima = juego.dentro(juego.raton(), [x, y, ancho, 22])
+funcion boton(texto t, numero x, numero y, numero ancho): logico {
+    sea encima = juego.colision(juego.raton(), [x, y, ancho, 22])
     caja(x, y, ancho, 22, si encima { AMARILLO } sino { nulo })
     juego.texto(t, x + ancho / 2, y + 7, {"fuente": LETRA, "alinear": "centro", "color": si encima { AMARILLO } sino { BLANCO }})
     devolver tocado(x, y, ancho, 22)
 }
 
-funcion apuntar(val texto t): nulo {
+funcion apuntar(texto t): nulo {
     registro.insertar(0, t)
     si registro.longitud() > 14 { registro.eliminar(14) }
 }
 
 # ── Lo que vale en todas las páginas ─────────────────────────────────
-funcion comun(val numero dt): nulo {
+funcion comun(numero dt): nulo {
     sea e = juego.entrada_pulsada()
     si e != nulo { apuntar(e) }
     escrito = juego.editar(escrito, 34)                # lo tecleado, con «borrar» aplicado
@@ -173,7 +173,7 @@ funcion pagina_teclado(): nulo {
     }
     escribe("Mueve el ratón por aquí:", 404, 170, GRIS)
     juego.rectangulo(404, 184, 220, 148, [24, 26, 40])
-    si juego.dentro(r, [404, 184, 220, 148]) {
+    si juego.colision(r, [404, 184, 220, 148]) {
         juego.linea(404, r[1], 624, r[1], [90, 100, 150])
         juego.linea(r[0], 184, r[0], 332, [90, 100, 150])
         juego.circulo(r[0], r[1], 4, AMARILLO)
@@ -181,18 +181,18 @@ funcion pagina_teclado(): nulo {
 }
 
 # ── 2. Mandos ────────────────────────────────────────────────────────
-funcion boton_mando(val texto nombre, val numero m, val numero x, val numero y, val numero radio, val lista color, val texto letra): nulo {
+funcion boton_mando(texto nombre, numero m, numero x, numero y, numero radio, lista color, texto letra): nulo {
     sea abajo = juego.boton(nombre, m)
     juego.circulo(x, y, radio, si abajo { color } sino { [44, 48, 72] })
     juego.texto(letra, x, y - 3, {"fuente": LETRA, "alinear": "centro", "color": si abajo { [20, 20, 30] } sino { GRIS }})
 }
 
-funcion palanca(val numero x, val numero y, val numero ex, val numero ey, val logico pulsada): nulo {
+funcion palanca(numero x, numero y, numero ex, numero ey, logico pulsada): nulo {
     juego.circulo(x, y, 20, si pulsada { [70, 160, 90] } sino { [44, 48, 72] })
     juego.circulo(x + ex * 15, y + ey * 15, 7, AMARILLO)
 }
 
-funcion dibujar_mando(val numero m, val numero ox, val numero oy): nulo {
+funcion dibujar_mando(numero m, numero ox, numero oy): nulo {
     caja(ox, oy, 304, 146)
     escribe("Mando {m}", ox + 8, oy + 8, AMARILLO)
     # gatillos y botones de arriba
@@ -261,7 +261,7 @@ fijo OPCIONES_SONIDO = [
     "Volumen general: menos"
 ]
 
-funcion hacer_sonido(val numero i): nulo {
+funcion hacer_sonido(numero i): nulo {
     elegir i {
         caso 0 {
             juego.reproducir(WAV)
@@ -273,7 +273,7 @@ funcion hacer_sonido(val numero i): nulo {
         }
         caso 2 {
             musica_sonando = no musica_sonando
-            juego.musica(si musica_sonando { MUSICA } sino { nulo }, 0.6)
+            juego.musica(si musica_sonando { MUSICA } sino { nulo }, {"volumen": 0.6})
             aviso = si musica_sonando { "Música: tiene que sonar sin cortes (25 s, en bucle)" } sino { "Música parada" }
         }
         caso 3 {
@@ -308,7 +308,7 @@ funcion hacer_sonido(val numero i): nulo {
     aviso_t = 4
 }
 
-funcion pagina_sonido(val numero dt): nulo {
+funcion pagina_sonido(numero dt): nulo {
     escribe("Elige con las flechas o la cruceta y pulsa entrar o A,", 8, 40, GRIS)
     escribe("o pincha o toca una línea.", 8, 54, GRIS)
     sea n = OPCIONES_SONIDO.longitud()
@@ -332,7 +332,7 @@ funcion pagina_sonido(val numero dt): nulo {
     escribe("Qué tiene que pasar", 424, 80, AMARILLO)
     aviso_t = matematica.maximo(0, aviso_t - dt)
     si aviso_t > 0 {
-        sea palabras = texto.dividir(aviso, " ")
+        sea palabras = aviso.dividir(" ")
         sea linea = ""
         sea y = 100
         para cada texto p en palabras {

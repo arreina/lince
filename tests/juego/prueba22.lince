@@ -15,12 +15,12 @@ mientras juego.abierto() {
             sea acc = juego.acciones()
             escribir("saltar: {acc["saltar"]}")
             escribir("disparar: {acc["disparar"]}")
-            escribir("guardado: {juego.cargar("lince_controles")}")
+            escribir("guardado: {juego.cargar_partida("lince_controles")}")
             # como al abrir el juego otra vez: definir_accion pone lo del jugador
             juego.definir_accion("saltar", ["espacio", "mando:a"])
             escribir("al definirla otra vez: {juego.acciones()["saltar"]}")
             juego.restablecer_controles()
-            escribir("restablecidos: {juego.acciones()["saltar"]} {juego.acciones()["disparar"]} {juego.cargar("lince_controles")}")
+            escribir("restablecidos: {juego.acciones()["saltar"]} {juego.acciones()["disparar"]} {juego.cargar_partida("lince_controles")}")
         }
     } sino {
         # un botón del mando (de mentira) también se lee

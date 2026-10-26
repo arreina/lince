@@ -4,17 +4,17 @@
 clase Vector {
     privado sea _x = 0
     obtener x(): numero { devolver mi._x }
-    fijar x(val numero v): nulo {
+    fijar x(numero v): nulo {
         si v < 0 { lanzar Error("x no puede ser negativa") }
         mi._x = v
     }
-    funcion sumar(val Vector b): Vector {
+    funcion sumar(Vector b): Vector {
         sea r = Vector()
         r.x = mi.x + b.x
         devolver r
     }
-    funcion menor(val Vector b): logico { devolver mi.x < b.x }
-    funcion igual(val Vector b): logico { devolver mi.x == b.x }
+    funcion menor(Vector b): logico { devolver mi.x < b.x }
+    funcion igual(Vector b): logico { devolver mi.x == b.x }
     funcion a_texto(): texto { devolver "Vector(" + mi.x + ")" }
 }
 

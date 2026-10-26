@@ -6,31 +6,31 @@
 importar "juego"
 
 juego.abrir("Uniones", 480, 270)
-sea mundo = juego.fisica({"gravedad": 900})
-juego.cuerpo(mundo, {"x": 0, "y": 250, "ancho": 480, "alto": 20, "fijo": verdadero})
+sea mundo = juego.fisica.mundo({"gravedad": 900})
+juego.fisica.cuerpo(mundo, {"x": 0, "y": 250, "ancho": 480, "alto": 20, "fijo": verdadero})
 # un puente de tablas, clavado por los dos lados
 sea anterior = nulo
 para (i = 0; i < 8; i++) {
-    sea tabla = juego.cuerpo(mundo, {"x": 40 + i * 30, "y": 120, "ancho": 30, "alto": 8, "gira": verdadero})
-    juego.bisagra(mundo, tabla, anterior, [40 + i * 30, 124])
+    sea tabla = juego.fisica.cuerpo(mundo, {"x": 40 + i * 30, "y": 120, "ancho": 30, "alto": 8, "gira": verdadero})
+    juego.fisica.bisagra(mundo, tabla, anterior, [40 + i * 30, 124])
     anterior = tabla
 }
-juego.bisagra(mundo, anterior, nulo, [280, 124])
-juego.cuerpo(mundo, {"x": 140, "y": 40, "ancho": 26, "alto": 26, "gira": verdadero, "masa": 2})
+juego.fisica.bisagra(mundo, anterior, nulo, [280, 124])
+juego.fisica.cuerpo(mundo, {"x": 140, "y": 40, "ancho": 26, "alto": 26, "gira": verdadero, "masa": 2})
 # una bola colgada de una cuerda, que empieza de lado
-sea bola = juego.cuerpo(mundo, {"x": 300, "y": 40, "radio": 14, "gira": verdadero})
-sea cuerda = juego.cuerda(mundo, bola, [400, 30])
+sea bola = juego.fisica.cuerpo(mundo, {"x": 300, "y": 40, "radio": 14, "gira": verdadero})
+sea cuerda = juego.fisica.cuerda(mundo, bola, [400, 30])
 mientras juego.abierto() {
-    juego.avanzar_fisica(mundo)
+    juego.fisica.avanzar(mundo)
     juego.limpiar([25, 30, 45])
-    sea p = juego.puntos_union(cuerda)
+    sea p = juego.fisica.puntos_union(cuerda)
     juego.linea(p[0][0], p[0][1], p[1][0], p[1][1], [230, 230, 200])
     para cada diccionario c en mundo["cuerpos"] {
-        juego.dibujar_cuerpo(c, si c["fijo"] { [70, 80, 110] } sino si c.contiene("radio") { [240, 120, 90] } sino { [200, 150, 80] })
+        juego.fisica.dibujar(c, si c["fijo"] { [70, 80, 110] } sino si c.contiene("radio") { [240, 120, 90] } sino { [200, 150, 80] })
     }
     para cada diccionario u en mundo["uniones"] {
         si u["union"] == "bisagra" {
-            sea b = juego.puntos_union(u)[0]
+            sea b = juego.fisica.puntos_union(u)[0]
             juego.circulo(b[0], b[1], 2, [255, 255, 255])
         }
     }

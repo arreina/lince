@@ -8,7 +8,7 @@ importar "juego"
 juego.abrir("Mapa", 480, 270)
 juego.definir_accion("izquierda", ["izquierda", "a", "mando:izq_x-"])
 juego.definir_accion("derecha", ["derecha", "d", "mando:izq_x+"])
-fijo NIVEL = juego.mapa([
+fijo NIVEL = juego.mapa.crear([
     "###############",
     "#.............#",
     "#.............#",
@@ -22,10 +22,10 @@ sea yo = {"x": 40, "y": 100, "ancho": 20, "alto": 28, "vx": 0, "vy": 0}
 mientras juego.abierto() {
     yo["vx"] = juego.direccion("izquierda", "derecha") * 160
     yo["vy"] = yo["vy"] + 1000 * juego.dt()
-    juego.mover_en_mapa(NIVEL, yo)
+    juego.mapa.mover(NIVEL, yo)
     juego.limpiar([30, 30, 50])
-    juego.dibujar_mapa(NIVEL, {"#": [90, 80, 120], "=": [180, 140, 80]})
+    juego.mapa.dibujar(NIVEL, {"#": [90, 80, 120], "=": [180, 140, 80]})
     juego.rectangulo(yo["x"], yo["y"], yo["ancho"], yo["alto"], [240, 150, 60])
-    juego.texto("EN SUELO: {yo["en_suelo"]}  PARED: {yo["pared"]}", 40, 8, 1)
+    juego.texto("EN SUELO: {yo["en_suelo"]}  PARED: {yo["pared"]}", 40, 8, {"escala": 1})
     juego.presentar()
 }

@@ -137,7 +137,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.8</span>
+  <span class="version">v1.9</span>
   <div class="crece"></div>
   <a class="pag aqui" href="manual.html">Lenguaje</a>
   <a class="pag" href="juego.html">Módulo juego</a>
@@ -179,9 +179,9 @@
 
 <span class="k">para</span> <span class="k">cada</span> <span class="t">numero</span> n <span class="k">en</span> rango(<span class="n">1</span>, <span class="n">10</span>, <span class="n">3</span>) { <span class="k">escribir</span>(n) }
 
-<span class="k">sea</span> dobles = mapear([<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>], <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> x * <span class="n">2</span> })
-<span class="k">sea</span> pares = filtrar(rango(<span class="n">10</span>), <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> x): <span class="t">logico</span> { <span class="k">devolver</span> x % <span class="n">2</span> == <span class="n">0</span> })
-<span class="k">sea</span> suma = reducir([<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>], <span class="n">0</span>, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> a, <span class="k">val</span> <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> a + x })
+<span class="k">sea</span> dobles = mapear([<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>], <span class="k">funcion</span>(<span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> x * <span class="n">2</span> })
+<span class="k">sea</span> pares = filtrar(rango(<span class="n">10</span>), <span class="k">funcion</span>(<span class="t">numero</span> x): <span class="t">logico</span> { <span class="k">devolver</span> x % <span class="n">2</span> == <span class="n">0</span> })
+<span class="k">sea</span> suma = reducir([<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>], <span class="n">0</span>, <span class="k">funcion</span>(<span class="t">numero</span> a, <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> a + x })
 <span class="k">escribir</span>(<span class="s">&quot;{dobles} {pares} {suma}&quot;</span>)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>7
 42!
 falso verdadero
@@ -243,7 +243,7 @@ contador = <span class="n">2</span>
 fuera</pre></div><span class="fuente">040_tapar.lince</span></article><article class="ej" id="primeros-pasos-7"><h3>Dónde se declaran los tipos</h3><p class="nota">En parámetros y retorno de función son obligatorios. En <code>sea</code> son opcionales y sólo para <code>lista</code> y <code>diccionario</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> <span class="t">lista</span> notas = [<span class="n">9</span>, <span class="n">7</span>, <span class="n">10</span>]
 <span class="k">sea</span> <span class="t">diccionario</span> ficha = {<span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ana&quot;</span>}
 
-<span class="k">funcion</span> presentar(<span class="k">val</span> <span class="t">texto</span> quien, <span class="k">val</span> <span class="t">numero</span> anios): <span class="t">texto</span> {
+<span class="k">funcion</span> presentar(<span class="t">texto</span> quien, <span class="t">numero</span> anios): <span class="t">texto</span> {
     <span class="k">devolver</span> quien + <span class="s">&quot; tiene &quot;</span> + anios + <span class="s">&quot; años&quot;</span>
 }
 
@@ -282,7 +282,7 @@ entre 6 y 9</pre></div><span class="fuente">110_condicionales.lince</span></arti
 <span class="k">sea</span> lado = <span class="k">si</span> velocidad &lt; <span class="n">0</span> { <span class="s">&quot;izquierda&quot;</span> } <span class="k">sino</span> { <span class="s">&quot;derecha&quot;</span> }
 <span class="k">escribir</span>(lado)
 
-<span class="k">funcion</span> nota(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">texto</span> {
+<span class="k">funcion</span> nota(<span class="t">numero</span> n): <span class="t">texto</span> {
     <span class="k">devolver</span> <span class="k">si</span> n &gt;= <span class="n">9</span> { <span class="s">&quot;sobresaliente&quot;</span> } <span class="k">sino</span> <span class="k">si</span> n &gt;= <span class="n">5</span> { <span class="s">&quot;aprobado&quot;</span> } <span class="k">sino</span> { <span class="s">&quot;suspenso&quot;</span> }
 }
 <span class="k">escribir</span>(nota(<span class="n">7</span>))
@@ -342,7 +342,7 @@ vivo con 8
     <span class="k">caso</span> <span class="s">&quot;lince&quot;</span> { <span class="k">escribir</span>(<span class="s">&quot;es un felino ibérico&quot;</span>) }
     <span class="k">otro</span> { <span class="k">escribir</span>(<span class="s">&quot;no sé qué hace&quot;</span>) }
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>es un felino ibérico</pre></div><span class="fuente">130_elegir.lince</span></article></section>
-<section id="funciones"><h2>Funciones</h2><article class="ej" id="funciones-0"><h3>Declarar y llamar</h3><p class="nota">Cada parámetro lleva su tipo y su nombre (delante puede ir <code>val</code>, que es lo normal, o <code>ref</code>: ver «val y ref»).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> area(<span class="k">val</span> <span class="t">numero</span> base, <span class="k">val</span> <span class="t">numero</span> altura): <span class="t">numero</span> {
+<section id="funciones"><h2>Funciones</h2><article class="ej" id="funciones-0"><h3>Declarar y llamar</h3><p class="nota">Cada parámetro lleva su tipo y su nombre (delante puede ir <code>val</code>, que es lo normal, o <code>ref</code>: ver «val y ref»).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> area(<span class="t">numero</span> base, <span class="t">numero</span> altura): <span class="t">numero</span> {
     <span class="k">devolver</span> base * altura / <span class="n">2</span>
 }
 
@@ -361,36 +361,36 @@ intercambiar(x, <span class="k">y</span>)
 <span class="k">sea</span> marcas = []
 apuntar(marcas, <span class="n">12.5</span>)
 <span class="k">escribir</span>(marcas)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>x = 2, y = 1
-[12.5]</pre></div><span class="fuente">215_val_y_ref.lince</span></article><article class="ej" id="funciones-2"><h3>Valores por defecto</h3><p class="nota">Los parámetros con valor por defecto van al final.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> saludo(<span class="k">val</span> <span class="t">texto</span> nombre, <span class="k">val</span> <span class="t">texto</span> trato = <span class="s">&quot;Hola&quot;</span>): <span class="t">texto</span> {
+[12.5]</pre></div><span class="fuente">215_val_y_ref.lince</span></article><article class="ej" id="funciones-2"><h3>Valores por defecto</h3><p class="nota">Los parámetros con valor por defecto van al final.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> saludo(<span class="t">texto</span> nombre, <span class="t">texto</span> trato = <span class="s">&quot;Hola&quot;</span>): <span class="t">texto</span> {
     <span class="k">devolver</span> trato + <span class="s">&quot;, &quot;</span> + nombre
 }
 
 <span class="k">escribir</span>(saludo(<span class="s">&quot;Ana&quot;</span>))
 <span class="k">escribir</span>(saludo(<span class="s">&quot;Ana&quot;</span>, <span class="s">&quot;Buenas&quot;</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>Hola, Ana
-Buenas, Ana</pre></div><span class="fuente">220_defecto.lince</span></article><article class="ej" id="funciones-3"><h3>Lambdas y funciones como argumento</h3><p class="nota">Una función sin nombre es un valor como cualquier otro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> doble = <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> x * <span class="n">2</span> }
+Buenas, Ana</pre></div><span class="fuente">220_defecto.lince</span></article><article class="ej" id="funciones-3"><h3>Lambdas y funciones como argumento</h3><p class="nota">Una función sin nombre es un valor como cualquier otro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> doble = <span class="k">funcion</span>(<span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> x * <span class="n">2</span> }
 <span class="k">escribir</span>(doble(<span class="n">21</span>))
 
 <span class="k">sea</span> nums = [<span class="n">1</span>, <span class="n">2</span>, <span class="n">3</span>, <span class="n">4</span>]
 <span class="k">escribir</span>(mapear(nums, doble))
-<span class="k">escribir</span>(filtrar(nums, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> x): <span class="t">logico</span> { <span class="k">devolver</span> x % <span class="n">2</span> == <span class="n">0</span> }))
-<span class="k">escribir</span>(reducir(nums, <span class="n">0</span>, <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> a, <span class="k">val</span> <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> a + x }))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>42
+<span class="k">escribir</span>(filtrar(nums, <span class="k">funcion</span>(<span class="t">numero</span> x): <span class="t">logico</span> { <span class="k">devolver</span> x % <span class="n">2</span> == <span class="n">0</span> }))
+<span class="k">escribir</span>(reducir(nums, <span class="n">0</span>, <span class="k">funcion</span>(<span class="t">numero</span> a, <span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> a + x }))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>42
 [2, 4, 6, 8]
 [2, 4]
 10</pre></div><span class="fuente">230_lambdas.lince</span></article><article class="ej" id="funciones-4"><h3>Llamar a cualquier cosa que dé una función</h3><p class="nota">Una función es un valor más: se guarda en una lista, en un diccionario o en un campo, y se llama directamente desde ahí. También se puede llamar a lo que devuelve otra llamada. El <code>(</code> va en la misma línea que lo que se llama.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> golpes = [
-    <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> f): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;puñetazo de &quot;</span> + f },
-    <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> f): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;patada de &quot;</span> + f }
+    <span class="k">funcion</span>(<span class="t">numero</span> f): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;puñetazo de &quot;</span> + f },
+    <span class="k">funcion</span>(<span class="t">numero</span> f): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;patada de &quot;</span> + f }
 ]
 <span class="k">escribir</span>(golpes[<span class="n">1</span>](<span class="n">8</span>))
 
 <span class="k">sea</span> acciones = {<span class="s">&quot;saltar&quot;</span>: <span class="k">funcion</span>(): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;¡hop!&quot;</span> }}
 <span class="k">escribir</span>(acciones[<span class="s">&quot;saltar&quot;</span>]())
 
-<span class="k">funcion</span> sumador(<span class="k">val</span> <span class="t">numero</span> a): <span class="k">funcion</span> {
-    <span class="k">devolver</span> <span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> b): <span class="t">numero</span> { <span class="k">devolver</span> a + b }
+<span class="k">funcion</span> sumador(<span class="t">numero</span> a): <span class="k">funcion</span> {
+    <span class="k">devolver</span> <span class="k">funcion</span>(<span class="t">numero</span> b): <span class="t">numero</span> { <span class="k">devolver</span> a + b }
 }
 <span class="k">escribir</span>(sumador(<span class="n">2</span>)(<span class="n">3</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>patada de 8
 ¡hop!
-5</pre></div><span class="fuente">235_llamar_lo_que_sea.lince</span></article><article class="ej" id="funciones-5"><h3>Closures</h3><p class="nota">Una función recuerda el ámbito donde se creó, así que puede llevar estado.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> contador_desde(<span class="k">val</span> <span class="t">numero</span> inicio): <span class="k">funcion</span> {
+5</pre></div><span class="fuente">235_llamar_lo_que_sea.lince</span></article><article class="ej" id="funciones-5"><h3>Closures</h3><p class="nota">Una función recuerda el ámbito donde se creó, así que puede llevar estado.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> contador_desde(<span class="t">numero</span> inicio): <span class="k">funcion</span> {
     <span class="k">sea</span> n = inicio
     <span class="k">devolver</span> <span class="k">funcion</span>(): <span class="t">numero</span> {
         n = n + <span class="n">1</span>
@@ -422,7 +422,7 @@ verdadero</pre></div><span class="fuente">310_listas.lince</span></article><arti
 [3, 1, 2]</pre></div><span class="fuente">320_listas_nuevas.lince</span></article><article class="ej" id="listas-2"><h3>Ordenar con tu propio criterio</h3><p class="nota">La función comparadora devuelve negativo, cero o positivo. La ordenación es estable.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">sea</span> nums = [<span class="n">3</span>, <span class="n">1</span>, <span class="n">4</span>, <span class="n">1</span>, <span class="n">5</span>]
 
 <span class="k">escribir</span>(nums.ordenar())
-<span class="k">escribir</span>(nums.ordenar(<span class="k">funcion</span>(<span class="k">val</span> <span class="t">numero</span> a, <span class="k">val</span> <span class="t">numero</span> b): <span class="t">numero</span> {
+<span class="k">escribir</span>(nums.ordenar(<span class="k">funcion</span>(<span class="t">numero</span> a, <span class="t">numero</span> b): <span class="t">numero</span> {
     <span class="k">devolver</span> b - a
 }))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[1, 1, 3, 4, 5]
 [5, 4, 3, 1, 1]</pre></div><span class="fuente">330_ordenar_con.lince</span></article></section>
@@ -466,8 +466,8 @@ falso</pre></div><span class="fuente">415_claves_numero.lince</span></article></
 <span class="k">sea</span> frase = <span class="s">&quot;año de la cigüeña&quot;</span>
 <span class="k">escribir</span>(frase.longitud())
 <span class="k">escribir</span>(frase.mayusculas())
-<span class="k">escribir</span>(<span class="t">texto</span>.dividir(<span class="s">&quot;a,b,c&quot;</span>, <span class="s">&quot;,&quot;</span>))
-<span class="k">escribir</span>(<span class="t">texto</span>.repetir(<span class="s">&quot;ab&quot;</span>, <span class="n">3</span>))
+<span class="k">escribir</span>(<span class="s">&quot;a,b,c&quot;</span>.dividir(<span class="s">&quot;,&quot;</span>))
+<span class="k">escribir</span>((<span class="s">&quot;ab&quot;</span> * <span class="n">3</span>))
 
 <span class="c"># Sobre un texto escrito tal cual, sin guardarlo en una variable</span>
 <span class="k">escribir</span>(<span class="s">&quot;hola&quot;</span>.mayusculas())
@@ -502,7 +502,7 @@ y 300 puntos, 3 letras
 lista: [1, 2, 3]
 {&quot;vidas&quot;: 3}</pre></div><span class="fuente">515_texto_con_valores.lince</span></article></section>
 <section id="clases"><h2>Clases</h2><article class="ej" id="clases-0"><h3>Clase, constructor y métodos</h3><p class="nota"><code>mi</code> es la instancia actual. El constructor se llama <code>crear</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Rectangulo {
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> ancho, <span class="k">val</span> <span class="t">numero</span> alto): <span class="k">nulo</span> {
+    <span class="k">funcion</span> crear(<span class="t">numero</span> ancho, <span class="t">numero</span> alto): <span class="k">nulo</span> {
         <span class="k">mi</span>.ancho = ancho
         <span class="k">mi</span>.alto = alto
     }
@@ -513,12 +513,12 @@ lista: [1, 2, 3]
 
 <span class="k">sea</span> r = Rectangulo(<span class="n">4</span>, <span class="n">3</span>)
 <span class="k">escribir</span>(r.area())</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>12</pre></div><span class="fuente">610_clases.lince</span></article><article class="ej" id="clases-1"><h3>Herencia</h3><p class="nota"><code>extiende</code> hereda; <code>padre(...)</code> llama al constructor de arriba.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Figura {
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">texto</span> nombre): <span class="k">nulo</span> { <span class="k">mi</span>.nombre = nombre }
+    <span class="k">funcion</span> crear(<span class="t">texto</span> nombre): <span class="k">nulo</span> { <span class="k">mi</span>.nombre = nombre }
     <span class="k">funcion</span> describir(): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;soy un &quot;</span> + <span class="k">mi</span>.nombre }
 }
 
 <span class="k">clase</span> Cuadrado <span class="k">extiende</span> Figura {
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> lado): <span class="k">nulo</span> {
+    <span class="k">funcion</span> crear(<span class="t">numero</span> lado): <span class="k">nulo</span> {
         <span class="k">padre</span>(<span class="s">&quot;cuadrado&quot;</span>)
         <span class="k">mi</span>.lado = lado
     }
@@ -534,7 +534,7 @@ lista: [1, 2, 3]
 }
 
 <span class="k">clase</span> Rectangulo <span class="k">implementa</span> Forma {
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> ancho, <span class="k">val</span> <span class="t">numero</span> alto): <span class="k">nulo</span> {
+    <span class="k">funcion</span> crear(<span class="t">numero</span> ancho, <span class="t">numero</span> alto): <span class="k">nulo</span> {
         <span class="k">mi</span>.ancho = ancho
         <span class="k">mi</span>.alto = alto
     }
@@ -547,7 +547,7 @@ lista: [1, 2, 3]
 }
 
 <span class="k">clase</span> Cuadrado <span class="k">implementa</span> Forma {
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> lado): <span class="k">nulo</span> {
+    <span class="k">funcion</span> crear(<span class="t">numero</span> lado): <span class="k">nulo</span> {
         <span class="k">mi</span>.lado = lado
     }
     <span class="k">funcion</span> area(): <span class="t">numero</span> {
@@ -571,7 +571,7 @@ Cuadrado de lado 5 → 25</pre></div><span class="fuente">630_interfaces.lince</
     Derecha = [<span class="n">1</span>, <span class="n">0</span>]
 }
 
-<span class="k">funcion</span> animacion(<span class="k">val</span> Estado e): <span class="t">texto</span> {
+<span class="k">funcion</span> animacion(Estado e): <span class="t">texto</span> {
     <span class="k">elegir</span> e {
         <span class="k">caso</span> Estado.Quieto { <span class="k">devolver</span> <span class="s">&quot;respirar&quot;</span> }
         <span class="k">caso</span> Estado.Andando { <span class="k">devolver</span> <span class="s">&quot;andar&quot;</span> }
@@ -598,7 +598,7 @@ Derecha mueve [1, 0]
 2</pre></div><span class="fuente">640_enumeraciones.lince</span></article><article class="ej" id="clases-4"><h3>Visibilidad: `privado` y `protegido`</h3><p class="nota">Lo <code>privado</code> sólo se ve desde dentro de la clase; lo <code>protegido</code>, también desde sus subclases. Saltárselo lanza un <code>ErrorAcceso</code>, que se captura como cualquier error.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Cuenta {
     privado <span class="k">sea</span> saldo = <span class="n">0</span>
 
-    <span class="k">funcion</span> ingresar(<span class="k">val</span> <span class="t">numero</span> cantidad): <span class="k">nulo</span> {
+    <span class="k">funcion</span> ingresar(<span class="t">numero</span> cantidad): <span class="k">nulo</span> {
         <span class="k">mi</span>.saldo = <span class="k">mi</span>.saldo + cantidad
     }
     <span class="k">funcion</span> consultar(): <span class="t">numero</span> {
@@ -619,11 +619,11 @@ No se puede: El campo &#x27;saldo&#x27; de &#x27;Cuenta&#x27; es privado: no se 
     estatico <span class="k">sea</span> creados = <span class="n">0</span>
     estatico <span class="k">fijo</span> IVA = <span class="n">21</span>
 
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> base): <span class="k">nulo</span> {
+    <span class="k">funcion</span> crear(<span class="t">numero</span> base): <span class="k">nulo</span> {
         <span class="k">mi</span>.base = base
         Pedido.creados = Pedido.creados + <span class="n">1</span>
     }
-    estatico <span class="k">funcion</span> con_iva(<span class="k">val</span> <span class="t">numero</span> base): <span class="t">numero</span> {
+    estatico <span class="k">funcion</span> con_iva(<span class="t">numero</span> base): <span class="t">numero</span> {
         <span class="k">devolver</span> base + base * Pedido.IVA / <span class="n">100</span>
     }
 }
@@ -641,7 +641,7 @@ Pedido(<span class="n">20</span>)
 }
 
 <span class="k">clase</span> Cuadrado <span class="k">extiende</span> Figura {
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> lado): <span class="k">nulo</span> {
+    <span class="k">funcion</span> crear(<span class="t">numero</span> lado): <span class="k">nulo</span> {
         <span class="k">mi</span>.lado = lado
     }
     sobrescribe <span class="k">funcion</span> area(): <span class="t">numero</span> {
@@ -659,17 +659,17 @@ Pedido(<span class="n">20</span>)
 &#x27;Figura&#x27; es una clase abstracta y no se puede instanciar.</pre></div><span class="fuente">670_abstractas.lince</span></article><article class="ej" id="clases-7"><h3>Propiedades, operadores y `a_texto`</h3><p class="nota"><code>obtener</code> y <code>fijar</code> se usan como un campo pero ejecutan código, así que pueden validar. Los métodos <code>sumar</code>, <code>igual</code>, <code>menor</code>... dan sentido a los operadores, y <code>a_texto</code> decide cómo se escribe el objeto.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">clase</span> Vector {
     privado <span class="k">sea</span> _x = <span class="n">0</span>
     obtener x(): <span class="t">numero</span> { <span class="k">devolver</span> <span class="k">mi</span>._x }
-    fijar x(<span class="k">val</span> <span class="t">numero</span> v): <span class="k">nulo</span> {
+    fijar x(<span class="t">numero</span> v): <span class="k">nulo</span> {
         <span class="k">si</span> v &lt; <span class="n">0</span> { <span class="k">lanzar</span> Error(<span class="s">&quot;x no puede ser negativa&quot;</span>) }
         <span class="k">mi</span>._x = v
     }
-    <span class="k">funcion</span> sumar(<span class="k">val</span> Vector b): Vector {
+    <span class="k">funcion</span> sumar(Vector b): Vector {
         <span class="k">sea</span> r = Vector()
         r.x = <span class="k">mi</span>.x + b.x
         <span class="k">devolver</span> r
     }
-    <span class="k">funcion</span> menor(<span class="k">val</span> Vector b): <span class="t">logico</span> { <span class="k">devolver</span> <span class="k">mi</span>.x &lt; b.x }
-    <span class="k">funcion</span> igual(<span class="k">val</span> Vector b): <span class="t">logico</span> { <span class="k">devolver</span> <span class="k">mi</span>.x == b.x }
+    <span class="k">funcion</span> menor(Vector b): <span class="t">logico</span> { <span class="k">devolver</span> <span class="k">mi</span>.x &lt; b.x }
+    <span class="k">funcion</span> igual(Vector b): <span class="t">logico</span> { <span class="k">devolver</span> <span class="k">mi</span>.x == b.x }
     <span class="k">funcion</span> a_texto(): <span class="t">texto</span> { <span class="k">devolver</span> <span class="s">&quot;Vector(&quot;</span> + <span class="k">mi</span>.x + <span class="s">&quot;)&quot;</span> }
 }
 
@@ -727,7 +727,7 @@ ana.arma = Arma()
 0
 espada
 3</pre></div><span class="fuente">692_nulo.lince</span></article></section>
-<section id="generadores"><h2>Generadores</h2><article class="ej" id="generadores-0"><h3>Producir valores de uno en uno</h3><p class="nota"><code>generador</code> en vez de <code>funcion</code>, y <code>producir</code> en vez de <code>devolver</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">generador</span> pares(<span class="k">val</span> <span class="t">numero</span> hasta): <span class="t">numero</span> {
+<section id="generadores"><h2>Generadores</h2><article class="ej" id="generadores-0"><h3>Producir valores de uno en uno</h3><p class="nota"><code>generador</code> en vez de <code>funcion</code>, y <code>producir</code> en vez de <code>devolver</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">generador</span> pares(<span class="t">numero</span> hasta): <span class="t">numero</span> {
     <span class="k">para</span> (i = <span class="n">0</span>; i &lt;= hasta; i++) {
         <span class="k">si</span> i % <span class="n">2</span> == <span class="n">0</span> { <span class="k">producir</span> i }
     }
@@ -779,7 +779,7 @@ ronda 2: Ana
 0
 1
 2</pre></div><span class="fuente">717_generador_guardado.lince</span></article></section>
-<section id="tareas"><h2>Tareas</h2><article class="ej" id="tareas-0"><h3>Esperar sin parar el juego</h3><p class="nota">Una <code>tarea</code> se escribe como una función y empieza a correr al llamarla. <code>esperar()</code> la deja aparcada en esa línea hasta el fotograma siguiente; <code>esperar(segundos)</code>, hasta que pase ese tiempo, y <code>esperar(otra)</code>, hasta que otra tarea acabe (y da lo que devolvió). Mientras, todo lo demás sigue. En un juego avanzan solas en cada <code>juego.presentar()</code>; aquí, sin juego, avanzan mientras el programa espera.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">tarea</span> parpadear(<span class="k">val</span> <span class="t">texto</span> quien, <span class="k">val</span> <span class="t">numero</span> veces) {
+<section id="tareas"><h2>Tareas</h2><article class="ej" id="tareas-0"><h3>Esperar sin parar el juego</h3><p class="nota">Una <code>tarea</code> se escribe como una función y empieza a correr al llamarla. <code>esperar()</code> la deja aparcada en esa línea hasta el fotograma siguiente; <code>esperar(segundos)</code>, hasta que pase ese tiempo, y <code>esperar(otra)</code>, hasta que otra tarea acabe (y da lo que devolvió). Mientras, todo lo demás sigue. En un juego avanzan solas en cada <code>juego.presentar()</code>; aquí, sin juego, avanzan mientras el programa espera.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">tarea</span> parpadear(<span class="t">texto</span> quien, <span class="t">numero</span> veces) {
     <span class="k">para</span> (i = <span class="n">0</span>; i &lt; veces; i++) {
         <span class="k">escribir</span>(quien + <span class="s">&quot;: brilla&quot;</span>)
         <span class="k">esperar</span>()
@@ -823,7 +823,7 @@ verdadero</pre></div><span class="fuente">720_tareas.lince</span></article></sec
 } <span class="k">finalmente</span> {
     <span class="k">escribir</span>(<span class="s">&quot;esto se ejecuta siempre&quot;</span>)
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>fuera de rango: Índice 99 fuera de rango. La lista tiene 3 elementos.
-esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span></article><article class="ej" id="errores-1"><h3>Lanzar errores propios</h3><p class="nota">Tipos predefinidos: Error, ErrorTipo, ErrorRango, ErrorNulo, ErrorMatematico, ErrorArgumento.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> raiz_entera(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">numero</span> {
+esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span></article><article class="ej" id="errores-1"><h3>Lanzar errores propios</h3><p class="nota">Tipos predefinidos: Error, ErrorTipo, ErrorRango, ErrorNulo, ErrorMatematico, ErrorArgumento.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> raiz_entera(<span class="t">numero</span> n): <span class="t">numero</span> {
     <span class="k">si</span> n &lt; <span class="n">0</span> {
         <span class="k">lanzar</span> ErrorArgumento(<span class="s">&quot;no hay raíz real de un número negativo&quot;</span>)
     }
@@ -861,7 +861,7 @@ esto se ejecuta siempre</pre></div><span class="fuente">810_errores.lince</span>
 }
 
 <span class="k">clase</span> Caja {
-    <span class="k">funcion</span> crear(<span class="k">val</span> <span class="t">numero</span> v): <span class="k">nulo</span> { <span class="k">mi</span>.v = v }
+    <span class="k">funcion</span> crear(<span class="t">numero</span> v): <span class="k">nulo</span> { <span class="k">mi</span>.v = v }
 }
 
 <span class="k">intentar</span> {
@@ -906,11 +906,11 @@ m</pre></div><span class="fuente">930_como.lince</span></article><article class=
 180 5 10
 verdadero</pre></div><span class="fuente">940_matematica.lince</span></article><article class="ej" id="modulos-y-librerias-5"><h3>El módulo `texto`</h3><p class="nota">Lo que se hace con textos y no es un método: partirlos por un separador, unir una lista, darles la vuelta buscar dónde aparece algo (−1 si no está) y escribir números con los decimales justos o con los miles separados.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;texto&quot;</span>
 
-<span class="k">sea</span> partes = <span class="t">texto</span>.dividir(<span class="s">&quot;rojo,verde,azul&quot;</span>, <span class="s">&quot;,&quot;</span>)
+<span class="k">sea</span> partes = <span class="s">&quot;rojo,verde,azul&quot;</span>.dividir(<span class="s">&quot;,&quot;</span>)
 <span class="k">escribir</span>(partes)
 <span class="k">escribir</span>(<span class="t">texto</span>.unir(partes, <span class="s">&quot; y &quot;</span>))
-<span class="k">escribir</span>(<span class="t">texto</span>.invertir(<span class="s">&quot;lince&quot;</span>))
-<span class="k">escribir</span>(<span class="s">&quot;{texto.posicion(&quot;</span>perspicaz<span class="s">&quot;, &quot;</span>pica<span class="s">&quot;)} {texto.posicion(&quot;</span>lince<span class="s">&quot;, &quot;</span>x<span class="s">&quot;)}&quot;</span>)
+<span class="k">escribir</span>(<span class="s">&quot;lince&quot;</span>.invertir())
+<span class="k">escribir</span>(<span class="s">&quot;{&quot;</span>perspicaz<span class="s">&quot;.posicion(&quot;</span>pica<span class="s">&quot;)} {&quot;</span>lince<span class="s">&quot;.posicion(&quot;</span>x<span class="s">&quot;)}&quot;</span>)
 <span class="k">escribir</span>(<span class="t">texto</span>.decimales(<span class="n">3.5</span>, <span class="n">2</span>))
 <span class="k">escribir</span>(<span class="t">texto</span>.miles(<span class="n">1234567</span>))
 <span class="k">escribir</span>(<span class="t">texto</span>.miles(<span class="n">1234.5</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>[&quot;rojo&quot;, &quot;verde&quot;, &quot;azul&quot;]
@@ -973,7 +973,7 @@ b.escribir_u32(<span class="n">2</span>, <span class="n">4096</span>)
 0011 verdadero
 ff 16 255</pre></div><span class="fuente">975_bytes_y_bits.lince</span></article><article class="ej" id="modulos-y-librerias-10"><h3>El módulo `pruebas`</h3><p class="nota">Pruebas unitarias para tus programas: <code>afirmar</code> comprueba una condición, <code>igual</code> compara valores (también listas y diccionarios), <code>lanza</code> comprueba que una función da error y <code>resumen</code> imprime el total y termina con código 1 si algo falló, ideal para la integración continua.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;pruebas&quot;</span>
 
-<span class="k">funcion</span> doble(<span class="k">val</span> <span class="t">numero</span> n): <span class="t">numero</span> {
+<span class="k">funcion</span> doble(<span class="t">numero</span> n): <span class="t">numero</span> {
     <span class="k">devolver</span> n * <span class="n">2</span>
 }
 
@@ -1005,8 +1005,8 @@ verdadero
 nulo</pre></div><span class="fuente">985_fechas.lince</span></article><article class="ej" id="modulos-y-librerias-12"><h3>El módulo `juego`</h3><p class="nota">El módulo para hacer juegos: ventana, dibujo, sprites y animaciones, teclado, ratón, mandos y pantalla táctil, sonido, mapas, física, menús... Tiene su propia página, con un ejemplo y su captura para cada cosa: <a href="juego.html">el módulo juego</a>. Estas funciones de ayuda no necesitan abrir ventana.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 <span class="c"># ¿se tocan el jugador y el enemigo? (x, y, ancho, alto de cada uno)</span>
-<span class="k">escribir</span>(juego.colision(<span class="n">10</span>, <span class="n">10</span>, <span class="n">32</span>, <span class="n">32</span>, <span class="n">30</span>, <span class="n">30</span>, <span class="n">32</span>, <span class="n">32</span>))
-<span class="k">escribir</span>(juego.colision(<span class="n">10</span>, <span class="n">10</span>, <span class="n">32</span>, <span class="n">32</span>, <span class="n">100</span>, <span class="n">100</span>, <span class="n">32</span>, <span class="n">32</span>))
+<span class="k">escribir</span>(juego.colision([<span class="n">10</span>, <span class="n">10</span>, <span class="n">32</span>, <span class="n">32</span>], [<span class="n">30</span>, <span class="n">30</span>, <span class="n">32</span>, <span class="n">32</span>]))
+<span class="k">escribir</span>(juego.colision([<span class="n">10</span>, <span class="n">10</span>, <span class="n">32</span>, <span class="n">32</span>], [<span class="n">100</span>, <span class="n">100</span>, <span class="n">32</span>, <span class="n">32</span>]))
 
 <span class="c"># ancho en píxeles de un texto, para centrarlo en la pantalla</span>
 <span class="k">sea</span> ancho_pantalla = <span class="n">800</span>

@@ -24,16 +24,16 @@ sea reloj = 0
 sea record = 0
 
 # Posición de la casilla n (0 y 1 arriba, 2 y 3 abajo)
-funcion casilla_x(val numero n): numero {
+funcion casilla_x(numero n): numero {
     devolver 30 + (n % 2) * (LADO + 20)
 }
-funcion casilla_y(val numero n): numero {
+funcion casilla_y(numero n): numero {
     devolver 100 + matematica.piso(n / 2) * (LADO + 20)
 }
 
-funcion casilla_en(val numero px, val numero py): numero {
+funcion casilla_en(numero px, numero py): numero {
     para cada numero n en rango(0, 4) {
-        si juego.colision(px, py, 1, 1, casilla_x(n), casilla_y(n), LADO, LADO) { devolver n }
+        si juego.colision([px, py, 1, 1], [casilla_x(n), casilla_y(n), LADO, LADO]) { devolver n }
     }
     devolver -1
 }
@@ -46,7 +46,7 @@ funcion nueva_ronda(): nulo {
     reloj = 0.8
 }
 
-funcion encender(val numero n): nulo {
+funcion encender(numero n): nulo {
     encendido = n
     reloj = 0.35
     juego.pitido(TONOS[n], 0.3)
@@ -105,14 +105,14 @@ mientras juego.abierto() {
         si n == encendido { color = ENCENDIDOS[n] }
         juego.rectangulo(casilla_x(n), casilla_y(n), LADO, LADO, color)
     }
-    juego.texto("RONDA " + a_texto(secuencia.longitud()), 30, 30, 3, [230, 230, 245])
+    juego.texto("RONDA " + a_texto(secuencia.longitud()), 30, 30, {"escala": 3, "color": [230, 230, 245]})
     sea r = "RECORD " + a_texto(record)
-    juego.texto(r, ANCHO - juego.ancho_texto(r, 2) - 30, 36, 2, [255, 200, 80])
+    juego.texto(r, ANCHO - juego.ancho_texto(r, 2) - 30, 36, {"escala": 2, "color": [255, 200, 80]})
     sea mensaje = ""
     si estado == "inicio" { mensaje = "HAZ CLIC PARA EMPEZAR" }
     si estado == "mirar" { mensaje = "MIRA LA SECUENCIA..." }
     si estado == "repetir" { mensaje = "AHORA TU: " + a_texto(indice) + " DE " + a_texto(secuencia.longitud()) }
     si estado == "fallo" { mensaje = "FALLASTE - CLIC PARA REINTENTAR" }
-    juego.texto(mensaje, (ANCHO - juego.ancho_texto(mensaje, 2)) / 2, ALTO - 36, 2, [180, 180, 200])
+    juego.texto(mensaje, (ANCHO - juego.ancho_texto(mensaje, 2)) / 2, ALTO - 36, {"escala": 2, "color": [180, 180, 200]})
     juego.presentar()
 }

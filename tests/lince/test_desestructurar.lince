@@ -8,7 +8,7 @@ fijo [ANCHO, ALTO] = [320, 180]
 escribir(ANCHO * ALTO)
 
 # De una función que devuelve varias cosas
-funcion min_max(val lista l): lista {
+funcion min_max(lista l): lista {
     sea menor = l[0]
     sea mayor = l[0]
     para cada numero v en l {
@@ -55,7 +55,7 @@ intentar {
 sea vel = -3
 sea lado = si vel < 0 { -1 } sino { 1 }
 escribir(lado)
-funcion nota(val numero n): texto {
+funcion nota(numero n): texto {
     devolver si n >= 9 { "sobresaliente" } sino si n >= 5 { "aprobado" } sino { "suspenso" }
 }
 escribir(nota(9.5) + " " + nota(6) + " " + nota(2))
@@ -68,7 +68,7 @@ escribir(si falso { falla() } sino { "bien" })
 # Errores de sintaxis
 fijo LINCE = sistema.entorno("LINCE_BIN", "./lince")
 fijo TMP = "test_desestructurar_tmp.lince"
-funcion comprobar(val texto codigo, val texto espera): nulo {
+funcion comprobar(texto codigo, texto espera): nulo {
     archivos.escribir(TMP, codigo)
     sea salida = sistema.ejecutar(LINCE + " comprobar " + TMP + " 2>&1")
     escribir(salida.contiene(espera))

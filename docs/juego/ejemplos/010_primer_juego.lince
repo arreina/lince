@@ -12,6 +12,6 @@ mientras juego.abierto() {
     x = x + 150 * juego.dt()                    # 150 píxeles por segundo, vaya a los fps que vaya
     juego.limpiar([25, 30, 45])
     juego.circulo(x, 135, 24, [255, 200, 60])
-    juego.texto("HOLA, LINCE", 20, 20, 3)
+    juego.texto("HOLA, LINCE", 20, 20, {"escala": 3})
     juego.presentar()
 }

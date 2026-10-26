@@ -3,19 +3,19 @@
 importar "matematica"
 
 clase Particula {
-    funcion crear(val numero px, val numero py, val numero vx, val numero vy): nulo {
+    funcion crear(numero px, numero py, numero vx, numero vy): nulo {
         mi.px = px
         mi.py = py
         mi.vx = vx
         mi.vy = vy
     }
-    funcion mover(val numero dt): nulo {
+    funcion mover(numero dt): nulo {
         mi.px = mi.px + mi.vx * dt
         mi.py = mi.py + mi.vy * dt
         si mi.px < 0 o mi.px > 800 { mi.vx = -mi.vx }
         si mi.py < 0 o mi.py > 600 { mi.vy = -mi.vy }
     }
-    funcion cerca(val numero cx, val numero cy, val numero r): logico {
+    funcion cerca(numero cx, numero cy, numero r): logico {
         sea dx = mi.px - cx
         sea dy = mi.py - cy
         devolver dx * dx + dy * dy < r * r

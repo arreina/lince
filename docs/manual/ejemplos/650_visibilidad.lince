@@ -4,7 +4,7 @@
 clase Cuenta {
     privado sea saldo = 0
 
-    funcion ingresar(val numero cantidad): nulo {
+    funcion ingresar(numero cantidad): nulo {
         mi.saldo = mi.saldo + cantidad
     }
     funcion consultar(): numero {

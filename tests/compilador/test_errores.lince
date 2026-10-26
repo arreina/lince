@@ -15,7 +15,7 @@ intentar {
 }
 
 # Error en función
-funcion dividir(val numero a, val numero b): numero {
+funcion dividir(numero a, numero b): numero {
     si b == 0 {
         lanzar ErrorMatematico("division por cero")
     }

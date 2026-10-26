@@ -22,6 +22,7 @@
 #include "formatear.h"
 #include "documentar.h"
 #include "probar.h"
+#include "migrar.h"
 #include "version.h"
 
 static char *leer_archivo(const char *ruta) {
@@ -57,6 +58,7 @@ static void mostrar_ayuda(void) {
     printf("  lince comprobar <archivo.lince>          Sin ejecutar: la sintaxis, y avisos de descuidos\n");
     printf("  lince probar [carpeta]                   Las pruebas (prueba_*.lince) y su cobertura\n");
     printf("  lince formatear <archivo.lince>...       Deja el código con el estilo de Lince\n");
+    printf("  lince migrar [--comprobar] <archivo o carpeta>...  Pasa el código a la forma de la 2.0\n");
     printf("  lince perfil <archivo.lince>             Lo ejecuta y dice en qué se va el tiempo\n");
     printf("  lince documentar <archivo.lince> [-o a.md] La ayuda de sus comentarios, en Markdown\n");
     printf("  lince depurar <archivo.lince>            Depura paso a paso\n");
@@ -209,6 +211,95 @@ int main(int argc, char *argv[]) {
         lsp_analizar(codigo);            /* termina el proceso si hay un error */
         printf("✅ Sintaxis correcta: %s\n", argv[2]);
         return 0;
+    }
+
+    /* 'lince migrar [--comprobar] archivos o carpetas': lo que la 2.0 cambia, a
+       su forma nueva. Con --comprobar dice qué cambiaría y sale con 1 si hay
+       algo (para la integración continua), sin tocar nada. */
+    if (strcmp(cmd, "migrar") == 0) {
+        int comprobar = 0, mostrar = 0, rutas = 0, pendientes = 0, migrados = 0, total = 0, a_mano = 0;
+        for (int i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "--comprobar") == 0) comprobar = 1;
+            else if (strcmp(argv[i], "--mostrar") == 0) mostrar = 1;
+            else rutas++;
+        }
+        if (mostrar && rutas == 1) {        /* el resultado, a la salida (también trozos sueltos, para la documentación) */
+            for (int i = 2; i < argc; i++) {
+                if (argv[i][0] == '-' && argv[i][1] == '-') continue;
+                char *codigo = leer_archivo(argv[i]);
+                char *nuevo = migrar_codigo(codigo, NULL);
+                fputs(nuevo, stdout);
+                free(nuevo);
+                free(codigo);
+            }
+            return 0;
+        }
+        if (!rutas) {
+            fprintf(stderr, "\n❌ Uso: lince migrar [--comprobar | --mostrar] <archivo o carpeta>...\n"
+                            "   Cambia a la forma de la 2.0 lo que en la 1.9 avisa «obsoleto». Con --comprobar\n"
+                            "   solo dice qué cambiaría, sin tocar nada.\n\n");
+            return 1;
+        }
+        for (int i = 2; i < argc; i++) {
+            if (argv[i][0] == '-' && argv[i][1] == '-') continue;
+            char **archivos = NULL;
+            int n = migrar_buscar(argv[i], &archivos);
+            for (int k = 0; k < n; k++) {
+                char *codigo = leer_archivo(archivos[k]);
+                total++;
+                int linea = 0;
+                char msg[1024];
+                if (lsp_comprobar_texto(codigo, &linea, msg, sizeof msg)) {
+                    printf("⏭️  %s: tiene un error de sintaxis en la línea %d; arréglalo antes de migrarlo.\n", archivos[k], linea);
+                    free(codigo);
+                    continue;
+                }
+                MigrarInforme inf;
+                char *nuevo = migrar_codigo(codigo, &inf);
+                int cambia = strcmp(nuevo, codigo) != 0;
+                if (cambia && lsp_comprobar_texto(nuevo, &linea, msg, sizeof msg)) {
+                    fprintf(stderr, "\n❌ No sé migrar '%s' sin romperlo (la línea %d quedaría mal): lo dejo como estaba.\n"
+                                    "   (Es un fallo de Lince: cuéntalo con el archivo, por favor.)\n\n", archivos[k], linea);
+                    return 1;
+                }
+                if (cambia || inf.nmano) {
+                    printf("%s %s", comprobar ? "📄" : cambia ? "✨" : "📄", archivos[k]);
+                    if (cambia) printf(comprobar ? " (%d cambios por hacer)" : " (%d cambios)", inf.ncambios);
+                    printf("\n");
+                    int vals = 0;
+                    for (int c = 0; c < inf.ncambios; c++) {
+                        if (!strcmp(inf.cambios[c].que, "val")) { vals++; continue; }
+                        if (comprobar) printf("   línea %d: %s\n", inf.cambios[c].linea, inf.cambios[c].que);
+                    }
+                    if (vals && comprobar) printf("   'val' (ya no hace falta): %d %s\n", vals, vals == 1 ? "vez" : "veces");
+                    for (int c = 0; c < inf.nmano; c++)
+                        printf("   ✋ línea %d, a mano: %s\n", inf.mano[c].linea, inf.mano[c].que);
+                    a_mano += inf.nmano;
+                }
+                if (cambia) {
+                    pendientes++;
+                    if (!comprobar) {
+                        FILE *f = fopen(archivos[k], "wb");
+                        if (!f || fwrite(nuevo, 1, strlen(nuevo), f) != strlen(nuevo)) {
+                            fprintf(stderr, "\n❌ No pude escribir '%s'.\n\n", archivos[k]);
+                            return 1;
+                        }
+                        fclose(f);
+                        migrados++;
+                    }
+                }
+                migrar_informe_liberar(&inf);
+                free(nuevo);
+                free(codigo);
+                free(archivos[k]);
+            }
+            free(archivos);
+        }
+        if (comprobar) printf("%s %d de %d archivos tienen algo que cambiar para la 2.0%s\n", pendientes ? "✏️ " : "✅",
+                              pendientes, total, a_mano ? "; lo marcado con ✋ hay que mirarlo a mano" : "");
+        else printf("%s %d de %d archivos migrados a la forma de la 2.0%s\n", migrados ? "✨" : "✅", migrados, total,
+                    a_mano ? "; lo marcado con ✋ hay que mirarlo a mano" : "");
+        return comprobar && pendientes ? 1 : 0;
     }
 
     /* 'lince formatear a.lince b.lince…': el estilo de siempre. Con --comprobar

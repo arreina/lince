@@ -4,6 +4,6 @@
 sea nums = [3, 1, 4, 1, 5]
 
 escribir(nums.ordenar())
-escribir(nums.ordenar(funcion(val numero a, val numero b): numero {
+escribir(nums.ordenar(funcion(numero a, numero b): numero {
     devolver b - a
 }))

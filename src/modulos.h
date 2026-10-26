@@ -54,6 +54,19 @@ Valor      *json_a_valor(const char *s);
 char       *json_de_valor(Valor *v, int sangria);
 const char *json_lo_que_no_cabe(Valor *v);
 
+/* ── Métodos de un texto que son funciones del módulo texto ──
+   t.dividir(",") es texto.dividir(t, ","). Devuelve NULL si 'met' no es uno de
+   ellos; si lo es, el resultado (o el error). Los argumentos son prestados. */
+Valor *modulo_metodo_texto(const char *met, Valor *texto, Valor **args, int num_args);
+
+/* ── Lo que la 2.0 cambiará ──
+   Avisa (una vez por 'clave', en la salida de errores) de que algo está
+   obsoleto: «juego.cuerpo → juego.fisica.cuerpo». Con LINCE_OBSOLETOS=0 no
+   avisa. modulo_obsoleto_llamada mira si 'nombre' del módulo 'mod' es una de
+   las funciones que van a cambiar, y si lo es, avisa. */
+void modulo_avisar_obsoleto(const char *clave, const char *mensaje, int linea);
+void modulo_obsoleto_llamada(Valor *mod, const char *nombre, int linea);
+
 /* ── Recarga en caliente (módulo juego) ── */
 int  juego_ventana_abierta(void);
 void juego_preparar_recarga(int conserva);

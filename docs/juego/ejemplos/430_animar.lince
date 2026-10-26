@@ -14,7 +14,7 @@ mientras juego.abierto() {
     juego.limpiar([25, 35, 50])
     para (i = 0; i < TIPOS.longitud(); i++) {
         juego.dibujar(hojas[i], 30 + i * 90, 90, {"cuadro": juego.cuadro(hojas[i]["cuadros"], 8), "escala": 8})
-        juego.texto(TIPOS[i].mayusculas(), 30 + i * 90, 190, 1)
+        juego.texto(TIPOS[i].mayusculas(), 30 + i * 90, 190, {"escala": 1})
     }
     juego.presentar()
 }

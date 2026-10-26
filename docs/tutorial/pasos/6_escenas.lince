@@ -56,11 +56,11 @@ funcion empezar(): nulo {
     puntos = 0
     vidas = 3
     reloj = 0
-    juego.borrar_particulas()
+    juego.quitar_particulas()
 }
 
 # Un paso de la partida: lo mismo que antes, ahora dentro de una función
-funcion mover(val numero dt): nulo {
+funcion mover(numero dt): nulo {
     reloj = reloj + dt
     si juego.tecla("izquierda") { x = x - VELOCIDAD * dt }
     si juego.tecla("derecha") { x = x + VELOCIDAD * dt }
@@ -76,7 +76,7 @@ funcion mover(val numero dt): nulo {
     # caen; si tocan al lince, punto, pitido y chispas
     para cada diccionario e en estrellas {
         e["y"] = e["y"] + e["vel"] * dt
-        si juego.colision(x - 24, ALTO - 60, 48, 40, e["x"] - 10, e["y"] - 10, 20, 20) {
+        si juego.colision([x - 24, ALTO - 60, 48, 40], [e["x"] - 10, e["y"] - 10, 20, 20]) {
             e["cogida"] = verdadero
             puntos = puntos + 1
             juego.pitido(880, 0.06, 0.2)
@@ -84,7 +84,7 @@ funcion mover(val numero dt): nulo {
                                               "velocidad": [60, 200], "vida": [0.3, 0.6]})
         }
     }
-    estrellas = filtrar(estrellas, funcion(val diccionario e): logico {
+    estrellas = filtrar(estrellas, funcion(diccionario e): logico {
         devolver no e["cogida"] y e["y"] < ALTO + 20
     })
 
@@ -97,7 +97,7 @@ funcion mover(val numero dt): nulo {
     }
     para cada diccionario r en rocas {
         r["y"] = r["y"] + r["vel"] * dt
-        si juego.colision_circulo_rect(r["x"], r["y"], 14, x - 24, ALTO - 60, 48, 40) {
+        si juego.colision({"centro": [r["x"], r["y"]], "radio": 14}, [x - 24, ALTO - 60, 48, 40]) {
             r["choca"] = verdadero
             vidas = vidas - 1
             juego.pitido(110, 0.25)
@@ -105,7 +105,7 @@ funcion mover(val numero dt): nulo {
                                               "velocidad": [80, 260], "gravedad": 500})
         }
     }
-    rocas = filtrar(rocas, funcion(val diccionario r): logico {
+    rocas = filtrar(rocas, funcion(diccionario r): logico {
         devolver no r["choca"] y r["y"] < ALTO + 20
     })
 
@@ -123,13 +123,13 @@ funcion dibujar_partida(): nulo {
     juego.dibujar(LINCE, x, ALTO - 40, {"escala": 4, "centrado": verdadero})
     para cada diccionario r en rocas { juego.circulo(r["x"], r["y"], 14, [120, 110, 120]) }
     juego.dibujar_particulas()
-    juego.texto("PUNTOS " + a_texto(puntos), 16, 16, 3, [255, 255, 255])
-    juego.texto("VIDAS " + a_texto(vidas), ANCHO - 150, 16, 3, [255, 120, 120])
+    juego.texto("PUNTOS " + a_texto(puntos), 16, 16, {"escala": 3, "color": [255, 255, 255]})
+    juego.texto("VIDAS " + a_texto(vidas), ANCHO - 150, 16, {"escala": 3, "color": [255, 120, 120]})
 }
 
 # Escribe un texto centrado
-funcion centrado(val texto t, val numero arriba, val numero escala, val lista color): nulo {
-    juego.texto(t, (ANCHO - juego.ancho_texto(t, escala)) / 2, arriba, escala, color)
+funcion centrado(texto t, numero arriba, numero escala, lista color): nulo {
+    juego.texto(t, (ANCHO - juego.ancho_texto(t, escala)) / 2, arriba, {"escala": escala, "color": color})
 }
 
 funcion portada(): nulo {

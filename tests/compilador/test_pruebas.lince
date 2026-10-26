@@ -1,6 +1,6 @@
 importar "pruebas"
 
-funcion doble(val numero n): numero {
+funcion doble(numero n): numero {
     devolver n * 2
 }
 

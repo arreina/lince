@@ -4,8 +4,8 @@
 importar "juego"
 
 # ¿se tocan el jugador y el enemigo? (x, y, ancho, alto de cada uno)
-escribir(juego.colision(10, 10, 32, 32, 30, 30, 32, 32))
-escribir(juego.colision(10, 10, 32, 32, 100, 100, 32, 32))
+escribir(juego.colision([10, 10, 32, 32], [30, 30, 32, 32]))
+escribir(juego.colision([10, 10, 32, 32], [100, 100, 32, 32]))
 
 # ancho en píxeles de un texto, para centrarlo en la pantalla
 sea ancho_pantalla = 800

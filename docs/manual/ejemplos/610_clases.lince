@@ -2,7 +2,7 @@
 # @titulo: Clase, constructor y métodos
 # @nota: `mi` es la instancia actual. El constructor se llama `crear`.
 clase Rectangulo {
-    funcion crear(val numero ancho, val numero alto): nulo {
+    funcion crear(numero ancho, numero alto): nulo {
         mi.ancho = ancho
         mi.alto = alto
     }

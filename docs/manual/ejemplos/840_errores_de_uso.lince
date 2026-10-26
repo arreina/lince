@@ -16,7 +16,7 @@ intentar {
 }
 
 clase Caja {
-    funcion crear(val numero v): nulo { mi.v = v }
+    funcion crear(numero v): nulo { mi.v = v }
 }
 
 intentar {

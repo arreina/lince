@@ -46,8 +46,8 @@ juego.definir_accion("abajo", ["abajo", "s", "mando:abajo", "mando:izq_y+"])
 juego.definir_accion("empezar", ["espacio", "entrar", "mando:a"])
 
 # El plano como mapa de casillas: '#' es muro (por defecto) y fuera del mapa también
-fijo NIVEL = juego.mapa(PLANO, CASILLA, {"bordes": "todos"})
-fijo GEMAS = juego.buscar_en_mapa(NIVEL, "*")        # dónde están al empezar
+fijo NIVEL = juego.mapa.crear(PLANO, CASILLA, {"bordes": "todos"})
+fijo GEMAS = juego.mapa.buscar(NIVEL, "*")        # dónde están al empezar
 
 # Los tiles del mapa: una hoja de cuadros de 8×8 (aquí dibujada con texto; podría
 # ser un PNG hecho con cualquier editor: juego.hoja("tiles.png", 16)).
@@ -93,20 +93,20 @@ sea estado = "jugando"              # "jugando", "ganado" o "perdido"
 sea pausa = 0                       # tras perder una vida, un respiro
 
 # Centro de una casilla, en píxeles
-funcion centro(val numero c): numero { devolver c * CASILLA + CASILLA / 2 }
+funcion centro(numero c): numero { devolver c * CASILLA + CASILLA / 2 }
 
 funcion colocar(): nulo {
-    sea p = juego.buscar_en_mapa(NIVEL, "P")[0]
+    sea p = juego.mapa.buscar(NIVEL, "P")[0]
     yo["x"] = centro(p[0]) - yo["ancho"] / 2
     yo["y"] = centro(p[1]) - yo["alto"] / 2
     fantasmas = []
-    para cada lista f en juego.buscar_en_mapa(NIVEL, "F") {
+    para cada lista f en juego.mapa.buscar(NIVEL, "F") {
         fantasmas.agregar({"x": centro(f[0]), "y": centro(f[1]), "camino": [], "recalcular": 0})
     }
 }
 
 funcion empezar(): nulo {
-    para cada lista g en GEMAS { juego.poner_casilla(NIVEL, g[0], g[1], "*") }   # vuelven las gemas
+    para cada lista g en GEMAS { juego.mapa.poner(NIVEL, g[0], g[1], "*") }   # vuelven las gemas
     gemas = 0
     total_gemas = GEMAS.longitud()
     vidas = 3
@@ -116,16 +116,16 @@ funcion empezar(): nulo {
 }
 
 # ── Un paso de la partida ────────────────────────────────────────────
-funcion mover_jugador(val numero dt): nulo {
+funcion mover_jugador(numero dt): nulo {
     yo["vx"] = juego.direccion("izquierda", "derecha") * VELOCIDAD
     yo["vy"] = juego.direccion("arriba", "abajo") * VELOCIDAD
-    juego.mover_en_mapa(NIVEL, yo, dt)          # sin gravedad: choca en las cuatro direcciones
+    juego.mapa.mover(NIVEL, yo, dt)          # sin gravedad: choca en las cuatro direcciones
 
     # ¿qué hay bajo sus pies?
-    sea aqui = juego.casilla_en(NIVEL, yo["x"] + yo["ancho"] / 2, yo["y"] + yo["alto"] / 2)
-    sea t = juego.casilla(NIVEL, aqui[0], aqui[1])
+    sea aqui = juego.mapa.casilla_en(NIVEL, yo["x"] + yo["ancho"] / 2, yo["y"] + yo["alto"] / 2)
+    sea t = juego.mapa.casilla(NIVEL, aqui[0], aqui[1])
     si t == "*" {
-        juego.poner_casilla(NIVEL, aqui[0], aqui[1], ".")      # la gema desaparece del mapa
+        juego.mapa.poner(NIVEL, aqui[0], aqui[1], ".")      # la gema desaparece del mapa
         gemas = gemas + 1
         juego.efecto("moneda", {"tono": 1.3, "volumen": 0.35})
         juego.particulas(centro(aqui[0]), centro(aqui[1]), {"cantidad": 18, "color": [90, 220, 255],
@@ -137,14 +137,14 @@ funcion mover_jugador(val numero dt): nulo {
     }
 }
 
-funcion mover_fantasmas(val numero dt): nulo {
-    sea objetivo = juego.casilla_en(NIVEL, yo["x"] + yo["ancho"] / 2, yo["y"] + yo["alto"] / 2)
+funcion mover_fantasmas(numero dt): nulo {
+    sea objetivo = juego.mapa.casilla_en(NIVEL, yo["x"] + yo["ancho"] / 2, yo["y"] + yo["alto"] / 2)
     sea atrapado = falso
     para cada diccionario f en fantasmas {
         # cada medio segundo busca de nuevo el camino hasta ti
         f["recalcular"] = f["recalcular"] - dt
         si f["recalcular"] <= 0 {
-            f["camino"] = juego.camino(NIVEL, juego.casilla_en(NIVEL, f["x"], f["y"]), objetivo)
+            f["camino"] = juego.mapa.camino(NIVEL, juego.mapa.casilla_en(NIVEL, f["x"], f["y"]), objetivo)
             f["recalcular"] = 0.5
         }
         # va hacia el centro de la siguiente casilla del camino
@@ -163,7 +163,7 @@ funcion mover_fantasmas(val numero dt): nulo {
                 f["y"] = f["y"] + dy / d * avance
             }
         }
-        si pausa == 0 y juego.colision_circulo_rect(f["x"], f["y"], 12, yo["x"], yo["y"], yo["ancho"], yo["alto"]) {
+        si pausa == 0 y juego.colision({"centro": [f["x"], f["y"]], "radio": 12}, [yo["x"], yo["y"], yo["ancho"], yo["alto"]]) {
             vidas = vidas - 1
             juego.efecto("perder", {"largo": 0.6})
             juego.particulas(yo["x"] + 10, yo["y"] + 10, {"cantidad": 40, "color": [255, 160, 60],
@@ -182,9 +182,9 @@ funcion dibujar(): nulo {
     sea salida = [TILES, 2]                              # cerrada: una puerta
     si gemas == total_gemas { salida = [TILES, [3, 4], 0.3] }   # abierta: brilla (dos cuadros)
     sea suelo = [TILES, 1]
-    juego.dibujar_mapa(NIVEL, {"#": [TILES, 0], "S": salida,
+    juego.mapa.dibujar(NIVEL, {"#": [TILES, 0], "S": salida,
         ".": suelo, "*": suelo, "P": suelo, "F": suelo})
-    para cada lista g en juego.buscar_en_mapa(NIVEL, "*") {
+    para cada lista g en juego.mapa.buscar(NIVEL, "*") {
         juego.dibujar(GEMA, centro(g[0]), centro(g[1]) + matematica.seno(juego.tiempo() * 4 + g[0]) * 2,
             {"escala": 3, "centrado": verdadero})
     }
@@ -198,15 +198,15 @@ funcion dibujar(): nulo {
             {"escala": 3, "centrado": verdadero, "alfa": 220})
     }
     juego.dibujar_particulas()
-    juego.texto("GEMAS " + a_texto(gemas) + "/" + a_texto(total_gemas), 8, 8, 2, [140, 230, 255])
-    juego.texto("VIDAS " + a_texto(vidas), ANCHO - 110, 8, 2, [255, 170, 60])
+    juego.texto("GEMAS " + a_texto(gemas) + "/" + a_texto(total_gemas), 8, 8, {"escala": 2, "color": [140, 230, 255]})
+    juego.texto("VIDAS " + a_texto(vidas), ANCHO - 110, 8, {"escala": 2, "color": [255, 170, 60]})
     si estado != "jugando" {
         juego.rectangulo(0, 190, ANCHO, 100, [0, 0, 0, 180])
         sea m = "HAS ESCAPADO!"
         si estado == "perdido" { m = "TE HAN ATRAPADO" }
-        juego.texto(m, (ANCHO - juego.ancho_texto(m, 4)) / 2, 205, 4, [255, 220, 120])
+        juego.texto(m, (ANCHO - juego.ancho_texto(m, 4)) / 2, 205, {"escala": 4, "color": [255, 220, 120]})
         sea r = "ESPACIO PARA REPETIR"
-        juego.texto(r, (ANCHO - juego.ancho_texto(r, 2)) / 2, 255, 2, [255, 255, 255])
+        juego.texto(r, (ANCHO - juego.ancho_texto(r, 2)) / 2, 255, {"escala": 2, "color": [255, 255, 255]})
     }
 }
 

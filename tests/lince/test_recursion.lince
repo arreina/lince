@@ -1,6 +1,6 @@
 # TEST: recursion
 # Recursión simple
-funcion factorial(val numero n): numero {
+funcion factorial(numero n): numero {
     si n <= 1 { devolver 1 }
     devolver n * factorial(n - 1)
 }
@@ -10,7 +10,7 @@ escribir(factorial(5))
 escribir(factorial(10))
 
 # Fibonacci
-funcion fib(val numero n): numero {
+funcion fib(numero n): numero {
     si n <= 1 { devolver n }
     devolver fib(n - 1) + fib(n - 2)
 }
@@ -20,11 +20,11 @@ escribir(fib(7))
 escribir(fib(10))
 
 # Recursión mutua — par/impar
-funcion es_par(val numero n): logico {
+funcion es_par(numero n): logico {
     si n == 0 { devolver verdadero }
     devolver es_impar(n - 1)
 }
-funcion es_impar(val numero n): logico {
+funcion es_impar(numero n): logico {
     si n == 0 { devolver falso }
     devolver es_par(n - 1)
 }
@@ -34,7 +34,7 @@ escribir(es_impar(3))
 escribir(es_impar(6))
 
 # Recursión con acumulador
-funcion suma_hasta(val numero n, val numero acc): numero {
+funcion suma_hasta(numero n, numero acc): numero {
     si n <= 0 { devolver acc }
     devolver suma_hasta(n - 1, acc + n)
 }
@@ -43,7 +43,7 @@ escribir(suma_hasta(100, 0))
 
 # Recursión capturada como error
 intentar {
-    funcion infinita(val numero n): numero {
+    funcion infinita(numero n): numero {
         devolver infinita(n + 1)
     }
     infinita(0)

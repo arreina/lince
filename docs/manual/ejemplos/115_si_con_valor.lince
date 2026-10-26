@@ -5,7 +5,7 @@ sea velocidad = -4
 sea lado = si velocidad < 0 { "izquierda" } sino { "derecha" }
 escribir(lado)
 
-funcion nota(val numero n): texto {
+funcion nota(numero n): texto {
     devolver si n >= 9 { "sobresaliente" } sino si n >= 5 { "aprobado" } sino { "suspenso" }
 }
 escribir(nota(7))

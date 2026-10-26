@@ -15,7 +15,7 @@ mientras juego.abierto() {
         juego.dibujar(ARBOL, a[0], a[1], {"escala": 12, "capa": a[1] + 72})    # la base del tronco
     }
     juego.capa(1000)
-    juego.texto("CADA COSA EN SU CAPA", 12, 12, 2)
+    juego.texto("CADA COSA EN SU CAPA", 12, 12, {"escala": 2})
     juego.capa()
     juego.presentar()
 }

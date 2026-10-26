@@ -14,6 +14,6 @@ mientras juego.abierto() {
         sea op = {"fila": fila, "cuadro": juego.cuadro(cuantos, 6), "escala": 4}
         juego.dibujar(LINCE, 140 + fila * 85, 120, op)
     }
-    juego.texto("CUADROS: {LINCE["cuadros"]}  POR FILA: {LINCE["por_fila"]}", 20, 230, 2)
+    juego.texto("CUADROS: {LINCE["cuadros"]}  POR FILA: {LINCE["por_fila"]}", 20, 230, {"escala": 2})
     juego.presentar()
 }

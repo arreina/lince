@@ -24,19 +24,19 @@ sea derrotas = 0
 sea empates = 0
 
 # Devuelve 1 o 2 si alguien tiene tres en raya, 0 si nadie
-funcion ganador(val lista t): numero {
+funcion ganador(lista t): numero {
     para cada lista l en LINEAS {
         si t[l[0]] != 0 y t[l[0]] == t[l[1]] y t[l[1]] == t[l[2]] { devolver t[l[0]] }
     }
     devolver 0
 }
 
-funcion hay_hueco(val lista t): logico {
+funcion hay_hueco(lista t): logico {
     devolver t.contiene(0)
 }
 
 # Valor de la jugada para la O: +1 si acaba ganando, -1 si pierde, 0 si empata
-funcion minimax(val lista t, val numero quien): numero {
+funcion minimax(lista t, numero quien): numero {
     sea g = ganador(t)
     si g == 2 { devolver 1 }
     si g == 1 { devolver -1 }
@@ -146,13 +146,13 @@ mientras juego.abierto() {
             juego.circulo(cx, cy, 32, [24, 26, 36])
         }
     }
-    juego.texto("TRES EN RAYA", 30, 30, 3, [230, 230, 245])
-    juego.texto("TU " + a_texto(victorias) + "  EMPATES " + a_texto(empates) + "  MAQUINA " + a_texto(derrotas), 30, 66, 2, [160, 165, 190])
+    juego.texto("TRES EN RAYA", 30, 30, {"escala": 3, "color": [230, 230, 245]})
+    juego.texto("TU " + a_texto(victorias) + "  EMPATES " + a_texto(empates) + "  MAQUINA " + a_texto(derrotas), 30, 66, {"escala": 2, "color": [160, 165, 190]})
     sea mensaje = "TU TURNO (X)"
     si turno == 2 { mensaje = "PIENSA..." }
     si fin == "gana1" { mensaje = "GANASTE - CLIC PARA OTRA" }
     si fin == "gana2" { mensaje = "GANA LA MAQUINA - CLIC PARA OTRA" }
     si fin == "empate" { mensaje = "EMPATE - CLIC PARA OTRA" }
-    juego.texto(mensaje, (ANCHO - juego.ancho_texto(mensaje, 2)) / 2, ALTO - 36, 2, [255, 200, 80])
+    juego.texto(mensaje, (ANCHO - juego.ancho_texto(mensaje, 2)) / 2, ALTO - 36, {"escala": 2, "color": [255, 200, 80]})
     juego.presentar()
 }

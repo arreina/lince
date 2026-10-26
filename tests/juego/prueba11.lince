@@ -6,7 +6,7 @@ importar "juego"
 importar "matematica"
 juego.abrir("Letras", 200, 80)
 
-funcion par(val lista l): texto {
+funcion par(lista l): texto {
     devolver a_texto(matematica.redondear(l[0])) + " " + a_texto(matematica.redondear(l[1]))
 }
 

@@ -63,7 +63,7 @@ funcion dibujar_mundo(): nulo {
     si cerca() y no juego.dialogo_abierto() {
         juego.texto("ESPACIO: HABLAR", lince_x, lince_y + 30, {"escala": 2, "alinear": "centro"})
     }
-    si amigos { juego.texto("TIENES UNA AMIGA", 10, 10, 2) }
+    si amigos { juego.texto("TIENES UNA AMIGA", 10, 10, {"escala": 2}) }
 }
 
 mientras juego.abierto() {

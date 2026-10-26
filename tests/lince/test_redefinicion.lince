@@ -62,7 +62,7 @@ si verdadero {
 escribir(visible)
 
 # Un parámetro puede llamarse como algo de fuera
-funcion con_parametro(val texto visible): texto {
+funcion con_parametro(texto visible): texto {
     devolver visible
 }
 escribir(con_parametro("como parametro"))

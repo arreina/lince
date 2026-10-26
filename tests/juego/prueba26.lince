@@ -20,7 +20,7 @@ mientras juego.abierto() {
     juego.rectangulo(45, 20, 10, 10, [255, 255, 255])
     juego.camara()
     # girada 90 grados, abajo a la derecha: una barra horizontal sale vertical
-    juego.camara(0, 0, {"giro": 90, "zona": [100, 50, 100, 50]})
+    juego.camara(0, 0, {"angulo": 90, "zona": [100, 50, 100, 50]})
     juego.rectangulo(50, 23, 20, 4, [255, 0, 255])
     juego.camara()
     juego.presentar()
@@ -28,7 +28,7 @@ mientras juego.abierto() {
     si vueltas == 1 { escribir("capa de antes: {antes}") }
 }
 # de la pantalla al mundo y al revés
-juego.camara(10, 20, {"zoom": 2, "giro": 90, "zona": [0, 0, 100, 100]})
+juego.camara(10, 20, {"zoom": 2, "angulo": 90, "zona": [0, 0, 100, 100]})
 sea w = juego.a_mundo(30, 70)
 escribir("a_mundo: {w} a_pantalla: {juego.a_pantalla(w)}")
 escribir("camara_actual: {juego.camara_actual()}")

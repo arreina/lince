@@ -1,18 +1,18 @@
 # TEST: funciones
 # Función básica
-funcion sumar(val numero a, val numero b): numero {
+funcion sumar(numero a, numero b): numero {
     devolver a + b
 }
 escribir(sumar(3, 7))
 
 # Función con texto
-funcion saludar(val texto nombre): texto {
+funcion saludar(texto nombre): texto {
     devolver "Hola, " + nombre
 }
 escribir(saludar("Lince"))
 
 # Función recursiva
-funcion factorial(val numero n): numero {
+funcion factorial(numero n): numero {
     si n <= 1 {
         devolver 1
     }
@@ -22,7 +22,7 @@ escribir(factorial(5))
 escribir(factorial(10))
 
 # Función con ref
-funcion agregar_doble(ref lista nums, val numero x): nulo {
+funcion agregar_doble(ref lista nums, numero x): nulo {
     nums.agregar(x * 2)
 }
 sea lista miLista = [1, 2, 3]
@@ -31,7 +31,7 @@ escribir(miLista.longitud())
 escribir(miLista[3])
 
 # Valores por defecto
-funcion potencia(val numero base, val numero exp = 2): numero {
+funcion potencia(numero base, numero exp = 2): numero {
     sea r = 1
     para (i = 0; i < exp; i++) {
         r = r * base
@@ -42,27 +42,27 @@ escribir(potencia(3))
 escribir(potencia(2, 8))
 
 # Lambda en variable
-sea triple = funcion(val numero x): numero {
+sea triple = funcion(numero x): numero {
     devolver x * 3
 }
 escribir(triple(7))
 
 # Lambda como argumento
-funcion aplicar(val numero x, val funcion f): numero {
+funcion aplicar(numero x, funcion f): numero {
     devolver f(x)
 }
-escribir(aplicar(4, funcion(val numero n): numero { devolver n * n }))
+escribir(aplicar(4, funcion(numero n): numero { devolver n * n }))
 
 # Se puede llamar a cualquier cosa que dé una función, no solo a un nombre
-sea doble = funcion(val numero x): numero { devolver x * 2 }
+sea doble = funcion(numero x): numero { devolver x * 2 }
 escribir((doble)(4))
-sea golpes = [funcion(val numero d): numero { devolver d + 1 }, doble]
+sea golpes = [funcion(numero d): numero { devolver d + 1 }, doble]
 escribir(golpes[0](10))
 escribir(golpes[1](10))
 sea por_nombre = {"puño": doble}
 escribir(por_nombre["puño"](3))
-funcion sumador(val numero a): funcion {
-    devolver funcion(val numero b): numero { devolver a + b }
+funcion sumador(numero a): funcion {
+    devolver funcion(numero b): numero { devolver a + b }
 }
 escribir(sumador(2)(3))
 clase Arma { sea al_golpear = nulo }

@@ -10,7 +10,7 @@ sea orden = "printf 'linea1\nlinea2\nlinea3\n'"
 si sistema.plataforma() == "windows" { orden = "echo linea1& echo linea2& echo linea3" }
 sea salida2 = sistema.ejecutar(orden).reemplazar("\r", "")
 importar "texto"
-sea lineas = texto.dividir(salida2.recortar(), "\n")
+sea lineas = salida2.recortar().dividir("\n")
 escribir(lineas.longitud())
 escribir(lineas[0])
 escribir(lineas[2])

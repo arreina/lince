@@ -7,7 +7,7 @@ escribir("{a_logico(0)} {a_logico("hola")}")
 
 para cada numero n en rango(1, 10, 3) { escribir(n) }
 
-sea dobles = mapear([1, 2, 3], funcion(val numero x): numero { devolver x * 2 })
-sea pares = filtrar(rango(10), funcion(val numero x): logico { devolver x % 2 == 0 })
-sea suma = reducir([1, 2, 3, 4], 0, funcion(val numero a, val numero x): numero { devolver a + x })
+sea dobles = mapear([1, 2, 3], funcion(numero x): numero { devolver x * 2 })
+sea pares = filtrar(rango(10), funcion(numero x): logico { devolver x % 2 == 0 })
+sea suma = reducir([1, 2, 3, 4], 0, funcion(numero a, numero x): numero { devolver a + x })
 escribir("{dobles} {pares} {suma}")

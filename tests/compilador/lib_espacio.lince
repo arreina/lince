@@ -3,11 +3,11 @@ sea contador = 0
 
 enumeracion Modo { Suma Resta }
 
-funcion escala(val numero x): numero {
+funcion escala(numero x): numero {
     devolver x * FACTOR
 }
 
-funcion doble_escala(val numero x): numero {
+funcion doble_escala(numero x): numero {
     devolver escala(escala(x))
 }
 
@@ -17,12 +17,12 @@ funcion subir(): numero {
 }
 
 # Un parámetro llamado igual que una global la tapa
-funcion tapado(val numero FACTOR): numero {
+funcion tapado(numero FACTOR): numero {
     devolver FACTOR + 1
 }
 
 clase Caja {
-    funcion crear(val numero v): nulo {
+    funcion crear(numero v): nulo {
         mi.v = v
     }
     funcion grande(): numero {
@@ -31,7 +31,7 @@ clase Caja {
 }
 
 clase CajaPlus extiende Caja {
-    funcion crear(val numero v): nulo {
+    funcion crear(numero v): nulo {
         padre(v)
     }
     funcion doble(): numero {
@@ -39,7 +39,7 @@ clase CajaPlus extiende Caja {
     }
 }
 
-funcion nombre_modo(val texto m): texto {
+funcion nombre_modo(texto m): texto {
     elegir m {
         caso Modo.Suma { devolver "suma" }
         otro           { devolver "resta" }

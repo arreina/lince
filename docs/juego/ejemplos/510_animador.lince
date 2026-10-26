@@ -19,6 +19,6 @@ mientras juego.abierto() {
     juego.limpiar([190, 220, 240])
     juego.rectangulo(0, 200, 480, 70, [90, 160, 80])
     juego.dibujar(pj, x, 136, {"escala": 4})
-    juego.texto("ANIMACIÓN: {pj["actual"]}", 20, 20, 2)
+    juego.texto("ANIMACIÓN: {pj["actual"]}", 20, 20, {"escala": 2})
     juego.presentar()
 }

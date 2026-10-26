@@ -1,6 +1,6 @@
 # TEST COMPILADOR: closures
-funcion multiplicador(val numero factor): funcion {
-    devolver funcion(val numero x): numero {
+funcion multiplicador(numero factor): funcion {
+    devolver funcion(numero x): numero {
         devolver x * factor
     }
 }
@@ -12,8 +12,8 @@ escribir(triple(5))
 escribir(doble(10))
 
 # Closure con múltiples capturas
-funcion crear_sumador(val numero base, val numero extra): funcion {
-    devolver funcion(val numero x): numero {
+funcion crear_sumador(numero base, numero extra): funcion {
+    devolver funcion(numero x): numero {
         devolver x + base + extra
     }
 }
@@ -22,20 +22,20 @@ escribir(suma10(0))
 escribir(suma10(5))
 
 # Composición
-funcion componer(val funcion f, val funcion g): funcion {
-    devolver funcion(val numero x): numero {
+funcion componer(funcion f, funcion g): funcion {
+    devolver funcion(numero x): numero {
         devolver f(g(x))
     }
 }
-sea mas1   = funcion(val numero x): numero { devolver x + 1 }
-sea por2   = funcion(val numero x): numero { devolver x * 2 }
+sea mas1   = funcion(numero x): numero { devolver x + 1 }
+sea por2   = funcion(numero x): numero { devolver x * 2 }
 sea mas1_luego_por2 = componer(por2, mas1)
 escribir(mas1_luego_por2(4))
 escribir(mas1_luego_por2(9))
 
 # Función que devuelve función que devuelve función
-funcion potenciador(val numero exp): funcion {
-    devolver funcion(val numero base): numero {
+funcion potenciador(numero exp): funcion {
+    devolver funcion(numero base): numero {
         sea resultado = 1
         sea i = 0
         mientras i < exp {

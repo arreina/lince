@@ -22,7 +22,7 @@ sea dx = 1
 sea dy = 0
 sea comida = [0, 0]
 sea puntos = 0
-sea guardado = juego.cargar("record", {"puntos": 0, "nombre": ""})
+sea guardado = juego.cargar_partida("record", {"puntos": 0, "nombre": ""})
 sea record = guardado["puntos"]
 sea nombre_record = guardado["nombre"]
 sea escribiendo = falso         # pidiendo el nombre para el récord
@@ -30,7 +30,7 @@ sea nombre = ""
 sea vivo = verdadero
 sea acumulado = 0
 
-funcion ocupada(val numero c, val numero f): logico {
+funcion ocupada(numero c, numero f): logico {
     para cada lista seg en cuerpo {
         si seg[0] == c y seg[1] == f { devolver verdadero }
     }
@@ -89,7 +89,7 @@ mientras juego.abierto() {
         si juego.tecla_pulsada("entrar") y nombre.recortar() != "" {
             nombre_record = nombre.recortar()
             escribiendo = falso
-            juego.guardar("record", {"puntos": record, "nombre": nombre_record})
+            juego.guardar_partida("record", {"puntos": record, "nombre": nombre_record})
         }
     } sino si vivo {
         si (juego.tecla("arriba") o juego.tecla("w")) y dy == 0 {
@@ -120,10 +120,10 @@ mientras juego.abierto() {
     # ── dibujo ──
     juego.limpiar([16, 24, 20])
     juego.rectangulo(0, 0, COLUMNAS * CELDA, MARGEN, [10, 16, 13])
-    juego.texto("PUNTOS " + a_texto(puntos), 12, 12, 2, [230, 240, 230])
+    juego.texto("PUNTOS " + a_texto(puntos), 12, 12, {"escala": 2, "color": [230, 240, 230]})
     sea r = "RECORD " + a_texto(record)
     si nombre_record != "" { r = r + " " + nombre_record }
-    juego.texto(r, COLUMNAS * CELDA - juego.ancho_texto(r, 2) - 12, 12, 2, [255, 200, 80])
+    juego.texto(r, COLUMNAS * CELDA - juego.ancho_texto(r, 2) - 12, 12, {"escala": 2, "color": [255, 200, 80]})
     juego.rectangulo(comida[0] * CELDA + 3, MARGEN + comida[1] * CELDA + 3, CELDA - 6, CELDA - 6, [230, 70, 70])
     sea color = [140, 240, 140]                  # la cabeza, más clara
     para cada lista seg en cuerpo {
@@ -136,16 +136,16 @@ mientras juego.abierto() {
         juego.rectangulo(ancho_total / 2 - 200, centro - 50, 400, 110, [10, 16, 13])
         juego.contorno(ancho_total / 2 - 200, centro - 50, 400, 110, [255, 200, 80])
         sea t = "NUEVO RECORD! TU NOMBRE:"
-        juego.texto(t, (ancho_total - juego.ancho_texto(t, 2)) / 2, centro - 34, 2, [255, 200, 80])
+        juego.texto(t, (ancho_total - juego.ancho_texto(t, 2)) / 2, centro - 34, {"escala": 2, "color": [255, 200, 80]})
         sea cursor = ""
         si matematica.piso(juego.tiempo() * 2) % 2 == 0 { cursor = "_" }
         sea escrito = nombre + cursor
-        juego.texto(escrito, (ancho_total - juego.ancho_texto(nombre + "_", 3)) / 2, centro, 3, [255, 255, 255])
+        juego.texto(escrito, (ancho_total - juego.ancho_texto(nombre + "_", 3)) / 2, centro, {"escala": 3, "color": [255, 255, 255]})
         sea ayuda = "ENTRAR PARA GUARDAR"
-        juego.texto(ayuda, (ancho_total - juego.ancho_texto(ayuda, 1)) / 2, centro + 40, 1, [150, 170, 150])
+        juego.texto(ayuda, (ancho_total - juego.ancho_texto(ayuda, 1)) / 2, centro + 40, {"escala": 1, "color": [150, 170, 150]})
     } sino si no vivo {
         sea m = "HAS PERDIDO - ESPACIO PARA REINTENTAR"
-        juego.texto(m, (COLUMNAS * CELDA - juego.ancho_texto(m, 2)) / 2, MARGEN + FILAS * CELDA / 2, 2, [255, 255, 255])
+        juego.texto(m, (COLUMNAS * CELDA - juego.ancho_texto(m, 2)) / 2, MARGEN + FILAS * CELDA / 2, {"escala": 2, "color": [255, 255, 255]})
     }
     juego.presentar()
 }

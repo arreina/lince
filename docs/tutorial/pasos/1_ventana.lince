@@ -9,6 +9,6 @@ juego.abrir("Lluvia de estrellas", 640, 480)
 
 mientras juego.abierto() {
     juego.limpiar([20, 24, 48])
-    juego.texto("HOLA", 272, 220, 4, [255, 220, 120])
+    juego.texto("HOLA", 272, 220, {"escala": 4, "color": [255, 220, 120]})
     juego.presentar()
 }
