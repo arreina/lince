@@ -507,7 +507,7 @@ grep -qxF "menu: Salir" salida25.txt && ok "menús: se elige con un clic (o el d
 # ── Mapas de Tiled (.tmx con tileset .tsx, y .tmj con capa en base64 y zlib) ──
 (cd "$DIR" && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=3 LINCE_JUEGO_CAPTURA="$T/tiled.bmp" \
     timeout 30 "$LINCE" prueba20.lince) > salida26.txt 2>&1
-for ruta in tiled/nivel.tmx tiled/nivel.tmj; do
+for ruta in tiled/nivel.tmx tiled/nivel.tmj tiled/infinito.tmx tiled/infinito.tmj; do
     for l in "$ruta: 10x6, casilla 8, capas [\"Fondo\", \"Suelo\"]" "objeto: inicio jugador 8,16 8x8 rectangulo {}"; do
         grep -qxF "$l" salida26.txt && ok "tiled: $l" || mal "falta la línea: $l"
     done
@@ -588,4 +588,41 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=100 LINCE_JUE
     LINCE_JUEGO_GRABAR_GUION=guion2.txt timeout 30 "$LINCE" "$DIR/prueba25.lince" > /dev/null 2>&1
 [ "$(tr -d '\r' < guion1.txt)" = "10:espacio:5,30:derecha:20,50:z:1,70:f3:2" ] && ok "grabar guion: apunta las teclas (sin Esc), por orden" || mal "grabar guion: $(cat guion1.txt)"
 [ "$(tr -d '\r' < guion1.txt)" = "$(tr -d '\r' < guion2.txt)" ] && ok "grabar guion: lo grabado se reproduce igual" || mal "grabar guion: al reproducirlo sale otra cosa: $(cat guion1.txt) / $(cat guion2.txt)"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida5b.txt; exit 1; }
+# ── 1.5: capas, cámara (zoom, giro, zona), a_mundo, texto en una caja e idiomas ──
+mkdir -p idiomas
+printf '# inglés\nidioma = English\nJugar = Play\nVidas: {} = Lives: {}\n{} de {} = {} of {}\n' > idiomas/en.txt
+printf 'idioma = Español\n' > idiomas/es.txt
+LANG=en_US.UTF-8 LC_ALL= LANGUAGE= SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 LINCE_JUEGO_CAPTURA=capas.bmp \
+    timeout 30 "$LINCE" "$DIR/prueba26.lince" > salida32.txt 2>&1
+for l in "capa de antes: 0" "a_mundo: [70, 80] a_pantalla: [30, 70]" \
+         'camara_actual: {"x": 10, "y": 20, "zoom": 2, "giro": 90, "zona": [0, 0, 100, 100], "temblor": verdadero}' \
+         "sin zoom: [5, 5]" "resto: una vez un lince que vivía en el bosque" "cabe: []" "medir con salto: [22, 32]" \
+         'idiomas: {"en": English, "es": Español}' "elegido solo: en" "Play / Lives: 3 / 1 of 5 / Sin traducir" "original: Jugar nulo" \
+         "error: idioma(): no está idiomas/fr.txt (cada idioma es un archivo en la carpeta idiomas del juego)" \
+         'error: camara(): "zoom" es mayor que 0 (2: todo el doble de grande; 0.5: se ve el doble de mundo)' \
+         'error: camara(): "zona" es [x, y, ancho, alto], la parte de la pantalla donde se ve' \
+         'error: "capa" es un número: lo de las capas más altas queda encima' \
+         'error: texto_caja(): "vertical" es "arriba", "centro" o "abajo"'; do
+    grep -qxF "$l" salida32.txt && ok "1.5: $l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+d = open("capas.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]; w, h = struct.unpack_from("<ii", d, 18); B = struct.unpack_from("<H", d, 28)[0] // 8
+fila = (w * B + 3) & ~3
+def px(x, y):
+    f = (abs(h) - 1 - y) if h > 0 else y
+    i = off + f * fila + x * B
+    return (d[i + 2], d[i + 1], d[i])
+casos = [((5, 5), (255, 0, 0), "sin capa, debajo"), ((22, 22), (0, 0, 255), "capa 2 encima de la 0 y la 1"),
+         ((45, 45), (0, 255, 0), "capa 0 tras las capas"), ((16, 16), (0, 0, 255), "capa 1 debajo de la 2"),
+         ((150, 25), (255, 255, 255), "zoom 2: el centro"), ((141, 16), (255, 255, 255), "zoom 2: mide el doble"),
+         ((138, 25), (40, 40, 40), "zoom 2: alrededor"), ((95, 25), (0, 0, 0), "la zona recorta"),
+         ((148, 80), (255, 0, 255), "giro 90: vertical"), ((165, 76), (0, 0, 0), "giro 90: ya no es horizontal")]
+mal = 0
+for (x, y), esp, nombre in casos:
+    if px(x, y) == esp: print("  ✅ 1.5, píxel:", nombre)
+    else: print("  ❌ 1.5, píxel:", nombre, "→", px(x, y)); mal += 1
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida5b.txt; exit 1; }

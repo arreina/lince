@@ -14,6 +14,7 @@
 importar "matematica"
 importar "texto"
 importar "sistema"
+importar "archivos"
 
 # ── Comprobaciones con el mismo mensaje en todas las funciones ──
 
@@ -801,7 +802,7 @@ funcion _dibujar_mando(): nulo {
     si _mt == nulo { devolver nulo }
     sea m = _mt_medidas()
     sea alfa = _mt["alfa"]
-    sea camara = juego.posicion_camara()
+    sea camara = juego.camara_actual()
     juego.camara()
     si _mt["palanca"] {
         sea base = si _mt_palanca != nulo { [_mt_palanca["x"], _mt_palanca["y"]] } sino { m["casa"] }
@@ -822,7 +823,7 @@ funcion _dibujar_mando(): nulo {
         juego.texto(letra, sitio[0], sitio[1] - 3.5 * escala,
             {"escala": escala, "alinear": "centro", "color": [255, 255, 255, matematica.minimo(255, alfa * 1.8)]})
     }
-    juego.camara(camara[0], camara[1])
+    juego.camara(camara)
 }
 
 # ── Menús y diálogos ──
@@ -913,6 +914,8 @@ funcion menu(val cualquiera textos, val cualquiera opciones = nulo): cualquiera 
         si no (op es texto) { lanzar ErrorTipo("menu(): cada opción es un texto") }
     }
     sea aj = _ui_opciones(opciones, _MENU_OPCIONES, "menu")
+    sea vistos = []                # lo que se ve, en el idioma elegido (devuelve el original)
+    para cada texto op en textos { vistos.agregar(traducir(op)) }
     sea escala = _de(aj, "escala", 3)
     sea letra = _ui_letra(aj, escala)
     sea alto = juego.medir_texto("Ay", letra)[1]
@@ -934,7 +937,7 @@ funcion menu(val cualquiera textos, val cualquiera opciones = nulo): cualquiera 
     sea mov = juego.movimiento_raton()
     sea tocada = -1
     para (i = 0; i < total; i++) {
-        sea ancho = juego.ancho_texto(textos[i], letra)
+        sea ancho = juego.ancho_texto(vistos[i], letra)
         sea arriba = cy + i * paso - paso * 0.2
         si r[0] >= cx - ancho / 2 - alto y r[0] <= cx + ancho / 2 + alto y r[1] >= arriba y r[1] < arriba + paso {
             si mov[0] != 0 o mov[1] != 0 o juego.clic(1) { m["elegida"] = i }
@@ -943,21 +946,21 @@ funcion menu(val cualquiera textos, val cualquiera opciones = nulo): cualquiera 
     }
     si m["elegida"] != antes { _ui_sonar(aj, "sonido_mover") }
     # dibujar
-    sea camara = juego.posicion_camara()
+    sea camara = juego.camara_actual()
     juego.camara()
     para (i = 0; i < total; i++) {
         sea elegida = i == m["elegida"]
         sea y_op = cy + i * paso
         si elegida {
-            sea ancho = juego.ancho_texto(textos[i], letra)
+            sea ancho = juego.ancho_texto(vistos[i], letra)
             juego.rectangulo(cx - ancho / 2 - alto * 0.6, y_op - alto * 0.3, ancho + alto * 1.2, alto * 1.6, [255, 255, 255, 40])
         }
         sea color = si elegida { _de(aj, "color_elegido", [255, 220, 80]) } sino { _de(aj, "color", [210, 210, 220]) }
         sea t = {"alinear": "centro", "color": color}
         para cada texto c en letra { t[c] = letra[c] }
-        juego.texto(textos[i], cx, y_op, t)
+        juego.texto(vistos[i], cx, y_op, t)
     }
-    juego.camara(camara[0], camara[1])
+    juego.camara(camara)
     # elegir
     si tocada >= 0 o _ui_aceptar() {
         _ui_sonar(aj, "sonido_elegir")
@@ -1045,7 +1048,7 @@ funcion dialogo(val cualquiera paginas, val cualquiera opciones = nulo): nulo {
         sea respuestas = _de(p, "respuestas", [])
         si no (respuestas es lista) { lanzar ErrorTipo("dialogo(): \"respuestas\" es una lista de textos") }
         sea md = _dl_medidas(aj, p.contiene("retrato"))
-        sea todas = _partir_lineas(p["texto"], md["ancho_texto"], md["letra"])
+        sea todas = _partir_lineas(traducir(p["texto"]), md["ancho_texto"], md["letra"])
         # las respuestas van en la última parte (la caja crece para que quepan)
         sea caben = md["lineas"]
         sea i = 0
@@ -1053,7 +1056,8 @@ funcion dialogo(val cualquiera paginas, val cualquiera opciones = nulo): nulo {
             sea quedan = todas.longitud() - i
             sea ultimo = quedan <= caben
             sea cuantas = si ultimo { quedan } sino { caben }
-            sea trozo = {"lineas": [], "nombre": _de(p, "nombre", nulo), "retrato": _de(p, "retrato", nulo),
+            sea nombre = _de(p, "nombre", nulo)
+            sea trozo = {"lineas": [], "nombre": si nombre es texto { traducir(nombre) } sino { nombre }, "retrato": _de(p, "retrato", nulo),
                 "respuestas": si ultimo { respuestas } sino { [] }}
             para (k = 0; k < cuantas; k++) { trozo["lineas"].agregar(todas[i + k]) }
             trozos.agregar(trozo)
@@ -1146,7 +1150,7 @@ funcion _dibujar_dialogo(): nulo {
     sea aj = _dl["opciones"]
     sea trozo = _dl["trozos"][_dl["pagina"]]
     sea md = _dl_caja()
-    sea camara = juego.posicion_camara()
+    sea camara = juego.camara_actual()
     juego.camara()
     sea borde = _de(aj, "borde", [255, 255, 255])
     juego.rectangulo(md["x"], md["y"], md["ancho"], md["alto"], _de(aj, "fondo", [16, 18, 36, 235]))
@@ -1198,7 +1202,7 @@ funcion _dibujar_dialogo(): nulo {
                 sea elegida = i == _dl["elegida"]
                 sea lr = {"color": si elegida { [255, 220, 80] } sino { color }}
                 para cada texto c en md["letra"] { lr[c] = md["letra"][c] }
-                juego.texto((si elegida { "> " } sino { "  " }) + respuestas[i], md["texto_x"], fila + i * md["paso"], lr)
+                juego.texto((si elegida { "> " } sino { "  " }) + traducir(respuestas[i]), md["texto_x"], fila + i * md["paso"], lr)
             }
         } sino si (juego.tiempo_real() * 2) % 2 < 1 {     # el triangulito de «sigue»
             sea t = md["alto_letra"] * 0.5
@@ -1209,7 +1213,7 @@ funcion _dibujar_dialogo(): nulo {
             }
         }
     }
-    juego.camara(camara[0], camara[1])
+    juego.camara(camara)
 }
 
 # ── Física sencilla ──
@@ -1569,9 +1573,9 @@ funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
     si _ctrl == nulo o ahora - _ctrl["visto"] > 0.25 { _ctrl = {"elegida": 0, "esperando": nulo, "visto": ahora} }
     _ctrl["visto"] = ahora
     # las columnas, según lo que ocupan; si no cabe, la letra más pequeña
-    sea textos = [["ACCIÓN"], ["TECLADO"], ["MANDO"]]
+    sea textos = [[traducir("ACCIÓN")], [traducir("TECLADO")], [traducir("MANDO")]]
     para cada texto n en nombres {
-        textos[0].agregar(si aj.contiene("nombres") y aj["nombres"].contiene(n) { aj["nombres"][n] } sino { n })
+        textos[0].agregar(traducir(si aj.contiene("nombres") y aj["nombres"].contiene(n) { aj["nombres"][n] } sino { n }))
         textos[1].agregar(_ver_entradas(todas[n], ["tecla", "raton"]))
         textos[2].agregar(_ver_entradas(todas[n], ["boton", "eje"]))
     }
@@ -1623,7 +1627,7 @@ funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
         }
     }
     # dibujar
-    sea camara = juego.posicion_camara()
+    sea camara = juego.camara_actual()
     juego.camara()
     sea gris = [150, 150, 170]
     sea normal = _de(aj, "color", [210, 210, 220])
@@ -1633,9 +1637,9 @@ funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
         para cada texto c en letra { op[c] = letra[c] }
         juego.texto(t, x, fila_y, op)
     }
-    escribir_en("ACCIÓN", col[0], arriba, gris)
-    escribir_en("TECLADO", col[1], arriba, gris)
-    escribir_en("MANDO", col[2], arriba, gris)
+    escribir_en(textos[0][0], col[0], arriba, gris)
+    escribir_en(textos[1][0], col[1], arriba, gris)
+    escribir_en(textos[2][0], col[2], arriba, gris)
     para (i = 0; i < filas; i++) {
         sea fila_y = arriba + (i + 1) * paso
         sea elegida = i == _ctrl["elegida"]
@@ -1643,23 +1647,261 @@ funcion menu_controles(val cualquiera opciones = nulo): cualquiera {
         sea color = si elegida { amarillo } sino { normal }
         si i < nombres.longitud() {
             sea n = nombres[i]
-            sea visible = si aj.contiene("nombres") y aj["nombres"].contiene(n) { aj["nombres"][n] } sino { n }
+            sea visible = textos[0][i + 1]
             escribir_en(visible, col[0], fila_y, color)
             si _ctrl["esperando"] == n {
-                escribir_en("PULSA UNA TECLA O UN BOTÓN", col[1], fila_y, amarillo)
+                escribir_en(traducir("PULSA UNA TECLA O UN BOTÓN"), col[1], fila_y, amarillo)
             } sino {
                 escribir_en(textos[1][i + 1], col[1], fila_y, color)
                 escribir_en(textos[2][i + 1], col[2], fila_y, color)
             }
         } sino si i == nombres.longitud() {
-            escribir_en("Restablecer", col[0], fila_y, color)
+            escribir_en(traducir("Restablecer"), col[0], fila_y, color)
         } sino {
-            escribir_en("Volver", col[0], fila_y, color)
+            escribir_en(traducir("Volver"), col[0], fila_y, color)
         }
     }
-    sea ayuda = si _ctrl["esperando"] != nulo { "ESC: NO CAMBIAR" } sino { "ENTRAR O A: CAMBIAR    ESC O B: VOLVER" }
+    sea ayuda = traducir(si _ctrl["esperando"] != nulo { "ESC: NO CAMBIAR" } sino { "ENTRAR O A: CAMBIAR    ESC O B: VOLVER" })
     escribir_en(ayuda, col[0], arriba + (filas + 1.5) * paso, gris)
-    juego.camara(camara[0], camara[1])
+    juego.camara(camara)
     si resultado != nulo { _ctrl = nulo }
     devolver resultado
+}
+
+# ── La cámara: de la pantalla al mundo y al revés ──
+# Con la cámara de ahora (camara_actual(): zoom, giro y zona incluidos), sin el
+# temblor. El zoom y el giro van alrededor del centro de la zona.
+
+funcion _punto(val cualquiera x, val cualquiera y, val texto fn): lista {
+    si x es lista y y == nulo y x.longitud() >= 2 { devolver [x[0], x[1]] }
+    si no (x es numero) o no (y es numero) { lanzar ErrorTipo("{fn}() espera (x, y) o una lista [x, y]") }
+    devolver [x, y]
+}
+
+funcion _zona_camara(val diccionario c): lista {
+    si c["zona"] != nulo { devolver c["zona"] }
+    devolver [0, 0, juego.ancho(), juego.alto()]
+}
+
+# a_mundo(x, y): el punto del mundo que se ve en (x, y) de la pantalla; para
+# saber dónde ha tocado o hecho clic el jugador: juego.a_mundo(juego.raton())
+funcion a_mundo(val cualquiera x, val cualquiera y = nulo): lista {
+    sea p = _punto(x, y, "a_mundo")
+    sea c = juego.camara_actual()
+    sea z = _zona_camara(c)
+    sea dx = p[0] - (z[0] + z[2] / 2)
+    sea dy = p[1] - (z[1] + z[3] / 2)
+    sea g = matematica.radianes(c["giro"])
+    devolver [c["x"] + z[2] / 2 + (dx * matematica.coseno(g) + dy * matematica.seno(g)) / c["zoom"],
+        c["y"] + z[3] / 2 + (dy * matematica.coseno(g) - dx * matematica.seno(g)) / c["zoom"]]
+}
+
+# a_pantalla(x, y): dónde se ve en la pantalla el punto (x, y) del mundo
+funcion a_pantalla(val cualquiera x, val cualquiera y = nulo): lista {
+    sea p = _punto(x, y, "a_pantalla")
+    sea c = juego.camara_actual()
+    sea z = _zona_camara(c)
+    sea dx = (p[0] - c["x"] - z[2] / 2) * c["zoom"]
+    sea dy = (p[1] - c["y"] - z[3] / 2) * c["zoom"]
+    sea g = matematica.radianes(c["giro"])
+    devolver [z[0] + z[2] / 2 + dx * matematica.coseno(g) - dy * matematica.seno(g),
+        z[1] + z[3] / 2 + dx * matematica.seno(g) + dy * matematica.coseno(g)]
+}
+
+# ── Texto en una caja ──
+
+# texto_caja(t, x, y, ancho, alto[, opciones]): escribe el texto partido en
+# líneas dentro de esa caja; si no cabe entero, la última línea acaba en
+# "..." y devuelve lo que falta (para la página siguiente), o "" si cabe.
+# Opciones: las de texto() (fuente, escala, color, alinear, capa) y vertical
+# ("arriba", "centro" o "abajo": dónde va el texto dentro de la caja). Con
+# "medir": verdadero no escribe nada: solo devuelve lo que faltaría.
+funcion texto_caja(val texto t, val numero x, val numero y, val numero ancho, val numero alto,
+        val cualquiera opciones = nulo): texto {
+    sea aj = _ui_opciones(opciones, ["fuente", "escala", "color", "alinear", "capa", "vertical", "medir"], "texto_caja")
+    sea letra = {}
+    para cada texto c en aj {
+        si c != "vertical" y c != "medir" { letra[c] = aj[c] }
+    }
+    si no letra.contiene("escala") y no letra.contiene("fuente") { letra["escala"] = 2 }
+    sea alto_linea = juego.medir_texto("Ay\nAy", letra)[1] - juego.medir_texto("Ay", letra)[1]
+    sea alto_letra = juego.medir_texto("Ay", letra)[1]
+    sea lineas = _partir_lineas(t, ancho, letra)
+    sea caben = 0
+    mientras caben < lineas.longitud() y caben * alto_linea + alto_letra <= alto + 0.001 { caben = caben + 1 }
+    sea resto = ""
+    si caben < lineas.longitud() {
+        # lo que falta, sin repetir lo escrito: las líneas que no caben, juntas
+        sea quedan = []
+        para (k = caben; k < lineas.longitud(); k++) { quedan.agregar(lineas[k]) }
+        resto = texto.unir(quedan, " ")
+        si caben > 0 {
+            sea u = lineas[caben - 1]
+            mientras u != "" y juego.ancho_texto(u + "...", letra) > ancho {
+                sea palabras = texto.dividir(u, " ")
+                si palabras.longitud() > 1 {
+                    # la última palabra pasa a la página siguiente
+                    resto = palabras[palabras.longitud() - 1] + " " + resto
+                    palabras.eliminar(palabras.longitud() - 1)
+                    u = texto.unir(palabras, " ")
+                } sino {
+                    u = texto.extraer(u, 0, u.longitud() - 1)
+                }
+            }
+            lineas[caben - 1] = u + "..."
+        }
+    }
+    si _de(aj, "medir", falso) { devolver resto }
+    sea total = si caben == 0 { 0 } sino { (caben - 1) * alto_linea + alto_letra }
+    sea v = _de(aj, "vertical", "arriba")
+    si v == "centro" { y = y + (alto - total) / 2 }
+    sino si v == "abajo" { y = y + alto - total }
+    sino si v != "arriba" { lanzar ErrorArgumento("texto_caja(): \"vertical\" es \"arriba\", \"centro\" o \"abajo\"") }
+    sea px = x
+    si letra.contiene("alinear") y letra["alinear"] == "centro" { px = x + ancho / 2 }
+    sino si letra.contiene("alinear") y letra["alinear"] == "derecha" { px = x + ancho }
+    para (k = 0; k < caben; k++) { juego.texto(lineas[k], px, y + k * alto_linea, letra) }
+    devolver resto
+}
+
+# ── Idiomas ──
+# Cada idioma es un archivo idiomas/<código>.txt junto al juego (en.txt,
+# fr.txt…), con una traducción por línea, «texto original = traducción»; las
+# líneas que empiezan por # son comentarios, \n es un salto de línea y
+# «idioma = English» es el nombre del idioma para el menú. traducir() da la
+# traducción, o el texto tal cual si no la hay. La primera vez se elige solo:
+# el que eligió el jugador con menu_idiomas() o, si no, el del sistema.
+sea _idioma = nulo                # el código del idioma elegido, o nulo
+sea _traducciones = {}
+sea _idioma_elegido = falso       # ya se ha elegido (o mirado) el idioma
+
+funcion _leer_idioma(val texto codigo): cualquiera {
+    sea ruta = "idiomas/" + codigo + ".txt"
+    si no archivos.existe(ruta) { devolver nulo }
+    sea d = {}
+    para cada texto linea en texto.dividir(archivos.leer(ruta), "\n") {
+        sea l = linea.recortar()
+        si l == "" o texto.empieza_con(l, "#") { continuar }
+        sea i = texto.posicion(l, " = ")
+        sea salto = 3
+        si i < 0 {
+            i = texto.posicion(l, "=")
+            salto = 1
+        }
+        si i <= 0 { continuar }
+        sea clave = texto.extraer(l, 0, i).recortar().reemplazar("\\n", "\n")
+        d[clave] = texto.extraer(l, i + salto, l.longitud()).recortar().reemplazar("\\n", "\n")
+    }
+    devolver d
+}
+
+funcion _codigo_idioma_bien(val cualquiera c): logico {
+    si no (c es texto) o c == "" o c.longitud() > 16 { devolver falso }
+    para cada texto letra en c {
+        si no texto.es_letra(letra) y no texto.es_numero(letra) y letra != "_" y letra != "-" { devolver falso }
+    }
+    devolver verdadero
+}
+
+funcion _elegir_idioma_inicial(): nulo {
+    si _idioma_elegido { devolver nulo }
+    _idioma_elegido = verdadero
+    sea hay = idiomas()
+    si hay.longitud() == 0 { devolver nulo }
+    sea guardado = nulo
+    intentar { guardado = juego.cargar("lince_idioma") } capturar (error e) { guardado = nulo }
+    si guardado es texto y hay.contiene(guardado) {
+        idioma(guardado)
+        devolver nulo
+    }
+    sea sistema = juego._idioma_sistema()
+    si hay.contiene(sistema) { idioma(sistema) }
+}
+
+# idioma(código): elige el idioma ("" o nulo: los textos como están escritos);
+# idioma(): el que hay, o nulo
+funcion idioma(val cualquiera codigo = "?"): cualquiera {
+    si codigo == "?" {
+        _elegir_idioma_inicial()
+        devolver _idioma
+    }
+    _idioma_elegido = verdadero
+    si codigo == nulo o codigo == "" {
+        _idioma = nulo
+        _traducciones = {}
+        devolver nulo
+    }
+    si no _codigo_idioma_bien(codigo) {
+        lanzar ErrorTipo("idioma() espera el código de un idioma, como \"en\" (el de idiomas/en.txt)")
+    }
+    sea d = _leer_idioma(codigo)
+    si d == nulo {
+        lanzar ErrorArgumento("idioma(): no está idiomas/{codigo}.txt (cada idioma es un archivo en la carpeta idiomas del juego)")
+    }
+    _idioma = codigo
+    _traducciones = d
+    devolver codigo
+}
+
+# idiomas(): {código: nombre} de los idiomas que tiene el juego
+funcion idiomas(): diccionario {
+    sea r = {}
+    si no archivos.existe("idiomas") y archivos.listar("idiomas").longitud() == 0 { devolver r }
+    sea nombres = archivos.listar("idiomas")
+    nombres.ordenar()
+    para cada texto a en nombres {
+        si texto.termina_con(a, ".txt") {
+            sea c = texto.extraer(a, 0, a.longitud() - 4)
+            si _codigo_idioma_bien(c) {
+                sea d = _leer_idioma(c)
+                si d != nulo { r[c] = _de(d, "idioma", c) }
+            }
+        }
+    }
+    devolver r
+}
+
+# traducir(t[, valores]): la traducción de t en el idioma elegido (o t, si no
+# la hay), con cada {} cambiado por un valor, en orden: valores es uno solo o
+# una lista. traducir("Vidas: {}", vidas), traducir("{} de {}", [a, b])
+funcion traducir(val texto t, val cualquiera valores = nulo): texto {
+    si no _idioma_elegido { _elegir_idioma_inicial() }
+    sea r = si _traducciones.contiene(t) { _traducciones[t] } sino { t }
+    si valores == nulo { devolver r }
+    si no (valores es lista) { valores = [valores] }
+    para cada cualquiera v en valores {
+        sea i = texto.posicion(r, "{}")
+        si i < 0 { romper }
+        r = texto.extraer(r, 0, i) + a_texto(v) + texto.extraer(r, i + 2, r.longitud())
+    }
+    devolver r
+}
+
+fijo _IDIOMAS_OPCIONES = ["x", "y", "escala", "fuente", "color", "color_elegido", "separacion", "sonido_mover", "sonido_elegir"]
+
+# menu_idiomas([opciones]): un menú con los idiomas del juego (por su nombre)
+# y «Volver». Elegir uno lo pone y lo guarda para la próxima vez. Se llama en
+# cada fotograma mientras se vea; devuelve el código elegido, "volver" al
+# salir (también con escape o B), o nulo. Opciones: las de menu().
+funcion menu_idiomas(val cualquiera opciones = nulo): cualquiera {
+    sea aj = _ui_opciones(opciones, _IDIOMAS_OPCIONES, "menu_idiomas")
+    sea hay = idiomas()
+    sea codigos = []
+    sea textos = []
+    para cada texto c en hay {
+        codigos.agregar(c)
+        textos.agregar(hay[c])
+    }
+    textos.agregar("Volver")
+    aj["atras"] = "Volver"
+    sea e = menu(textos, aj)
+    si e == nulo { devolver nulo }
+    para (i = 0; i < codigos.longitud(); i++) {
+        si textos[i] == e {
+            idioma(codigos[i])
+            intentar { juego.guardar("lince_idioma", codigos[i]) } capturar (error x) {}
+            devolver codigos[i]
+        }
+    }
+    devolver "volver"
 }

@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.4
+# 🐆 Lince — Especificación del Lenguaje v1.5
 
 ## Filosofía
 
@@ -1093,6 +1093,9 @@ archivos.crear_directorio("carpeta")
 archivos.listar("carpeta")        # lista de nombres
 ```
 
+En un juego hecho con `lince compilar` o `lince repartir`, `leer`, `existe` y `listar` también
+encuentran los archivos que lleva dentro (si no hay uno con ese nombre en el disco).
+
 ### `tiempo`
 
 ```lince
@@ -1205,8 +1208,50 @@ mientras juego.abierto() {
 | `texto(t, x, y[, escala[, color]])` · `ancho_texto(t[, escala])` | fuente de mapa de bits incluida (mayúsculas, cifras, signos; las minúsculas salen como mayúsculas; tildes y ñ se marcan) |
 | `texto(t, x, y, opciones)` · `ancho_texto(t, opciones)` · `medir_texto(t[, opciones])` | con otra fuente, alineado o partido en líneas (ver **Letras**, abajo). `medir_texto` da `[ancho, alto]` |
 | `posicion_camara()` | `[x, y]` de la cámara (sin el temblor) |
-| `camara(x, y)` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador, que tampoco tiembla con `temblor()` |
+| `camara(x, y[, opciones])` · `camara()` | desplaza todo lo que se dibuja (para mundos más grandes que la pantalla) / vuelve a (0, 0), por ejemplo para el marcador, que tampoco tiembla con `temblor()`. Opciones: `zoom` (2: todo el doble de grande; 0,5: se ve el doble de mundo), `giro` (grados) y `zona` (`[x, y, ancho, alto]`: la parte de la pantalla donde se ve, para la pantalla partida); ver **Cámara**, abajo |
+| `camara_actual()` · `camara(guardada)` | `{"x", "y", "zoom", "giro", "zona", "temblor"}` de la cámara de ahora, y volver a ella |
+| `a_mundo(x, y)` · `a_pantalla(x, y)` | el punto del mundo que se ve en (x, y) de la pantalla, y al revés, con la cámara de ahora (zoom, giro y zona incluidos): `juego.a_mundo(juego.raton())` es dónde hace clic el jugador. Están escritas en Lince |
+| `capa(n)` · `capa()` | lo que se dibuje desde ahora va en la capa `n` (ver **Capas**, abajo) / vuelve a la 0; devuelve la de antes |
 | `captura(ruta)` | guarda la ventana como `.bmp` |
+
+**Cámara.** `(x, y)` es la esquina de arriba a la izquierda de lo que se ve, como siempre: el zoom
+y el giro van alrededor del centro, así que una cámara que ya seguía al jugador lo sigue igual
+con zoom. Con `zona`, lo que se dibuja con esa cámara se ve solo en esa parte de la pantalla; dos
+cámaras, una para cada jugador, hacen la pantalla partida:
+
+```lince
+juego.camara(j1["x"] - 200, j1["y"] - 300, {"zona": [0, 0, 400, 600]})
+dibujar_mundo()
+juego.camara(j2["x"] - 200, j2["y"] - 300, {"zona": [400, 0, 400, 600], "zoom": 1.5})
+dibujar_mundo()
+juego.camara()                    # el marcador, encima de las dos
+```
+
+**Capas.** Lo que se dibuja con la opción `"capa"` (en `dibujar` y `texto`) o después de
+`juego.capa(n)` (para lo demás: rectángulos, mapas, partículas...) no sale aún: `presentar()` lo
+dibuja todo ordenado, lo de las capas más altas encima, y en la misma capa en el orden en que se
+pidió. Sin capa es la 0. Así se puede dibujar en cualquier orden: por ejemplo, cada personaje con
+`"capa": y` sale delante de los que están más arriba en la pantalla. Lo que se dibuja antes de la
+primera capa queda debajo de todo (el fondo); lo que va después, sin capa, entra en el orden como
+capa 0, así que el marcador lleva una capa alta (`juego.capa(1000)`). Cada cosa se dibuja con la
+cámara que tenía al pedirla.
+
+```lince
+juego.dibujar(fondo, 0, 0)                                    # antes de las capas: debajo
+para cada diccionario p en personajes {
+    juego.dibujar(p["imagen"], p["x"], p["y"], {"capa": p["y"]})   # los de abajo, delante
+}
+juego.capa(1000)
+juego.texto("Vidas: {vidas}", 10, 10)                         # el marcador, encima de todo
+juego.capa()
+```
+
+**Texto en una caja.** `texto_caja(t, x, y, ancho, alto[, opciones])` escribe el texto partido en
+líneas dentro de la caja; si no cabe entero, la última línea acaba en `...` y devuelve lo que falta
+(si cabe, `""`), para escribirlo en la página siguiente. Opciones: las de `texto()` (`fuente`,
+`escala`, `color`, `alinear`, `capa`), `vertical` (`"arriba"`, `"centro"` o `"abajo"`: dónde va
+dentro de la caja) y `medir` (verdadero: no escribe; solo dice lo que faltaría). Está escrita en
+Lince.
 
 **Letras.** Además de la fuente incluida, `fuente()` carga una fuente TrueType u OpenType
 (`.ttf`, `.otf`, como las de Google Fonts) a un tamaño, o hace una con letras dibujadas en una
@@ -1645,7 +1690,10 @@ Paredes), una capa o un tile del tileset con la propiedad `solido` (lógica, ver
 opción `"solidos"`. Con la propiedad o la opción `plataforma`, se atraviesan desde abajo y se
 pisan desde arriba. Una capa de colisiones se puede dejar oculta en Tiled: sirve para chocar y
 no se dibuja. Lince entiende los mapas ortogonales (rejilla normal) con casillas cuadradas y
-tilesets de una sola imagen (también con margen, separación y un color transparente). Los mapas
+tilesets de una sola imagen (también con margen, separación y un color transparente). Las capas
+pueden ir en CSV o en base64, sin comprimir o con zlib, gzip o zstd. Un mapa **infinito** se
+convierte en uno normal que empieza en la casilla de más arriba a la izquierda que tiene algo; los
+objetos se mueven lo mismo, así que siguen en su sitio. Los mapas
 y lo que usan (tilesets e imágenes) van dentro del juego al hacer `lince compilar` o `lince
 repartir`, como las imágenes.
 
@@ -1755,6 +1803,36 @@ si juego.menu_controles() == "volver" { ...salir de las opciones... }
 | `menu_controles([opciones])` | enseña cada acción con sus teclas y sus botones; se elige una y se pulsa lo nuevo (Esc deja como estaba). Una tecla nueva sustituye a las teclas que tenía la acción, un botón de mando a sus botones y una dirección de la palanca a sus direcciones; si otra acción ya la usaba, se intercambian. Lo cambiado **se guarda solo** y se aplica solo la próxima vez que el juego defina esa acción con `definir_accion`, sin hacer nada más. Tiene «Restablecer» y «Volver»; devuelve `"volver"` al salir (también con Esc o B). Opciones: `acciones` (cuáles y en qué orden), `nombres` (`{acción: cómo se enseña}`), `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
 | `restablecer_controles()` | vuelven los controles que definió el juego |
 | `entrada_pulsada()` | lo que se acaba de pulsar (tecla, botón del ratón, botón o dirección de la palanca de un mando), escrito como en `definir_accion` (`"espacio"`, `"mando:a"`, `"mando:izq_x-"`), o `nulo`: para hacer un menú de controles propio |
+
+**Idiomas.** Cada idioma del juego es un archivo `idiomas/<código>.txt` (`en.txt`, `fr.txt`...)
+junto al juego, con una traducción por línea:
+
+```
+# idiomas/en.txt
+idioma = English
+Jugar = Play
+Vidas: {} = Lives: {}
+¿Seguro?\nSe perderá la partida = Sure?\nThe game will be lost
+```
+
+`traducir(texto)` da la traducción en el idioma elegido, o el texto tal cual si no la hay, así que
+el juego se escribe en su idioma y se traduce poco a poco. Los `{}` se cambian por valores:
+`traducir("Vidas: {}", vidas)`, `traducir("{} de {}", [a, b])`. `menu()`, `dialogo()` y
+`menu_controles()` enseñan sus textos traducidos (`menu()` sigue devolviendo el texto original,
+así que `si eleccion == "Jugar"` funciona en cualquier idioma).
+
+| Función | Qué hace |
+|---|---|
+| `traducir(texto[, valores])` | el texto en el idioma elegido, con cada `{}` cambiado por un valor, en orden |
+| `idioma(código)` · `idioma()` | elige el idioma (`""`: los textos como están escritos) / dice el que hay, o `nulo` |
+| `idiomas()` | `{código: nombre}` de los archivos de `idiomas/` (el nombre es su línea `idioma = ...`) |
+| `menu_idiomas([opciones])` | un menú con los idiomas por su nombre y «Volver»: elegir uno lo pone y lo guarda para la próxima vez. Devuelve el código elegido, `"volver"` o `nulo`, como `menu_controles()`. Opciones: las de `menu()` |
+
+El idioma se elige solo la primera vez que hace falta: el que eligió el jugador con
+`menu_idiomas()` o, si no, el del sistema si el juego lo tiene. Pon también un archivo para el
+idioma en que está escrito el juego, aunque solo tenga su nombre (`idioma = Español`), para que
+salga en el menú. La carpeta `idiomas` va dentro del juego al hacer `lince compilar` o `lince
+repartir`. Está escrito en Lince.
 
 **Partidas guardadas.** Récords, opciones y avances que siguen ahí al volver a abrir el juego:
 
@@ -2349,6 +2427,7 @@ lince/
 │   ├── formatear.c/h   # lince formatear
 │   ├── documentar.c/h  # la ayuda de los comentarios (lince documentar, el editor)
 │   ├── probar.c/h      # lince probar: las pruebas y su cobertura
+│   ├── zstd.c/h        # descomprimir zstd (capas de Tiled)
 │   └── plataforma.h    # compatibilidad multiplataforma
 ├── tests/
 │   ├── runner.lince           # runner de tests del intérprete

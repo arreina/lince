@@ -1,8 +1,9 @@
-# Mapas de Tiled: el mismo nivel en .tmx (XML, CSV, tileset aparte en .tsx)
-# y en .tmj (JSON, capa en base64 con zlib, tileset dentro)
+# Mapas de Tiled: el mismo nivel en .tmx (XML, CSV, tileset aparte en .tsx),
+# en .tmj (JSON, capa en base64 con zlib, tileset dentro) y como mapa infinito
+# (trozos en coordenadas negativas, en CSV y en base64 con zstd; .tmx y .tmj)
 importar "juego"
 juego.abrir("Tiled", 80, 48)
-para cada texto ruta en ["tiled/nivel.tmx", "tiled/nivel.tmj"] {
+para cada texto ruta en ["tiled/nivel.tmx", "tiled/nivel.tmj", "tiled/infinito.tmx", "tiled/infinito.tmj"] {
     sea m = juego.mapa_tiled(ruta)
     escribir("{ruta}: {m["columnas"]}x{m["filas"]}, casilla {m["tamaño"]}, capas {m["capas"]}")
     escribir("propiedades: {m["propiedades"]["musica"]} {m["propiedades"]["gravedad"]}")

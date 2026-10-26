@@ -18,6 +18,7 @@
 /* de stb_image (imagen.c) */
 char *stbi_zlib_decode_malloc(const char *buffer, int len, int *outlen);
 char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen);
+#include "zstd.h"
 
 /* ── Rutas ── */
 
@@ -325,6 +326,35 @@ static Valor *objeto_xml(const Xml *o) {
     return d;
 }
 
+/* Los datos de un <data> (o un <chunk>): <tile gid> uno a uno, CSV, o el
+   texto en base64 tal cual (datos_capa lo descodifica) */
+static void datos_xml(const Xml *d, const char *cod, const char *comp, Valor *c) {
+    if (d->nhijos > 0 && !cod) {                       /* <tile gid=.../> uno a uno */
+        Valor *l = valor_lista_crear();
+        for (int k = 0; k < d->nhijos; k++) {
+            if (strcmp(d->hijos[k]->nombre, "tile")) continue;
+            const char *g = xml_atr(d->hijos[k], "gid");
+            lista_agregar(l, valor_numero(g ? strtod(g, NULL) : 0));
+        }
+        poner(c, "data", l);
+    } else if (cod && !strcmp(cod, "csv")) {
+        Valor *l = valor_lista_crear();
+        const char *s = d->texto ? d->texto : "";
+        while (*s) {
+            while (*s && (*s < '0' || *s > '9')) s++;
+            if (!*s) break;
+            char *fin;
+            lista_agregar(l, valor_numero((double)strtoul(s, &fin, 10)));
+            s = fin;
+        }
+        poner(c, "data", l);
+    } else {
+        poner(c, "data", valor_texto(d->texto ? d->texto : ""));
+        if (cod) poner(c, "encoding", valor_texto(cod));
+        if (comp) poner(c, "compression", valor_texto(comp));
+    }
+}
+
 static Valor *capa_xml(const Xml *h) {
     Valor *c = valor_diccionario_crear();
     atributos(h, c);
@@ -334,31 +364,20 @@ static Valor *capa_xml(const Xml *h) {
             Xml *d = h->hijos[i];
             if (strcmp(d->nombre, "data")) continue;
             const char *cod = xml_atr(d, "encoding"), *comp = xml_atr(d, "compression");
-            if (d->nhijos > 0 && !cod) {                       /* <tile gid=.../> uno a uno */
-                Valor *l = valor_lista_crear();
+            int hay_trozos = 0;
+            for (int k = 0; k < d->nhijos; k++) if (!strcmp(d->hijos[k]->nombre, "chunk")) hay_trozos = 1;
+            if (hay_trozos) {                                  /* un mapa infinito: trozos con su sitio */
+                Valor *trozos = valor_lista_crear();
                 for (int k = 0; k < d->nhijos; k++) {
-                    const char *g = xml_atr(d->hijos[k], "gid");
-                    lista_agregar(l, valor_numero(g ? strtod(g, NULL) : 0));
+                    Xml *ch = d->hijos[k];
+                    if (strcmp(ch->nombre, "chunk")) continue;
+                    Valor *t = valor_diccionario_crear();
+                    atributos(ch, t);
+                    datos_xml(ch, cod, comp, t);
+                    lista_agregar(trozos, t);
                 }
-                poner(c, "data", l);
-            } else if (cod && !strcmp(cod, "csv")) {
-                Valor *l = valor_lista_crear();
-                const char *s = d->texto ? d->texto : "";
-                while (*s) {
-                    while (*s && (*s < '0' || *s > '9')) s++;
-                    if (!*s) break;
-                    char *fin;
-                    lista_agregar(l, valor_numero((double)strtoul(s, &fin, 10)));
-                    s = fin;
-                }
-                poner(c, "data", l);
-            } else {
-                poner(c, "data", valor_texto(d->texto ? d->texto : ""));
-                if (cod) poner(c, "encoding", valor_texto(cod));
-                if (comp) poner(c, "compression", valor_texto(comp));
-            }
-            for (int k = 0; k < d->nhijos; k++)
-                if (!strcmp(d->hijos[k]->nombre, "chunk")) poner(c, "infinite", valor_booleano(1));
+                poner(c, "chunks", trozos);
+            } else datos_xml(d, cod, comp, c);
         }
     } else if (!strcmp(h->nombre, "objectgroup")) {
         poner(c, "type", valor_texto("objectgroup"));
@@ -488,9 +507,13 @@ static int datos_capa(Valor *capa, char *error, size_t max) {
             if (fl & 16) { while (i < n && b[i]) i++; i++; }
             if (fl & 2) i += 2;
             if (i < n) sin = stbi_zlib_decode_noheader_malloc((const char *)b + i, (int)(n - i), &largo);
+        } else if (!strcmp(comp, "zstd")) {
+            size_t l = 0;
+            sin = (char *)zstd_descomprimir(b, n, &l);
+            largo = (int)l;
         } else {
             free(b);
-            snprintf(error, max, "capa comprimida con '%s': en Tiled, guarda el mapa con capas en CSV, o en base64 sin comprimir, con zlib o con gzip", comp);
+            snprintf(error, max, "capa comprimida con '%s': en Tiled, guarda el mapa con capas en CSV, o en base64 sin comprimir, con zlib, gzip o zstd", comp);
             return 0;
         }
         free(b);
@@ -506,6 +529,112 @@ static int datos_capa(Valor *capa, char *error, size_t max) {
     return 1;
 }
 
+/* ── Mapas infinitos ──
+   Las capas de un mapa infinito vienen en trozos, cada uno con su sitio (en
+   casillas, que pueden ser negativas). Se juntan en un mapa normal que
+   empieza en la casilla de más arriba a la izquierda que tiene algo, y los
+   objetos se mueven lo mismo para que sigan en su sitio. */
+typedef struct { double x0, y0, x1, y1; int hay; } Limites;
+
+static double num_de(Valor *d, const char *k) {
+    Valor *v = campo(d, k);
+    return v && v->tipo == VAL_NUMERO ? v->numero : 0;
+}
+
+static int trozos_limites(Valor *capas, Limites *l, char *error, size_t max) {
+    for (int i = 0; capas && capas->tipo == VAL_LISTA && i < capas->lista.cantidad; i++) {
+        Valor *c = capas->lista.elementos[i];
+        const char *tipo = campo_texto(c, "type");
+        if (tipo && !strcmp(tipo, "group")) { if (!trozos_limites(campo(c, "layers"), l, error, max)) return 0; continue; }
+        Valor *tr = campo(c, "chunks");
+        if (!tr || tr->tipo != VAL_LISTA) continue;
+        for (int k = 0; k < tr->lista.cantidad; k++) {
+            Valor *t = tr->lista.elementos[k];
+            /* en el JSON, la codificación es de la capa */
+            if (!campo(t, "encoding") && campo_texto(c, "encoding")) poner(t, "encoding", valor_texto(campo_texto(c, "encoding")));
+            if (!campo(t, "compression") && campo_texto(c, "compression")) poner(t, "compression", valor_texto(campo_texto(c, "compression")));
+            if (!datos_capa(t, error, max)) return 0;
+            /* solo cuentan las casillas con algo: los trozos son de 16 × 16 */
+            double x = num_de(t, "x"), y = num_de(t, "y");
+            int w = (int)num_de(t, "width");
+            Valor *d = campo(t, "data");
+            for (int j = 0; w > 0 && d && d->tipo == VAL_LISTA && j < d->lista.cantidad; j++) {
+                if (d->lista.elementos[j]->tipo != VAL_NUMERO || d->lista.elementos[j]->numero == 0) continue;
+                double cx = x + j % w, cy = y + j / w;
+                if (!l->hay || cx < l->x0) l->x0 = cx;
+                if (!l->hay || cy < l->y0) l->y0 = cy;
+                if (!l->hay || cx + 1 > l->x1) l->x1 = cx + 1;
+                if (!l->hay || cy + 1 > l->y1) l->y1 = cy + 1;
+                l->hay = 1;
+            }
+        }
+    }
+    return 1;
+}
+
+static void trozos_juntar(Valor *capas, const Limites *l) {
+    int W = (int)(l->x1 - l->x0), H = (int)(l->y1 - l->y0);
+    for (int i = 0; capas && capas->tipo == VAL_LISTA && i < capas->lista.cantidad; i++) {
+        Valor *c = capas->lista.elementos[i];
+        const char *tipo = campo_texto(c, "type");
+        if (tipo && !strcmp(tipo, "group")) { trozos_juntar(campo(c, "layers"), l); continue; }
+        if (!tipo || strcmp(tipo, "tilelayer")) continue;
+        double *rej = calloc((size_t)W * (size_t)H, sizeof(double));
+        Valor *tr = campo(c, "chunks");
+        for (int k = 0; tr && tr->tipo == VAL_LISTA && k < tr->lista.cantidad; k++) {
+            Valor *t = tr->lista.elementos[k], *d = campo(t, "data");
+            int x = (int)(num_de(t, "x") - l->x0), y = (int)(num_de(t, "y") - l->y0);
+            int w = (int)num_de(t, "width"), h = (int)num_de(t, "height");
+            for (int j = 0; d && d->tipo == VAL_LISTA && j < d->lista.cantidad && j < w * h; j++) {
+                int cx = x + j % w, cy = y + j / w;
+                if (cx >= 0 && cy >= 0 && cx < W && cy < H && d->lista.elementos[j]->tipo == VAL_NUMERO)
+                    rej[(size_t)cy * W + cx] = d->lista.elementos[j]->numero;
+            }
+        }
+        Valor *lista = valor_lista_crear();
+        for (size_t j = 0; j < (size_t)W * H; j++) lista_agregar(lista, valor_numero(rej[j]));
+        free(rej);
+        poner(c, "data", lista);
+        poner(c, "width", valor_numero(W));
+        poner(c, "height", valor_numero(H));
+        poner(c, "chunks", valor_nulo());
+        poner(c, "encoding", valor_nulo());
+        poner(c, "compression", valor_nulo());
+    }
+}
+
+static void objetos_mover(Valor *capas, double dx, double dy) {
+    for (int i = 0; capas && capas->tipo == VAL_LISTA && i < capas->lista.cantidad; i++) {
+        Valor *c = capas->lista.elementos[i];
+        const char *tipo = campo_texto(c, "type");
+        if (tipo && !strcmp(tipo, "group")) { objetos_mover(campo(c, "layers"), dx, dy); continue; }
+        Valor *objs = campo(c, "objects");
+        for (int k = 0; objs && objs->tipo == VAL_LISTA && k < objs->lista.cantidad; k++) {
+            Valor *o = objs->lista.elementos[k];
+            poner(o, "x", valor_numero(num_de(o, "x") + dx));
+            poner(o, "y", valor_numero(num_de(o, "y") + dy));
+        }
+    }
+}
+
+static int infinito_a_normal(Valor *m, const char *ruta, char *error, size_t max) {
+    Valor *inf = campo(m, "infinite");
+    if (!inf || !((inf->tipo == VAL_BOOLEANO && inf->booleano) || (inf->tipo == VAL_NUMERO && inf->numero != 0))) return 1;
+    Limites l = {0, 0, 0, 0, 0};
+    if (!trozos_limites(campo(m, "layers"), &l, error, max)) return 0;
+    if (!l.hay) l.x1 = l.y1 = 1;                       /* sin nada dibujado: una casilla */
+    if ((l.x1 - l.x0) * (l.y1 - l.y0) > 16.0 * 1024 * 1024) {
+        snprintf(error, max, "'%s' es un mapa infinito demasiado grande (más de 16 millones de casillas)", ruta);
+        return 0;
+    }
+    trozos_juntar(campo(m, "layers"), &l);
+    objetos_mover(campo(m, "layers"), -l.x0 * num_de(m, "tilewidth"), -l.y0 * num_de(m, "tileheight"));
+    poner(m, "width", valor_numero(l.x1 - l.x0));
+    poner(m, "height", valor_numero(l.y1 - l.y0));
+    poner(m, "infinite", valor_booleano(0));
+    return 1;
+}
+
 static int resolver_capas(Valor *capas, const char *ruta, char *error, size_t max) {
     if (!capas || capas->tipo != VAL_LISTA) return 1;
     for (int i = 0; i < capas->lista.cantidad; i++) {
@@ -513,11 +642,6 @@ static int resolver_capas(Valor *capas, const char *ruta, char *error, size_t ma
         const char *tipo = campo_texto(c, "type");
         if (!tipo) continue;
         if (!strcmp(tipo, "tilelayer")) {
-            Valor *inf = campo(c, "infinite");
-            if (campo(c, "chunks") || (inf && inf->tipo == VAL_BOOLEANO && inf->booleano)) {
-                snprintf(error, max, "'%s' es un mapa infinito: en Tiled, quita «Infinito» en las propiedades del mapa", ruta);
-                return 0;
-            }
             if (!datos_capa(c, error, max)) return 0;
         } else if (!strcmp(tipo, "group")) {
             if (!resolver_capas(campo(c, "layers"), ruta, error, max)) return 0;
@@ -536,12 +660,6 @@ static int resolver_capas(Valor *capas, const char *ruta, char *error, size_t ma
 Valor *tiled_leer(const char *ruta, char *error, size_t max) {
     Valor *m = leer_documento(ruta, 0, error, max);
     if (!m) return NULL;
-    Valor *inf = campo(m, "infinite");
-    if (inf && ((inf->tipo == VAL_BOOLEANO && inf->booleano) || (inf->tipo == VAL_NUMERO && inf->numero != 0))) {
-        snprintf(error, max, "'%s' es un mapa infinito: en Tiled, quita «Infinito» en las propiedades del mapa", ruta);
-        valor_destruir(m);
-        return NULL;
-    }
     const char *ori = campo_texto(m, "orientation");
     if (ori && strcmp(ori, "orthogonal")) {
         snprintf(error, max, "'%s' es un mapa «%s»: Lince entiende los ortogonales (casillas en rejilla)", ruta, ori);
@@ -583,7 +701,10 @@ Valor *tiled_leer(const char *ruta, char *error, size_t max) {
             }
         }
     }
-    if (!resolver_capas(campo(m, "layers"), ruta, error, max)) { valor_destruir(m); return NULL; }
+    if (!infinito_a_normal(m, ruta, error, max) || !resolver_capas(campo(m, "layers"), ruta, error, max)) {
+        valor_destruir(m);
+        return NULL;
+    }
     return m;
 }
 

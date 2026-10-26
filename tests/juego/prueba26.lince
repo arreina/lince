@@ -1,0 +1,54 @@
+# 1.5: capas, cámara con zoom, giro y zona, de la pantalla al mundo,
+# texto en una caja e idiomas (la carpeta idiomas la crea smoke.sh)
+importar "juego"
+juego.abrir("1.5", 200, 100)
+fijo PUNTO = juego.sprite(["X"], {"X": [255, 255, 0]})
+sea vueltas = 0
+mientras juego.abierto() {
+    juego.limpiar([0, 0, 0])
+    # capas: el orden de capa manda, no el de las llamadas
+    juego.rectangulo(0, 0, 50, 50, [255, 0, 0])                 # antes de la primera capa: debajo
+    sea antes = juego.capa(2)
+    juego.rectangulo(10, 10, 30, 30, [0, 0, 255])
+    juego.capa()
+    juego.rectangulo(20, 20, 30, 30, [0, 255, 0])                # capa 0, tras haber capas
+    juego.dibujar(PUNTO, 15, 15, {"escala": 10, "capa": 1})
+    # cámara con zoom 2 en la zona de la derecha: el cuadro de 10 en el centro mide 20
+    juego.camara(0, 0, {"zoom": 2, "zona": [100, 0, 100, 50]})
+    juego.rectangulo(-1000, -1000, 3000, 3000, [40, 40, 40])
+    juego.rectangulo(45, 20, 10, 10, [255, 255, 255])
+    juego.camara()
+    # girada 90 grados, abajo a la derecha: una barra horizontal sale vertical
+    juego.camara(0, 0, {"giro": 90, "zona": [100, 50, 100, 50]})
+    juego.rectangulo(50, 23, 20, 4, [255, 0, 255])
+    juego.camara()
+    juego.presentar()
+    vueltas = vueltas + 1
+    si vueltas == 1 { escribir("capa de antes: {antes}") }
+}
+# de la pantalla al mundo y al revés
+juego.camara(10, 20, {"zoom": 2, "giro": 90, "zona": [0, 0, 100, 100]})
+sea w = juego.a_mundo(30, 70)
+escribir("a_mundo: {w} a_pantalla: {juego.a_pantalla(w)}")
+escribir("camara_actual: {juego.camara_actual()}")
+juego.camara(juego.camara_actual())
+juego.camara(5, 5)
+escribir("sin zoom: {juego.a_mundo([0, 0])}")
+juego.camara()
+# texto en una caja
+sea largo = "Había una vez un lince que vivía en el bosque"
+escribir("resto: {juego.texto_caja(largo, 0, 0, 120, 30, {"medir": verdadero})}")
+escribir("cabe: [{juego.texto_caja("corto", 0, 0, 120, 30)}]")
+escribir("medir con salto: {juego.medir_texto("Ay\nAy")}")
+# idiomas
+escribir("idiomas: {juego.idiomas()}")
+escribir("elegido solo: {juego.idioma()}")
+juego.idioma("en")
+escribir("{juego.traducir("Jugar")} / {juego.traducir("Vidas: {}", 3)} / {juego.traducir("{} de {}", [1, 5])} / {juego.traducir("Sin traducir")}")
+juego.idioma("")
+escribir("original: {juego.traducir("Jugar")} {juego.idioma()}")
+para cada cualquiera prueba en [funcion(): nulo { juego.idioma("fr") }, funcion(): nulo { juego.camara(0, 0, {"zoom": 0}) },
+        funcion(): nulo { juego.camara(0, 0, {"zona": [0, 0]}) }, funcion(): nulo { juego.dibujar(PUNTO, 0, 0, {"capa": "alta"}) },
+        funcion(): nulo { juego.texto_caja("x", 0, 0, 10, 10, {"vertical": "medio"}) }] {
+    intentar { prueba() } capturar (error e) { escribir("error: {e.mensaje}") }
+}

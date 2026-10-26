@@ -33,4 +33,8 @@ int empaquetado_ruta_ejecutable(char *out, size_t max);
 /* Lector para interprete_fijar_lector: contenido empaquetado de una ruta */
 const char *empaquetado_buscar(const char *ruta, size_t *largo);
 
+/* Lo que lleva dentro: cuántos archivos y la ruta del i-ésimo (sin "./") */
+int empaquetado_cantidad(void);
+const char *empaquetado_clave(int i);
+
 #endif /* LINCE_EMPAQUETADO_H */

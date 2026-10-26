@@ -1,0 +1,7 @@
+# El ejemplo de idiomas del módulo juego
+idioma = English
+AVENTURA EN EL CLARO = ADVENTURE IN THE GLADE
+Jugar = Play
+Opciones = Options
+Salir = Quit
+Monedas: {} = Coins: {}

@@ -23,6 +23,7 @@
 #include <direct.h>      /* _mkdir */
 #endif
 #include "modulos.h"
+#include "empaquetado.h"
 #include "plataforma.h"
 
 /* Función del entorno — declaración externa */
@@ -760,6 +761,17 @@ static Valor *fn_arc_leer(Valor **a, int n) {
     }
     FILE *f = fopen(a[0]->texto, "r");
     if (!f) {
+        /* en un juego compilado, lo que lleva dentro (si no hay uno en el disco) */
+        size_t largo = 0;
+        const char *dentro = empaquetado_buscar(a[0]->texto, &largo);
+        if (dentro) {
+            char *c = malloc(largo + 1);
+            memcpy(c, dentro, largo);
+            c[largo] = '\0';
+            Valor *v = valor_texto(c);
+            free(c);
+            return v;
+        }
         char msg[512];
         snprintf(msg, sizeof(msg), "No se pudo abrir el archivo '%s'", a[0]->texto);
         hay_error = 1;
@@ -825,7 +837,7 @@ static Valor *fn_arc_existe(Valor **a, int n) {
     if (a[0]->tipo != VAL_TEXTO) return valor_booleano(0);
     FILE *f = fopen(a[0]->texto, "r");
     if (f) { fclose(f); return valor_booleano(1); }
-    return valor_booleano(0);
+    return valor_booleano(empaquetado_buscar(a[0]->texto, NULL) != NULL);   /* dentro de un juego compilado */
 }
 
 static Valor *fn_arc_eliminar(Valor **a, int n) {
@@ -904,6 +916,23 @@ static Valor *fn_arc_listar(Valor **a, int n) {
             lista_agregar(lista, valor_texto(linea));
     }
     pclose(proc);
+    /* y, en un juego compilado, lo que lleva dentro en esa carpeta */
+    char dir[1024];
+    const char *d = a[0]->texto;
+    if (d[0] == '.' && (d[1] == '/' || d[1] == '\\')) d += 2;
+    snprintf(dir, sizeof dir, "%s", strcmp(d, ".") == 0 ? "" : d);
+    size_t ld = strlen(dir);
+    while (ld && (dir[ld - 1] == '/' || dir[ld - 1] == '\\')) dir[--ld] = '\0';
+    for (int i = 0; i < empaquetado_cantidad(); i++) {
+        const char *c = empaquetado_clave(i);
+        if (!c || (ld && (strncmp(c, dir, ld) != 0 || c[ld] != '/'))) continue;
+        const char *nombre = ld ? c + ld + 1 : c;
+        if (!*nombre || strchr(nombre, '/')) continue;
+        int esta = 0;
+        for (int k = 0; k < lista->lista.cantidad && !esta; k++)
+            esta = strcmp(lista->lista.elementos[k]->texto, nombre) == 0;
+        if (!esta) lista_agregar(lista, valor_texto(nombre));
+    }
     return lista;
 }
 

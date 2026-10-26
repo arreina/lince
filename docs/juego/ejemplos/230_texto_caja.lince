@@ -1,0 +1,20 @@
+# @seccion: Texto y letras
+# @titulo: Texto en una caja
+# @nota: `juego.texto_caja(t, x, y, ancho, alto, opciones)` parte el texto en líneas dentro de la caja; si no cabe, la última acaba en «...» y devuelve lo que falta, para la página siguiente. `vertical` lo pone arriba, en el centro o abajo de la caja, y `medir` dice lo que faltaría sin escribir nada.
+# @fotogramas: 3
+importar "juego"
+
+juego.abrir("Texto en una caja", 480, 270)
+fijo LETRA = juego.fuente("recursos/PressStart2P-Regular.ttf", 8)
+fijo CUENTO = "Había una vez un lince que vivía en lo más hondo del bosque y salía de noche a buscar estrellas caídas."
+mientras juego.abierto() {
+    juego.limpiar([30, 30, 50])
+    juego.rectangulo(20, 30, 200, 60, [60, 60, 100])
+    sea resto = juego.texto_caja(CUENTO, 28, 38, 184, 44, {"fuente": LETRA, "escala": 2})
+    juego.rectangulo(260, 30, 200, 60, [60, 60, 100])
+    juego.texto_caja(resto, 268, 38, 184, 44, {"fuente": LETRA, "escala": 2})
+    juego.rectangulo(20, 130, 440, 110, [60, 60, 100])
+    juego.texto_caja("En el centro de la caja", 20, 130, 440, 110,
+        {"fuente": LETRA, "escala": 2, "alinear": "centro", "vertical": "centro", "color": [255, 220, 80]})
+    juego.presentar()
+}

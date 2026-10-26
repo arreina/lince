@@ -1,0 +1,16 @@
+# @seccion: Menús y diálogos
+# @titulo: Idiomas
+# @nota: Cada idioma es un archivo `idiomas/en.txt` junto al juego, con líneas `Jugar = Play`. `juego.traducir(t)` da la traducción, o el texto tal cual si no la hay; los `{}` se cambian por valores. `menu()` enseña sus textos traducidos y sigue devolviendo el original. El idioma se elige solo (el del sistema, o el que eligió el jugador con `juego.menu_idiomas()`); aquí se elige a mano con `juego.idioma("en")`.
+# @fotogramas: 3
+importar "juego"
+
+juego.abrir("Idiomas", 480, 270)
+juego.idioma("en")
+mientras juego.abierto() {
+    juego.limpiar([25, 25, 45])
+    juego.texto(juego.traducir("AVENTURA EN EL CLARO"), 240, 40, {"escala": 3, "alinear": "centro", "color": [255, 200, 90]})
+    juego.texto(juego.traducir("Monedas: {}", 12), 240, 80, {"escala": 2, "alinear": "centro"})
+    sea eleccion = juego.menu(["Jugar", "Opciones", "Salir"], {"y": 140})
+    si eleccion == "Salir" { juego.salir() }
+    juego.presentar()
+}

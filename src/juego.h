@@ -115,6 +115,12 @@ static struct {
     void *(*SensorOpen)(int);
     int  (*SensorData)(void *, float *, int);
     int  (*DisplayOrientation)(int);
+    /* cámaras con zoom o giro: se dibuja en una textura y se pega girada */
+    void *(*CreateTexture)(void *, unsigned, int, int, int);
+    int  (*SetRenderTarget)(void *, void *);
+    int  (*SetClipRect)(void *, const JgRect *);
+    void *(*PreferredLocales)(void);                                 /* SDL ≥ 2.0.14 */
+    void (*Free)(void *);
 } _jg;
 
 /* Formato de audio de Lince: 16 bits con signo, estéreo, 44100 Hz */
@@ -242,6 +248,20 @@ static struct {
     long limite, total;
     int pulsar[16], npulsar, clic_x, clic_y, hay_clic;
     double cam_x, cam_y, t_inicio;
+    /* la cámara entera: zoom, giro y la zona de la pantalla donde se ve. Con
+       zoom o giro se dibuja en cam_tex, que se pega en su zona al cambiar de
+       cámara o al presentar */
+    double cam_zoom, cam_giro;
+    int cam_zona[4], cam_hay_zona;
+    void *cam_tex;
+    int cam_tw, cam_th, cam_tex_activa, cam_recorte, cam_sin_textura;
+    double vista[4];                     /* lo que se ve, en coordenadas de dibujo: x0, y0, x1, y1 */
+    /* capas: lo que se dibuja en una capa espera a presentar() para dibujarse
+       en orden (y desde entonces, también lo de la capa 0) */
+    struct JgDiferido *dif;
+    int ndif, cap_dif, repitiendo;
+    long orden_dif;
+    double capa;
     int completa;
     JgImagen imagenes[JG_MAX_IMAGENES];
     int nimagenes;
@@ -378,10 +398,245 @@ static int jg_opciones_validas(Valor *op, const char *fn, const char *const *val
 }
 
 /* La cámara con la que se dibuja: la del juego más el temblor */
-static void jg_cam_aplicar(void) {
-    _jgs.cam_x = _jgs.cu_x + (_jgs.cam_quieta ? 0 : _jgs.tem_x);
-    _jgs.cam_y = _jgs.cu_y + (_jgs.cam_quieta ? 0 : _jgs.tem_y);
+/* ── La cámara ──
+   Sin zoom ni giro, lo que se dibuja se desplaza (cam_x, cam_y) y, con zona,
+   se recorta a esa parte de la pantalla. Con zoom o giro se dibuja en una
+   textura del tamaño del trozo de mundo que se ve, que al soltar la cámara
+   se pega escalada y girada en el centro de su zona. (x, y) es siempre la
+   esquina de la vista sin zoom: el zoom y el giro van alrededor del centro,
+   así que una cámara que ya seguía al jugador lo sigue igual con zoom. */
+static int jg_cam_con_textura(void) {
+    return ((_jgs.cam_zoom > 0 && _jgs.cam_zoom != 1) || _jgs.cam_giro != 0) &&
+           _jg.CreateTexture && _jg.SetRenderTarget && !_jgs.cam_sin_textura;
 }
+
+static void jg_cam_zona(double *zx, double *zy, double *zw, double *zh) {
+    if (_jgs.cam_hay_zona) {
+        *zx = _jgs.cam_zona[0]; *zy = _jgs.cam_zona[1]; *zw = _jgs.cam_zona[2]; *zh = _jgs.cam_zona[3];
+    } else {
+        *zx = 0; *zy = 0; *zw = _jgs.ancho; *zh = _jgs.alto;
+    }
+}
+
+static void jg_cam_aplicar(void) {
+    double bx = _jgs.cu_x + (_jgs.cam_quieta ? 0 : _jgs.tem_x);
+    double by = _jgs.cu_y + (_jgs.cam_quieta ? 0 : _jgs.tem_y);
+    double zx, zy, zw, zh;
+    jg_cam_zona(&zx, &zy, &zw, &zh);
+    if (jg_cam_con_textura()) {
+        double zoom = _jgs.cam_zoom > 0 ? _jgs.cam_zoom : 1;
+        double lw = zw, lh = zh;
+        if (_jgs.cam_giro != 0) lw = lh = sqrt(zw * zw + zh * zh);    /* girada, tapa también las esquinas */
+        int tw = (int)ceil(lw / zoom) + 2, th = (int)ceil(lh / zoom) + 2;
+        _jgs.cam_tw = tw > 8192 ? 8192 : tw;
+        _jgs.cam_th = th > 8192 ? 8192 : th;
+        _jgs.cam_x = bx + zw / 2 - _jgs.cam_tw / 2.0;
+        _jgs.cam_y = by + zh / 2 - _jgs.cam_th / 2.0;
+        _jgs.vista[0] = 0; _jgs.vista[1] = 0; _jgs.vista[2] = _jgs.cam_tw; _jgs.vista[3] = _jgs.cam_th;
+    } else {
+        _jgs.cam_x = bx - zx;
+        _jgs.cam_y = by - zy;
+        _jgs.vista[0] = zx; _jgs.vista[1] = zy; _jgs.vista[2] = zx + zw; _jgs.vista[3] = zy + zh;
+    }
+}
+
+/* Lo dibujado con una cámara con zoom o giro, a la pantalla; y fuera el recorte de su zona */
+static void jg_cam_soltar(void) {
+    if (!_jgs.abierta) return;
+    if (_jgs.cam_tex_activa) {
+        _jgs.cam_tex_activa = 0;
+        _jg.SetRenderTarget(_jgs.render, NULL);
+        double zx, zy, zw, zh;
+        jg_cam_zona(&zx, &zy, &zw, &zh);
+        double zoom = _jgs.cam_zoom > 0 ? _jgs.cam_zoom : 1;
+        double w = _jgs.cam_tw * zoom, h = _jgs.cam_th * zoom;
+        JgRect dst = {(int)floor(zx + zw / 2 - w / 2 + 0.5), (int)floor(zy + zh / 2 - h / 2 + 0.5),
+                      (int)ceil(w), (int)ceil(h)};
+        JgRect z = {(int)zx, (int)zy, (int)zw, (int)zh};
+        if (_jg.SetClipRect) _jg.SetClipRect(_jgs.render, &z);
+        _jg.TextureAlpha(_jgs.cam_tex, 255);
+        _jg.TextureColor(_jgs.cam_tex, 255, 255, 255);
+        _jg.RenderCopyEx(_jgs.render, _jgs.cam_tex, NULL, &dst, _jgs.cam_giro, NULL, 0);
+        if (_jg.SetClipRect) _jg.SetClipRect(_jgs.render, NULL);
+        _jgs.cam_recorte = 0;
+    } else if (_jgs.cam_recorte) {
+        _jg.SetClipRect(_jgs.render, NULL);
+        _jgs.cam_recorte = 0;
+    }
+}
+
+/* Antes de dibujar: con zoom o giro, a la textura de la cámara (vacía, si se
+   acaba de pegar); con zona, recortado a ella */
+static void jg_dibujo_listo(void) {
+    if (jg_cam_con_textura()) {
+        if (_jgs.cam_tex_activa) return;
+        if (_jgs.cam_tex) {
+            unsigned f; int acc, w, h;
+            _jg.QueryTexture(_jgs.cam_tex, &f, &acc, &w, &h);
+            if (w != _jgs.cam_tw || h != _jgs.cam_th) { _jg.DestroyTexture(_jgs.cam_tex); _jgs.cam_tex = NULL; }
+        }
+        if (!_jgs.cam_tex) {
+            /* ARGB8888, para dibujar en ella (SDL_TEXTUREACCESS_TARGET) */
+            _jgs.cam_tex = _jg.CreateTexture(_jgs.render, 0x16362004, 2, _jgs.cam_tw, _jgs.cam_th);
+            if (!_jgs.cam_tex) {           /* sin texturas de dibujo: la cámara se queda sin zoom ni giro */
+                _jgs.cam_sin_textura = 1;
+                jg_cam_aplicar();
+                jg_dibujo_listo();
+                return;
+            }
+            _jg.TextureBlend(_jgs.cam_tex, 1);
+        }
+        if (_jgs.cam_recorte) { _jg.SetClipRect(_jgs.render, NULL); _jgs.cam_recorte = 0; }
+        _jg.SetRenderTarget(_jgs.render, _jgs.cam_tex);
+        _jg.SetDrawColor(_jgs.render, 0, 0, 0, 0);
+        _jg.RenderClear(_jgs.render);
+        _jgs.cam_tex_activa = 1;
+    } else if (_jgs.cam_hay_zona && _jg.SetClipRect && !_jgs.cam_recorte) {
+        JgRect z = {_jgs.cam_zona[0], _jgs.cam_zona[1], _jgs.cam_zona[2], _jgs.cam_zona[3]};
+        _jg.SetClipRect(_jgs.render, &z);
+        _jgs.cam_recorte = 1;
+    }
+}
+
+/* La cámara entera, para guardarla con lo que espera en una capa */
+typedef struct { double cu_x, cu_y, zoom, giro; int zona[4], hay_zona, quieta; } JgCam;
+
+static JgCam jg_cam_leer(void) {
+    JgCam c = {_jgs.cu_x, _jgs.cu_y, _jgs.cam_zoom, _jgs.cam_giro,
+               {_jgs.cam_zona[0], _jgs.cam_zona[1], _jgs.cam_zona[2], _jgs.cam_zona[3]},
+               _jgs.cam_hay_zona, _jgs.cam_quieta};
+    return c;
+}
+
+static int jg_cam_igual(const JgCam *a, const JgCam *b) {
+    return a->cu_x == b->cu_x && a->cu_y == b->cu_y && a->zoom == b->zoom && a->giro == b->giro &&
+           a->hay_zona == b->hay_zona && a->quieta == b->quieta &&
+           (!a->hay_zona || memcmp(a->zona, b->zona, sizeof a->zona) == 0);
+}
+
+static void jg_cam_poner(const JgCam *c) {
+    JgCam a = jg_cam_leer();
+    if (jg_cam_igual(&a, c)) return;
+    jg_cam_soltar();
+    _jgs.cu_x = c->cu_x; _jgs.cu_y = c->cu_y;
+    _jgs.cam_zoom = c->zoom; _jgs.cam_giro = c->giro;
+    memcpy(_jgs.cam_zona, c->zona, sizeof _jgs.cam_zona);
+    _jgs.cam_hay_zona = c->hay_zona;
+    _jgs.cam_quieta = c->quieta;
+    jg_cam_aplicar();
+}
+
+/* ── Capas ──
+   Lo que se dibuja con capa (la opción "capa", o juego.capa(n)) no se dibuja
+   aún: se guarda, con su cámara, y presentar() lo dibuja todo ordenado por
+   capa (y, en la misma, en el orden en que se pidió). Desde que hay algo
+   guardado, lo de la capa 0 también espera, para quedar entre las demás. Lo
+   dibujado antes de la primera capa ya está en la pantalla: queda debajo. */
+typedef Valor *(*JgFnDibujo)(Valor **, int);
+typedef struct JgDiferido {
+    JgFnDibujo fn;
+    Valor **args;
+    int n;
+    double capa;
+    long orden;
+    JgCam cam;
+} JgDiferido;
+
+/* Una copia de una lista o un diccionario (no de lo de dentro): si el juego
+   cambia sus opciones después de dibujar, lo guardado no cambia */
+static Valor *jg_copia_corta(Valor *v) {
+    if (v->tipo == VAL_LISTA) {
+        Valor *l = valor_lista_crear();
+        for (int i = 0; i < v->lista.cantidad; i++) { v->lista.elementos[i]->refs++; lista_agregar(l, v->lista.elementos[i]); }
+        return l;
+    }
+    if (v->tipo == VAL_DICCIONARIO && !v->es_modulo && valor_diccionario_buscar(v, "animador") < 0) {
+        Valor *d = valor_diccionario_crear();
+        for (int i = 0; i < v->diccionario.cantidad; i++) {
+            v->diccionario.valores[i]->refs++;
+            valor_diccionario_agregar(d, v->diccionario.claves[i], v->diccionario.valores[i]);
+        }
+        return d;
+    }
+    v->refs++;
+    return v;
+}
+
+/* ¿Hay que guardarlo para luego? 1 sí (ya está guardado), 0 no, -1 error */
+static int jg_diferir(JgFnDibujo fn, Valor **a, int n) {
+    if (_jgs.repitiendo) return 0;
+    double capa = _jgs.capa;
+    for (int i = 1; i < n; i++) {
+        if (a[i]->tipo != VAL_DICCIONARIO) continue;
+        int k = valor_diccionario_buscar(a[i], "capa");
+        if (k < 0) continue;
+        Valor *c = a[i]->diccionario.valores[k];
+        if (c->tipo != VAL_NUMERO) {
+            jg_error("ErrorTipo", "\"capa\" es un número: lo de las capas más altas queda encima");
+            return -1;
+        }
+        capa = c->numero;
+    }
+    if (capa == 0 && _jgs.ndif == 0) return 0;
+    if (_jgs.ndif == _jgs.cap_dif) {
+        _jgs.cap_dif = _jgs.cap_dif ? _jgs.cap_dif * 2 : 256;
+        _jgs.dif = realloc(_jgs.dif, sizeof(JgDiferido) * (size_t)_jgs.cap_dif);
+    }
+    JgDiferido *d = &_jgs.dif[_jgs.ndif++];
+    d->fn = fn;
+    d->n = n;
+    d->args = malloc(sizeof(Valor *) * (size_t)(n > 0 ? n : 1));
+    for (int i = 0; i < n; i++) {
+        if (i == 0) { a[0]->refs++; d->args[0] = a[0]; }
+        else d->args[i] = jg_copia_corta(a[i]);
+    }
+    d->capa = capa;
+    d->orden = _jgs.orden_dif++;
+    d->cam = jg_cam_leer();
+    return 1;
+}
+
+static int jg_cmp_diferido(const void *x, const void *y) {
+    const JgDiferido *a = x, *b = y;
+    if (a->capa != b->capa) return a->capa < b->capa ? -1 : 1;
+    return a->orden < b->orden ? -1 : a->orden > b->orden;
+}
+
+static void jg_diferido_liberar(JgDiferido *d) {
+    for (int i = 0; i < d->n; i++) valor_destruir(d->args[i]);
+    free(d->args);
+}
+
+/* Dibuja lo guardado, en orden de capa (en presentar(), o antes de una captura) */
+static void jg_capas_vaciar(void) {
+    if (_jgs.ndif == 0) return;
+    int n = _jgs.ndif;
+    _jgs.ndif = 0;
+    qsort(_jgs.dif, (size_t)n, sizeof(JgDiferido), jg_cmp_diferido);
+    JgCam antes = jg_cam_leer();
+    _jgs.repitiendo = 1;
+    for (int i = 0; i < n; i++) {
+        JgDiferido *d = &_jgs.dif[i];
+        if (!hay_error) {
+            jg_cam_poner(&d->cam);
+            valor_destruir(d->fn(d->args, d->n));
+        }
+        jg_diferido_liberar(d);
+    }
+    _jgs.repitiendo = 0;
+    _jgs.orden_dif = 0;
+    jg_cam_poner(&antes);
+}
+
+static void jg_capas_olvidar(void) {
+    for (int i = 0; i < _jgs.ndif; i++) jg_diferido_liberar(&_jgs.dif[i]);
+    _jgs.ndif = 0;
+    _jgs.orden_dif = 0;
+}
+
+/* Al principio de cada función que dibuja: si va en una capa, se guarda y no
+   se dibuja todavía; si no, se prepara la cámara */
+#define JG_DIBUJO(fn) do { if (jg_diferir(fn, a, n)) return valor_nulo(); jg_dibujo_listo(); } while (0)
 
 static int jg_cargar(void) {
     if (_jg.Init) return 1;
@@ -447,6 +702,11 @@ static int jg_cargar(void) {
     JG_FN(LogicalSize, "SDL_RenderSetLogicalSize")
     JG_FN(OutputSize, "SDL_GetRendererOutputSize")
     *(void **)(&_jg.WindowToLogical) = JG_SIMBOLO(h, "SDL_RenderWindowToLogical");
+    *(void **)(&_jg.CreateTexture) = JG_SIMBOLO(h, "SDL_CreateTexture");
+    *(void **)(&_jg.SetRenderTarget) = JG_SIMBOLO(h, "SDL_SetRenderTarget");
+    *(void **)(&_jg.SetClipRect) = JG_SIMBOLO(h, "SDL_RenderSetClipRect");
+    *(void **)(&_jg.PreferredLocales) = JG_SIMBOLO(h, "SDL_GetPreferredLocales");
+    *(void **)(&_jg.Free) = JG_SIMBOLO(h, "SDL_free");
     *(void **)(&_jg.ShowCursor) = JG_SIMBOLO(h, "SDL_ShowCursor");
     *(void **)(&_jg.RelativeMouse) = JG_SIMBOLO(h, "SDL_SetRelativeMouseMode");
     *(void **)(&_jg.StartTextInput) = JG_SIMBOLO(h, "SDL_StartTextInput");
@@ -559,6 +819,9 @@ static void jg_cerrar_audio_prueba(void) {
 }
 
 static void jg_cerrar_todo(void) {
+    jg_capas_olvidar();
+    if (_jgs.cam_tex) { _jg.DestroyTexture(_jgs.cam_tex); _jgs.cam_tex = NULL; }
+    _jgs.cam_tex_activa = _jgs.cam_recorte = 0;
     jg_cerrar_audio_prueba();
     jg_parar_flujo();
     if (_jgs.audio) { _jg.CloseAudio(_jgs.audio); _jgs.audio = 0; }
@@ -633,6 +896,8 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         }
         /* el tiempo vuelve a correr normal y se olvidan temblor y pulsaciones */
         _jgs.cu_x = _jgs.cu_y = _jgs.tem_x = _jgs.tem_y = 0;
+        _jgs.cam_zoom = 1; _jgs.cam_giro = 0; _jgs.cam_hay_zona = 0; _jgs.capa = 0;
+        jg_capas_olvidar();
         _jgs.tem_dur = 0;
         _jgs.velocidad = 1; _jgs.congelar_hasta = 0;
         _jgs.nhist = 0;
@@ -700,6 +965,10 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     _jgs.voz_musica = 0;
     _jgs.t_inicio = jg_ahora();
     _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.zoom = (int)z; _jgs.cierre = 0; _jgs.atras = 0;
+    _jgs.cam_zoom = 1; _jgs.cam_giro = 0; _jgs.cam_hay_zona = 0; _jgs.capa = 0;
+    _jgs.cam_tex = NULL; _jgs.cam_tex_activa = _jgs.cam_recorte = _jgs.cam_sin_textura = 0;
+    jg_capas_olvidar();
+    jg_cam_aplicar();
     _jgs.limite = 0; _jgs.total = 0; _jgs.npulsar = 0; _jgs.hay_clic = 0;
     const char *e = getenv("LINCE_JUEGO_FOTOGRAMAS");
     if (e && atol(e) > 0) _jgs.limite = atol(e);
@@ -780,6 +1049,7 @@ static Valor *fn_jg_limpiar(Valor **a, int n) {
     JG_ABIERTA();
     unsigned char c[4] = {0, 0, 0, 255};
     if (n > 0 && !jg_color(a, n, 0, c)) return valor_nulo();
+    jg_cam_soltar();                    /* la ventana entera, no la cámara */
     jg_pintar(c);
     _jg.RenderClear(_jgs.render);
     return valor_nulo();
@@ -797,12 +1067,13 @@ static Valor *jg_rect(Valor **a, int n, int relleno, const char *fn) {
     if (relleno) _jg.FillRect(_jgs.render, &r); else _jg.DrawRect(_jgs.render, &r);
     return valor_nulo();
 }
-static Valor *fn_jg_rectangulo(Valor **a, int n) { return jg_rect(a, n, 1, "rectangulo"); }
-static Valor *fn_jg_contorno(Valor **a, int n)   { return jg_rect(a, n, 0, "contorno"); }
+static Valor *fn_jg_rectangulo(Valor **a, int n) { JG_ABIERTA(); JG_DIBUJO(fn_jg_rectangulo); return jg_rect(a, n, 1, "rectangulo"); }
+static Valor *fn_jg_contorno(Valor **a, int n)   { JG_ABIERTA(); JG_DIBUJO(fn_jg_contorno); return jg_rect(a, n, 0, "contorno"); }
 
 /* linea(x1, y1, x2, y2[, color]) */
 static Valor *fn_jg_linea(Valor **a, int n) {
     JG_ABIERTA();
+    JG_DIBUJO(fn_jg_linea);
     double v[4];
     for (int i = 0; i < 4; i++) if (!jg_num(a, n, i, &v[i], "linea")) return valor_nulo();
     unsigned char c[4];
@@ -816,6 +1087,7 @@ static Valor *fn_jg_linea(Valor **a, int n) {
 /* circulo(x, y, radio[, color]): relleno, con una línea horizontal por fila */
 static Valor *fn_jg_circulo(Valor **a, int n) {
     JG_ABIERTA();
+    JG_DIBUJO(fn_jg_circulo);
     double v[3];
     for (int i = 0; i < 3; i++) if (!jg_num(a, n, i, &v[i], "circulo")) return valor_nulo();
     unsigned char c[4];
@@ -904,6 +1176,7 @@ static int jg_ancho_texto(const char *t, int escala) {
 static Valor *fn_jg_texto(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 3 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "texto() espera (contenido, x, y[, escala[, color]]) o (contenido, x, y, opciones)");
+    JG_DIBUJO(fn_jg_texto);
     if (n > 3 && a[3]->tipo == VAL_DICCIONARIO) return jg_texto_opciones(a, n, 0);
     double x, y, esc = 2;
     if (!jg_num(a, n, 1, &x, "texto") || !jg_num(a, n, 2, &y, "texto")) return valor_nulo();
@@ -1291,9 +1564,16 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
        fotograma (las escenas y su fundido, que queda encima de todo). */
     if (!recargar) {
         interprete_avanzar_tareas();
+        jg_capas_vaciar();                         /* lo de las capas, en orden */
+        /* las escenas, el diálogo y el mando táctil van encima de todo */
+        double capa = _jgs.capa;
+        _jgs.capa = 0;
         if (!hay_error) valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_presentar", NULL, 0));
-        if (hay_error) return valor_nulo();
-    }
+        jg_capas_vaciar();
+        _jgs.capa = capa;
+        if (hay_error) { jg_capas_olvidar(); return valor_nulo(); }
+    } else jg_capas_olvidar();
+    jg_cam_soltar();                               /* lo de una cámara con zoom o giro, a la ventana */
     interprete_perfil_categoria(PERFIL_PRESENTAR);     /* desde aquí, mostrarlo y esperar */
     if (recarga_error()) jg_aviso_error(recarga_error(), 0);
     if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))
@@ -1588,6 +1868,8 @@ static int jg_guardar_bmp(const char *ruta) {
 static Valor *fn_jg_captura(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "captura() espera la ruta del archivo .bmp");
+    jg_capas_vaciar();                  /* lo que esperaba en sus capas, y lo de la cámara, a la ventana */
+    jg_cam_soltar();
     if (!jg_guardar_bmp(a[0]->texto)) return jg_error("ErrorJuego", "no se pudo guardar la captura");
     return valor_nulo();
 }
@@ -3711,6 +3993,7 @@ static void jg_blancas_liberar(void) {
    cuadros de distinto tamaño quedan en su sitio. */
 static Valor *fn_jg_dibujar(Valor **a, int n) {
     JG_ABIERTA();
+    JG_DIBUJO(fn_jg_dibujar);
     /* una hoja, o un animador (que dice qué cuadro de su hoja toca) */
     JgHoja *hoja = NULL;
     int anim_fila = -1, anim_cuadro = 0, es_animador = n > 0 && a[0]->tipo == VAL_DICCIONARIO && jg_dic(a[0], "animador");
@@ -3727,7 +4010,7 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     if (op && op->tipo != VAL_DICCIONARIO && op->tipo != VAL_NULO)
         return jg_error("ErrorTipo", "dibujar(): las opciones van en un diccionario, por ejemplo {\"escala\": 2}");
     static const char *const VD[] = {"escala", "ancho", "alto", "angulo", "espejo", "voltear", "centrado", "alfa", "color",
-                                     "blanco", "mezcla", "recorte", "cuadro", "celda", "fila", NULL};
+                                     "blanco", "mezcla", "recorte", "cuadro", "celda", "fila", "capa", NULL};
     if (!jg_opciones_validas(op, "dibujar", VD)) return valor_nulo();
     JgImagen *img = &_jgs.imagenes[k];
     JgRect src = {0, 0, img->ancho, img->alto};
@@ -4302,23 +4585,75 @@ static Valor *fn_jg_fuente(Valor **a, int n) {
 /* ── Cámara y pantalla ── */
 /* camara(x, y): lo que se dibuja se desplaza; camara() vuelve a (0, 0) y sin
    temblor (para el marcador). Devuelve [x, y] */
+/* camara(x, y[, opciones]) · camara(opciones) · camara(): opciones zoom (2:
+   todo el doble de grande), giro (grados), zona ([x, y, ancho, alto] de la
+   pantalla donde se ve: pantalla partida) y temblor (falso: no tiembla) */
 static Valor *fn_jg_camara(Valor **a, int n) {
-    if (n >= 2) {
-        double x, y;
-        if (!jg_num(a, n, 0, &x, "camara") || !jg_num(a, n, 1, &y, "camara")) return valor_nulo();
-        _jgs.cu_x = x; _jgs.cu_y = y;
-        _jgs.cam_quieta = 0;
-    } else if (n == 0) {
-        _jgs.cu_x = _jgs.cu_y = 0;
-        _jgs.cam_quieta = 1;
-    } else {
-        return jg_error("ErrorTipo", "camara() espera (x, y) o nada");
+    JgCam c = {0, 0, 1, 0, {0, 0, 0, 0}, 0, 0};
+    Valor *op = NULL;
+    if (n == 0) c.quieta = 1;
+    else if (n == 1 && a[0]->tipo == VAL_DICCIONARIO) op = a[0];
+    else if (n >= 2) {
+        if (!jg_num(a, n, 0, &c.cu_x, "camara") || !jg_num(a, n, 1, &c.cu_y, "camara")) return valor_nulo();
+        if (n > 2 && a[2]->tipo != VAL_NULO) {
+            if (a[2]->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo", "camara(): las opciones van en un diccionario, por ejemplo {\"zoom\": 2}");
+            op = a[2];
+        }
+    } else return jg_error("ErrorTipo", "camara() espera (x, y), (x, y, opciones), un diccionario de opciones o nada");
+    if (op) {
+        static const char *const V[] = {"x", "y", "zoom", "giro", "zona", "temblor", NULL};
+        if (!jg_opciones_validas(op, "camara", V)) return valor_nulo();
+        double v;
+        if (n == 1) { jg_opcion(op, "x", &c.cu_x); jg_opcion(op, "y", &c.cu_y); }
+        if (jg_opcion(op, "zoom", &v)) {
+            if (!(v > 0) || v > 64) return jg_error("ErrorArgumento", "camara(): \"zoom\" es mayor que 0 (2: todo el doble de grande; 0.5: se ve el doble de mundo)");
+            c.zoom = v;
+        }
+        if (jg_opcion(op, "giro", &v)) c.giro = fmod(v, 360);
+        Valor *t = jg_opcion_valor(op, "temblor");
+        if (t && t->tipo == VAL_BOOLEANO) c.quieta = !t->booleano;
+        Valor *z = jg_opcion_valor(op, "zona");
+        if (z && z->tipo != VAL_NULO) {
+            int bien = z->tipo == VAL_LISTA && z->lista.cantidad == 4;
+            for (int i = 0; bien && i < 4; i++) bien = z->lista.elementos[i]->tipo == VAL_NUMERO;
+            if (!bien) return jg_error("ErrorTipo", "camara(): \"zona\" es [x, y, ancho, alto], la parte de la pantalla donde se ve");
+            for (int i = 0; i < 4; i++) c.zona[i] = (int)floor(z->lista.elementos[i]->numero + 0.5);
+            if (c.zona[2] < 1 || c.zona[3] < 1) return jg_error("ErrorArgumento", "camara(): la \"zona\" mide al menos 1 × 1");
+            c.hay_zona = 1;
+        }
     }
-    jg_cam_aplicar();
+    jg_cam_poner(&c);
     Valor *l = valor_lista_crear();
     lista_agregar(l, valor_numero(_jgs.cu_x));
     lista_agregar(l, valor_numero(_jgs.cu_y));
     return l;
+}
+
+/* camara_actual(): {"x", "y", "zoom", "giro", "zona", "temblor"}, para volver a
+   ella con camara(lo_guardado) */
+static Valor *fn_jg_camara_actual(Valor **a, int n) {
+    (void)a; (void)n;
+    Valor *d = valor_diccionario_crear();
+    jg_dic_poner(d, "x", valor_numero(_jgs.cu_x));
+    jg_dic_poner(d, "y", valor_numero(_jgs.cu_y));
+    jg_dic_poner(d, "zoom", valor_numero(_jgs.cam_zoom > 0 ? _jgs.cam_zoom : 1));
+    jg_dic_poner(d, "giro", valor_numero(_jgs.cam_giro));
+    if (_jgs.cam_hay_zona) {
+        Valor *z = valor_lista_crear();
+        for (int i = 0; i < 4; i++) lista_agregar(z, valor_numero(_jgs.cam_zona[i]));
+        jg_dic_poner(d, "zona", z);
+    } else jg_dic_poner(d, "zona", valor_nulo());
+    jg_dic_poner(d, "temblor", valor_booleano(!_jgs.cam_quieta));
+    return d;
+}
+
+/* capa(n) · capa(): en qué capa va lo que se dibuje desde ahora (0, la de siempre) */
+static Valor *fn_jg_capa(Valor **a, int n) {
+    double c = 0;
+    if (n > 0 && !jg_num(a, n, 0, &c, "capa")) return valor_nulo();
+    double antes = _jgs.capa;
+    _jgs.capa = c;
+    return valor_numero(antes);
 }
 
 /* temblor(fuerza[, segundos]): la cámara tiembla hasta 'fuerza' píxeles y se
@@ -5126,8 +5461,9 @@ static Valor *fn_jg_particulas(Valor **a, int n) {
 
 /* dibujar_particulas(): mueve y dibuja las partículas vivas; devuelve cuántas quedan */
 static Valor *fn_jg_dibujar_particulas(Valor **a, int n) {
-    (void)a; (void)n;
     JG_ABIERTA();
+    if (jg_diferir(fn_jg_dibujar_particulas, a, n)) return valor_numero(_jgs.npart);
+    jg_dibujo_listo();
     float dt = (float)_jgs.dt;
     int vivas = 0, modo = 1;
     _jg.SetBlend(_jgs.render, 1);
@@ -5175,6 +5511,8 @@ static Valor *fn_jg_cubrir(Valor **a, int n) {
     unsigned char c[4] = {0, 0, 0, 255};
     if (n < 1) return jg_error("ErrorArgumento", "cubrir() espera un color, por ejemplo [0, 0, 0, 128]");
     if (!jg_color(a, n, 0, c)) return valor_nulo();
+    if (jg_diferir(fn_jg_cubrir, a, n)) return valor_nulo();
+    jg_cam_soltar();                    /* la ventana entera, sin cámara */
     jg_pintar(c);
     JgRect r = {0, 0, _jgs.ancho, _jgs.alto};
     _jg.FillRect(_jgs.render, &r);
@@ -5546,6 +5884,27 @@ static Valor *fn_jg_cargar(Valor **a, int n) {
     return v;
 }
 
+/* ── Idiomas ── (la lectura de los archivos de idiomas y traducir() están en juego.lince) */
+/* El idioma del sistema, en dos letras ("es", "en"…), o "" */
+static Valor *fn_jg_idioma_sistema(Valor **a, int n) {
+    (void)a; (void)n;
+    char c[8] = "";
+    if (jg_cargar() && _jg.PreferredLocales) {
+        const char **l = (const char **)_jg.PreferredLocales();       /* SDL_Locale: {language, country}… */
+        if (l && l[0]) snprintf(c, sizeof c, "%.2s", l[0]);
+        if (l && _jg.Free) _jg.Free(l);
+    }
+    if (!c[0]) {
+        const char *v[] = {"LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"};
+        for (int i = 0; i < 4 && !c[0]; i++) {
+            const char *e = getenv(v[i]);
+            if (e && e[0] && strcmp(e, "C") && strcmp(e, "POSIX")) snprintf(c, sizeof c, "%.2s", e);
+        }
+    }
+    for (char *p = c; *p; p++) if (*p >= 'A' && *p <= 'Z') *p += 32;
+    return valor_texto(c);
+}
+
 /* olvidar(nombre): borra lo guardado; verdadero si había algo */
 static Valor *fn_jg_olvidar(Valor **a, int n) {
     char ruta[1100];
@@ -5883,6 +6242,7 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
    jg_aspecto_imagen). Los caracteres que no aparecen no se dibujan. */
 static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
     JG_ABIERTA();
+    JG_DIBUJO(fn_jg_dibujar_mapa);
     JgMapa *m = jg_mapa_arg(a, n, "dibujar_mapa");
     if (!m) return valor_nulo();
     if (n < 2 || a[1]->tipo != VAL_DICCIONARIO)
@@ -5910,8 +6270,8 @@ static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
         if (!jg_color(arg, 1, 0, color[ch])) return valor_nulo();
         tipo[ch] = 1;
     }
-    int c0 = (int)floor(_jgs.cam_x / m->tam), f0 = (int)floor(_jgs.cam_y / m->tam);
-    int c1 = (int)floor((_jgs.cam_x + _jgs.ancho) / m->tam), f1 = (int)floor((_jgs.cam_y + _jgs.alto) / m->tam);
+    int c0 = (int)floor((_jgs.cam_x + _jgs.vista[0]) / m->tam), f0 = (int)floor((_jgs.cam_y + _jgs.vista[1]) / m->tam);
+    int c1 = (int)floor((_jgs.cam_x + _jgs.vista[2]) / m->tam), f1 = (int)floor((_jgs.cam_y + _jgs.vista[3]) / m->tam);
     if (c0 < 0) c0 = 0;
     if (f0 < 0) f0 = 0;
     if (c1 >= m->cols) c1 = m->cols - 1;
@@ -6293,8 +6653,8 @@ static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c) {
         return;
     }
     /* las casillas que se ven, con margen para los tiles más grandes que una casilla */
-    int c0 = (int)floor(cx / t->tw) - 2, f0 = (int)floor(cy / t->th) - 1;
-    int c1 = (int)floor((cx + _jgs.ancho) / t->tw) + 1, f1 = (int)floor((cy + _jgs.alto) / t->th) + 4;
+    int c0 = (int)floor((cx + _jgs.vista[0]) / t->tw) - 2, f0 = (int)floor((cy + _jgs.vista[1]) / t->th) - 1;
+    int c1 = (int)floor((cx + _jgs.vista[2]) / t->tw) + 1, f1 = (int)floor((cy + _jgs.vista[3]) / t->th) + 4;
     if (c0 < 0) c0 = 0;
     if (f0 < 0) f0 = 0;
     if (c1 >= t->cols) c1 = t->cols - 1;
@@ -6330,6 +6690,7 @@ static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c) {
    o una lista: el fondo antes del personaje y lo de delante después) */
 static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
     JG_ABIERTA();
+    JG_DIBUJO(fn_jg_dibujar_tiled);
     int k = n > 0 ? jg_id_de(a[0], "tiled") : -1;
     if (k < 0 || k >= _jgs.ntiled || !_jgs.tiled[k].usado)
         return jg_error("ErrorTipo", "dibujar_tiled() espera un mapa de juego.mapa_tiled()");
@@ -6485,6 +6846,9 @@ static void cargar_juego(Entorno *entorno) {
         {"musica",          fn_jg_musica,          -1},
         {"volumen",         fn_jg_volumen,         -1},
         {"camara",          fn_jg_camara,          -1},
+        {"camara_actual",   fn_jg_camara_actual,    0},
+        {"capa",            fn_jg_capa,            -1},
+        {"_idioma_sistema", fn_jg_idioma_sistema,   0},
         {"temblor",         fn_jg_temblor,         -1},
         {"congelar",        fn_jg_congelar,         1},
         {"velocidad",       fn_jg_velocidad,       -1},

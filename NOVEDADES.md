@@ -3,6 +3,26 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 1.5.0
+
+Gráficos y texto en pantalla. Nada de lo que ya funcionaba cambia.
+
+- **Capas**: con `"capa"` en `dibujar` y `texto`, o tras `juego.capa(n)` para lo demás, lo dibujado sale ordenado al presentar: las capas más altas encima, se dibuje en el orden que se dibuje. Con `"capa": y`, lo que está más abajo en la pantalla tapa a lo de arriba.
+- **Cámara con zoom, giro y zona**: `juego.camara(x, y, {"zoom": 2, "giro": 15, "zona": [0, 0, 400, 600]})`. Con dos zonas, pantalla partida. El zoom y el giro van alrededor del centro, así que una cámara que ya seguía al jugador lo sigue igual. `camara_actual()` la guarda y `camara(guardada)` vuelve a ella; `a_mundo(x, y)` y `a_pantalla(x, y)` pasan de la pantalla al mundo y al revés (para saber dónde hace clic el jugador).
+- **Texto en una caja**: `juego.texto_caja(t, x, y, ancho, alto)` parte el texto en líneas dentro de la caja; si no cabe, acaba en «...» y devuelve lo que falta, para la página siguiente. `vertical` lo pone arriba, en el centro o abajo.
+- **Idiomas**: archivos `idiomas/en.txt` con líneas `Jugar = Play`; `juego.traducir("Jugar")` da la traducción (o el texto tal cual), con `{}` para los valores. `menu()`, `dialogo()` y la pantalla de controles salen traducidos (y `menu()` sigue devolviendo el original). El idioma se elige solo (el del sistema, o el que eligió el jugador con `juego.menu_idiomas()`). La carpeta va dentro al compilar.
+- **Tiled**: mapas infinitos (se convierten en uno normal, con los objetos en su sitio) y capas comprimidas con zstd.
+- **`archivos.leer`, `existe` y `listar`** encuentran también lo que va dentro de un juego compilado.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-1.5.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-1.5.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-1.5.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-1.5.0.vsix` |
+
 ## 1.4.0
 
 Herramientas. El lenguaje no cambia: todo son comandos nuevos y ayudas del editor.

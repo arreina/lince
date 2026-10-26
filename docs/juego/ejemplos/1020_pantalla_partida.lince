@@ -1,0 +1,36 @@
+# @seccion: Cámara
+# @titulo: Zoom, giro y pantalla partida
+# @nota: `juego.camara(x, y, opciones)` admite `zoom`, `giro` (en grados) y `zona`, la parte de la pantalla donde se ve. Con dos zonas, cada jugador tiene su cámara: pantalla partida. El zoom y el giro van alrededor del centro, así que una cámara que ya seguía al jugador lo sigue igual. `juego.a_mundo(juego.raton())` dice qué punto del mundo hay bajo el ratón, con cualquier cámara.
+# @fotogramas: 30
+importar "juego"
+importar "matematica"
+
+juego.abrir("Pantalla partida", 480, 270)
+sea j1 = [200, 300]
+sea j2 = [900, 300]
+
+funcion mundo(): nulo {
+    para (i = 0; i < 30; i++) {
+        juego.rectangulo(i * 80, 340, 70, 40, [90, 150 + (i % 2) * 30, 80])
+        juego.circulo(i * 80 + 35, 310, 14, [60, 120, 60])
+    }
+    juego.rectangulo(j1[0], j1[1], 20, 20, [230, 140, 60])
+    juego.rectangulo(j2[0], j2[1], 20, 20, [90, 140, 230])
+}
+
+mientras juego.abierto() {
+    j1[0] = j1[0] + 120 * juego.dt()
+    j2[0] = j2[0] - 90 * juego.dt()
+    juego.limpiar([20, 20, 30])
+    juego.camara(j1[0] - 120, j1[1] - 130, {"zona": [0, 0, 240, 270]})
+    juego.rectangulo(j1[0] - 1000, -1000, 3000, 3000, [150, 200, 240])
+    mundo()
+    juego.camara(j2[0] - 120, j2[1] - 130, {"zona": [240, 0, 240, 270], "zoom": 1.6, "giro": 8})
+    juego.rectangulo(j2[0] - 1000, -1000, 3000, 3000, [230, 200, 160])
+    mundo()
+    juego.camara()
+    juego.rectangulo(239, 0, 2, 270, [20, 20, 30])
+    juego.texto("JUGADOR 1", 12, 12, 2)
+    juego.texto("JUGADOR 2 (ZOOM)", 252, 12, 2)
+    juego.presentar()
+}

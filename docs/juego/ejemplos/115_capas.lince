@@ -1,0 +1,21 @@
+# @seccion: Dibujar
+# @titulo: Capas
+# @nota: Con `"capa"` (o tras `juego.capa(n)`), lo dibujado espera a `presentar()` y sale ordenado: las capas más altas encima. Aquí cada árbol y el jugador llevan `"capa": y`, así que lo que está más abajo en la pantalla tapa a lo de arriba, se dibuje en el orden que se dibuje. El fondo va antes de la primera capa (debajo de todo) y el marcador en una capa alta.
+# @fotogramas: 3
+importar "juego"
+
+juego.abrir("Capas", 480, 270)
+fijo ARBOL = juego.sprite(["..GG..", ".GGGG.", "GGGGGG", ".GGGG.", "..TT..", "..TT.."], {"G": [60, 150, 70], "T": [120, 80, 40]})
+fijo LINCE = juego.hoja("recursos/lince.png", 16)
+fijo ARBOLES = [[60, 120], [150, 60], [210, 150], [300, 90], [360, 170], [420, 70]]
+mientras juego.abierto() {
+    juego.limpiar([130, 190, 110])                                # antes de las capas: el fondo
+    juego.dibujar(LINCE, 190, 150, {"cuadro": 0, "escala": 4, "capa": 150 + 64})   # sus pies, en y = 214
+    para cada lista a en ARBOLES {
+        juego.dibujar(ARBOL, a[0], a[1], {"escala": 12, "capa": a[1] + 72})    # la base del tronco
+    }
+    juego.capa(1000)
+    juego.texto("CADA COSA EN SU CAPA", 12, 12, 2)
+    juego.capa()
+    juego.presentar()
+}

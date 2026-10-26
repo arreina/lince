@@ -72,12 +72,17 @@ siempre, que es el que ya usa el editor.
 - [x] Paquetes con versión fija (`url@v1.2`) en `paquetes/` del juego y `lince.paquetes` con la
   huella SHA-256; `lince instalar` sin nada los baja tal cual.
 
-### 1.5 — Gráficos y texto en pantalla
-- [ ] Capas de dibujo con orden (`"capa": 3`).
-- [ ] Cámara con zoom y giro; varias cámaras (pantalla partida).
-- [ ] Medir texto y texto que salta de línea dentro de una caja.
-- [ ] Traducciones: `juego.traducir("hola")` con archivos de idioma; el menú de opciones cambia de idioma.
-- [ ] Tiled: capas con zstd y mapas infinitos (isométricos y hexagonales, solo si algún juego los pide).
+### 1.5 — Gráficos y texto en pantalla (publicada)
+En C solo lo que toca el dibujo (las capas, y el zoom, el giro y la zona de la cámara); lo demás
+está en `juego.lince`.
+- [x] Capas de dibujo con orden (`"capa": 3`, `juego.capa(n)`).
+- [x] Cámara con zoom y giro; varias cámaras con `zona` (pantalla partida); `a_mundo` y `a_pantalla`.
+- [x] Medir texto ya estaba (`medir_texto`, `"ancho"`); se añade `texto_caja` (alto, «...», lo que
+  falta para la página siguiente, alineación vertical).
+- [x] Traducciones: `idiomas/<código>.txt`, `traducir`, `idioma`, `idiomas`, `menu_idiomas`; los menús
+  y diálogos de Lince salen traducidos.
+- [x] Tiled: capas con zstd y mapas infinitos.
+- [ ] Tiled isométricos y hexagonales: solo si algún juego los pide.
 
 ### 1.6 — Física y sonido
 - [ ] Cuerpos que giran, círculo contra caja de verdad, polígonos, uniones sencillas (cuerda, bisagra).

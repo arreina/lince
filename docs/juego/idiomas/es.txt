@@ -1,0 +1,2 @@
+# El idioma en que está escrito el ejemplo
+idioma = Español

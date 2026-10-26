@@ -127,6 +127,9 @@ static const char *sin_punto(const char *r) {
     return r;
 }
 
+int empaquetado_cantidad(void) { return _num_entradas; }
+const char *empaquetado_clave(int i) { return i >= 0 && i < _num_entradas ? sin_punto(_entradas[i].clave) : NULL; }
+
 const char *empaquetado_buscar(const char *ruta, size_t *largo) {
     const char *rn = sin_punto(ruta);
     for (int i = 0; i < _num_entradas; i++)
@@ -234,6 +237,17 @@ static void recoger(const char *codigo, const char *actual) {
     static const char *const MEDIOS[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".wav", ".ogg", ".ttf", ".otf",
                                           ".tmx", ".tmj", NULL };
     for (int i = 0; i < cnt; i++) {
+        /* los idiomas (la carpeta idiomas) van dentro si el juego traduce algo */
+        if (tok[i].tipo == TOK_IDENTIFICADOR && tok[i].valor && i > 0 && tok[i - 1].tipo == TOK_PUNTO &&
+            (!strcmp(tok[i].valor, "traducir") || !strcmp(tok[i].valor, "idioma") ||
+             !strcmp(tok[i].valor, "idiomas") || !strcmp(tok[i].valor, "menu_idiomas"))) {
+            struct stat sti;
+            if (!ya_esta("idiomas/") && stat("idiomas", &sti) == 0 && (sti.st_mode & S_IFDIR)) {
+                anadir_bin("idiomas/", "", 0);          /* marca: ya se han metido */
+                if (anadir_extra("idiomas")) printf("   + idiomas/\n");
+            }
+            continue;
+        }
         if (tok[i].tipo != TOK_TEXTO || !tok[i].valor) continue;
         const char *v = tok[i].valor, *ext = strrchr(v, '.');
         if (!ext || strchr(ext, '/')) continue;
