@@ -8,7 +8,7 @@ T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/lib"
 cat > "$T/lib/saludos.lince" <<'EOF'
-funcion saludar(val texto n): texto { devolver "hola " + n }
+funcion saludar(texto n): texto { devolver "hola " + n }
 EOF
 cat > "$T/prog.lince" <<'EOF'
 importar "./lib/saludos"

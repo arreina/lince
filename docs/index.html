@@ -526,7 +526,7 @@
   </div>
 
   <div class="badges">
-    <span class="badge">versión <span>1.9</span></span>
+    <span class="badge">versión <span>2.0</span></span>
     <span class="badge">tests <span>31/31</span></span>
     <span class="badge">licencia <span>MIT</span></span>
     <span class="badge">C puro, sin deps</span>
@@ -598,7 +598,7 @@ juego.<span class="fn">musica</span>(<span class="s">"tema.ogg"</span>)         
 <span class="kw">sea lista</span> notas = [<span class="n">9</span>, <span class="n">7</span>, <span class="n">10</span>]
 
 <span class="c"># Función con valor por defecto</span>
-<span class="k">funcion</span> <span class="fn">saludar</span>(<span class="k">val texto</span> nombre, <span class="k">val texto</span> saludo = <span class="s">"Hola"</span>): <span class="t">texto</span> {
+<span class="k">funcion</span> <span class="fn">saludar</span>(<span class="t">texto</span> nombre, <span class="t">texto</span> saludo = <span class="s">"Hola"</span>): <span class="t">texto</span> {
     <span class="k">devolver</span> saludo + <span class="s">", "</span> + nombre
 }
 
@@ -611,8 +611,8 @@ juego.<span class="fn">musica</span>(<span class="s">"tema.ogg"</span>)         
 }
 
 <span class="c"># Closures</span>
-<span class="k">funcion</span> <span class="fn">multiplicador</span>(<span class="k">val numero</span> factor): <span class="t">funcion</span> {
-    <span class="k">devolver funcion</span>(<span class="k">val numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> x * factor }
+<span class="k">funcion</span> <span class="fn">multiplicador</span>(<span class="t">numero</span> factor): <span class="t">funcion</span> {
+    <span class="k">devolver funcion</span>(<span class="t">numero</span> x): <span class="t">numero</span> { <span class="k">devolver</span> x * factor }
 }
 <span class="kw">sea</span> doble = <span class="fn">multiplicador</span>(<span class="n">2</span>)
 <span class="fn">escribir</span>(<span class="fn">doble</span>(<span class="n">5</span>))   <span class="c"># 10</span></pre>
@@ -631,7 +631,7 @@ juego.<span class="fn">musica</span>(<span class="s">"tema.ogg"</span>)         
 }
 
 <span class="k">clase</span> Rectangulo <span class="k">implementa</span> Forma {
-    <span class="k">funcion</span> <span class="fn">crear</span>(<span class="k">val numero</span> ancho, <span class="k">val numero</span> alto): <span class="t">nulo</span> {
+    <span class="k">funcion</span> <span class="fn">crear</span>(<span class="t">numero</span> ancho, <span class="t">numero</span> alto): <span class="t">nulo</span> {
         <span class="k">mi</span>.ancho = ancho
         <span class="k">mi</span>.alto  = alto
     }
@@ -642,7 +642,7 @@ juego.<span class="fn">musica</span>(<span class="s">"tema.ogg"</span>)         
 }
 
 <span class="k">clase</span> Cuadrado <span class="k">extiende</span> Rectangulo {
-    <span class="k">funcion</span> <span class="fn">crear</span>(<span class="k">val numero</span> lado): <span class="t">nulo</span> {
+    <span class="k">funcion</span> <span class="fn">crear</span>(<span class="t">numero</span> lado): <span class="t">nulo</span> {
         <span class="fn">padre</span>(lado, lado)   <span class="c"># llama al constructor del padre</span>
     }
 }
@@ -660,7 +660,7 @@ juego.<span class="fn">musica</span>(<span class="s">"tema.ogg"</span>)         
           <span class="code-file">generadores.lince</span>
         </div>
         <pre><span class="c"># Generadores — secuencias perezosas</span>
-<span class="k">generador</span> <span class="fn">pares</span>(<span class="k">val numero</span> hasta): <span class="t">numero</span> {
+<span class="k">generador</span> <span class="fn">pares</span>(<span class="t">numero</span> hasta): <span class="t">numero</span> {
     <span class="k">para cada numero</span> n <span class="k">en</span> <span class="fn">rango</span>(hasta) {
         <span class="k">si</span> n % <span class="n">2</span> == <span class="n">0</span> { <span class="k">producir</span> n }
     }
@@ -733,7 +733,7 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
 
     juego.<span class="fn">limpiar</span>([<span class="n">20</span>, <span class="n">20</span>, <span class="n">30</span>])
     juego.<span class="fn">circulo</span>(x, <span class="n">300</span>, <span class="n">20</span>, <span class="s">"#ffc850"</span>)
-    juego.<span class="fn">texto</span>(<span class="s">"Flechas para mover"</span>, <span class="n">10</span>, <span class="n">10</span>, <span class="n">3</span>)
+    juego.<span class="fn">texto</span>(<span class="s">"Flechas para mover"</span>, <span class="n">10</span>, <span class="n">10</span>, {<span class="s">"escala"</span>: <span class="n">3</span>})
     juego.<span class="fn">presentar</span>()      <span class="c"># muestra y espera a 60 fps</span>
 }</pre>
       </div>
@@ -1034,7 +1034,7 @@ juego.<span class="fn">abrir</span>(<span class="s">"Mi primer juego"</span>, <s
 <!-- ══ FOOTER ══ -->
 <footer>
   <p>
-    <strong style="color:var(--texto)">Lince v1.9</strong> &nbsp;·&nbsp;
+    <strong style="color:var(--texto)">Lince v2.0</strong> &nbsp;·&nbsp;
     Licencia <a href="https://github.com/arreina/lince/blob/main/LICENSE">MIT</a> &nbsp;·&nbsp;
     <a href="https://github.com/arreina/lince">GitHub</a> &nbsp;·&nbsp;
     <a href="https://github.com/arreina/lince/blob/main/ESPECIFICACION.md">Especificación</a>

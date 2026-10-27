@@ -18,20 +18,20 @@ Y se reparten como un único ejecutable:
 | Juego | Cómo se juega | Qué enseña |
 |-------|---------------|------------|
 | `01_pong.lince` | W / S y flechas; 1 o 2 jugadores | el bucle `mientras juego.abierto()`, `dt()`, teclado, colisiones, texto y sonido |
-| `02_serpiente.lince` | flechas o WASD | listas de listas, tiempo acumulado con `dt`, funciones con variables globales, **escribir tu nombre** para el récord (`juego.editar`), que **se guarda** para la próxima vez (`juego.guardar` y `juego.cargar`) |
+| `02_serpiente.lince` | flechas o WASD | listas de listas, tiempo acumulado con `dt`, funciones con variables globales, **escribir tu nombre** para el récord (`juego.editar`), que **se guarda** para la próxima vez (`juego.guardar_partida` y `juego.cargar_partida`) |
 | `03_rompeladrillos.lince` | flechas o A / D, espacio lanza | lista de diccionarios, rebotes y colisiones con rectángulos, estados de juego |
 | `04_pajaro.lince` | espacio salta | gravedad, obstáculos que se crean y descartan, **guardar el récord** con `archivos` y `json` |
 | `05_esquiva.lince` | flechas o A / D | **clases, herencia y polimorfismo** (`Objeto` → `Meteorito` y `Estrella`), `es` |
 | `06_memoria.lince` | ratón | el ratón, una máquina de estados y temporizadores sin bloquear el bucle |
 | `07_tres_en_raya.lince` | ratón | **recursión** (minimax): la máquina nunca pierde |
-| `08_plataformas.lince` | flechas / A-D y espacio, o **mando** | nivel escrito como texto, **sprites dibujados con texto** y animados (`juego.sprite`, hoja de sprites), gravedad y un **mapa de casillas** (`juego.mapa`, `juego.mover_en_mapa`), **cámara** con marcador fijo, **acciones** (cada control definido una vez para teclado y mando), **partículas**, **escenas** con fundido (portada y nivel) y animación con `juego.cuadro` |
-| `09_mazmorra.lince` | flechas o WASD, o **mando** | un juego de **vista cenital**: el mismo mapa de casillas sin gravedad, casillas que cambian (`juego.poner_casilla`) y **enemigos que te persiguen** esquivando las paredes (`juego.camino`) |
+| `08_plataformas.lince` | flechas / A-D y espacio, o **mando** | nivel escrito como texto, **sprites dibujados con texto** y animados (`juego.sprite`, hoja de sprites), gravedad y un **mapa de casillas** (`juego.mapa.crear`, `juego.mapa.mover`), **cámara** con marcador fijo, **acciones** (cada control definido una vez para teclado y mando), **partículas**, **escenas** con fundido (portada y nivel) y animación con `juego.cuadro` |
+| `09_mazmorra.lince` | flechas o WASD, o **mando** | un juego de **vista cenital**: el mismo mapa de casillas sin gravedad, casillas que cambian (`juego.poner_casilla`) y **enemigos que te persiguen** esquivando las paredes (`juego.mapa.camino`) |
 | `10_paseo.lince` | flechas o A / D, Mayús corre, o **mando** | **animaciones generadas** a partir de un solo dibujo (`juego.animar`: andar, correr y respirar), la hoja generada en pantalla, **animación tradicional** con una hoja de sprites que se divide sola (`juego.hoja`, los pájaros), pasos con sonido y un paisaje que se repite con varias capas de profundidad |
 | `11_movil.lince` | botones en la pantalla (o el ratón), flechas y espacio | para probar Lince **en un móvil Android** (`android/construir.sh`): `juego.toques()` con un círculo por dedo, **botones táctiles** con `"pantalla:..."` en las acciones, inclinar el móvil para moverse (`"inclinacion:x-"`), vibrar al saltar, una tarea que hace parpadear una estrella y un archivo que cuenta cuántas veces se ha abierto |
 
 | `12_aventura.lince` | flechas o WASD, espacio para hablar, Esc para la pausa | un **menú** de portada y otro de pausa (`juego.menu`) y **diálogos** con el texto saliendo letra a letra, quién habla y respuestas para elegir (`juego.dialogo`, `juego.respuesta`); todo con teclado, mando, ratón o dedo |
 
-| `13_fisica.lince` | flechas o A/D, espacio para saltar, R para empezar otra vez | **física sencilla** (`juego.fisica`, `juego.cuerpo`, `juego.avanzar_fisica`): cajas que se empujan según su masa y se apilan, pelotas que rebotan, un ascensor que lleva lo que tiene encima y monedas que solo avisan al tocarlas (`juego.tocando`) |
+| `13_fisica.lince` | flechas o A/D, espacio para saltar, R para empezar otra vez | **física sencilla** (`juego.fisica.mundo`, `juego.fisica.cuerpo`, `juego.fisica.avanzar`): cajas que se empujan según su masa y se apilan, pelotas que rebotan, un ascensor que lleva lo que tiene encima y monedas que solo avisan al tocarlas (`juego.fisica.tocando`) |
 
 Todos terminan con **Esc** (en la aventura, Esc abre la pausa, que tiene «Salir»).
 

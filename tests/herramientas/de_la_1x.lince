@@ -1,0 +1,11 @@
+# Lo que en la 1.x era de otra forma da en la 2.0 un error que dice cómo es ahora
+importar "texto"
+importar "juego"
+intentar { escribir(texto.dividir("a,b", ",")) } capturar (error e) { escribir(e.mensaje) }
+escribir("a,b".dividir(","))
+intentar { sea m = juego.fisica({"gravedad": 10}) } capturar (error e) { escribir(e.mensaje) }
+intentar { juego.cuerpo(juego.fisica.mundo(), {}) } capturar (error e) { escribir(e.mensaje) }
+escribir(juego.fisica.mundo()["gravedad"])
+sea numero vida = 3
+intentar { vida = "mucha" } capturar (error e) { escribir("{e.tipo}: {e.mensaje}") }
+escribir("fin {vida}")

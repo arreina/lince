@@ -1,7 +1,7 @@
 # @seccion: Mapas de Tiled
 # @titulo: Niveles hechos con Tiled
-# @nota: [Tiled](https://www.mapeditor.org) es el editor de mapas gratuito más usado. `juego.mapa_tiled(ruta)` lee sus mapas (`.tmx` o `.tmj`) con sus tilesets, y da un mapa de Lince normal: `mover_en_mapa`, `camino` y las demás funciones sirven igual. Lo sólido se marca en Tiled: una capa llamada **Colisiones**, o la propiedad `solido` en una capa o en un tile del tileset (o `plataforma`).
-# @nota: `juego.dibujar_tiled(mapa, capas)` lo dibuja con los tiles animados, girados y volteados, la opacidad y el paralaje de cada capa: el fondo antes del personaje y lo de delante después. Los objetos que se pusieron en Tiled (dónde empieza el jugador, las monedas) vienen en `mapa["objetos"]`.
+# @nota: [Tiled](https://www.mapeditor.org) es el editor de mapas gratuito más usado. `juego.mapa.tiled(ruta)` lee sus mapas (`.tmx` o `.tmj`) con sus tilesets, y da un mapa de Lince normal: `juego.mapa.mover`, `juego.mapa.camino` y las demás funciones sirven igual. Lo sólido se marca en Tiled: una capa llamada **Colisiones**, o la propiedad `juego.mapa.solido` en una capa o en un tile del tileset (o `plataforma`).
+# @nota: `juego.mapa.dibujar_tiled(mapa, capas)` lo dibuja con los tiles animados, girados y volteados, la opacidad y el paralaje de cada capa: el fondo antes del personaje y lo de delante después. Los objetos que se pusieron en Tiled (dónde empieza el jugador, las monedas) vienen en `mapa["objetos"]`.
 # @guion: 1:derecha:70
 # @fotogramas: 70
 importar "juego"

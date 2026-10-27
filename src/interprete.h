@@ -59,7 +59,6 @@ typedef struct {
     TipoDato            tipo_tarea;     /* el tipo de lo que devuelve la tarea al acabar */
     const char         *archivo;        /* el fichero donde se escribió (para los errores) */
     int                 perfil;         /* su sitio en la tabla de 'lince perfil' (0: aún no tiene) */
-    int                 obsoleta;       /* con algún nombre, va a cambiar en la 2.0 (ver modulo_obsoleto_llamada) */
 } FuncionLince;
 
 enum { VIS_PUBLICO = 0, VIS_PRIVADO = 1, VIS_PROTEGIDO = 2 };
@@ -212,6 +211,7 @@ void   valor_diccionario_asegurar(Valor *dic, int n);
 void   valor_diccionario_agregar(Valor *dic, const char *clave, Valor *valor);
 /* Posición de la clave en el diccionario, o -1 */
 int    valor_diccionario_buscar(Valor *dic, const char *clave);
+void   valor_diccionario_quitar(Valor *dic, const char *clave);
 void   lista_agregar(Valor *lista, Valor *elem);
 Valor *valor_crear_error(const char *tipo, const char *mensaje, int linea);
 void   entorno_definir_i(Entorno *e, const char *nombre_internado, Valor *valor, int constante);
@@ -306,10 +306,6 @@ void interprete_fijar_hook_error(void (*hook)(Nodo *sentencia, Entorno *e));
 /* El fichero del código que corre ahora (el de la función, si es de otro) */
 const char *interprete_archivo_en_curso(void);
 int  interprete_profundidad(void);
-/* La línea de la última llamada a una función nativa de un módulo, y si se está
-   dentro de una biblioteca escrita en Lince (juego.lince) */
-int  interprete_linea_nativa(void);
-int  interprete_en_biblioteca(void);
 /* Llamada activa 'nivel' (1 = la más externa): nombre y línea desde la que se hizo */
 int  interprete_pila(int nivel, const char **nombre, int *linea);
 

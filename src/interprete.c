@@ -96,11 +96,6 @@ static void (*_hook_sentencia)(Nodo *s, Entorno *e) = NULL;
 /* > 0 mientras corre código de una biblioteca estándar escrita en Lince: el
    depurador no se para dentro (sus líneas no son del programa) */
 static int _en_biblioteca = 0;
-/* La línea desde la que se llamó a la última función nativa de un módulo (para
-   los avisos que dan ellas, como los de lo obsoleto) */
-static int _linea_nativa = 0;
-int interprete_linea_nativa(void) { return _linea_nativa; }
-int interprete_en_biblioteca(void) { return _en_biblioteca > 0; }
 /* Cuántos 'intentar' hay abiertos: con 0, un error no lo captura nadie y el
    depurador se puede parar antes de que acabe el programa */
 static int _intentando = 0;
@@ -793,6 +788,20 @@ static unsigned hash_cadena(const char *s) {
    en línea recta; con más, con una tabla hash que se construye al primer uso
    y crece con las entradas nuevas (las entradas solo se añaden al final, salvo
    'eliminar', que invalida la tabla con indice_n = -1). */
+/* Quita la clave (y su valor) del diccionario, si está */
+void valor_diccionario_quitar(Valor *d, const char *k) {
+    int i = valor_diccionario_buscar(d, k);
+    if (i < 0) return;
+    free(d->diccionario.claves[i]);
+    valor_destruir(d->diccionario.valores[i]);
+    for (int j = i + 1; j < d->diccionario.cantidad; j++) {
+        d->diccionario.claves[j - 1] = d->diccionario.claves[j];
+        d->diccionario.valores[j - 1] = d->diccionario.valores[j];
+    }
+    d->diccionario.cantidad--;
+    d->diccionario.indice_n = -1;                /* el índice se rehace al buscar */
+}
+
 int valor_diccionario_buscar(Valor *d, const char *k) {
     int n = d->diccionario.cantidad;
     if (n <= 8) {
@@ -1320,12 +1329,15 @@ static Valor *obtener_var(Nodo *n, Entorno *e, const char *id, const char *nombr
     return valor_nulo();
 }
 
-static void avisar_tipo(Valor *v, TipoDato t, const char *clase, Entorno *e, const char *que, const char *nombre, int linea);
+static int comprobar_tipo(Valor *v, TipoDato t, const char *clase, Entorno *e, const char *que, const char *nombre, int linea);
 static void asignar_var(Nodo *n, Entorno *e, const char *id, const char *nombre, Valor *nuevo) {
     EntradaVar *v = buscar_var(n, e, id);
     if (!v) { entorno_asignar_i(e, id, nombre, nuevo, n->linea); return; }   /* da el error */
     if (v->constante) { entorno_asignar_i(e, id, nombre, nuevo, n->linea); return; }
-    if (v->tipo) avisar_tipo(nuevo, (TipoDato)(v->tipo - 1), v->clase, e, "la variable", nombre, n->linea);
+    if (v->tipo && comprobar_tipo(nuevo, (TipoDato)(v->tipo - 1), v->clase, e, "la variable", nombre, n->linea)) {
+        valor_destruir(nuevo);
+        return;
+    }
     valor_destruir(v->valor);
     v->valor = nuevo;
 }
@@ -1443,10 +1455,10 @@ static Valor *obtener_tipo(Entorno *e, const char *nombre, int linea) {
     return r;
 }
 
-/* ── Los tipos que en la 2.0 se comprobarán al ejecutar (en la 1.9, un aviso) ──
-   Hoy se comprueba el valor inicial de 'sea numero x' y los parámetros con
-   tipo sencillo. En la 2.0 también: darle luego otro valor, los campos con
-   tipo y los tipos de clase. */
+/* ── Los tipos, comprobados al ejecutar ──
+   Además del valor inicial de 'sea numero x' y de los parámetros (validar_tipo),
+   lo que se le da luego a una variable con tipo, los campos con tipo y los
+   tipos de clase. */
 
 /* Lo que hay con ese nombre (o 'alias.Nombre'), sin dar error si no está */
 static Valor *tipo_sin_error(Entorno *e, const char *nombre) {
@@ -1516,18 +1528,18 @@ static const char *describir_valor(Valor *v) {
     }
 }
 
-/* Si 'v' no es del tipo de 'que' 'nombre', avisa (una vez por línea) */
-static void avisar_tipo(Valor *v, TipoDato t, const char *clase, Entorno *e, const char *que, const char *nombre, int linea) {
-    if (t == TIPO_CUALQUIERA || _en_biblioteca || cumple_tipo(v, t, clase, e)) return;
-    const char *apagar = getenv("LINCE_OBSOLETOS");
-    if (apagar && !strcmp(apagar, "0")) return;
-    static int vistas[256], nvistas;
-    for (int i = 0; i < nvistas; i++) if (vistas[i] == linea) return;
-    if (nvistas < 256) vistas[nvistas++] = linea;
+/* Si 'v' no es del tipo de 'que' 'nombre', un ErrorTipo; devuelve si lo hubo */
+static int comprobar_tipo(Valor *v, TipoDato t, const char *clase, Entorno *e, const char *que, const char *nombre, int linea) {
+    if (t == TIPO_CUALQUIERA || hay_error || cumple_tipo(v, t, clase, e)) return 0;
     static const char *const N[] = { "numero", "texto", "logico", "lista", "diccionario", "nulo", "clase", "funcion",
                                      "cualquiera", "tarea" };
-    fprintf(stderr, "⚠️  Aviso en línea %d: %s '%s' es %s y aquí recibe %s. En la 2.0 será un ErrorTipo.\n",
-            linea, que, nombre, t == TIPO_CLASE && clase ? clase : t <= TIPO_TAREA ? N[t] : "?", describir_valor(v));
+    char msg[600];
+    snprintf(msg, sizeof msg, "%s '%s' es %s y aquí recibe %s.", que, nombre,
+             t == TIPO_CLASE && clase ? clase : t <= TIPO_TAREA ? N[t] : "?", describir_valor(v));
+    msg[0] = (char)(msg[0] == 'l' ? 'L' : msg[0] == 'e' ? 'E' : msg[0]);    /* "La variable", "El campo" */
+    valor_error = valor_error_nuevo("ErrorTipo", msg, linea);
+    hay_error = 1;
+    return 1;
 }
 
 static Valor *exec_es(Nodo *n, Entorno *e) {
@@ -2953,7 +2965,7 @@ static Valor *instanciar_clase(Valor *vcls, Nodo **argn, int nargs, Entorno *e, 
         for (int j = 0; j < f->num_parametros; j++) {
             Valor *arg = ejecutar(argn[j], e);
             validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, linea);
-            if (f->parametros[j].tipo == TIPO_CLASE && !hay_error) avisar_tipo(arg, TIPO_CLASE, f->parametros[j].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[j].nombre, linea);
+            if (f->parametros[j].tipo == TIPO_CLASE && !hay_error) comprobar_tipo(arg, TIPO_CLASE, f->parametros[j].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[j].nombre, linea);
             entorno_definir_i(fn_e, PI(&f->parametros[j]), arg, 0);
         }
         Valor *esto_anterior   = esto_actual;
@@ -3071,8 +3083,11 @@ static Valor *exec_declaracion(Nodo *n, Entorno *e) {
         valor_destruir(v);
         return valor_nulo();
     }
-    if (n->declaracion.tipado && n->declaracion.tipo == TIPO_CLASE)
-        avisar_tipo(v, TIPO_CLASE, n->declaracion.tipo_clase, e, "la variable", n->declaracion.nombre, n->linea);
+    if (n->declaracion.tipado && n->declaracion.tipo == TIPO_CLASE &&
+        comprobar_tipo(v, TIPO_CLASE, n->declaracion.tipo_clase, e, "la variable", n->declaracion.nombre, n->linea)) {
+        valor_destruir(v);
+        return valor_nulo();
+    }
     int pos = e->cantidad;
     entorno_definir_i(e, id, v, n->declaracion.constante);
     if (!hay_error && n->declaracion.tipado && pos < e->cantidad) {
@@ -3472,7 +3487,7 @@ static Valor *llamar_valor(Nodo *n, Valor *vfun, Nodo **argn, int nargs_nodos, E
 
         validar_tipo(arg, param->tipo, "parámetro", param->nombre, n->linea);
         if (param->tipo == TIPO_CLASE && !hay_error)
-            avisar_tipo(arg, TIPO_CLASE, param->tipo_clase, f->entorno_closure, "el parámetro", param->nombre, n->linea);
+            comprobar_tipo(arg, TIPO_CLASE, param->tipo_clase, f->entorno_closure, "el parámetro", param->nombre, n->linea);
         entorno_definir_i(fn_e, PI(param), arg, 0);
     }
 
@@ -3881,7 +3896,7 @@ static Valor *llamar_biblioteca(Valor *vf, Valor **args, int nargs, int linea) {
         Valor *arg = i < nargs ? args[i] : ejecutar(f->parametros[i].valor_defecto, fn_e);
         if (i < nargs) args[i] = NULL;
         validar_tipo(arg, f->parametros[i].tipo, "parámetro", f->parametros[i].nombre, linea);
-        if (f->parametros[i].tipo == TIPO_CLASE && !hay_error) avisar_tipo(arg, TIPO_CLASE, f->parametros[i].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[i].nombre, linea);
+        if (f->parametros[i].tipo == TIPO_CLASE && !hay_error) comprobar_tipo(arg, TIPO_CLASE, f->parametros[i].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[i].nombre, linea);
         entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
     }
     for (int i = 0; i < nargs; i++) if (args[i]) valor_destruir(args[i]);
@@ -3898,7 +3913,13 @@ static Valor *llamar_biblioteca(Valor *vf, Valor **args, int nargs, int linea) {
         er->linea = linea;
         er->archivo = archivo_en_curso();
         size_t ln = strlen(f->nombre);
-        if (strncmp(er->mensaje, f->nombre, ln) != 0 || er->mensaje[ln] != '(') {
+        /* ¿el mensaje ya empieza por el nombre de una función? ("cuerpo(): ..." o,
+           con su parte, "fisica.avanzar() espera ...") */
+        const char *q = er->mensaje;
+        while ((*q >= 'a' && *q <= 'z') || *q == '_' || *q == '.' || (*q >= '0' && *q <= '9')) q++;
+        int ya = q > er->mensaje && *q == '(';
+        (void)ln;
+        if (!ya) {
             char *m = malloc(ln + strlen(er->mensaje) + 8);
             sprintf(m, "%s(): %s", f->nombre, er->mensaje);
             free(er->mensaje);
@@ -3943,12 +3964,6 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 vf = obj->diccionario.valores[i];
                 n->cache_i = i;
             }
-            if (vf && vf->tipo == VAL_DICCIONARIO && vf->es_modulo) {
-                /* una parte del módulo que aún se puede llamar como la función
-                   de antes: juego.mapa(filas) es juego.mapa.crear(filas) */
-                int c = valor_diccionario_buscar(vf, "__llamar__");
-                if (c >= 0) vf = vf->diccionario.valores[c];
-            }
             if (vf) {
                 if (vf->tipo == VAL_CLASE) {
                     Valor *cls = valor_retener(vf);
@@ -3957,12 +3972,13 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                                             n->metodo.num_argumentos, e, n->linea);
                 }
                 if (vf->tipo != VAL_FUNCION) {
+                    const char *ahora = modulo_quitado(obj, met);        /* juego.mapa(filas): de la 1.x */
+                    Valor *err = ahora ? error_rt("Error", n->linea, "Esto es de la 1.x, y en la 2.0 cambió: %s («lince migrar» lo cambia solo).", ahora)
+                                       : error_rt("ErrorTipo", n->linea, "'%s' no es una función del módulo.", met);
                     valor_destruir(obj);
-                    return error_rt("ErrorTipo", n->linea,
-                        "'%s' no es una función del módulo.", met);
+                    return err;
                 }
                 FuncionLince *f = vf->funcion;
-                if (f->obsoleta && !_en_biblioteca) modulo_obsoleto_llamada(obj, met, n->linea);
 
                 int nargs = n->metodo.num_argumentos;
                 Valor *args_pila[8];
@@ -3977,7 +3993,6 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                     /* Nativa: 'cuerpo' guarda el puntero a la función C */
                     typedef Valor *(*FnNativa)(Valor**, int);
                     FnNativa fn = (FnNativa)(uintptr_t)f->cuerpo;
-                    _linea_nativa = n->linea;
                     if (__builtin_expect(_perfil, 0)) {
                         int pf_antes = _pf_actual, pf_cat = _pf_cat;
                         perfil_tic();
@@ -4008,8 +4023,11 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
                 return resultado ? resultado : valor_nulo();
             }
         }
+        const char *ahora = modulo_quitado(obj, met);           /* juego.cuerpo, texto.dividir: de la 1.x */
+        Valor *err = ahora ? error_rt("Error", n->linea, "Esto es de la 1.x, y en la 2.0 cambió: %s («lince migrar» lo cambia solo).", ahora)
+                           : error_rt("Error", n->linea, "El módulo no tiene la función '%s'.", met);
         valor_destruir(obj);
-        return error_rt("Error", n->linea, "El módulo no tiene la función '%s'.", met);
+        return err;
     }
 
     /* ── Métodos ESTÁTICOS: Clase.metodo(...) ── */
@@ -4107,7 +4125,7 @@ static Valor *exec_metodo(Nodo *n, Entorno *e) {
         for (int j = 0; j < f->num_parametros; j++) {
             Valor *arg = ejecutar(n->metodo.argumentos[j], e);
             validar_tipo(arg, f->parametros[j].tipo, "parámetro", f->parametros[j].nombre, n->linea);
-            if (f->parametros[j].tipo == TIPO_CLASE && !hay_error) avisar_tipo(arg, TIPO_CLASE, f->parametros[j].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[j].nombre, n->linea);
+            if (f->parametros[j].tipo == TIPO_CLASE && !hay_error) comprobar_tipo(arg, TIPO_CLASE, f->parametros[j].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[j].nombre, n->linea);
             entorno_definir_i(fn_e, PI(&f->parametros[j]), arg, 0);
         }
         Valor *esto_anterior   = esto_actual;
@@ -4497,7 +4515,7 @@ static Valor *exec_padre(Nodo *n, Entorno *e) {
     for (int i = 0; i < f->num_parametros; i++) {
         Valor *arg = ejecutar(n->padre.argumentos[i], e);
         validar_tipo(arg, f->parametros[i].tipo, "parámetro", f->parametros[i].nombre, n->linea);
-        if (f->parametros[i].tipo == TIPO_CLASE && !hay_error) avisar_tipo(arg, TIPO_CLASE, f->parametros[i].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[i].nombre, n->linea);
+        if (f->parametros[i].tipo == TIPO_CLASE && !hay_error) comprobar_tipo(arg, TIPO_CLASE, f->parametros[i].tipo_clase, f->entorno_closure, "el parámetro", f->parametros[i].nombre, n->linea);
         entorno_definir_i(fn_e, PI(&f->parametros[i]), arg, 0);
     }
 
@@ -4934,8 +4952,12 @@ static Valor *exec_asignacion_campo(Nodo *n, Entorno *e) {
             err = error_rt("ErrorTipo", n->linea,
                 "'%s.%s' es constante ('fijo'): no se puede modificar.", cd->duena->nombre, campo);
         if (err) { valor_destruir(val); if (propio) valor_destruir(obj); return err; }
-        if (cd->decl && cd->decl->declaracion.tipado)
-            avisar_tipo(val, cd->decl->declaracion.tipo, cd->decl->declaracion.tipo_clase, e, "el campo", campo, n->linea);
+        if (cd->decl && cd->decl->declaracion.tipado &&
+            comprobar_tipo(val, cd->decl->declaracion.tipo, cd->decl->declaracion.tipo_clase, e, "el campo", campo, n->linea)) {
+            valor_destruir(val);
+            if (propio) valor_destruir(obj);
+            return valor_nulo();
+        }
         valor_destruir(cd->valor);
         cd->valor = val;
         if (propio) valor_destruir(obj);
@@ -4962,8 +4984,12 @@ static Valor *exec_asignacion_campo(Nodo *n, Entorno *e) {
                 err = error_rt("ErrorTipo", n->linea,
                     "El campo '%s' es constante ('fijo'): no se puede modificar.", campo);
             if (err) { valor_destruir(val); if (propio) valor_destruir(obj); return err; }
-            if (cd && cd->decl && cd->decl->declaracion.tipado)
-                avisar_tipo(val, cd->decl->declaracion.tipo, cd->decl->declaracion.tipo_clase, e, "el campo", campo, n->linea);
+            if (cd && cd->decl && cd->decl->declaracion.tipado &&
+                comprobar_tipo(val, cd->decl->declaracion.tipo, cd->decl->declaracion.tipo_clase, e, "el campo", campo, n->linea)) {
+                valor_destruir(val);
+                if (propio) valor_destruir(obj);
+                return valor_nulo();
+            }
             valor_destruir(obj->objeto->campos_valores[i]);
             obj->objeto->campos_valores[i] = val;
             if (propio) valor_destruir(obj);
@@ -6034,7 +6060,7 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {
        dueño — el módulo motor guarda el callback de al_actualizar — y ese cuerpo puede soltarlo desde
        dentro:
 
-           motor.al_actualizar(funcion(val numero d): nulo {
+           motor.al_actualizar(funcion(numero d): nulo {
                motor.al_actualizar(otra)     # suelta la que se está ejecutando
            })
 

@@ -1245,24 +1245,24 @@ funcion _dibujar_dialogo(): nulo {
 # ── Física sencilla ──
 # Cuerpos que caen, rebotan, se empujan y chocan entre ellos y con un mapa:
 # cajas, pelotas, plataformas que se mueven y el propio personaje. Un cuerpo
-# es un diccionario como los de mover_en_mapa (x, y, ancho, alto, vx, vy) con
+# es un diccionario como los de mapa.mover (x, y, ancho, alto, vx, vy) con
 # lo suyo: masa, rebote, friccion, fijo, sensor, gravedad. Los que llevan
 # "gira" (o "puntos", un polígono) giran al chocar: ver «Física con giros».
-#   sea mundo = juego.fisica({"gravedad": 900, "mapa": NIVEL})
-#   sea caja = juego.cuerpo(mundo, {"x": 100, "y": 50, "ancho": 24, "alto": 24})
+#   sea mundo = juego.fisica.mundo({"gravedad": 900, "mapa": NIVEL})
+#   sea caja = juego.fisica.cuerpo(mundo, {"x": 100, "y": 50, "ancho": 24, "alto": 24})
 #   # en cada fotograma:
-#   juego.avanzar_fisica(mundo)
+#   juego.fisica.avanzar(mundo)
 
 fijo _FISICA_OPCIONES = ["gravedad", "mapa", "pasos", "iteraciones"]
 sea _cuerpos_creados = 0
 
 funcion fisica(cualquiera opciones = nulo): diccionario {
-    sea op = _ui_opciones(opciones, _FISICA_OPCIONES, "fisica")
+    sea op = _ui_opciones(opciones, _FISICA_OPCIONES, "fisica.mundo")
     sea g = _de(op, "gravedad", 900)
     si g es numero { g = [0, g] }
-    si no (g es lista) o g.longitud() != 2 { lanzar ErrorTipo("fisica(): \"gravedad\" es un número (hacia abajo) o [x, y]") }
+    si no (g es lista) o g.longitud() != 2 { lanzar ErrorTipo("fisica.mundo(): \"gravedad\" es un número (hacia abajo) o [x, y]") }
     sea it = _de(op, "iteraciones", 8)
-    si no (it es numero) o it < 1 o it > 100 { lanzar ErrorArgumento("fisica(): \"iteraciones\" va de 1 a 100 (más: pilas más quietas, pero más lento)") }
+    si no (it es numero) o it < 1 o it > 100 { lanzar ErrorArgumento("fisica.mundo(): \"iteraciones\" va de 1 a 100 (más: pilas más quietas, pero más lento)") }
     devolver {"gravedad": g, "mapa": _de(op, "mapa", nulo), "pasos": _de(op, "pasos", 120),
         "iteraciones": it, "_pasos_puestos": op.contiene("pasos"), "cuerpos": [], "toques": {}, "uniones": [], "_cache": {}, "_casillas": {},
         "_sin_choque": {}}
@@ -1270,18 +1270,18 @@ funcion fisica(cualquiera opciones = nulo): diccionario {
 
 funcion _es_mundo(cualquiera m, texto fn): nulo {
     si no (m es diccionario) o no m.contiene("cuerpos") {
-        lanzar ErrorTipo("{fn}() espera un mundo de juego.fisica()")
+        lanzar ErrorTipo("{fn}() espera un mundo de juego.fisica.mundo()")
     }
 }
 
-# cuerpo(mundo, datos): añade un cuerpo al mundo y lo devuelve (el mismo
+# fisica.cuerpo(mundo, datos): añade un cuerpo al mundo y lo devuelve (el mismo
 # diccionario, con lo que falte puesto). Con "radio" es un círculo (x, y es
 # su esquina, como en las cajas). "fijo": no lo mueven los choques ni la
 # gravedad (suelos, paredes, plataformas que se mueven con su vx, vy).
 # "sensor": no choca, solo cuenta lo que toca (monedas, zonas).
 funcion cuerpo(cualquiera mundo, cualquiera datos): diccionario {
-    _es_mundo(mundo, "cuerpo")
-    si no (datos es diccionario) { lanzar ErrorTipo("cuerpo() espera (mundo, \{\"x\": ..., \"y\": ..., \"ancho\": ..., \"alto\": ...})") }
+    _es_mundo(mundo, "fisica.cuerpo")
+    si no (datos es diccionario) { lanzar ErrorTipo("fisica.cuerpo() espera (mundo, \{\"x\": ..., \"y\": ..., \"ancho\": ..., \"alto\": ...})") }
     si datos.contiene("radio") {
         datos["ancho"] = datos["radio"] * 2
         datos["alto"] = datos["radio"] * 2
@@ -1289,7 +1289,7 @@ funcion cuerpo(cualquiera mundo, cualquiera datos): diccionario {
     si datos.contiene("puntos") { _medir_puntos(datos) }
     para cada texto c en ["x", "y", "ancho", "alto"] {
         si no datos.contiene(c) o no (datos[c] es numero) {
-            lanzar ErrorTipo("cuerpo(): falta \"{c}\" (un número; o \"radio\" en vez de ancho y alto)")
+            lanzar ErrorTipo("fisica.cuerpo(): falta \"{c}\" (un número; o \"radio\" en vez de ancho y alto)")
         }
     }
     para cada texto c en ["vx", "vy", "rebote"] { si no datos.contiene(c) { datos[c] = 0 } }
@@ -1298,7 +1298,7 @@ funcion cuerpo(cualquiera mundo, cualquiera datos): diccionario {
     si no datos.contiene("gravedad") { datos["gravedad"] = 1 }
     si no datos.contiene("fijo") { datos["fijo"] = falso }
     si no datos.contiene("sensor") { datos["sensor"] = falso }
-    si datos["masa"] <= 0 { lanzar ErrorArgumento("cuerpo(): la masa tiene que ser mayor que 0") }
+    si datos["masa"] <= 0 { lanzar ErrorArgumento("fisica.cuerpo(): la masa tiene que ser mayor que 0") }
     si datos.contiene("puntos") o (datos.contiene("gira") y datos["gira"]) { _preparar_rigido(datos) }
     _cuerpos_creados = _cuerpos_creados + 1
     datos["id_fisica"] = _cuerpos_creados
@@ -1308,7 +1308,7 @@ funcion cuerpo(cualquiera mundo, cualquiera datos): diccionario {
 }
 
 funcion quitar_cuerpo(cualquiera mundo, cualquiera c): nulo {
-    _es_mundo(mundo, "quitar_cuerpo")
+    _es_mundo(mundo, "fisica.quitar")
     sea quedan = []
     para cada diccionario vecino en mundo["cuerpos"] {
         si vecino["id_fisica"] != c["id_fisica"] { quedan.agregar(vecino) }
@@ -1323,14 +1323,14 @@ funcion quitar_cuerpo(cualquiera mundo, cualquiera c): nulo {
     mundo["uniones"] = uniones
 }
 
-# empujar(cuerpo, fx, fy[, punto]): un golpe: cambia su velocidad según su
+# fisica.empujar(cuerpo, fx, fy[, punto]): un golpe: cambia su velocidad según su
 # masa. Si gira y el golpe es en un punto [x, y] que no es su centro, gira.
 funcion empujar(cualquiera c, numero fx, numero fy, cualquiera punto = nulo): nulo {
     si c["fijo"] { devolver nulo }
     c["vx"] = c["vx"] + fx / c["masa"]
     c["vy"] = c["vy"] + fy / c["masa"]
     si punto != nulo y c.contiene("_forma") y c["gira"] {
-        sea p = _punto(punto, nulo, "empujar")
+        sea p = _punto(punto, nulo, "fisica.empujar")
         sea centro = centro_cuerpo(c)
         sea rx = p[0] - centro[0]
         sea ry = p[1] - centro[1]
@@ -1338,9 +1338,9 @@ funcion empujar(cualquiera c, numero fx, numero fy, cualquiera punto = nulo): nu
     }
 }
 
-# tocando(mundo, cuerpo): los cuerpos que tocaba en el último avanzar_fisica()
+# fisica.tocando(mundo, cuerpo): los cuerpos que tocaba en el último fisica.avanzar()
 funcion tocando(cualquiera mundo, cualquiera c): lista {
-    _es_mundo(mundo, "tocando")
+    _es_mundo(mundo, "fisica.tocando")
     sea clave = "{c["id_fisica"]}"
     si mundo["toques"].contiene(clave) { devolver mundo["toques"][clave] }
     devolver []
@@ -1512,10 +1512,10 @@ funcion _paso_fisica(diccionario mundo, numero dt): nulo {
     }
 }
 
-# avanzar_fisica(mundo[, dt]): mueve todo lo de un fotograma (en pasos
+# fisica.avanzar(mundo[, dt]): mueve todo lo de un fotograma (en pasos
 # pequeños, para que nada atraviese nada)
 funcion avanzar_fisica(cualquiera mundo, cualquiera dt = nulo): nulo {
-    _es_mundo(mundo, "avanzar_fisica")
+    _es_mundo(mundo, "fisica.avanzar")
     si dt == nulo { dt = juego.dt() }
     mundo["toques"] = {}
     si dt <= 0 { devolver nulo }
@@ -1543,7 +1543,7 @@ funcion avanzar_fisica(cualquiera mundo, cualquiera dt = nulo): nulo {
 # Un cuerpo con "gira": verdadero, o con "puntos" (un polígono convexo), gira
 # al chocar: lleva "angulo" (en grados, como dibujar()) y "vgiro" (grados por
 # segundo). Sus esquinas chocan de verdad, rueda, vuelca y se apila. Con
-# cuerda() y bisagra() se unen dos cuerpos (o un cuerpo y un punto fijo).
+# fisica.cuerda() y fisica.bisagra() se unen dos cuerpos (o un cuerpo y un punto fijo).
 # Su (x, y) es la esquina de la caja sin girar, como en los demás: el centro
 # no se mueve al girar, así que se dibuja con juego.dibujar(imagen, c["x"],
 # c["y"], {"angulo": c["angulo"]}).
@@ -1563,9 +1563,9 @@ fijo _SIN_BOTE = 40        # por debajo de esta velocidad (píxeles por segundo)
 # ancho y alto de un polígono, por sus puntos
 funcion _medir_puntos(diccionario c): nulo {
     sea ps = c["puntos"]
-    sea uso = "cuerpo(): \"puntos\" es una lista de puntos [[x, y], [x, y], [x, y], ...] (al menos 3), desde (x, y)"
+    sea uso = "fisica.cuerpo(): \"puntos\" es una lista de puntos [[x, y], [x, y], [x, y], ...] (al menos 3), desde (x, y)"
     si no (ps es lista) o ps.longitud() < 3 { lanzar ErrorTipo(uso) }
-    si ps.longitud() > 16 { lanzar ErrorArgumento("cuerpo(): un polígono tiene como mucho 16 puntos") }
+    si ps.longitud() > 16 { lanzar ErrorArgumento("fisica.cuerpo(): un polígono tiene como mucho 16 puntos") }
     sea x1 = 0
     sea y1 = 0
     para cada cualquiera p en ps {
@@ -1584,7 +1584,7 @@ funcion _preparar_rigido(diccionario c): nulo {
     si no c.contiene("vgiro") { c["vgiro"] = 0 }
     si no c.contiene("gira") { c["gira"] = verdadero }
     para cada texto k en ["angulo", "vgiro"] {
-        si no (c[k] es numero) { lanzar ErrorTipo("cuerpo(): \"{k}\" es un número (en grados)") }
+        si no (c[k] es numero) { lanzar ErrorTipo("fisica.cuerpo(): \"{k}\" es un número (en grados)") }
     }
     si c.contiene("radio") {
         c["_forma"] = {"radio": c["radio"], "cm": [c["radio"], c["radio"]], "inercia": c["radio"] * c["radio"] / 2}
@@ -1609,7 +1609,7 @@ funcion _preparar_rigido(diccionario c): nulo {
         cx = cx + (p[0] + q[0]) * cr
         cy = cy + (p[1] + q[1]) * cr
     }
-    si matematica.abs(area) < 0.0001 { lanzar ErrorArgumento("cuerpo(): los puntos del polígono no encierran nada (están en línea)") }
+    si matematica.abs(area) < 0.0001 { lanzar ErrorArgumento("fisica.cuerpo(): los puntos del polígono no encierran nada (están en línea)") }
     cx = cx / (3 * area)
     cy = cy / (3 * area)
     si area < 0 { ps = ps.invertir() }
@@ -1623,12 +1623,12 @@ funcion _preparar_rigido(diccionario c): nulo {
         sea q = locales[(i + 1) % n]
         sea r = locales[(i + 2) % n]
         si (q[0] - p[0]) * (r[1] - q[1]) - (q[1] - p[1]) * (r[0] - q[0]) < -0.0001 {
-            lanzar ErrorArgumento("cuerpo(): el polígono tiene que ser convexo (sin entrantes); uno con entrantes se hace con varios")
+            lanzar ErrorArgumento("fisica.cuerpo(): el polígono tiene que ser convexo (sin entrantes); uno con entrantes se hace con varios")
         }
         sea ex = q[0] - p[0]
         sea ey = q[1] - p[1]
         sea l = matematica.raiz(ex * ex + ey * ey)
-        si l < 0.0001 { lanzar ErrorArgumento("cuerpo(): el polígono tiene dos puntos repetidos seguidos") }
+        si l < 0.0001 { lanzar ErrorArgumento("fisica.cuerpo(): el polígono tiene dos puntos repetidos seguidos") }
         normales.agregar([ey / l, -ex / l])
         sea cr = p[0] * q[1] - q[0] * p[1]
         arriba = arriba + cr * (p[0] * p[0] + p[1] * p[1] + p[0] * q[0] + p[1] * q[1] + q[0] * q[0] + q[1] * q[1])
@@ -1639,12 +1639,12 @@ funcion _preparar_rigido(diccionario c): nulo {
 
 # El centro de masas de un cuerpo, [x, y] (en uno que no gira, el de su caja)
 funcion centro_cuerpo(cualquiera c): lista {
-    si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("centro_cuerpo() espera un cuerpo de juego.cuerpo()") }
+    si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("fisica.centro() espera un cuerpo de juego.fisica.cuerpo()") }
     si c.contiene("_forma") { devolver [c["x"] + c["_forma"]["cm"][0], c["y"] + c["_forma"]["cm"][1]] }
     devolver [c["x"] + c["ancho"] / 2, c["y"] + c["alto"] / 2]
 }
 
-# puntos_cuerpo(c): su contorno en el mundo, ya girado (para poligono())
+# fisica.puntos(c): su contorno en el mundo, ya girado (para poligono())
 funcion puntos_cuerpo(cualquiera c): lista {
     sea centro = centro_cuerpo(c)
     sea a = 0
@@ -1669,14 +1669,14 @@ funcion puntos_cuerpo(cualquiera c): lista {
     devolver r
 }
 
-# dibujar_cuerpo(c[, color[, opciones]]): lo dibuja tal cual es (para probar,
+# fisica.dibujar(c[, color[, opciones]]): lo dibuja tal cual es (para probar,
 # o para juegos de formas). Opciones: las de poligono() ("relleno", "capa").
 # Con relleno, el borde va algo más oscuro (para que se distingan dos cajas juntas).
 funcion dibujar_cuerpo(cualquiera c, cualquiera color = [220, 220, 220], cualquiera opciones = nulo): nulo {
     sea ps = puntos_cuerpo(c)
     sea op = {}
     si opciones != nulo {
-        si no (opciones es diccionario) { lanzar ErrorTipo("dibujar_cuerpo(): las opciones son un diccionario (\"relleno\", \"capa\")") }
+        si no (opciones es diccionario) { lanzar ErrorTipo("fisica.dibujar(): las opciones son un diccionario (\"relleno\", \"capa\")") }
         para cada texto k en opciones { op[k] = opciones[k] }
     }
     juego.poligono(ps, color, op)
@@ -2168,17 +2168,17 @@ funcion _paso_rigido(diccionario mundo, numero dt): nulo {
 }
 
 # ── Uniones ──
-# bisagra(mundo, a, b, punto): a y b quedan clavados por ese punto [x, y] del
+# fisica.bisagra(mundo, a, b, punto): a y b quedan clavados por ese punto [x, y] del
 # mundo y giran alrededor de él (una puerta, un péndulo, una rueda, los
 # eslabones de una cadena). Con b nulo, a queda clavado al fondo. Lo unido
 # por una bisagra no choca entre sí.
-# cuerda(mundo, a, b[, opciones]): a y b no se pueden alejar más que el largo
+# fisica.cuerda(mundo, a, b[, opciones]): a y b no se pueden alejar más que el largo
 # de la cuerda (sí acercarse). b es un cuerpo o un punto fijo [x, y].
 # Opciones: "largo" (lo que estén separados ahora), "en_a" y "en_b" (dónde se
 # ata, [x, y] desde el centro de cada uno sin girar; en el centro si no se
 # dice) y "rigida" (una barra: ni se alejan ni se acercan).
-# Devuelven la unión, que se quita con quitar_union(mundo, union). Con
-# puntos_union(union) se sabe por dónde dibujarla.
+# Devuelven la unión, que se quita con fisica.quitar_union(mundo, union). Con
+# fisica.puntos_union(union) se sabe por dónde dibujarla.
 
 sea _uniones_creadas = 0
 
@@ -2198,23 +2198,23 @@ funcion _a_local(diccionario c, lista p): lista {
 }
 
 funcion _es_cuerpo_de(diccionario mundo, cualquiera c, texto fn): nulo {
-    si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("{fn}() espera cuerpos de juego.cuerpo()") }
+    si no (c es diccionario) o no c.contiene("id_fisica") { lanzar ErrorTipo("{fn}() espera cuerpos de juego.fisica.cuerpo()") }
     sea esta = falso
     para cada diccionario cuerpo_o en mundo["cuerpos"] { si cuerpo_o["id_fisica"] == c["id_fisica"] { esta = verdadero } }
     si no esta { lanzar ErrorArgumento("{fn}(): ese cuerpo no está en este mundo") }
 }
 
 funcion bisagra(cualquiera mundo, cualquiera a, cualquiera b, cualquiera punto): diccionario {
-    _es_mundo(mundo, "bisagra")
-    _es_cuerpo_de(mundo, a, "bisagra")
-    sea p = _punto(punto, nulo, "bisagra")
+    _es_mundo(mundo, "fisica.bisagra")
+    _es_cuerpo_de(mundo, a, "fisica.bisagra")
+    sea p = _punto(punto, nulo, "fisica.bisagra")
     _uniones_creadas = _uniones_creadas + 1
     sea u = {"union": "bisagra", "id_union": _uniones_creadas, "a": a, "b": b, "en_a": _a_local(a, p), "p": [0, 0]}
     si b == nulo {
         u["en_b"] = p
     } sino {
-        _es_cuerpo_de(mundo, b, "bisagra")
-        si b["id_fisica"] == a["id_fisica"] { lanzar ErrorArgumento("bisagra(): une dos cuerpos distintos (o uno y nulo, para clavarlo al fondo)") }
+        _es_cuerpo_de(mundo, b, "fisica.bisagra")
+        si b["id_fisica"] == a["id_fisica"] { lanzar ErrorArgumento("fisica.bisagra(): une dos cuerpos distintos (o uno y nulo, para clavarlo al fondo)") }
         u["en_b"] = _a_local(b, p)
         mundo["_sin_choque"]["{a["id_fisica"]}:{b["id_fisica"]}"] = verdadero
         mundo["_sin_choque"]["{b["id_fisica"]}:{a["id_fisica"]}"] = verdadero
@@ -2224,33 +2224,33 @@ funcion bisagra(cualquiera mundo, cualquiera a, cualquiera b, cualquiera punto):
 }
 
 funcion cuerda(cualquiera mundo, cualquiera a, cualquiera b, cualquiera opciones = nulo): diccionario {
-    _es_mundo(mundo, "cuerda")
-    _es_cuerpo_de(mundo, a, "cuerda")
-    sea op = _ui_opciones(opciones, ["largo", "en_a", "en_b", "rigida"], "cuerda")
-    sea en_a = _punto(_de(op, "en_a", [0, 0]), nulo, "cuerda")
+    _es_mundo(mundo, "fisica.cuerda")
+    _es_cuerpo_de(mundo, a, "fisica.cuerda")
+    sea op = _ui_opciones(opciones, ["largo", "en_a", "en_b", "rigida"], "fisica.cuerda")
+    sea en_a = _punto(_de(op, "en_a", [0, 0]), nulo, "fisica.cuerda")
     _uniones_creadas = _uniones_creadas + 1
     sea u = {"union": "cuerda", "id_union": _uniones_creadas, "a": a, "b": b, "en_a": en_a, "rigida": _de(op, "rigida", falso), "p": 0}
     si b es lista {
-        u["en_b"] = _punto(b, nulo, "cuerda")
+        u["en_b"] = _punto(b, nulo, "fisica.cuerda")
         u["b"] = nulo
     } sino {
-        _es_cuerpo_de(mundo, b, "cuerda")
-        si b["id_fisica"] == a["id_fisica"] { lanzar ErrorArgumento("cuerda(): ata dos cuerpos distintos (o uno y un punto [x, y])") }
-        u["en_b"] = _punto(_de(op, "en_b", [0, 0]), nulo, "cuerda")
+        _es_cuerpo_de(mundo, b, "fisica.cuerda")
+        si b["id_fisica"] == a["id_fisica"] { lanzar ErrorArgumento("fisica.cuerda(): ata dos cuerpos distintos (o uno y un punto [x, y])") }
+        u["en_b"] = _punto(_de(op, "en_b", [0, 0]), nulo, "fisica.cuerda")
     }
-    si no (u["rigida"] es logico) { lanzar ErrorTipo("cuerda(): \"rigida\" es verdadero o falso") }
+    si no (u["rigida"] es logico) { lanzar ErrorTipo("fisica.cuerda(): \"rigida\" es verdadero o falso") }
     sea ps = puntos_union(u)
     sea dx = ps[1][0] - ps[0][0]
     sea dy = ps[1][1] - ps[0][1]
     u["largo"] = _de(op, "largo", matematica.raiz(dx * dx + dy * dy))
-    si no (u["largo"] es numero) o u["largo"] < 0 { lanzar ErrorArgumento("cuerda(): \"largo\" es un número de píxeles (0 o más)") }
+    si no (u["largo"] es numero) o u["largo"] < 0 { lanzar ErrorArgumento("fisica.cuerda(): \"largo\" es un número de píxeles (0 o más)") }
     mundo["uniones"].agregar(u)
     devolver u
 }
 
 funcion quitar_union(cualquiera mundo, cualquiera u): nulo {
-    _es_mundo(mundo, "quitar_union")
-    si no (u es diccionario) o no u.contiene("id_union") { lanzar ErrorTipo("quitar_union() espera una unión de cuerda() o bisagra()") }
+    _es_mundo(mundo, "fisica.quitar_union")
+    si no (u es diccionario) o no u.contiene("id_union") { lanzar ErrorTipo("fisica.quitar_union() espera una unión de fisica.cuerda() o fisica.bisagra()") }
     sea quedan = []
     para cada diccionario otra en mundo["uniones"] { si otra["id_union"] != u["id_union"] { quedan.agregar(otra) } }
     mundo["uniones"] = quedan
@@ -2271,9 +2271,9 @@ funcion quitar_union(cualquiera mundo, cualquiera u): nulo {
     }
 }
 
-# puntos_union(u): [[x, y] en a, [x, y] en b]: por dónde va la cuerda o dónde está la bisagra
+# fisica.puntos_union(u): [[x, y] en a, [x, y] en b]: por dónde va la cuerda o dónde está la bisagra
 funcion puntos_union(cualquiera u): lista {
-    si no (u es diccionario) o no u.contiene("union") { lanzar ErrorTipo("puntos_union() espera una unión de cuerda() o bisagra()") }
+    si no (u es diccionario) o no u.contiene("union") { lanzar ErrorTipo("fisica.puntos_union() espera una unión de fisica.cuerda() o fisica.bisagra()") }
     sea r = []
     para cada texto lado en ["a", "b"] {
         sea c = u[lado]
@@ -2393,7 +2393,7 @@ funcion _resolver_union(diccionario u): nulo {
 # ── Controles a gusto del jugador ──
 # menu_controles() enseña cada acción con sus teclas y sus botones y deja
 # cambiarlos: se elige una y se pulsa lo nuevo. Lo cambiado se guarda (con
-# guardar(), como "lince_controles") y se aplica solo la próxima vez que el
+# guardar_partida(), como "lince_controles") y se aplica solo la próxima vez que el
 # juego defina esa acción. Una tecla nueva sustituye a las teclas que tenía
 # la acción; un botón de mando, a sus botones; una dirección de la palanca, a
 # sus direcciones. Si otra acción ya la usaba, se intercambian.

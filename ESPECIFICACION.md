@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v1.9
+# 🐆 Lince — Especificación del Lenguaje v2.0
 
 ## Filosofía
 
@@ -43,7 +43,7 @@ Lince es un lenguaje de programación **para videojuegos, en español**, impleme
 | `nulo` | null |
 | `escribir` | print |
 | `leer` | leer del teclado |
-| `ref` | parámetro por referencia (`val`, por valor, es lo mismo que no poner nada: obsoleto desde la 1.9) |
+| `ref` | parámetro por referencia (`val`, de la 1.x, ya no existe: un parámetro sin nada es por valor) |
 | `intentar` / `capturar` / `finalmente` | try / catch / finally |
 | `lanzar` | throw |
 | `importar` | import |
@@ -90,9 +90,9 @@ sea Arma arma = nulo
 sea geo.Punto centro = geo.Punto(0, 0)
 ```
 
-- Al ejecutar, el valor inicial tiene que ser de ese tipo (si no, `ErrorTipo`). Darle luego un
-  valor de otro tipo, o uno que no es de la clase en un tipo de clase, avisa al ejecutar desde la
-  1.9 («En la 2.0 será un ErrorTipo»): en la 2.0 será un error, como el valor inicial.
+- Al ejecutar, el valor tiene que ser de ese tipo (si no, `ErrorTipo`): el inicial y el que se
+  le dé después. En un tipo de clase vale un objeto de esa clase (o de una que la extienda o la
+  implemente) y `nulo`. Igual en los campos con tipo y en los parámetros.
 - `lince comprobar` y el editor avisan, sin ejecutar, cuando más adelante se le da un valor de
   otro tipo (`vida = "mucha"`). A una variable de un tipo de clase se le puede dar `nulo`.
 - El tipo y el nombre van en la misma línea.
@@ -268,9 +268,9 @@ da `ErrorRango`.
   (`cualquiera v`, y también como tipo de retorno), y con `es` se mira cuál es
 - Toda función declara su tipo de retorno
 - Asignar a un parámetro dentro de la función no cambia nada fuera, salvo si lleva delante
-  `ref`: entonces lo que valga al acabar la función pasa a la variable que se le dio. (`val`
-  delante, que es lo mismo que no poner nada, está obsoleto desde la 1.9: avisa, y `lince
-  migrar` lo quita.)
+  `ref`: entonces lo que valga al acabar la función pasa a la variable que se le dio. (En la
+  1.x se podía poner `val` delante, que era lo mismo que no poner nada; en la 2.0 ya no existe,
+  y `lince migrar` lo quita.)
 
   ```lince
   funcion intercambiar(ref numero a, ref numero b): nulo {
@@ -540,9 +540,8 @@ s[0]                    # carácter por índice
 s[-1]                   # último carácter
 ```
 
-Desde la 1.9 todo lo que se hace con un texto es un método suyo. Las funciones del módulo `texto`
-que hacían lo mismo (`texto.dividir(s, ",")`...) siguen funcionando, pero avisan: en la 2.0 ya
-no estarán, y `lince migrar` las cambia solas.
+Todo lo que se hace con un texto es un método suyo. En la 1.x algunas eran funciones del módulo
+`texto` (`texto.dividir(s, ",")`...); `lince migrar` las cambia solas.
 
 El texto se guarda en UTF-8 y se trabaja **por caracteres, no por
 bytes**, que es lo que se espera escribiendo en español:
@@ -2254,15 +2253,17 @@ archivo, y cuentan también los campos que se crean con `objeto.campo = ...` en 
 
 ## De la 1.x a la 2.0 (`lince migrar`)
 
-La 2.0 será una limpieza: algunas cosas cambian de nombre o de forma, y lo duplicado se queda en
-una sola manera (lo decidido está en `PROPUESTA_2.0.md`). La 1.9 ya tiene lo nuevo, y lo viejo
-sigue funcionando pero **avisa**:
+La 2.0 es una limpieza, no un lenguaje nuevo: algunas cosas cambiaron de nombre o de forma, y lo
+duplicado se quedó en una sola manera (lo decidido está en `PROPUESTA_2.0.md`). El código de la
+1.x que usa lo de antes no se queda a medias sin saber por qué:
 
-- **Al ejecutar**, una vez por cada cosa: `⚠️ Obsoleto en línea 12: juego.cuerpo → juego.fisica.cuerpo`.
-  Con `LINCE_OBSOLETOS=0` no avisa.
-- **En `lince comprobar` y en el editor**, sin ejecutar.
-- Las **anotaciones de tipo** que no se cumplen al darle a una variable otro valor, en un campo
-  con tipo o en un tipo de clase avisan al ejecutar: «En la 2.0 será un ErrorTipo».
+- **Al ejecutar**, lo quitado da un error que dice cómo es ahora: `Esto es de la 1.x, y en la 2.0
+  cambió: juego.cuerpo → juego.fisica.cuerpo («lince migrar» lo cambia solo)`. `val` es un error
+  de sintaxis que dice lo mismo.
+- **En `lince comprobar` y en el editor**, sin ejecutar, un aviso por cada cosa de la 1.x.
+- Las **anotaciones de tipo** se comprueban también al darle a una variable otro valor, en los
+  campos con tipo y en los tipos de clase (en la 1.x solo el valor inicial y los parámetros de
+  tipos sencillos): `ErrorTipo`.
 
 ```bash
 lince migrar --comprobar .        # qué cambiaría, archivo por archivo; sale con 1 si hay algo
@@ -2272,8 +2273,8 @@ lince migrar --mostrar juego.lince # el resultado, a la salida, sin tocar el arc
 
 `lince migrar` solo toca lo que cambia: los comentarios, los espacios y los saltos de línea se
 quedan como estaban. Lo que no puede saber solo lo marca con ✋, por ejemplo
-`juego.reproducir(s, vol)` (¿`vol` es el volumen o unas opciones?); eso lo avisa el programa al
-ejecutarse, que sí lo sabe.
+`juego.reproducir(s, vol)` (¿`vol` es el volumen o unas opciones?); si era el volumen, el
+programa lo dice al ejecutarse, que sí lo sabe.
 
 | Antes (1.x) | En la 2.0 |
 |---|---|
@@ -2537,7 +2538,7 @@ lince/
 │   ├── paquetes.c/h    # gestor de paquetes (y lince.paquetes)
 │   ├── revisor.c/h     # avisos sin ejecutar (lince comprobar, el editor)
 │   ├── formatear.c/h   # lince formatear
-│   ├── migrar.c/h      # lince migrar (y los avisos de «obsoleto» de comprobar)
+│   ├── migrar.c/h      # lince migrar (y los avisos de comprobar sobre el código de la 1.x)
 │   ├── documentar.c/h  # la ayuda de los comentarios (lince documentar, el editor)
 │   ├── probar.c/h      # lince probar: las pruebas y su cobertura
 │   ├── zstd.c/h        # descomprimir zstd (capas de Tiled)

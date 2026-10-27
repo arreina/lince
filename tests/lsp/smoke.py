@@ -54,7 +54,7 @@ comprobar("Error en línea" not in d[0]["message"] and d[0]["message"] != "", "e
 
 # ── texto correcto: sin diagnósticos ──
 src = ('importar "matematica"\n'
-       'funcion doble(val numero n): numero {\n    devolver n * 2\n}\n'
+       'funcion doble(numero n): numero {\n    devolver n * 2\n}\n'
        'sea r = matematica.\n'                      # incompleto a propósito
        'clase P {\n  funcion crear(): nulo { mi.a = 1 }\n  funcion f(): nulo { mi. }\n}\n')
 send({"jsonrpc": "2.0", "method": "textDocument/didChange", "params": {
@@ -108,7 +108,7 @@ comprobar(loc and loc["range"]["start"]["line"] == 1, "ir a la definición lleva
 
 # ── alias de importación: miembros de otra librería ──
 with tempfile.TemporaryDirectory() as d_:
-    open(os.path.join(d_, "lib.lince"), "w").write("funcion suma(val numero a, val numero b): numero {\n    devolver a + b\n}\nsea PI2 = 6\n")
+    open(os.path.join(d_, "lib.lince"), "w").write("funcion suma(numero a, numero b): numero {\n    devolver a + b\n}\nsea PI2 = 6\n")
     u2 = "file://" + os.path.join(d_, "main.lince")
     t2 = 'importar "./lib" como mi_lib\nmi_lib.\n'
     send({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": u2, "text": t2}}})
@@ -121,8 +121,8 @@ with tempfile.TemporaryDirectory() as d_:
 # ── la columna del error, y ir a la definición en archivos importados ──
 with tempfile.TemporaryDirectory() as d_:
     os.makedirs(os.path.join(d_, "libs"))
-    open(os.path.join(d_, "libs", "util.lince"), "w").write("sea PI2 = 6\nfuncion doble(val numero n): numero {\n    devolver n * 2\n}\n")
-    open(os.path.join(d_, "libs", "mas.lince"), "w").write('importar "./util"\nfuncion triple(val numero n): numero {\n    devolver n * 3\n}\n')
+    open(os.path.join(d_, "libs", "util.lince"), "w").write("sea PI2 = 6\nfuncion doble(numero n): numero {\n    devolver n * 2\n}\n")
+    open(os.path.join(d_, "libs", "mas.lince"), "w").write('importar "./util"\nfuncion triple(numero n): numero {\n    devolver n * 3\n}\n')
     u3 = "file://" + os.path.join(d_, "main.lince")
     t3 = 'importar "./libs/mas"\nimportar "./libs/util" como u\nsea a = triple(1)\nsea b = doble(2)\nsea c = u.doble(3)\nsea \u00f1 = 1\n'
     send({"jsonrpc": "2.0", "method": "textDocument/didOpen", "params": {"textDocument": {"uri": u3, "text": t3}}})

@@ -18,7 +18,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Camino a la 1.0
 
-**La 1.0 está publicada (2026-10-25): el lenguaje queda congelado.** Desde ahora el lenguaje solo se amplía (lo que se añade no rompe juegos ya escritos) y el trabajo pasa al IDE (lince-motor, en su propia conversación). Lo que hubo que hacer:
+**La 2.0 está publicada (2026-10-27): el lenguaje queda congelado otra vez**, como pasó con la 1.0 (2026-10-25). Desde ahora el lenguaje solo se amplía (lo que se añade no rompe juegos ya escritos) y el trabajo pasa al IDE (lince-motor, en su propia conversación). Lo que hubo que hacer:
 
 - [x] **El lenguaje no cambia de forma que rompa juegos ya escritos.** Desde la 1.0 se cumple ese compromiso.
 - [x] **Probado en real** por el autor con `examples/probar_equipo`: Linux y Android, con teclado, ratón, sonido y un mando de PS5 conectado al PC; todo bien. **Sin probar en un equipo real: Windows** (se probó con wine y en la CI de Windows) **y los mandos de Xbox y genéricos**. Si sale algún fallo ahí, se arregla como cualquier otro. Subir un juego a Google Play queda para después de la 1.0.
@@ -113,21 +113,21 @@ está en `juego.lince`.
 - [x] `lince migrar --comprobar` (qué cambiaría) y `lince migrar` (lo cambia solo). Los ejemplos,
   el juego, la web y las pruebas ya están migrados con él.
 - [x] Última versión que añade cosas; después, solo arreglos.
-- [ ] Probar `lince migrar` con lince-motor y con los juegos de otros (el autor).
 
 ### 2.0 — Limpieza, no un lenguaje nuevo
-Cada cambio que rompa, aprobado por el autor uno por uno. **Aprobados el 2026-10-26**; el
+Cada cambio que rompa, aprobado por el autor uno por uno. **Aprobados el 2026-10-26 y hechos en la 2.0.0**; el
 detalle de cada uno está en PROPUESTA_2.0.md:
-- [ ] A1 `juego.fisica.*` (mundo, cuerpo, avanzar, quitar, tocando, empujar, bisagra, cuerda…).
-- [ ] A2 `juego.mapa.*` (crear, tiled, casilla, poner, solido, casilla_en, buscar, mover, dibujar, dibujar_tiled, camino).
-- [ ] B1 `reproducir`, B2 `musica` y B3 `texto`, solo con opciones (sin volumen, bucle, escala, color ni fuente sueltos).
-- [ ] B5 una sola `colision(a, b)` (cajas, puntos, círculos y cuerpos); fuera `colision_circulos`, `colision_circulo_rect` y `dentro`.
-- [ ] B6 fuera `posicion_camara()`.
-- [ ] C1 `guardar_partida` / `cargar_partida` / `olvidar_partida`; C2 `quitar_particulas`; C3 `"angulo"` en la cámara.
-- [ ] D1 fuera `val`; D2 lo de un texto, como métodos (`t.dividir(",")`); D3 fuera `texto.a_numero`, `de_numero`, `repetir` y `es_vacio`.
-- [ ] D4 las anotaciones de tipo, comprobadas también al ejecutar.
+- [x] A1 `juego.fisica.*` (mundo, cuerpo, avanzar, quitar, tocando, empujar, bisagra, cuerda…).
+- [x] A2 `juego.mapa.*` (crear, tiled, casilla, poner, solido, casilla_en, buscar, mover, dibujar, dibujar_tiled, camino).
+- [x] B1 `reproducir`, B2 `musica` y B3 `texto`, solo con opciones (sin volumen, bucle, escala, color ni fuente sueltos).
+- [x] B5 una sola `colision(a, b)` (cajas, puntos, círculos y cuerpos); fuera `colision_circulos`, `colision_circulo_rect` y `dentro`.
+- [x] B6 fuera `posicion_camara()`.
+- [x] C1 `guardar_partida` / `cargar_partida` / `olvidar_partida`; C2 `quitar_particulas`; C3 `"angulo"` en la cámara.
+- [x] D1 fuera `val`; D2 lo de un texto, como métodos (`t.dividir(",")`); D3 fuera `texto.a_numero`, `de_numero`, `repetir` y `es_vacio`.
+- [x] D4 las anotaciones de tipo, comprobadas también al ejecutar.
 - No: el sonido en partes (A3), quitar `ancho_texto` (B4) ni cambiar `clic` (C4).
-- [ ] La 2.x se congela igual que la 1.x.
+- [x] La 2.x se congela igual que la 1.x: desde la 2.0.0 solo se añade lo que no rompe juegos ya escritos.
+- [ ] Probar `lince migrar` con lince-motor y con los juegos de otros, y pasar a la 2.0 las demos de lucha (el autor).
 
 Fuera del plan (decisión del autor): juego en red (se quitó a propósito), consolas (depende de
 que Nintendo y Sony aprueben; iría en un repositorio privado), macOS y navegador (descartados).

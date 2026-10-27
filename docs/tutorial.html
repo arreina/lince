@@ -146,7 +146,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.9</span>
+  <span class="version">v2.0</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag" href="juego.html">Módulo juego</a>
@@ -356,7 +356,7 @@
 <span class="linea nueva">    juego.<span class="t">texto</span>(<span class="s">&quot;PUNTOS &quot;</span> + a_texto(puntos), <span class="n">16</span>, <span class="n">16</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">3</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>]})</span>
 <span class="linea">    juego.presentar()</span>
 <span class="linea">}</span></code></pre></div><span class="fuente">docs/tutorial/pasos/4_atrapar.lince</span></section>
-<section class="paso" id="paso5"><h2>Paso 5 · Rocas y vidas</h2><p>Un juego necesita algo que lo complique. Las rocas caen igual que las estrellas, pero son círculos: <code>juego.colision_circulo_rect</code> comprueba si un círculo toca un rectángulo.</p><p>La dificultad sube sola: <code>reloj</code> cuenta los segundos de partida y la pausa entre rocas se acorta con él, hasta un mínimo de 0,4 segundos que marca <code>matematica.maximo</code>.</p><p>Al quedarse sin vidas, <code>dt</code> pasa a valer 0: todo lo que se mueve con <code>dt</code> se detiene sin necesidad de más código.</p><figure><img src="img/tutorial/paso5.png" alt="Captura del paso 5: Rocas y vidas" loading="lazy" width="640" height="480"><figcaption>Captura real del paso 5, sacada al generar esta página.</figcaption></figure><p class="leyenda">En <b>amarillo</b>, lo nuevo de este paso.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="linea"><span class="k">importar</span> <span class="s">&quot;juego&quot;</span></span>
+<section class="paso" id="paso5"><h2>Paso 5 · Rocas y vidas</h2><p>Un juego necesita algo que lo complique. Las rocas caen igual que las estrellas, pero son círculos: <code>juego.colision</code> comprueba igual si un círculo (<code>{&quot;centro&quot;: [x, y], &quot;radio&quot;: r}</code>) toca un rectángulo.</p><p>La dificultad sube sola: <code>reloj</code> cuenta los segundos de partida y la pausa entre rocas se acorta con él, hasta un mínimo de 0,4 segundos que marca <code>matematica.maximo</code>.</p><p>Al quedarse sin vidas, <code>dt</code> pasa a valer 0: todo lo que se mueve con <code>dt</code> se detiene sin necesidad de más código.</p><figure><img src="img/tutorial/paso5.png" alt="Captura del paso 5: Rocas y vidas" loading="lazy" width="640" height="480"><figcaption>Captura real del paso 5, sacada al generar esta página.</figcaption></figure><p class="leyenda">En <b>amarillo</b>, lo nuevo de este paso.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="linea"><span class="k">importar</span> <span class="s">&quot;juego&quot;</span></span>
 <span class="linea"><span class="k">importar</span> <span class="s">&quot;matematica&quot;</span></span>
 <span class="linea"> </span>
 <span class="linea"><span class="k">fijo</span> ANCHO = <span class="n">640</span></span>

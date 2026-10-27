@@ -5,10 +5,10 @@
 # moverte, espacio (o A en el mando) para saltar, R para empezar otra vez.
 # Esc sale.
 #
-# Muestra: física sencilla escrita en Lince (juego.fisica, juego.cuerpo,
-# juego.avanzar_fisica): gravedad, cajas que se empujan según su masa y se
+# Muestra: física sencilla escrita en Lince (juego.fisica, juego.fisica.cuerpo,
+# juego.fisica.avanzar): gravedad, cajas que se empujan según su masa y se
 # apilan, pelotas que rebotan, un ascensor que lleva lo que tiene encima y
-# monedas que solo avisan al tocarlas (sensores, juego.tocando).
+# monedas que solo avisan al tocarlas (sensores, juego.fisica.tocando).
 importar "juego"
 importar "matematica"
 

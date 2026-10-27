@@ -3,6 +3,40 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.0.0
+
+Una limpieza, no un lenguaje nuevo: lo que la 1.9 avisaba como obsoleto ya no está, y cada cosa
+se hace de una sola manera. Cada cambio lo aprobó el autor uno por uno (`PROPUESTA_2.0.md`).
+**Para pasar un juego de la 1.x: `lince migrar .`** (con `--comprobar`, solo dice qué cambiaría).
+
+- **El módulo `juego`, con partes**:
+  - La física, en `juego.fisica.*`: `mundo`, `cuerpo`, `avanzar`, `quitar`, `tocando`, `empujar`, `bisagra`, `cuerda`, `quitar_union`, `puntos_union`, `centro`, `puntos` y `dibujar`.
+  - Los mapas, en `juego.mapa.*`: `crear`, `tiled`, `casilla`, `poner`, `solido`, `casilla_en`, `buscar`, `mover`, `dibujar`, `dibujar_tiled` y `camino`.
+  - Lo demás sigue como estaba.
+- **Una sola forma**:
+  - `reproducir`, `musica` y `texto`, solo con opciones.
+  - Una sola `colision(a, b)` para puntos, cajas y círculos; ya no están `colision_circulos`, `colision_circulo_rect` ni `dentro`.
+  - En vez de `posicion_camara()`, `camara_actual()`.
+- **Nombres que siguen la misma regla**: `guardar_partida`, `cargar_partida`, `olvidar_partida`, `quitar_particulas` y `"angulo"` en la cámara.
+- **El lenguaje**:
+  - Sin `val`: un parámetro sin nada ya era por valor.
+  - Lo que se hace con un texto es un método suyo: `t.dividir(",")`, `t.posicion("a")`… El módulo `texto` se queda con `unir`, `formato`, `decimales` y `miles`.
+  - Ya no están `texto.a_numero`, `de_numero`, `repetir` ni `es_vacio`: se usan `a_numero(t)`, `a_texto(n)`, `t * n` y `t == ""`.
+- **Los tipos, comprobados al ejecutar**: darle a una variable con tipo un valor de otro tipo, un campo con tipo y los tipos de clase dan `ErrorTipo` (en la 1.x solo se miraba el valor inicial).
+- **El código de la 1.x no falla en silencio**:
+  - Al ejecutar, lo quitado da un error que dice cómo es ahora: «Esto es de la 1.x, y en la 2.0 cambió: juego.cuerpo → juego.fisica.cuerpo».
+  - `lince comprobar` y el editor lo avisan sin ejecutar.
+- **La 2.x se congela** como la 1.x: desde aquí solo se añade lo que no rompe juegos ya escritos.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.0.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-2.0.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.0.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.0.0.vsix` |
+
 ## 1.9.0
 
 Prepara la 2.0. Todo lo de antes sigue funcionando; lo que la 2.0 cambiará avisa, y `lince migrar` lo

@@ -1,6 +1,6 @@
 # @seccion: Mapas
 # @titulo: Un nivel escrito con texto
-# @nota: `juego.mapa(filas, tamaño)` hace un mapa de casillas a partir de texto, un carácter por casilla. `juego.mover_en_mapa(mapa, cosa)` mueve algo según su `vx` y su `vy` sin atravesar las paredes (`"#"`, o las que se digan) y deja en `en_suelo`, `techo` y `pared` con qué chocó; la gravedad la sumas tú. `juego.dibujar_mapa` lo pinta, con un color o un tile para cada carácter.
+# @nota: `juego.mapa.crear(filas, tamaño)` hace un mapa de casillas a partir de texto, un carácter por casilla. `juego.mapa.mover(mapa, cosa)` mueve algo según su `vx` y su `vy` sin atravesar las paredes (`"#"`, o las que se digan) y deja en `en_suelo`, `techo` y `pared` con qué chocó; la gravedad la sumas tú. `juego.mapa.dibujar` lo pinta, con un color o un tile para cada carácter.
 # @guion: 1:derecha:60
 # @fotogramas: 60
 importar "juego"

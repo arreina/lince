@@ -1,6 +1,6 @@
 # @seccion: Mapas
 # @titulo: Tiles y tiles animados
-# @nota: Lo normal es pintar el nivel con una hoja de tiles: a cada carácter, `[hoja, cuadro]`, o `[hoja, [cuadros], segundos]` para uno animado (el agua, las monedas). Los tiles se ajustan al tamaño de la casilla. `juego.casilla` y `juego.poner_casilla` leen y cambian una casilla (coger una moneda, abrir una puerta), y `juego.buscar_en_mapa` dice dónde están.
+# @nota: Lo normal es pintar el nivel con una hoja de tiles: a cada carácter, `[hoja, cuadro]`, o `[hoja, [cuadros], segundos]` para uno animado (el agua, las monedas). Los tiles se ajustan al tamaño de la casilla. `juego.casilla` y `juego.mapa.poner` leen y cambian una casilla (coger una moneda, abrir una puerta), y `juego.mapa.buscar` dice dónde están.
 importar "juego"
 
 juego.abrir("Tiles", 480, 270)

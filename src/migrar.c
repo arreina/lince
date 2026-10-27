@@ -510,13 +510,13 @@ void migrar_avisos(const char *codigo, void (*avisar)(int linea, const char *men
     for (int i = 0; i < inf.ncambios; i++) {
         if (!strcmp(inf.cambios[i].que, "val")) { if (!vals++) primera_val = inf.cambios[i].linea; continue; }
         char msg[800];
-        snprintf(msg, sizeof msg, "obsoleto: %s. En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.", inf.cambios[i].que);
+        snprintf(msg, sizeof msg, "esto es de la 1.x: %s («lince migrar» lo cambia solo).", inf.cambios[i].que);
         avisar(inf.cambios[i].linea, msg);
     }
     if (vals) {
         char msg[300];
-        snprintf(msg, sizeof msg, "obsoleto: 'val' ya no hace falta (es lo mismo que no poner nada; está %d %s en este archivo). "
-                 "En la 2.0 ya no valdrá; «lince migrar» lo quita solo.", vals, vals == 1 ? "vez" : "veces");
+        snprintf(msg, sizeof msg, "esto es de la 1.x: 'val' ya no existe (está %d %s en este archivo; «lince migrar» lo quita solo).",
+                 vals, vals == 1 ? "vez" : "veces");
         avisar(primera_val, msg);
     }
     /* Lo dudoso (reproducir(s, vol): ¿vol es el volumen o unas opciones?) no se

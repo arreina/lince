@@ -1,8 +1,8 @@
 /*
  * 🐆 Lince — migrar.h
- * 'lince migrar': cambia lo que la 2.0 va a cambiar a su forma nueva (ver
+ * 'lince migrar': pasa el código de la 1.x a la forma de la 2.0 (ver
  * PROPUESTA_2.0.md). Lo mismo, sin cambiar nada, son los avisos de
- * «obsoleto» de 'lince comprobar' y del editor.
+ * 'lince comprobar' y del editor sobre lo que es de la 1.x.
  */
 #ifndef LINCE_MIGRAR_H
 #define LINCE_MIGRAR_H
@@ -20,7 +20,7 @@ typedef struct {
 char *migrar_codigo(const char *codigo, MigrarInforme *inf);
 void  migrar_informe_liberar(MigrarInforme *inf);
 
-/* Los avisos de «obsoleto» de ese código, para 'lince comprobar' y el editor */
+/* Los avisos de lo que es de la 1.x en ese código, para 'lince comprobar' y el editor */
 void  migrar_avisos(const char *codigo, void (*avisar)(int linea, const char *mensaje));
 
 /* Los archivos .lince de 'ruta' (ella misma si es un archivo; si es una

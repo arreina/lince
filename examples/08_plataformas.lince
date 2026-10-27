@@ -6,7 +6,7 @@
 # F11 pantalla completa. Esc sale.
 #
 # Muestra: un nivel escrito como texto (cada carácter es una casilla) que
-# juego.mapa convierte en un mapa: juego.mover_en_mapa mueve al lince con
+# juego.mapa convierte en un mapa: juego.mapa.mover mueve al lince con
 # gravedad sin atravesar paredes y con plataformas que se cruzan desde abajo.
 # Sprites dibujados con texto y animados como hoja de sprites, una cámara que
 # sigue al jugador con un marcador fijo, acciones (cada control se define una
@@ -80,7 +80,7 @@ funcion hoja_del_lince(): lista {
 # ── Estado ──────────────────────────────────────────────────────────
 fijo JW = 22                         # tamaño del lince para chocar
 fijo JH = 26
-# El lince: lo que juego.mover_en_mapa necesita (posición, tamaño y velocidad)
+# El lince: lo que juego.mapa.mover necesita (posición, tamaño y velocidad)
 sea yo = {"x": 0, "y": 0, "ancho": JW, "alto": JH, "vx": 0, "vy": 0, "en_suelo": falso}
 sea mira_izquierda = falso
 sea monedas = []

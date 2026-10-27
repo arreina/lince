@@ -80,12 +80,12 @@ lenguaje no pueda hacer también escribiendo código.
 
 ## Mapas
 
-- **Editor de mapas de casillas** (`juego.mapa`): pintar el nivel con los
+- **Editor de mapas de casillas** (`juego.mapa.crear`): pintar el nivel con los
   tiles de una hoja y que escriba las filas de texto; marcar qué caracteres son
   sólidos o plataformas; ver los tiles animados (`[hoja, [cuadros], segundos]`).
-- **Ver el camino de `juego.camino`** entre dos casillas, para probar
+- **Ver el camino de `juego.mapa.camino`** entre dos casillas, para probar
   enemigos.
-- **Elegir qué tile es cada carácter** (el aspecto de `dibujar_mapa`) con un
+- **Elegir qué tile es cada carácter** (el aspecto de `mapa.dibujar`) con un
   clic en la hoja.
 
 ## Sonido

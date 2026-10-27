@@ -1,5 +1,5 @@
 # @titulo: Rocas y vidas
-# @texto: Un juego necesita algo que lo complique. Las rocas caen igual que las estrellas, pero son círculos: `juego.colision_circulo_rect` comprueba si un círculo toca un rectángulo.
+# @texto: Un juego necesita algo que lo complique. Las rocas caen igual que las estrellas, pero son círculos: `juego.colision` comprueba igual si un círculo (`{"centro": [x, y], "radio": r}`) toca un rectángulo.
 # @texto: La dificultad sube sola: `reloj` cuenta los segundos de partida y la pausa entre rocas se acorta con él, hasta un mínimo de 0,4 segundos que marca `matematica.maximo`.
 # @texto: Al quedarse sin vidas, `dt` pasa a valer 0: todo lo que se mueve con `dt` se detiene sin necesidad de más código.
 # @fotogramas: 900

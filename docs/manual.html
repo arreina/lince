@@ -137,7 +137,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v1.9</span>
+  <span class="version">v2.0</span>
   <div class="crece"></div>
   <a class="pag aqui" href="manual.html">Lenguaje</a>
   <a class="pag" href="juego.html">Módulo juego</a>
@@ -149,7 +149,7 @@
 <nav id="lateral">
 <div class="grupo"><a href="#primeros-pasos" class="sec">Primeros pasos</a><a href="#primeros-pasos-0" class="sub">Hola, mundo</a><a href="#primeros-pasos-1" class="sub">Funciones que ya vienen</a><a href="#primeros-pasos-2" class="sub">Variables y constantes</a><a href="#primeros-pasos-3" class="sub">Variables con tipo</a><a href="#primeros-pasos-4" class="sub">Operar y guardar: +=, -=, ++, --</a><a href="#primeros-pasos-5" class="sub">Cada nombre se define una sola vez</a><a href="#primeros-pasos-6" class="sub">Tapar un nombre en un ámbito interior</a><a href="#primeros-pasos-7" class="sub">Dónde se declaran los tipos</a><a href="#primeros-pasos-8" class="sub">Varios nombres de una vez</a></div>
 <div class="grupo"><a href="#control-de-flujo" class="sec">Control de flujo</a><a href="#control-de-flujo-0" class="sub">Condicionales</a><a href="#control-de-flujo-1" class="sub">x e y</a><a href="#control-de-flujo-2" class="sub">Un si que da un valor</a><a href="#control-de-flujo-3" class="sub">Las cuatro formas de repetir</a><a href="#control-de-flujo-4" class="sub">Romper y continuar</a><a href="#control-de-flujo-5" class="sub">Elegir / caso</a></div>
-<div class="grupo"><a href="#funciones" class="sec">Funciones</a><a href="#funciones-0" class="sub">Declarar y llamar</a><a href="#funciones-1" class="sub">val y ref</a><a href="#funciones-2" class="sub">Valores por defecto</a><a href="#funciones-3" class="sub">Lambdas y funciones como argumento</a><a href="#funciones-4" class="sub">Llamar a cualquier cosa que dé una función</a><a href="#funciones-5" class="sub">Closures</a></div>
+<div class="grupo"><a href="#funciones" class="sec">Funciones</a><a href="#funciones-0" class="sub">Declarar y llamar</a><a href="#funciones-1" class="sub">ref</a><a href="#funciones-2" class="sub">Valores por defecto</a><a href="#funciones-3" class="sub">Lambdas y funciones como argumento</a><a href="#funciones-4" class="sub">Llamar a cualquier cosa que dé una función</a><a href="#funciones-5" class="sub">Closures</a></div>
 <div class="grupo"><a href="#listas" class="sec">Listas</a><a href="#listas-0" class="sub">Crear, modificar y consultar</a><a href="#listas-1" class="sub">Operaciones que devuelven una lista nueva</a><a href="#listas-2" class="sub">Ordenar con tu propio criterio</a></div>
 <div class="grupo"><a href="#diccionarios" class="sec">Diccionarios</a><a href="#diccionarios-0" class="sub">Crear, leer y recorrer</a><a href="#diccionarios-1" class="sub">Números como claves</a></div>
 <div class="grupo"><a href="#texto" class="sec">Texto</a><a href="#texto-0" class="sub">Métodos de texto</a><a href="#texto-1" class="sub">En orden alfabético, y repetir</a><a href="#texto-2" class="sub">Texto con valores dentro</a></div>
@@ -342,11 +342,11 @@ vivo con 8
     <span class="k">caso</span> <span class="s">&quot;lince&quot;</span> { <span class="k">escribir</span>(<span class="s">&quot;es un felino ibérico&quot;</span>) }
     <span class="k">otro</span> { <span class="k">escribir</span>(<span class="s">&quot;no sé qué hace&quot;</span>) }
 }</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>es un felino ibérico</pre></div><span class="fuente">130_elegir.lince</span></article></section>
-<section id="funciones"><h2>Funciones</h2><article class="ej" id="funciones-0"><h3>Declarar y llamar</h3><p class="nota">Cada parámetro lleva su tipo y su nombre (delante puede ir <code>val</code>, que es lo normal, o <code>ref</code>: ver «val y ref»).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> area(<span class="t">numero</span> base, <span class="t">numero</span> altura): <span class="t">numero</span> {
+<section id="funciones"><h2>Funciones</h2><article class="ej" id="funciones-0"><h3>Declarar y llamar</h3><p class="nota">Cada parámetro lleva su tipo y su nombre (delante puede ir <code>ref</code>: ver «ref»).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> area(<span class="t">numero</span> base, <span class="t">numero</span> altura): <span class="t">numero</span> {
     <span class="k">devolver</span> base * altura / <span class="n">2</span>
 }
 
-<span class="k">escribir</span>(area(<span class="n">10</span>, <span class="n">4</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>20</pre></div><span class="fuente">210_funciones.lince</span></article><article class="ej" id="funciones-1"><h3>val y ref</h3><p class="nota">Delante de un parámetro se puede poner <code>val</code> (lo normal; da igual ponerlo o no) o <code>ref</code>. Con <code>ref</code>, lo que valga el parámetro al acabar la función pasa a la variable que se le dio. Las listas y los diccionarios se comparten siempre: si la función les añade algo, se ve fuera.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> intercambiar(<span class="k">ref</span> <span class="t">numero</span> a, <span class="k">ref</span> <span class="t">numero</span> b): <span class="k">nulo</span> {
+<span class="k">escribir</span>(area(<span class="n">10</span>, <span class="n">4</span>))</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>20</pre></div><span class="fuente">210_funciones.lince</span></article><article class="ej" id="funciones-1"><h3>ref</h3><p class="nota">Asignar a un parámetro dentro de la función no cambia nada fuera, salvo si lleva delante <code>ref</code>. Con <code>ref</code>, lo que valga el parámetro al acabar la función pasa a la variable que se le dio. Las listas y los diccionarios se comparten siempre: si la función les añade algo, se ve fuera.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> intercambiar(<span class="k">ref</span> <span class="t">numero</span> a, <span class="k">ref</span> <span class="t">numero</span> b): <span class="k">nulo</span> {
     <span class="k">sea</span> t = a
     a = b
     b = t
@@ -361,7 +361,7 @@ intercambiar(x, <span class="k">y</span>)
 <span class="k">sea</span> marcas = []
 apuntar(marcas, <span class="n">12.5</span>)
 <span class="k">escribir</span>(marcas)</code></pre></div><div class="salida"><span class="etiqueta">salida verificada</span><pre>x = 2, y = 1
-[12.5]</pre></div><span class="fuente">215_val_y_ref.lince</span></article><article class="ej" id="funciones-2"><h3>Valores por defecto</h3><p class="nota">Los parámetros con valor por defecto van al final.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> saludo(<span class="t">texto</span> nombre, <span class="t">texto</span> trato = <span class="s">&quot;Hola&quot;</span>): <span class="t">texto</span> {
+[12.5]</pre></div><span class="fuente">215_ref.lince</span></article><article class="ej" id="funciones-2"><h3>Valores por defecto</h3><p class="nota">Los parámetros con valor por defecto van al final.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">funcion</span> saludo(<span class="t">texto</span> nombre, <span class="t">texto</span> trato = <span class="s">&quot;Hola&quot;</span>): <span class="t">texto</span> {
     <span class="k">devolver</span> trato + <span class="s">&quot;, &quot;</span> + nombre
 }
 

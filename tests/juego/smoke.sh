@@ -274,7 +274,7 @@ for l in "cuadro 0: 11 21 2 3" "cuadro 1: 13 20 3 2" "escala: 16 20 6 4" "espejo
          "dentro: verdadero falso" "circulo: verdadero falso"; do
     grep -qxF "$l" salida14.txt && ok "caja: $l" || mal "falta la línea: $l"
 done
-for e in "colision() espera (x1, y1" "caja() espera una imagen, una hoja o un animador" "no hay fila 3"; do
+for e in "colision() espera dos formas" "caja() espera una imagen, una hoja o un animador" "no hay fila 3"; do
     grep -qF "$e" salida14.txt && ok "caja: error «$e»" || mal "falta el error: $e"
 done
 # ── Fuentes (TrueType y dibujadas), texto con opciones y movimiento suave ──
@@ -488,8 +488,8 @@ command -v cygpath > /dev/null && CASA_W="$(cygpath -w "$CASA")"
 HOME="$CASA" APPDATA="$CASA_W" XDG_DATA_HOME= timeout 20 "$LINCE" "$DIR/prueba18.lince" > salida23.txt 2>&1
 for l in "nada: nulo" "por defecto: 0.8" "nivel: 3, Ñandú, 95.5, verdadero" "opciones: 0.25 es" "otra vez: 4" \
          "olvidar: verdadero falso" "carpeta: verdadero" \
-         'error: guardar(): el nombre "../fuera" no vale (sin / \ : * ? " < > |, y que no empiece por punto)' \
-         "error: guardar(): no se puede guardar eso; se guardan solo números, textos, lógicos, nulo, listas y diccionarios"; do
+         'error: guardar_partida(): el nombre "../fuera" no vale (sin / \ : * ? " < > |, y que no empiece por punto)' \
+         "error: guardar_partida(): no se puede guardar eso; se guardan solo números, textos, lógicos, nulo, listas y diccionarios"; do
     grep -qxF "$l" salida23.txt && ok "partidas: $l" || mal "falta la línea: $l"
 done
 [ -f casa/.local/share/lince/prueba18/opciones.json ] || [ -f casa/Lince/prueba18/opciones.json ] \
@@ -515,8 +515,8 @@ for ruta in tiled/nivel.tmx tiled/nivel.tmj tiled/infinito.tmx tiled/infinito.tm
     done
 done
 for l in "propiedades: tema & fondo 900" 'objeto: moneda moneda 40,16 8x8 tile {"valor": 5}' "casillas: # = . verdadero" \
-         "cae a y=34 en_suelo=verdadero" "error: dibujar_tiled(): el mapa no tiene la capa 'NoExiste' (mira mapa[\"capas\"])" \
-         "error: mapa_tiled(): no se encuentra 'tiled/no_esta.tmx'"; do
+         "cae a y=34 en_suelo=verdadero" "error: mapa.dibujar_tiled(): el mapa no tiene la capa 'NoExiste' (mira mapa[\"capas\"])" \
+         "error: mapa.tiled(): no se encuentra 'tiled/no_esta.tmx'"; do
     [ "$(grep -cxF "$l" salida26.txt)" -ge 1 ] && ok "tiled: $l" || mal "falta la línea: $l"
 done
 python3 - <<'PY' || fallos=$((fallos+1))
@@ -541,7 +541,7 @@ PY
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=3 timeout 60 "$LINCE" "$DIR/prueba21.lince" > salida27.txt 2>&1
 for l in "caja en el suelo: 204 verdadero" "pelota rebota: verdadero y se para: 208 verdadero" "apiladas: 204 184 verdadero" \
          "la moneda no cae y avisa: 180 verdadero" "el pasajero sube con el ascensor: 16 verdadero" "empujar: 200 20" "cuerpos: 8" \
-         'error: cuerpo(): falta "y" (un número; o "radio" en vez de ancho y alto)' "error: avanzar_fisica() espera un mundo de juego.fisica()"; do
+         'error: fisica.cuerpo(): falta "y" (un número; o "radio" en vez de ancho y alto)' "error: fisica.avanzar() espera un mundo de juego.fisica.mundo()"; do
     grep -qxF "$l" salida27.txt && ok "física: $l" || mal "falta la línea: $l"
 done
 # ── Controles a gusto (en una carpeta de partidas de mentira) ──
@@ -597,7 +597,7 @@ printf 'idioma = Español\n' > idiomas/es.txt
 LANG=en_US.UTF-8 LC_ALL= LANGUAGE= SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=2 LINCE_JUEGO_CAPTURA=capas.bmp \
     timeout 30 "$LINCE" "$DIR/prueba26.lince" > salida32.txt 2>&1
 for l in "capa de antes: 0" "a_mundo: [70, 80] a_pantalla: [30, 70]" \
-         'camara_actual: {"x": 10, "y": 20, "zoom": 2, "angulo": 90, "giro": 90, "zona": [0, 0, 100, 100], "temblor": verdadero}' \
+         'camara_actual: {"x": 10, "y": 20, "zoom": 2, "angulo": 90, "zona": [0, 0, 100, 100], "temblor": verdadero}' \
          "sin zoom: [5, 5]" "resto: una vez un lince que vivía en el bosque" "cabe: []" "medir con salto: [22, 32]" \
          'idiomas: {"en": English, "es": Español}' "elegido solo: en" "Play / Lives: 3 / 1 of 5 / Sin traducir" "original: Jugar nulo" \
          "error: idioma(): no está idiomas/fr.txt (cada idioma es un archivo en la carpeta idiomas del juego)" \
@@ -635,10 +635,10 @@ for l in "pila: 282 quieta: verdadero" "cae de esquina y queda plana: 380 verdad
          "bisagra: no se suelta: verdadero y cae girando: verdadero" "cuerda: no se estira: verdadero" \
          "uniones tras quitar el peso: 0" "mapa: 66 verdadero" "puntos_cuerpo: [[0, 0], [10, 0], [10, 4], [0, 4]]" \
          "sonando: verdadero" "sonando al irse: falso" "grupos: 0 1 1" "cambiar_voz: verdadero falso falso" \
-         'error: cuerpo(): el polígono tiene que ser convexo (sin entrantes); uno con entrantes se hace con varios' \
-         'error: cuerpo(): los puntos del polígono no encierran nada (están en línea)' \
-         'error: cuerda(): ata dos cuerpos distintos (o uno y un punto [x, y])' \
-         'error: bisagra(): ese cuerpo no está en este mundo' \
+         'error: fisica.cuerpo(): el polígono tiene que ser convexo (sin entrantes); uno con entrantes se hace con varios' \
+         'error: fisica.cuerpo(): los puntos del polígono no encierran nada (están en línea)' \
+         'error: fisica.cuerda(): ata dos cuerpos distintos (o uno y un punto [x, y])' \
+         'error: fisica.bisagra(): ese cuerpo no está en este mundo' \
          'error: volumen(): el grupo es "efectos", "musica" o "voces"' \
          'error: musica(): "fundido" son los segundos del paso de una música a otra (de 0 a 60)' \
          'error: reproducir(): el grupo es "efectos", "musica" o "voces"' \
@@ -697,19 +697,21 @@ for l in "mandos: 3 verdadero falso" "se une el 1 en 5" "se une el 2 en 10" "se 
          'error: menu_jugadores(): "minimo" va de 1 a "maximo"'; do
     grep -qxF "$l" salida34.txt && ok "1.8: ${l:0:70}" || mal "falta la línea: $l"
 done
-# ── 1.9: lo de la 2.0 ya funciona, y lo de antes también (avisando una vez) ──
+# ── 2.0: colision única, juego.fisica.*, juego.mapa.*, partidas, cámara; y lo de la 1.x, un error claro ──
 LINCE_JUEGO_GUARDADO="$T/p19" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=3 \
     timeout 60 "$LINCE" "$DIR/prueba29.lince" > salida35.txt 2>&1
 for l in "caja-caja: verdadero falso" "punto-caja: verdadero falso falso" "círculo-caja: verdadero falso" \
          "círculo-círculo: verdadero falso" "punto-círculo: verdadero falso" "diccionario: verdadero" \
          'error: colision() espera dos formas: un punto [x, y], una caja [x, y, ancho, alto] (o un diccionario con x, y, ancho y alto) o un círculo {"centro": [x, y], "radio": r}' \
-         'mapa: verdadero . [[0, 0]]' "física: verdadero 2" "viejos: verdadero verdadero verdadero" "cámara: 30 30" \
-         "giro de antes: 45" 'partida: {"vidas": 3} 3 verdadero' "partículas: 0"; do
-    grep -qxF "$l" salida35.txt && ok "1.9: $l" || mal "falta la línea: $l"
-done
-for o in "juego.mapa(filas, tamaño) → juego.mapa.crear" "juego.solido → juego.mapa.solido" "juego.colision(x1, y1, ancho1" \
-         "juego.dentro(px, py" '{"giro": g}) → juego.camara(x, y, {"angulo": g})' "juego.cargar → juego.cargar_partida" \
-         "juego.texto(t, x, y, escala, color)"; do
-    [ "$(grep -cF "$o" salida35.txt)" = 1 ] && ok "1.9: avisa una vez de ${o:0:40}" || mal "no avisa una vez de: $o"
+         'mapa: verdadero . [[0, 0]]' "física: verdadero 2" "cámara: 30 falso" 'partida: {"vidas": 3} verdadero' "partículas: 0" \
+         "1.x: Esto es de la 1.x, y en la 2.0 cambió: juego.mapa(filas, tamaño) → juego.mapa.crear(filas, tamaño) («lince migrar» lo cambia solo)." \
+         "1.x: Esto es de la 1.x, y en la 2.0 cambió: juego.solido → juego.mapa.solido («lince migrar» lo cambia solo)." \
+         "1.x: Esto es de la 1.x, y en la 2.0 cambió: juego.cuerpo → juego.fisica.cuerpo («lince migrar» lo cambia solo)." \
+         "1.x: Esto es de la 1.x, y en la 2.0 cambió: juego.dentro(px, py, x, y, ancho, alto) → juego.colision([px, py], [x, y, ancho, alto]) («lince migrar» lo cambia solo)." \
+         "1.x: Esto es de la 1.x, y en la 2.0 cambió: juego.cargar → juego.cargar_partida («lince migrar» lo cambia solo)." \
+         '1.x: camara(): no conozco la opción '"'"'giro'"'"' (hay "x", "y", "zoom", "angulo", "zona" y "temblor")' \
+         '1.x: texto(): la escala, el color y la fuente van en las opciones: texto(t, x, y, {"escala": 2, "color": [255, 255, 255]})' \
+         '1.x: reproducir(): el volumen y el bucle van en las opciones: reproducir(sonido, {"volumen": 0.5, "bucle": verdadero})'; do
+    grep -qxF "$l" salida35.txt && ok "2.0: ${l:0:70}" || mal "falta la línea: $l"
 done
 [ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida5b.txt; exit 1; }

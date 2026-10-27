@@ -29,7 +29,8 @@ def leer(ruta):
 def palabras_clave():
     t = leer("src/lexer.c")
     bloque = re.search(r"PALABRAS_CLAVE\[\]\s*=\s*\{(.*?)\n\};", t, re.S).group(1)
-    return re.findall(r'\{\s*"([a-z_]+)"\s*,', bloque)
+    # 'val' sigue en el lexer solo para dar su error (ya no es del lenguaje desde la 2.0)
+    return [w for w in re.findall(r'\{\s*"([a-z_]+)"\s*,', bloque) if w != "val"]
 
 def palabras_contextuales():
     t = leer("src/lexer.c")
@@ -57,7 +58,7 @@ CONTROL = ["si", "sino", "para", "cada", "mientras", "hacer", "devolver", "produ
            "intentar", "capturar", "finalmente", "lanzar", "elegir", "caso", "otro",
            "romper", "continuar"]
 DECLARACION = ["sea", "fijo", "funcion", "generador", "clase", "extiende", "implementa",
-               "interfaz", "enumeracion", "mi", "padre", "importar", "val", "ref"]
+               "interfaz", "enumeracion", "mi", "padre", "importar", "ref"]
 TIPOS = ["numero", "texto", "logico", "lista", "diccionario"]
 LOGICAS = ["y", "o", "no"]
 LITERALES = ["verdadero", "falso", "nulo"]

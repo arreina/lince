@@ -1,7 +1,7 @@
 # @seccion: Física
 # @titulo: Cajas, pelotas y ascensores
-# @nota: `juego.fisica()` hace un mundo con gravedad (y, si se le da, un mapa con el que chocar), y `juego.cuerpo(mundo, datos)` le añade cuerpos: cajas o círculos (`radio`) con `masa`, `rebote` y `friccion`. `juego.avanzar_fisica(mundo)` lo mueve todo en cada fotograma: caen, rebotan, se empujan según su masa y se apilan.
-# @nota: Un cuerpo `fijo` no lo mueve nada; con `vx` o `vy` es una plataforma o un ascensor que lleva lo que tiene encima. Uno `sensor` no choca, solo avisa de lo que toca (`juego.tocando`), para monedas o zonas. Los cuerpos son diccionarios normales: el personaje puede ser uno más.
+# @nota: `juego.fisica.mundo()` hace un mundo con gravedad (y, si se le da, un mapa con el que chocar), y `juego.fisica.cuerpo(mundo, datos)` le añade cuerpos: cajas o círculos (`radio`) con `masa`, `rebote` y `friccion`. `juego.fisica.avanzar(mundo)` lo mueve todo en cada fotograma: caen, rebotan, se empujan según su masa y se apilan.
+# @nota: Un cuerpo `fijo` no lo mueve nada; con `vx` o `vy` es una plataforma o un ascensor que lleva lo que tiene encima. Uno `sensor` no choca, solo avisa de lo que toca (`juego.fisica.tocando`), para monedas o zonas. Los cuerpos son diccionarios normales: el personaje puede ser uno más.
 # @fotogramas: 90
 importar "juego"
 

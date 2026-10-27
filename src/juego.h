@@ -1287,18 +1287,18 @@ static int jg_ancho_texto(const char *t, int escala) {
     return cuenta ? (cuenta * 6 - 1) * escala : 0;
 }
 
-/* texto(contenido, x, y[, escala[, color]]) */
+/* texto(contenido, x, y[, opciones]) */
 static Valor *fn_jg_texto(Valor **a, int n) {
     JG_ABIERTA();
-    if (n < 3 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "texto() espera (contenido, x, y[, escala[, color]]) o (contenido, x, y, opciones)");
+    if (n < 3 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "texto() espera (contenido, x, y[, opciones])");
+    if (n > 4 || (n == 4 && a[3]->tipo != VAL_DICCIONARIO && a[3]->tipo != VAL_NULO))
+        return jg_error("ErrorTipo", "texto(): la escala, el color y la fuente van en las opciones: texto(t, x, y, {\"escala\": 2, \"color\": [255, 255, 255]})");
     JG_DIBUJO(fn_jg_texto);
     if (n > 3 && a[3]->tipo == VAL_DICCIONARIO) return jg_texto_opciones(a, n, 0);
-    if (n > 3) modulo_avisar_obsoleto("juego.texto(escala)", "juego.texto(t, x, y, escala, color) → juego.texto(t, x, y, {\"escala\": escala, \"color\": color})", -1);
     double x, y, esc = 2;
     if (!jg_num(a, n, 1, &x, "texto") || !jg_num(a, n, 2, &y, "texto")) return valor_nulo();
-    if (n > 3 && !jg_num(a, n, 3, &esc, "texto")) return valor_nulo();
     unsigned char c[4];
-    if (!jg_color(a, n, 4, c)) return valor_nulo();
+    if (!jg_color(a, 3, 4, c)) return valor_nulo();
     int e = esc < 1 ? 1 : esc > 64 ? 64 : (int)esc;
     jg_pintar(c);
     jg_escribir(a[0]->texto, (int)(x - _jgs.cam_x), (int)(y - _jgs.cam_y), e, -1);
@@ -2525,9 +2525,9 @@ static Valor *fn_jg_reproducir(Valor **a, int n) {
         }
         return valor_numero(id);
     }
-    int bucle = n > 2 && a[2]->tipo == VAL_BOOLEANO && a[2]->booleano;
-    if (n > 1) modulo_avisar_obsoleto("juego.reproducir(volumen)", "juego.reproducir(s, volumen, bucle) → juego.reproducir(s, {\"volumen\": volumen, \"bucle\": bucle})", -1);
-    return valor_numero(jg_sonar(s->datos, s->muestras, jg_volumen_arg(a, n, 1, 1), bucle, NULL));
+    if (n > 1)
+        return jg_error("ErrorTipo", "reproducir(): el volumen y el bucle van en las opciones: reproducir(sonido, {\"volumen\": 0.5, \"bucle\": verdadero})");
+    return valor_numero(jg_sonar(s->datos, s->muestras, 1, 0, NULL));
 }
 
 /* cambiar_voz(voz, opciones): cambia lo que suena (volumen, lado, tono, con
@@ -2604,9 +2604,9 @@ static int jg_voz_suena(int id, const short *datos) {
    vuelve a empezar al recargar en caliente). */
 static Valor *fn_jg_musica(Valor **a, int n) {
     JG_ABIERTA();
-    float vol = jg_volumen_arg(a, n, 1, 0.6f);
-    if (n > 1 && a[1]->tipo == VAL_NUMERO)
-        modulo_avisar_obsoleto("juego.musica(volumen)", "juego.musica(ruta, volumen) → juego.musica(ruta, {\"volumen\": volumen})", -1);
+    float vol = 0.6f;
+    if (n > 1 && a[1]->tipo != VAL_DICCIONARIO)
+        return jg_error("ErrorTipo", "musica(): el volumen va en las opciones: musica(ruta, {\"volumen\": 0.5})");
     double seg = 0;
     if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
         static const char *const V[] = {"volumen", "fundido", NULL};
@@ -4716,7 +4716,7 @@ static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
     JgFuente *f = NULL;
     int es_fuente = op && valor_diccionario_buscar(op, "fuente") >= 0 && op->diccionario.valores[valor_diccionario_buscar(op, "fuente")]->tipo == VAL_NUMERO;
     if (es_fuente && !medir && valor_diccionario_buscar(op, "alto") >= 0)     /* la fuente tal cual */
-        modulo_avisar_obsoleto("juego.texto(fuente)", "juego.texto(t, x, y, FUENTE) → juego.texto(t, x, y, {\"fuente\": FUENTE})", -1);
+        return jg_error("ErrorTipo", "texto(): la fuente va en las opciones: texto(t, x, y, {\"fuente\": LETRA})");
     if (op && !es_fuente) {                     /* unas opciones (no una fuente pasada tal cual) */
         static const char *const V[] = {"fuente", "escala", "color", "alinear", "ancho", "capa", NULL};
         if (!jg_opciones_validas(op, fn, V)) return valor_nulo();
@@ -4977,7 +4977,7 @@ static Valor *fn_jg_camara(Valor **a, int n) {
         }
     } else return jg_error("ErrorTipo", "camara() espera (x, y), (x, y, opciones), un diccionario de opciones o nada");
     if (op) {
-        static const char *const V[] = {"x", "y", "zoom", "angulo", "giro", "zona", "temblor", NULL};
+        static const char *const V[] = {"x", "y", "zoom", "angulo", "zona", "temblor", NULL};
         if (!jg_opciones_validas(op, "camara", V)) return valor_nulo();
         double v;
         if (n == 1) { jg_opcion(op, "x", &c.cu_x); jg_opcion(op, "y", &c.cu_y); }
@@ -4986,10 +4986,6 @@ static Valor *fn_jg_camara(Valor **a, int n) {
             c.zoom = v;
         }
         if (jg_opcion(op, "angulo", &v)) c.giro = fmod(v, 360);
-        else if (jg_opcion(op, "giro", &v)) {
-            c.giro = fmod(v, 360);
-            modulo_avisar_obsoleto("juego.camara(giro)", "juego.camara(x, y, {\"giro\": g}) → juego.camara(x, y, {\"angulo\": g}), como en dibujar", -1);
-        }
         Valor *t = jg_opcion_valor(op, "temblor");
         if (t && t->tipo == VAL_BOOLEANO) c.quieta = !t->booleano;
         Valor *z = jg_opcion_valor(op, "zona");
@@ -5018,7 +5014,6 @@ static Valor *fn_jg_camara_actual(Valor **a, int n) {
     jg_dic_poner(d, "y", valor_numero(_jgs.cu_y));
     jg_dic_poner(d, "zoom", valor_numero(_jgs.cam_zoom > 0 ? _jgs.cam_zoom : 1));
     jg_dic_poner(d, "angulo", valor_numero(_jgs.cam_giro));
-    jg_dic_poner(d, "giro", valor_numero(_jgs.cam_giro));          /* el de antes; en la 2.0, solo "angulo" */
     if (_jgs.cam_hay_zona) {
         Valor *z = valor_lista_crear();
         for (int i = 0; i < 4; i++) lista_agregar(z, valor_numero(_jgs.cam_zona[i]));
@@ -5205,14 +5200,6 @@ static Valor *fn_jg_mando_virtual(Valor **a, int n) {
     return valor_nulo();
 }
 
-/* posicion_camara() -> [x, y]: dónde está puesta la cámara (sin el temblor) */
-static Valor *fn_jg_posicion_camara(Valor **a, int n) {
-    (void)a; (void)n;
-    Valor *l = valor_lista_crear();
-    lista_agregar(l, valor_numero(_jgs.cu_x));
-    lista_agregar(l, valor_numero(_jgs.cu_y));
-    return l;
-}
 
 static int jg_mando_arg(Valor **a, int n, int i) {
     if (i < n && a[i]->tipo == VAL_NUMERO) {
@@ -5712,39 +5699,7 @@ static Valor *fn_jg_direccion(Valor **a, int n) {
     return valor_numero(jg_accion_fuerza(pos, 0) - fn);
 }
 
-/* Los 'cuantos' números de los argumentos, donde un punto puede ir en una
-   lista [x, y] (como el que da raton()), un rectángulo en una lista [x, y,
-   ancho, alto] (como los que da caja()) o en un diccionario
-   con "x", "y", "ancho" y "alto" (lo que mueve mover_en_mapa, un cuerpo) */
 static Valor *jg_dic(Valor *d, const char *clave);
-static int jg_numeros(Valor **a, int n, double *v, int cuantos, const char *fn, const char *forma) {
-    int k = 0, ok = 1;
-    for (int i = 0; i < n && ok; i++) {
-        if (a[i]->tipo == VAL_NUMERO) { if (k < cuantos) v[k] = a[i]->numero; k++; continue; }
-        if (a[i]->tipo == VAL_DICCIONARIO) {
-            static const char *const C[] = {"x", "y", "ancho", "alto"};
-            for (int j = 0; ok && j < 4; j++) {
-                Valor *e = jg_dic(a[i], C[j]);
-                ok = e && e->tipo == VAL_NUMERO;
-                if (ok && k < cuantos) v[k] = e->numero;
-                k++;
-            }
-            continue;
-        }
-        ok = a[i]->tipo == VAL_LISTA && a[i]->lista.cantidad >= 2 && a[i]->lista.cantidad <= 4;   /* punto, círculo o rectángulo */
-        for (int j = 0; ok && j < a[i]->lista.cantidad; j++) {
-            ok = a[i]->lista.elementos[j]->tipo == VAL_NUMERO;
-            if (ok && k < cuantos) v[k] = a[i]->lista.elementos[j]->numero;
-            k++;
-        }
-    }
-    if (ok && k == cuantos) return 1;
-    char msg[400];
-    snprintf(msg, sizeof msg, "%s() espera %s (en números o en listas: [x, y] un punto, [x, y, ancho, alto] un rectángulo y [x, y, radio] un círculo; "
-             "un rectángulo también puede ser un diccionario con x, y, ancho y alto)", fn, forma);
-    jg_error("ErrorTipo", msg);
-    return 0;
-}
 
 /* Una forma para colision(): un punto [x, y], una caja [x, y, ancho, alto] (o
    un diccionario con x, y, ancho y alto: un personaje, un cuerpo), o un círculo
@@ -5804,46 +5759,18 @@ static int jg_se_tocan(const JgForma *a, const JgForma *b) {
 
 /* colision(a, b): ¿se tocan? Cada uno, un punto [x, y], una caja [x, y, ancho,
    alto] (o un diccionario con x, y, ancho y alto) o un círculo {"centro": [x,
-   y], "radio": r}. La forma de antes, con 8 números, sigue valiendo (y avisa). */
+   y], "radio": r}. */
 static Valor *fn_jg_colision(Valor **a, int n) {
     JgForma fa, fb;
     if (n == 2 && jg_forma(a[0], &fa) && jg_forma(a[1], &fb)) return valor_booleano(jg_se_tocan(&fa, &fb));
-    if (n == 2)
-        return jg_error("ErrorTipo", "colision() espera dos formas: un punto [x, y], una caja [x, y, ancho, alto] "
-                        "(o un diccionario con x, y, ancho y alto) o un círculo {\"centro\": [x, y], \"radio\": r}");
-    double v[8];
-    if (!jg_numeros(a, n, v, 8, "colision", "(x1, y1, ancho1, alto1, x2, y2, ancho2, alto2)")) return valor_nulo();
-    modulo_avisar_obsoleto("juego.colision(8)", "juego.colision(x1, y1, ancho1, alto1, x2, y2, ancho2, alto2) → juego.colision([x1, y1, ancho1, alto1], [x2, y2, ancho2, alto2])", -1);
-    return valor_booleano(v[0] < v[4] + v[6] && v[0] + v[2] > v[4] &&
-                          v[1] < v[5] + v[7] && v[1] + v[3] > v[5]);
+    return jg_error("ErrorTipo", "colision() espera dos formas: un punto [x, y], una caja [x, y, ancho, alto] "
+                    "(o un diccionario con x, y, ancho y alto) o un círculo {\"centro\": [x, y], \"radio\": r}");
 }
 
 /* ── Colisiones ── */
 
-/* colision_circulos(x1, y1, r1, x2, y2, r2): ¿se tocan los dos círculos? */
-static Valor *fn_jg_colision_circulos(Valor **a, int n) {
-    double v[6];
-    if (!jg_numeros(a, n, v, 6, "colision_circulos", "(x1, y1, radio1, x2, y2, radio2)")) return valor_nulo();
-    double dx = v[3] - v[0], dy = v[4] - v[1], r = v[2] + v[5];
-    return valor_booleano(dx * dx + dy * dy < r * r);
-}
 
-/* colision_circulo_rect(cx, cy, radio, x, y, ancho, alto): ¿toca el círculo al rectángulo? */
-static Valor *fn_jg_colision_circulo_rect(Valor **a, int n) {
-    double v[7];
-    if (!jg_numeros(a, n, v, 7, "colision_circulo_rect", "(cx, cy, radio, x, y, ancho, alto)")) return valor_nulo();
-    double px = v[0] < v[3] ? v[3] : v[0] > v[3] + v[5] ? v[3] + v[5] : v[0];   /* punto del rectángulo más cercano */
-    double py = v[1] < v[4] ? v[4] : v[1] > v[4] + v[6] ? v[4] + v[6] : v[1];
-    double dx = v[0] - px, dy = v[1] - py;
-    return valor_booleano(dx * dx + dy * dy < v[2] * v[2]);
-}
 
-/* dentro(px, py, x, y, ancho, alto): ¿está el punto dentro del rectángulo? (botones, clics) */
-static Valor *fn_jg_dentro(Valor **a, int n) {
-    double v[6];
-    if (!jg_numeros(a, n, v, 6, "dentro", "(px, py, x, y, ancho, alto)")) return valor_nulo();
-    return valor_booleano(v[0] >= v[2] && v[0] < v[2] + v[4] && v[1] >= v[3] && v[1] < v[3] + v[5]);
-}
 
 /* ── Animación ──
    cuadro(cuadros, por_segundo[, desde[, repetir]]): el cuadro que toca ahora.
@@ -5992,7 +5919,7 @@ static Valor *fn_jg_dibujar_particulas(Valor **a, int n) {
 }
 
 /* borrar_particulas(): quita todas (al cambiar de nivel, por ejemplo) */
-static Valor *fn_jg_borrar_particulas(Valor **a, int n) {
+static Valor *fn_jg_quitar_particulas(Valor **a, int n) {
     (void)a; (void)n;
     _jgs.npart = 0;
     return valor_nulo();
@@ -6289,7 +6216,7 @@ static int jg_carpeta_guardado(char *ruta, size_t max, int crear) {
 /* La ruta del archivo de un nombre ("partida" → .../partida.json); 0 si el
    nombre no vale */
 static int jg_ruta_guardado(Valor **a, int n, const char *fn, char *ruta, size_t max) {
-    int crear = strcmp(fn, "guardar") == 0;          /* cargar u olvidar no crean la carpeta */
+    int crear = strcmp(fn, "guardar_partida") == 0;          /* cargar u olvidar no crean la carpeta */
     if (n < 1 || a[0]->tipo != VAL_TEXTO) {
         char m[160];
         snprintf(m, sizeof m, "%s() espera un nombre, como \"partida\" o \"opciones\"", fn);
@@ -6319,12 +6246,12 @@ static int jg_ruta_guardado(Valor **a, int n, const char *fn, char *ruta, size_t
 /* guardar(nombre, datos): números, textos, lógicos, nulo, listas y diccionarios */
 static Valor *fn_jg_guardar(Valor **a, int n) {
     char ruta[1100], temporal[1110];
-    if (!jg_ruta_guardado(a, n, "guardar", ruta, sizeof ruta)) return valor_nulo();
-    if (n < 2) return jg_error("ErrorTipo", "guardar() espera (nombre, datos): guardar(\"partida\", {\"nivel\": 3})");
+    if (!jg_ruta_guardado(a, n, "guardar_partida", ruta, sizeof ruta)) return valor_nulo();
+    if (n < 2) return jg_error("ErrorTipo", "guardar_partida() espera (nombre, datos): guardar(\"partida\", {\"nivel\": 3})");
     const char *no = json_lo_que_no_cabe(a[1]);
     if (no) {
         char m[200];
-        snprintf(m, sizeof m, "guardar(): no se puede guardar eso; se guardan %s", no);
+        snprintf(m, sizeof m, "guardar_partida(): no se puede guardar eso; se guardan %s", no);
         return jg_error("ErrorTipo", m);
     }
     char *json = json_de_valor(a[1], 2);
@@ -6340,7 +6267,7 @@ static Valor *fn_jg_guardar(Valor **a, int n) {
 #else
     if (ok) ok = rename(temporal, ruta) == 0;
 #endif
-    if (!ok) { remove(temporal); return jg_error("ErrorJuego", "guardar(): no se pudo escribir la partida"); }
+    if (!ok) { remove(temporal); return jg_error("ErrorJuego", "guardar_partida(): no se pudo escribir la partida"); }
     return valor_booleano(1);
 }
 
@@ -6357,9 +6284,9 @@ static Valor *jg_copia(Valor *v) {
    nueva de una versión posterior del juego) se toma de por_defecto */
 static Valor *fn_jg_cargar(Valor **a, int n) {
     char ruta[1100];
-    if (!jg_ruta_guardado(a, n, "cargar", ruta, sizeof ruta)) return valor_nulo();
+    if (!jg_ruta_guardado(a, n, "cargar_partida", ruta, sizeof ruta)) return valor_nulo();
     Valor *defecto = n > 1 ? a[1] : NULL;
-    if (defecto && json_lo_que_no_cabe(defecto)) return jg_error("ErrorTipo", "cargar(): el valor por defecto tiene que poder guardarse (números, textos, listas, diccionarios...)");
+    if (defecto && json_lo_que_no_cabe(defecto)) return jg_error("ErrorTipo", "cargar_partida(): el valor por defecto tiene que poder guardarse (números, textos, listas, diccionarios...)");
     FILE *f = fopen(ruta, "rb");
     if (!f) return defecto ? jg_copia(defecto) : valor_nulo();
     fseek(f, 0, SEEK_END);
@@ -6406,7 +6333,7 @@ static Valor *fn_jg_idioma_sistema(Valor **a, int n) {
 /* olvidar(nombre): borra lo guardado; verdadero si había algo */
 static Valor *fn_jg_olvidar(Valor **a, int n) {
     char ruta[1100];
-    if (!jg_ruta_guardado(a, n, "olvidar", ruta, sizeof ruta)) return valor_nulo();
+    if (!jg_ruta_guardado(a, n, "olvidar_partida", ruta, sizeof ruta)) return valor_nulo();
     return valor_booleano(remove(ruta) == 0);
 }
 
@@ -6433,7 +6360,7 @@ static JgMapa *jg_mapa_arg(Valor **a, int n, const char *fn) {
     int k = n > 0 ? jg_id_de(a[0], "mapa") : -1;
     if (k < 0 || k >= _jgs.nmapas || !_jgs.mapas[k].celdas) {
         char msg[120];
-        snprintf(msg, sizeof msg, "%s() espera un mapa creado con juego.mapa()", fn);
+        snprintf(msg, sizeof msg, "%s() espera un mapa creado con juego.mapa.crear() o juego.mapa.tiled()", fn);
         jg_error("ErrorTipo", msg);
         return NULL;
     }
@@ -6457,27 +6384,27 @@ static int jg_es_solida(const JgMapa *m, int c, int f) {
    se pisan desde arriba) y "bordes" ("lados", "todos" o "ninguno") */
 static Valor *fn_jg_mapa(Valor **a, int n) {
     if (n < 2 || a[0]->tipo != VAL_LISTA || a[0]->lista.cantidad == 0)
-        return jg_error("ErrorTipo", "mapa() espera (lista de filas de texto, tamaño de casilla[, opciones])");
+        return jg_error("ErrorTipo", "mapa.crear() espera (lista de filas de texto, tamaño de casilla[, opciones])");
     double tam;
-    if (!jg_num(a, n, 1, &tam, "mapa")) return valor_nulo();
-    if (tam <= 0) return jg_error("ErrorArgumento", "mapa(): el tamaño de casilla tiene que ser mayor que 0");
+    if (!jg_num(a, n, 1, &tam, "mapa.crear")) return valor_nulo();
+    if (tam <= 0) return jg_error("ErrorArgumento", "mapa.crear(): el tamaño de casilla tiene que ser mayor que 0");
     Valor *op = n > 2 && a[2]->tipo == VAL_DICCIONARIO ? a[2] : NULL;
     static const char *const VM[] = {"solidos", "plataformas", "bordes", NULL};
-    if (!jg_opciones_validas(op, "mapa", VM)) return valor_nulo();
+    if (!jg_opciones_validas(op, "mapa.crear", VM)) return valor_nulo();
     int filas = a[0]->lista.cantidad, cols = 0;
     for (int f = 0; f < filas; f++) {
         Valor *v = a[0]->lista.elementos[f];
-        if (v->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa(): cada fila es un texto");
+        if (v->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa.crear(): cada fila es un texto");
         for (const unsigned char *t = (const unsigned char *)v->texto; *t; t++)
             if (*t >= 128) {
                 char msg[160];
-                snprintf(msg, sizeof msg, "mapa(): la fila %d tiene un carácter que no es ASCII; usa letras sin tilde, cifras o signos", f + 1);
+                snprintf(msg, sizeof msg, "mapa.crear(): la fila %d tiene un carácter que no es ASCII; usa letras sin tilde, cifras o signos", f + 1);
                 return jg_error("ErrorArgumento", msg);
             }
         int l = (int)strlen(v->texto);
         if (l > cols) cols = l;
     }
-    if (cols == 0 || (long)cols * filas > 16 * 1024 * 1024) return jg_error("ErrorArgumento", "mapa(): tamaño no válido");
+    if (cols == 0 || (long)cols * filas > 16 * 1024 * 1024) return jg_error("ErrorArgumento", "mapa.crear(): tamaño no válido");
     int k = -1;
     for (int i = 0; i < _jgs.nmapas; i++) if (!_jgs.mapas[i].celdas) { k = i; break; }
     if (k < 0) {
@@ -6504,7 +6431,7 @@ static Valor *fn_jg_mapa(Valor **a, int n) {
         if (strcmp(v->texto, "todos") == 0) m->bordes = 2;
         else if (strcmp(v->texto, "ninguno") == 0) m->bordes = 0;
         else if (strcmp(v->texto, "lados") != 0) { free(m->celdas); m->celdas = NULL;
-            return jg_error("ErrorArgumento", "mapa(): \"bordes\" es \"lados\", \"todos\" o \"ninguno\""); }
+            return jg_error("ErrorArgumento", "mapa.crear(): \"bordes\" es \"lados\", \"todos\" o \"ninguno\""); }
     }
     Valor *d = valor_diccionario_crear();
     valor_diccionario_agregar(d, "mapa", valor_numero(k));
@@ -6525,29 +6452,29 @@ static int jg_celda_args(Valor **a, int n, int i, int *c, int *f, const char *fn
 
 /* casilla(mapa, columna, fila): el carácter que hay ahí ("" fuera del mapa) */
 static Valor *fn_jg_casilla(Valor **a, int n) {
-    JgMapa *m = jg_mapa_arg(a, n, "casilla");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.casilla");
     int c, f;
-    if (!m || !jg_celda_args(a, n, 1, &c, &f, "casilla")) return valor_nulo();
+    if (!m || !jg_celda_args(a, n, 1, &c, &f, "mapa.casilla")) return valor_nulo();
     char t[2] = {(char)jg_celda(m, c, f), 0};
     return valor_texto(t);
 }
 
 /* poner_casilla(mapa, columna, fila, carácter) */
 static Valor *fn_jg_poner_casilla(Valor **a, int n) {
-    JgMapa *m = jg_mapa_arg(a, n, "poner_casilla");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.poner");
     int c, f;
-    if (!m || !jg_celda_args(a, n, 1, &c, &f, "poner_casilla")) return valor_nulo();
+    if (!m || !jg_celda_args(a, n, 1, &c, &f, "mapa.poner")) return valor_nulo();
     if (n < 4 || a[3]->tipo != VAL_TEXTO || strlen(a[3]->texto) != 1 || (unsigned char)a[3]->texto[0] >= 128)
-        return jg_error("ErrorTipo", "poner_casilla() espera (mapa, columna, fila, un carácter ASCII)");
+        return jg_error("ErrorTipo", "mapa.poner() espera (mapa, columna, fila, un carácter ASCII)");
     if (c >= 0 && f >= 0 && c < m->cols && f < m->filas) m->celdas[f * m->cols + c] = a[3]->texto[0];
     return valor_nulo();
 }
 
 /* solido(mapa, columna, fila): ¿es pared? (fuera del mapa, según los bordes) */
 static Valor *fn_jg_solido(Valor **a, int n) {
-    JgMapa *m = jg_mapa_arg(a, n, "solido");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.solido");
     int c, f;
-    if (!m || !jg_celda_args(a, n, 1, &c, &f, "solido")) return valor_nulo();
+    if (!m || !jg_celda_args(a, n, 1, &c, &f, "mapa.solido")) return valor_nulo();
     return valor_booleano(jg_es_solida(m, c, f));
 }
 
@@ -6560,18 +6487,18 @@ static Valor *jg_par(double x, double y) {
 
 /* casilla_en(mapa, x, y): [columna, fila] de la casilla que hay en ese punto */
 static Valor *fn_jg_casilla_en(Valor **a, int n) {
-    JgMapa *m = jg_mapa_arg(a, n, "casilla_en");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.casilla_en");
     double x, y;
-    if (!m || !jg_num(a, n, 1, &x, "casilla_en") || !jg_num(a, n, 2, &y, "casilla_en")) return valor_nulo();
+    if (!m || !jg_num(a, n, 1, &x, "mapa.casilla_en") || !jg_num(a, n, 2, &y, "mapa.casilla_en")) return valor_nulo();
     return jg_par(floor(x / m->tam), floor(y / m->tam));
 }
 
 /* buscar_en_mapa(mapa, caracteres): lista de [columna, fila] de las casillas
    que tienen alguno de esos caracteres, fila a fila */
 static Valor *fn_jg_buscar_en_mapa(Valor **a, int n) {
-    JgMapa *m = jg_mapa_arg(a, n, "buscar_en_mapa");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.buscar");
     if (!m) return valor_nulo();
-    if (n < 2 || a[1]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "buscar_en_mapa() espera (mapa, caracteres)");
+    if (n < 2 || a[1]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa.buscar() espera (mapa, caracteres)");
     Valor *l = valor_lista_crear();
     for (int f = 0; f < m->filas; f++)
         for (int c = 0; c < m->cols; c++)
@@ -6613,19 +6540,19 @@ static double jg_num_dic(Valor *d, const char *clave, double defecto, int *falta
    pone a 0 esa velocidad. Deja en la cosa "en_suelo", "techo" (lógicos) y
    "pared" (-1 a la izquierda, 1 a la derecha, 0 ninguna). Devuelve si chocó. */
 static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
-    JgMapa *m = jg_mapa_arg(a, n, "mover_en_mapa");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.mover");
     if (!m) return valor_nulo();
     if (n < 2 || a[1]->tipo != VAL_DICCIONARIO)
-        return jg_error("ErrorTipo", "mover_en_mapa() espera (mapa, diccionario con x, y, ancho, alto, vx, vy[, dt])");
+        return jg_error("ErrorTipo", "mapa.mover() espera (mapa, diccionario con x, y, ancho, alto, vx, vy[, dt])");
     Valor *d = a[1];
     int falta = 0;
     double x = jg_num_dic(d, "x", 0, &falta), y = jg_num_dic(d, "y", 0, &falta);
     double w = jg_num_dic(d, "ancho", 0, &falta), h = jg_num_dic(d, "alto", 0, &falta);
     if (falta || w <= 0 || h <= 0)
-        return jg_error("ErrorArgumento", "mover_en_mapa(): la cosa necesita números en \"x\", \"y\", \"ancho\" y \"alto\"");
+        return jg_error("ErrorArgumento", "mapa.mover(): la cosa necesita números en \"x\", \"y\", \"ancho\" y \"alto\"");
     double vx = jg_num_dic(d, "vx", 0, NULL), vy = jg_num_dic(d, "vy", 0, NULL);
     double dt = _jgs.dt;
-    if (n > 2 && !jg_num(a, n, 2, &dt, "mover_en_mapa")) return valor_nulo();
+    if (n > 2 && !jg_num(a, n, 2, &dt, "mapa.mover")) return valor_nulo();
     double dx = vx * dt, dy = vy * dt;
     /* en pasos de media casilla como mucho, para no atravesar paredes finas */
     int pasos = (int)ceil(fmax(fabs(dx), fabs(dy)) / (m->tam / 2));
@@ -6684,7 +6611,7 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
     int ox, oy;
     if (id >= 0 && id < _jgs.nimagenes) {
         if (jg_hoja_de(v)) {
-            snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" es una hoja de tiles; di qué cuadro, por ejemplo [hoja, 3]", car);
+            snprintf(msg, sizeof msg, "mapa.dibujar(): \"%s\" es una hoja de tiles; di qué cuadro, por ejemplo [hoja, 3]", car);
             jg_error("ErrorTipo", msg);
             return -1;
         }
@@ -6697,7 +6624,7 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
     JgHoja *h = hoja ? jg_hoja_de(hoja) : NULL;
     id = h ? h->imagen : -1;
     if (!h) {
-        snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" debe ser un color, una imagen o [hoja, cuadro] "
+        snprintf(msg, sizeof msg, "mapa.dibujar(): \"%s\" debe ser un color, una imagen o [hoja, cuadro] "
                  "(la hoja se hace con juego.hoja(\"tiles.png\", 16))", car);
         jg_error("ErrorTipo", msg);
         return -1;
@@ -6710,7 +6637,7 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
         double paso = 0.25;
         if (nl == 3) {
             if (v->lista.elementos[2]->tipo != VAL_NUMERO || v->lista.elementos[2]->numero <= 0) {
-                snprintf(msg, sizeof msg, "dibujar_mapa(): en \"%s\", lo tercero son los segundos de cada cuadro (más de 0)", car);
+                snprintf(msg, sizeof msg, "mapa.dibujar(): en \"%s\", lo tercero son los segundos de cada cuadro (más de 0)", car);
                 jg_error("ErrorTipo", msg);
                 return -1;
             }
@@ -6720,13 +6647,13 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
         Valor *e = c->lista.elementos[i];
         for (int j = 0; j < c->lista.cantidad; j++)
             if (c->lista.elementos[j]->tipo != VAL_NUMERO) {
-                snprintf(msg, sizeof msg, "dibujar_mapa(): en \"%s\", los cuadros de la animación son números", car);
+                snprintf(msg, sizeof msg, "mapa.dibujar(): en \"%s\", los cuadros de la animación son números", car);
                 jg_error("ErrorTipo", msg);
                 return -1;
             }
         cuadro = (int)floor(e->numero);
     } else {
-        snprintf(msg, sizeof msg, "dibujar_mapa(): \"%s\" es [hoja, cuadro] o [hoja, [cuadros], segundos]", car);
+        snprintf(msg, sizeof msg, "mapa.dibujar(): \"%s\" es [hoja, cuadro] o [hoja, [cuadros], segundos]", car);
         jg_error("ErrorTipo", msg);
         return -1;
     }
@@ -6741,10 +6668,10 @@ static int jg_aspecto_imagen(Valor *v, const char *car, JgRect *src) {
 static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
     JG_ABIERTA();
     JG_DIBUJO(fn_jg_dibujar_mapa);
-    JgMapa *m = jg_mapa_arg(a, n, "dibujar_mapa");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.dibujar");
     if (!m) return valor_nulo();
     if (n < 2 || a[1]->tipo != VAL_DICCIONARIO)
-        return jg_error("ErrorTipo", "dibujar_mapa() espera (mapa, {carácter: color, imagen o [hoja, cuadro]})");
+        return jg_error("ErrorTipo", "mapa.dibujar() espera (mapa, {carácter: color, imagen o [hoja, cuadro]})");
     /* aspecto de cada carácter: color (tipo 1) o trozo de una textura (tipo 2) */
     unsigned char tipo[128] = {0}, color[128][4];
     void *tex[128] = {0};
@@ -6753,7 +6680,7 @@ static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
     for (int i = 0; i < d->diccionario.cantidad; i++) {
         const char *k = d->diccionario.claves[i];
         if (!k[0] || k[1] || (unsigned char)k[0] >= 128)
-            return jg_error("ErrorTipo", "dibujar_mapa(): cada clave es un solo carácter, por ejemplo \"#\"");
+            return jg_error("ErrorTipo", "mapa.dibujar(): cada clave es un solo carácter, por ejemplo \"#\"");
         Valor *v = d->diccionario.valores[i];
         int ch = (unsigned char)k[0];
         if (v->tipo == VAL_DICCIONARIO || (v->tipo == VAL_LISTA && v->lista.cantidad > 0 &&
@@ -6873,23 +6800,23 @@ static void jg_tiled_capas(Valor *capas, Valor **salida, int *n, int max, int vi
 
 static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     JG_ABIERTA();
-    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa_tiled() espera la ruta de un mapa de Tiled (.tmx o .tmj)");
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa.tiled() espera la ruta de un mapa de Tiled (.tmx o .tmj)");
     Valor *op = n > 1 && a[1]->tipo == VAL_DICCIONARIO ? a[1] : NULL;
-    if (n > 1 && !op && a[1]->tipo != VAL_NULO) return jg_error("ErrorTipo", "mapa_tiled(): las opciones van en un diccionario");
+    if (n > 1 && !op && a[1]->tipo != VAL_NULO) return jg_error("ErrorTipo", "mapa.tiled(): las opciones van en un diccionario");
     static const char *const VT[] = {"solidos", "plataformas", "bordes", NULL};
-    if (!jg_opciones_validas(op, "mapa_tiled", VT)) return valor_nulo();
+    if (!jg_opciones_validas(op, "mapa.tiled", VT)) return valor_nulo();
     char error[600], msg[800];
     Valor *m = tiled_leer(a[0]->texto, error, sizeof error);
-    if (!m) { snprintf(msg, sizeof msg, "mapa_tiled(): %s", error); return jg_error("ErrorJuego", msg); }
+    if (!m) { snprintf(msg, sizeof msg, "mapa.tiled(): %s", error); return jg_error("ErrorJuego", msg); }
     int cols = (int)jg_campo_num(m, "width", 0), filas = (int)jg_campo_num(m, "height", 0);
     int tw = (int)jg_campo_num(m, "tilewidth", 0), th = (int)jg_campo_num(m, "tileheight", 0);
     if (cols <= 0 || filas <= 0 || tw <= 0 || th <= 0 || (long)cols * filas > 16 * 1024 * 1024) {
         valor_destruir(m);
-        return jg_error("ErrorJuego", "mapa_tiled(): el mapa no tiene un tamaño válido");
+        return jg_error("ErrorJuego", "mapa.tiled(): el mapa no tiene un tamaño válido");
     }
     if (tw != th) {
         valor_destruir(m);
-        return jg_error("ErrorJuego", "mapa_tiled(): las casillas del mapa tienen que ser cuadradas (el ancho y el alto de tile iguales)");
+        return jg_error("ErrorJuego", "mapa.tiled(): las casillas del mapa tienen que ser cuadradas (el ancho y el alto de tile iguales)");
     }
     int k = -1;
     for (int i = 0; i < _jgs.ntiled; i++) if (!_jgs.tiled[i].usado) { k = i; break; }
@@ -6911,11 +6838,11 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     }
     unsigned char *tipo_gid = calloc(max_gid + 1, 1);       /* 1 sólido, 2 plataforma */
     for (int i = 0; tss && tss->tipo == VAL_LISTA && i < tss->lista.cantidad; i++) {
-        if (t->nts == JG_TILED_TS) { jg_tiled_liberar(t); free(tipo_gid); valor_destruir(m); return jg_error("ErrorJuego", "mapa_tiled(): demasiados tilesets"); }
+        if (t->nts == JG_TILED_TS) { jg_tiled_liberar(t); free(tipo_gid); valor_destruir(m); return jg_error("ErrorJuego", "mapa.tiled(): demasiados tilesets"); }
         Valor *x = tss->lista.elementos[i];
         const char *img = jg_campo_texto(x, "image");
         if (!*img) {
-            snprintf(msg, sizeof msg, "mapa_tiled(): el tileset '%s' es de imágenes sueltas; Lince usa tilesets de una sola imagen", jg_campo_texto(x, "name"));
+            snprintf(msg, sizeof msg, "mapa.tiled(): el tileset '%s' es de imágenes sueltas; Lince usa tilesets de una sola imagen", jg_campo_texto(x, "name"));
             jg_tiled_liberar(t); free(tipo_gid); valor_destruir(m);
             return jg_error("ErrorJuego", msg);
         }
@@ -7191,7 +7118,7 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
     JG_DIBUJO(fn_jg_dibujar_tiled);
     int k = n > 0 ? jg_id_de(a[0], "tiled") : -1;
     if (k < 0 || k >= _jgs.ntiled || !_jgs.tiled[k].usado)
-        return jg_error("ErrorTipo", "dibujar_tiled() espera un mapa de juego.mapa_tiled()");
+        return jg_error("ErrorTipo", "mapa.dibujar_tiled() espera un mapa de juego.mapa.tiled()");
     JgTiled *t = &_jgs.tiled[k];
     if (n < 2 || a[1]->tipo == VAL_NULO) {
         for (int i = 0; i < t->ncapas; i++) if (t->capas[i].visible) jg_tiled_dibujar_capa(t, &t->capas[i]);
@@ -7199,16 +7126,16 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
     }
     Valor *l = a[1];
     int cuantas = l->tipo == VAL_LISTA ? l->lista.cantidad : 1;
-    if (l->tipo != VAL_LISTA && l->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "dibujar_tiled(): las capas son un nombre o una lista de nombres");
+    if (l->tipo != VAL_LISTA && l->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa.dibujar_tiled(): las capas son un nombre o una lista de nombres");
     for (int j = 0; j < cuantas; j++) {
         Valor *nv = l->tipo == VAL_LISTA ? l->lista.elementos[j] : l;
-        if (nv->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "dibujar_tiled(): las capas son un nombre o una lista de nombres");
+        if (nv->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa.dibujar_tiled(): las capas son un nombre o una lista de nombres");
         int hecho = 0;
         for (int i = 0; i < t->ncapas; i++)
             if (!strcmp(t->capas[i].nombre, nv->texto)) { jg_tiled_dibujar_capa(t, &t->capas[i]); hecho = 1; }
         if (!hecho) {
             char m[300];
-            snprintf(m, sizeof m, "dibujar_tiled(): el mapa no tiene la capa '%s' (mira mapa[\"capas\"])", nv->texto);
+            snprintf(m, sizeof m, "mapa.dibujar_tiled(): el mapa no tiene la capa '%s' (mira mapa[\"capas\"])", nv->texto);
             return jg_error("ErrorArgumento", m);
         }
     }
@@ -7226,11 +7153,11 @@ static int jg_casilla_lista(Valor *v, int *c, int *f) {
 }
 
 static Valor *fn_jg_camino(Valor **a, int n) {
-    JgMapa *m = jg_mapa_arg(a, n, "camino");
+    JgMapa *m = jg_mapa_arg(a, n, "mapa.camino");
     if (!m) return valor_nulo();
     int c1, f1, c2, f2;
     if (n < 3 || !jg_casilla_lista(a[1], &c1, &f1) || !jg_casilla_lista(a[2], &c2, &f2))
-        return jg_error("ErrorTipo", "camino() espera (mapa, [columna, fila] de salida, [columna, fila] de llegada[, diagonales])");
+        return jg_error("ErrorTipo", "mapa.camino() espera (mapa, [columna, fila] de salida, [columna, fila] de llegada[, diagonales])");
     int diag = n > 3 && a[3]->tipo == VAL_BOOLEANO && a[3]->booleano;
     Valor *res = valor_lista_crear();
     int W = m->cols, H = m->filas;
@@ -7296,21 +7223,22 @@ static Valor *fn_jg_camino(Valor **a, int n) {
     return res;
 }
 
-/* Hace la parte 'parte' del módulo (juego.fisica) con lo que ya tiene con
-   otro nombre: {nombre nuevo, nombre de antes}. Si había una función con el
-   nombre de la parte, se sigue pudiendo llamar (juego.mapa(filas)). */
+/* Hace la parte 'parte' del módulo (juego.fisica) con lo que se cargó con
+   otro nombre ({nombre en la parte, nombre al cargarlo}), que deja de estar
+   suelto en el módulo: juego.fisica.cuerpo, y no juego.cuerpo */
 static void jg_parte(Valor *mod, const char *parte, const char *const (*nombres)[2]) {
     Valor *d = valor_diccionario_crear();
     d->es_modulo = 1;
     for (int i = 0; nombres[i][0]; i++) {
         int k = valor_diccionario_buscar(mod, nombres[i][1]);
-        if (k >= 0) { Valor *v = mod->diccionario.valores[k]; v->refs++; valor_diccionario_agregar(d, nombres[i][0], v); }
+        if (k < 0) continue;
+        Valor *v = mod->diccionario.valores[k];
+        v->refs++;
+        valor_diccionario_agregar(d, nombres[i][0], v);
+        valor_diccionario_quitar(mod, nombres[i][1]);
     }
-    int k = valor_diccionario_buscar(mod, parte);
-    if (k >= 0) {
-        valor_diccionario_agregar(d, "__llamar__", mod->diccionario.valores[k]);   /* se queda con su referencia */
-        mod->diccionario.valores[k] = d;
-    } else valor_diccionario_agregar(mod, parte, d);
+    if (valor_diccionario_buscar(mod, parte) >= 0) valor_diccionario_quitar(mod, parte);
+    valor_diccionario_agregar(mod, parte, d);
 }
 
 static void cargar_juego(Entorno *entorno) {
@@ -7387,7 +7315,6 @@ static void cargar_juego(Entorno *entorno) {
         {"vibrar",          fn_jg_vibrar,          -1},
         {"inclinacion",     fn_jg_inclinacion,      0},
         {"mando_virtual",   fn_jg_mando_virtual,    2},
-        {"posicion_camara", fn_jg_posicion_camara,  0},
         {"tactil",          fn_jg_tactil,           0},
         {"definir_accion",  fn_jg_definir_accion,   2},
         {"accion",          fn_jg_accion,          -1},
@@ -7395,29 +7322,22 @@ static void cargar_juego(Entorno *entorno) {
         {"accion_soltada",  fn_jg_accion_soltada,  -1},
         {"direccion",       fn_jg_direccion,       -1},
         {"recargado",       fn_jg_recargado,        0},
-        {"colision_circulos", fn_jg_colision_circulos, -1},
-        {"colision_circulo_rect", fn_jg_colision_circulo_rect, -1},
-        {"dentro",          fn_jg_dentro,          -1},
         {"cuadro",          fn_jg_cuadro,          -1},
         {"particulas",      fn_jg_particulas,      -1},
         {"dibujar_particulas", fn_jg_dibujar_particulas, 0},
-        {"borrar_particulas", fn_jg_borrar_particulas, 0},
         {"cubrir",          fn_jg_cubrir,          -1},
         {"tiempo_real",     fn_jg_tiempo_real,      0},
         {"mapa",            fn_jg_mapa,            -1},
         {"efecto",          fn_jg_efecto,          -1},
         {"crear_efecto",    fn_jg_crear_efecto,    -1},
         {"guardar_sonido",  fn_jg_guardar_sonido,   2},
-        {"guardar",         fn_jg_guardar,          2},
         {"guardar_partida", fn_jg_guardar,          2},
         {"cargar_partida",  fn_jg_cargar,          -1},
         {"olvidar_partida", fn_jg_olvidar,          1},
-        {"quitar_particulas", fn_jg_borrar_particulas, 0},
+        {"quitar_particulas", fn_jg_quitar_particulas, 0},
         {"entrada_pulsada", fn_jg_entrada_pulsada,  0},
         {"mapa_tiled",      fn_jg_mapa_tiled,      -1},
         {"dibujar_tiled",   fn_jg_dibujar_tiled,   -1},
-        {"cargar",          fn_jg_cargar,          -1},
-        {"olvidar",         fn_jg_olvidar,          1},
         {"carpeta_guardado", fn_jg_carpeta_guardado, 0},
         {"casilla",         fn_jg_casilla,          3},
         {"poner_casilla",   fn_jg_poner_casilla,    4},
@@ -7436,7 +7356,7 @@ static void cargar_juego(Entorno *entorno) {
     /* Y lo que está escrito en Lince: combo, pulsaciones, mantenida, curva,
        suavizar, acercar y las escenas */
     interprete_biblioteca(entorno, "juego", BIBLIOTECA_JUEGO);
-    /* Las partes de la 2.0 (ya en la 1.9): juego.fisica.cuerpo... */
+    /* Las partes: juego.fisica.cuerpo, juego.mapa.crear... */
     Valor *mod = modulo_ya_cargado("juego");
     if (!mod || hay_error) return;
     static const char *const FISICA[][2] = {
@@ -7450,5 +7370,4 @@ static void cargar_juego(Entorno *entorno) {
         {"dibujar", "dibujar_mapa"}, {"dibujar_tiled", "dibujar_tiled"}, {"camino", "camino"}, {NULL, NULL}};
     jg_parte(mod, "fisica", FISICA);
     jg_parte(mod, "mapa", MAPA);
-    modulo_marcar_obsoletas("juego", mod);      /* las de juego.lince también */
 }

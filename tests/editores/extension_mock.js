@@ -50,7 +50,7 @@ const ok = (c, t) => { console.log((c ? '  ✅ ' : '  ❌ ') + t); if (!c) fallo
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-    const texto = 'funcion doble(val numero n): numero {\n    devolver n * 2\n}\nsea r = doble(2)\nsi r > {\n}\n';
+    const texto = 'funcion doble(numero n): numero {\n    devolver n * 2\n}\nsea r = doble(2)\nsi r > {\n}\n';
     const doc = {
         languageId: 'lince', version: 1, uri: vscode.Uri.parse('file:///tmp/ext_prueba.lince'),
         getText: () => texto,

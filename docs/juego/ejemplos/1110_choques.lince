@@ -1,6 +1,6 @@
 # @seccion: Choques
 # @titulo: ¿Se tocan?
-# @nota: `juego.colision(x1, y1, an1, al1, x2, y2, an2, al2)` dice si se solapan dos rectángulos; `juego.colision_circulos` y `juego.colision_circulo_rect`, lo mismo con círculos (cada rectángulo puede ir en una lista `[x, y, ancho, alto]` y cada círculo en `[x, y, radio]`); `juego.dentro(px, py, x, y, an, al)`, si un punto (un clic) está dentro de un rectángulo (un botón).
+# @nota: `juego.colision(a, b)` dice si se tocan dos cosas, cada una un punto `[x, y]` (un clic), una caja `[x, y, ancho, alto]` (un botón, un personaje; también un diccionario con `x`, `y`, `ancho` y `alto`) o un círculo `{"centro": [x, y], "radio": r}`.
 # @nota: `juego.caja(cosa, x, y)` da el rectángulo de lo que se ve de verdad al dibujar una imagen, una hoja o un animador, sin el hueco transparente de alrededor: para que los choques sean justos.
 importar "juego"
 

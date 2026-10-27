@@ -376,21 +376,6 @@ static Valor *fn_txt_unir(Valor **a, int n) {
     return valor_texto(buf);
 }
 
-static Valor *fn_txt_repetir(Valor **a, int n) {
-    (void)n;
-    if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO) {
-        hay_error = 1;
-        valor_error = valor_error_nuevo("ErrorTipo",
-            "repetir() espera un texto y un numero", 0);
-        return valor_nulo();
-    }
-    const char *s = a[0]->texto;
-    int veces     = (int)a[1]->numero;
-    char buf[8192] = "";
-    for (int i = 0; i < veces; i++)
-        strncat(buf, s, sizeof(buf)-strlen(buf)-1);
-    return valor_texto(buf);
-}
 
 static Valor *fn_txt_invertir(Valor **a, int n) {
     (void)n;
@@ -455,40 +440,7 @@ static Valor *fn_txt_formato(Valor **a, int n) {
     return valor_texto(buf);
 }
 
-static Valor *fn_txt_a_numero(Valor **a, int n) {
-    (void)n;
-    if (a[0]->tipo != VAL_TEXTO) {
-        hay_error = 1;
-        valor_error = valor_error_nuevo("ErrorTipo",
-            "a_numero() espera un texto", 0);
-        return valor_nulo();
-    }
-    char *fin;
-    double d = strtod(a[0]->texto, &fin);
-    if (fin == a[0]->texto) {
-        hay_error = 1;
-        valor_error = valor_error_nuevo("ErrorTipo",
-            "No se puede convertir ese texto a número", 0);
-        return valor_nulo();
-    }
-    return valor_numero(d);
-}
 
-static Valor *fn_txt_de_numero(Valor **a, int n) {
-    (void)n;
-    if (a[0]->tipo != VAL_NUMERO) {
-        hay_error = 1;
-        valor_error = valor_error_nuevo("ErrorTipo",
-            "de_numero() espera un numero", 0);
-        return valor_nulo();
-    }
-    char buf[64];
-    if (a[0]->numero == (long long)a[0]->numero)
-        snprintf(buf, sizeof(buf), "%lld", (long long)a[0]->numero);
-    else
-        snprintf(buf, sizeof(buf), "%g", a[0]->numero);
-    return valor_texto(buf);
-}
 
 static Valor *fn_txt_a_lista(Valor **a, int n) {
     (void)n;
@@ -594,11 +546,6 @@ static Valor *fn_txt_es_letra(Valor **a, int n) {
     return valor_booleano(strlen(a[0]->texto) > 0);
 }
 
-static Valor *fn_txt_es_vacio(Valor **a, int n) {
-    (void)n;
-    if (a[0]->tipo != VAL_TEXTO) return valor_booleano(0);
-    return valor_booleano(strlen(a[0]->texto) == 0);
-}
 
 static Valor *fn_txt_empieza_con(Valor **a, int n) {
     (void)n;
@@ -1555,11 +1502,12 @@ static ModuloExterno _modulo_externo = NULL;
 void modulo_fijar_externo(ModuloExterno fn) { _modulo_externo = fn; }
 
 /* Registra un módulo como diccionario en el entorno */
-/* ── Lo que la 2.0 cambiará (ver PENDIENTE.md y PROPUESTA_2.0.md) ──
-   Las funciones de los módulos que tienen otro nombre o forma en la 2.0. En la
-   1.9 siguen funcionando, pero avisan una vez; 'lince migrar' las cambia solas. */
-typedef struct { const char *modulo, *nombre, *mensaje; } Obsoleto;
-static const Obsoleto OBSOLETOS[] = {
+/* ── Lo que la 2.0 quitó (ver PROPUESTA_2.0.md) ──
+   Las funciones de los módulos que en la 1.x tenían otro nombre o forma. Ya no
+   están; llamarlas da un error que dice cómo es ahora ('lince migrar' cambia
+   el código de la 1.x solo). */
+typedef struct { const char *modulo, *nombre, *mensaje; } Quitado;
+static const Quitado QUITADOS[] = {
     {"juego", "fisica",         "juego.fisica(opciones) → juego.fisica.mundo(opciones)"},
     {"juego", "cuerpo",         "juego.cuerpo → juego.fisica.cuerpo"},
     {"juego", "quitar_cuerpo",  "juego.quitar_cuerpo → juego.fisica.quitar"},
@@ -1610,7 +1558,7 @@ static const Obsoleto OBSOLETOS[] = {
     {"texto", "repetir",      "texto.repetir(t, n) → t * n"},
     {"texto", "es_vacio",     "texto.es_vacio(t) → t == \"\""},
 };
-#define NUM_OBSOLETOS ((int)(sizeof OBSOLETOS / sizeof OBSOLETOS[0]))
+#define NUM_QUITADOS ((int)(sizeof QUITADOS / sizeof QUITADOS[0]))
 
 /* Los módulos ya cargados, para saber de cuál es una llamada */
 /* (el mismo módulo puede cargarse varias veces: el del programa y el de
@@ -1627,47 +1575,13 @@ static void modulo_conocido(const char *nombre, Valor *mod) {
     _modulos_conocidos[k].mod = mod;
 }
 
-/* Marca las funciones del módulo 'nombre' que van a cambiar (para que llamarlas
-   mire la tabla; las demás no pagan nada) */
-static void modulo_marcar_obsoletas(const char *nombre, Valor *mod) {
-    for (int i = 0; i < NUM_OBSOLETOS; i++) {
-        if (strcmp(OBSOLETOS[i].modulo, nombre)) continue;
-        int k = valor_diccionario_buscar(mod, OBSOLETOS[i].nombre);
-        if (k < 0) continue;
-        Valor *v = mod->diccionario.valores[k];
-        if (v->tipo == VAL_FUNCION && v->funcion) v->funcion->obsoleta = 1;
-        if (v->tipo == VAL_DICCIONARIO) {                   /* una parte que aún se llama como antes */
-            int c = valor_diccionario_buscar(v, "__llamar__");
-            if (c >= 0 && v->diccionario.valores[c]->tipo == VAL_FUNCION) v->diccionario.valores[c]->funcion->obsoleta = 1;
-        }
-    }
-}
-
-static char *_obsoletos_avisados[256];
-static int _nobsoletos_avisados;
-
-void modulo_avisar_obsoleto(const char *clave, const char *mensaje, int linea) {
-    if (interprete_en_biblioteca()) return;           /* juego.lince es cosa de Lince */
-    if (linea < 0) linea = interprete_linea_nativa();
-    const char *e = getenv("LINCE_OBSOLETOS");
-    if (e && !strcmp(e, "0")) return;
-    for (int i = 0; i < _nobsoletos_avisados; i++) if (!strcmp(_obsoletos_avisados[i], clave)) return;
-    if (_nobsoletos_avisados < 256) _obsoletos_avisados[_nobsoletos_avisados++] = strdup(clave);
-    if (linea > 0) fprintf(stderr, "⚠️  Obsoleto en línea %d: %s. En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.\n", linea, mensaje);
-    else fprintf(stderr, "⚠️  Obsoleto: %s. En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.\n", mensaje);
-}
-
-void modulo_obsoleto_llamada(Valor *mod, const char *nombre, int linea) {
+const char *modulo_quitado(Valor *mod, const char *nombre) {
     const char *de = NULL;
     for (int i = 0; i < _nmodulos_conocidos; i++) if (_modulos_conocidos[i].mod == mod) de = _modulos_conocidos[i].nombre;
-    if (!de) return;
-    for (int i = 0; i < NUM_OBSOLETOS; i++)
-        if (!strcmp(OBSOLETOS[i].modulo, de) && !strcmp(OBSOLETOS[i].nombre, nombre)) {
-            char clave[80];
-            snprintf(clave, sizeof clave, "%s.%s", de, nombre);
-            modulo_avisar_obsoleto(clave, OBSOLETOS[i].mensaje, linea);
-            return;
-        }
+    if (!de) return NULL;
+    for (int i = 0; i < NUM_QUITADOS; i++)
+        if (!strcmp(QUITADOS[i].modulo, de) && !strcmp(QUITADOS[i].nombre, nombre)) return QUITADOS[i].mensaje;
+    return NULL;
 }
 
 static void registrar_modulo_diccionario(Entorno *entorno,
@@ -1732,7 +1646,6 @@ static void registrar_modulo_diccionario(Entorno *entorno,
 
     entorno_definir(entorno, nombre_mod, modulo, 0);
     modulo_conocido(nombre_mod, modulo);
-    modulo_marcar_obsoletas(nombre_mod, modulo);
 }
 
 /* El módulo ya cargado con ese nombre, o NULL */
@@ -1908,34 +1821,18 @@ static void cargar_matematica(Entorno *entorno) {
 
 static void cargar_texto(Entorno *entorno) {
     FuncionNativa fns[] = {
-        {"dividir",       fn_txt_dividir,       2},
+        /* lo que no parte de un texto; lo demás son métodos del texto (t.dividir(",")) */
         {"unir",          fn_txt_unir,          2},
-        {"repetir",       fn_txt_repetir,       2},
-        {"invertir",      fn_txt_invertir,      1},
         {"formato",       fn_txt_formato,       2},
-        {"a_numero",      fn_txt_a_numero,      1},
-        {"de_numero",     fn_txt_de_numero,     1},
-        {"a_lista",       fn_txt_a_lista,       1},
-        {"posicion",      fn_txt_posicion,      2},
-        {"contar",        fn_txt_contar,        2},
-        {"extraer",       fn_txt_extraer,       3},
-        {"es_numero",     fn_txt_es_numero,     1},
-        {"es_letra",      fn_txt_es_letra,      1},
-        {"es_vacio",      fn_txt_es_vacio,      1},
-        {"empieza_con",   fn_txt_empieza_con,   2},
-        {"termina_con",   fn_txt_termina_con,   2},
-        {"rellenar_izq",  fn_txt_rellenar_izq,  3},
-        {"rellenar_der",  fn_txt_rellenar_der,  3},
-        {"centrar",       fn_txt_centrar,       3},
         {"decimales",     fn_txt_decimales,     2},
         {"miles",         fn_txt_miles,        -1},
     };
     registrar_modulo_diccionario(entorno, "texto",
-        fns, 21, NULL, NULL, 0);
+        fns, 4, NULL, NULL, 0);
 }
 
-/* t.dividir(",") y compañía: las funciones del módulo texto que parten de un
-   texto, como métodos suyos (desde la 1.9; en la 2.0, solo así) */
+/* t.dividir(",") y compañía: lo que se hace con un texto, como métodos suyos
+   (en la 1.x también eran funciones del módulo texto) */
 Valor *modulo_metodo_texto(const char *met, Valor *t, Valor **args, int num_args) {
     static const FuncionNativa M[] = {
         {"dividir", fn_txt_dividir, 2}, {"invertir", fn_txt_invertir, 1}, {"a_lista", fn_txt_a_lista, 1},

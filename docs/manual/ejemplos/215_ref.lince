@@ -1,6 +1,6 @@
 # @seccion: Funciones
-# @titulo: val y ref
-# @nota: Delante de un parámetro se puede poner `val` (lo normal; da igual ponerlo o no) o `ref`. Con `ref`, lo que valga el parámetro al acabar la función pasa a la variable que se le dio. Las listas y los diccionarios se comparten siempre: si la función les añade algo, se ve fuera.
+# @titulo: ref
+# @nota: Asignar a un parámetro dentro de la función no cambia nada fuera, salvo si lleva delante `ref`. Con `ref`, lo que valga el parámetro al acabar la función pasa a la variable que se le dio. Las listas y los diccionarios se comparten siempre: si la función les añade algo, se ve fuera.
 funcion intercambiar(ref numero a, ref numero b): nulo {
     sea t = a
     a = b

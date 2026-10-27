@@ -81,9 +81,14 @@ const char *lince_de_archivo(void) {
     return buf;
 }
 
+/* (sin 'val': sigue reservada para dar su error, pero ya no es del lenguaje) */
 const char *lexer_palabra_clave(int i) {
     int n = (int)(sizeof(PALABRAS_CLAVE) / sizeof(PALABRAS_CLAVE[0])) - 1;
-    return (i >= 0 && i < n) ? PALABRAS_CLAVE[i].palabra : NULL;
+    for (int k = 0; k < n && i >= 0; k++) {
+        if (PALABRAS_CLAVE[k].tipo == TOK_VAL) continue;
+        if (i-- == 0) return PALABRAS_CLAVE[k].palabra;
+    }
+    return NULL;
 }
 
 const char *lexer_palabra_contextual(int i) {

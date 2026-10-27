@@ -1,6 +1,6 @@
 # @seccion: Mapas
 # @titulo: Buscar el camino
-# @nota: `juego.camino(mapa, [c1, f1], [c2, f2])` da el camino más corto entre dos casillas sin atravesar paredes, como lista de `[columna, fila]`: para enemigos que persiguen al jugador por un laberinto. Con un cuarto argumento verdadero también va en diagonal.
+# @nota: `juego.mapa.camino(mapa, [c1, f1], [c2, f2])` da el camino más corto entre dos casillas sin atravesar paredes, como lista de `[columna, fila]`: para enemigos que persiguen al jugador por un laberinto. Con un cuarto argumento verdadero también va en diagonal.
 importar "juego"
 
 juego.abrir("Camino", 480, 270)

@@ -6,9 +6,9 @@
 #
 # Muestra: un juego de vista cenital con un mapa de casillas (juego.mapa)
 # dibujado con tiles de una hoja (juego.hoja), algunos animados,
-# movimiento sin atravesar paredes y sin gravedad (juego.mover_en_mapa),
-# casillas que cambian (juego.poner_casilla), y enemigos que te persiguen
-# esquivando las paredes (juego.camino). Los sonidos son efectos generados
+# movimiento sin atravesar paredes y sin gravedad (juego.mapa.mover),
+# casillas que cambian (juego.mapa.poner), y enemigos que te persiguen
+# esquivando las paredes (juego.mapa.camino). Los sonidos son efectos generados
 # (juego.efecto), sin archivos.
 importar "juego"
 importar "matematica"

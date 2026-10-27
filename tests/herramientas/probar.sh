@@ -89,7 +89,7 @@ MINGW*|MSYS*|CYGWIN*) echo "  (paquetes con versión: no se prueban en Windows, 
     cd "$RAIZ";;
 esac
 
-# ── 1.9: lince migrar, y los avisos de lo obsoleto ──
+# ── lince migrar (de la 1.x a la 2.0), y lo que la 2.0 dice del código de la 1.x ──
 igual "migrar deja viejo.lince como nuevo.esperado (salvo el comentario de arriba)" "$(sin_r < "$DIR/nuevo.esperado" | tail -n +2)" \
       "$("$LINCE" migrar --mostrar "$DIR/viejo.lince" | sin_r | tail -n +2)"
 "$LINCE" migrar --comprobar "$DIR/viejo.lince" > "$TMP/migrar.txt" 2>&1 && mal "migrar --comprobar no ve lo que hay que cambiar" \
@@ -105,22 +105,20 @@ grep -q "1 de 2 archivos migrados" "$TMP/migrar2.txt" && bien "migrar cuenta los
 printf 'funcion f(val numero x): numero {\n    devolver x\n' > "$TMP/roto.lince"
 "$LINCE" migrar "$TMP/roto.lince" > /dev/null 2>&1
 grep -q "val" "$TMP/roto.lince" && bien "migrar no toca un archivo con un error de sintaxis" || mal "migrar tocó un archivo roto"
-avisos="$("$LINCE" comprobar "$DIR/viejo.lince" 2>&1 | sin_r | grep -c "obsoleto:")"
-[ "$avisos" -ge 20 ] && bien "comprobar avisa de lo obsoleto ($avisos avisos)" || mal "comprobar no avisa de lo obsoleto ($avisos)"
-"$LINCE" comprobar "$DIR/nuevo.esperado" 2>&1 | grep -q "obsoleto" && mal "comprobar avisa de lo obsoleto en lo ya migrado" \
-    || bien "lo ya migrado no da avisos de obsoleto (ni de lo que no se sabe)"
-"$LINCE" "$DIR/obsoleto.lince" > "$TMP/obs.out" 2> "$TMP/obs.err"
-igual "lo obsoleto sigue funcionando" '["a", "b"]
-["c", "d"]
+"$LINCE" comprobar "$DIR/viejo.lince" > "$TMP/comp.txt" 2>&1 && mal "comprobar acepta 'val', que ya no existe" \
+    || { grep -q "'val' ya no existe en la 2.0" "$TMP/comp.txt" && grep -q "lince migrar" "$TMP/comp.txt" \
+         && bien "con 'val', comprobar dice que ya no existe y que lince migrar lo quita" || { mal "comprobar no explica lo de 'val'"; cat "$TMP/comp.txt"; }; }
+sed 's/val //g' "$DIR/viejo.lince" > "$TMP/viejo_sin_val.lince"
+avisos="$("$LINCE" comprobar "$TMP/viejo_sin_val.lince" 2>&1 | sin_r | grep -c "esto es de la 1.x:")"
+[ "$avisos" -ge 20 ] && bien "comprobar avisa de lo que es de la 1.x ($avisos avisos)" || mal "comprobar no avisa de lo que es de la 1.x ($avisos)"
+"$LINCE" comprobar "$DIR/nuevo.esperado" 2>&1 | grep -q "1.x" && mal "comprobar avisa de la 1.x en lo ya migrado" \
+    || bien "lo ya migrado no da avisos (ni de lo que no se sabe)"
+igual "lo de la 1.x da un error que dice cómo es ahora" 'Esto es de la 1.x, y en la 2.0 cambió: texto.dividir(t, separador) → t.dividir(separador) («lince migrar» lo cambia solo).
 ["a", "b"]
+Esto es de la 1.x, y en la 2.0 cambió: juego.fisica(opciones) → juego.fisica.mundo(opciones) («lince migrar» lo cambia solo).
+Esto es de la 1.x, y en la 2.0 cambió: juego.cuerpo → juego.fisica.cuerpo («lince migrar» lo cambia solo).
 [0, 900]
-8
-fin' "$(sin_r < "$TMP/obs.out")"
-igual "y avisa una vez por cosa al ejecutar (con los tipos que en la 2.0 serán un error)" \
-'⚠️  Obsoleto en línea 5: texto.dividir(t, separador) → t.dividir(separador). En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.
-⚠️  Obsoleto en línea 8: juego.fisica(opciones) → juego.fisica.mundo(opciones). En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.
-⚠️  Obsoleto en línea 9: juego.cuerpo → juego.fisica.cuerpo. En la 2.0 ya no valdrá; «lince migrar» lo cambia solo.
-⚠️  Aviso en línea 13: la variable '"'"'vida'"'"' es numero y aquí recibe un texto. En la 2.0 será un ErrorTipo.' "$(sin_r < "$TMP/obs.err")"
-[ -z "$(LINCE_OBSOLETOS=0 "$LINCE" "$DIR/obsoleto.lince" 2>&1 >/dev/null)" ] && bien "LINCE_OBSOLETOS=0 los calla" || mal "LINCE_OBSOLETOS=0 no los calla"
+ErrorTipo: La variable '"'"'vida'"'"' es numero y aquí recibe un texto.
+fin 3' "$("$LINCE" "$DIR/de_la_1x.lince" 2>&1 | sin_r)"
 
 [ "$fallos" -eq 0 ] && echo "✅ Herramientas: todo correcto" || { echo "❌ $fallos comprobaciones fallaron"; exit 1; }

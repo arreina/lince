@@ -51,7 +51,7 @@ typedef enum {
     NODO_ELEGIR,             /* elegir expr { caso v { } ... otro { } } */
     NODO_ENUMERACION,        /* enumeracion Color { Rojo Verde Azul } */
     NODO_INTERFAZ,           /* interfaz Forma { funcion area(): numero } */
-    NODO_GENERADOR,          /* generador contar(val numero n): numero { producir i } */
+    NODO_GENERADOR,          /* generador contar(numero n): numero { producir i } */
     NODO_PRODUCIR,           /* producir valor */
     NODO_ROMPER,             /* romper: sale del bucle */
     NODO_CONTINUAR,          /* continuar: pasa a la vuelta siguiente */

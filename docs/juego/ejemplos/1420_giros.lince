@@ -1,7 +1,7 @@
 # @seccion: Física
 # @titulo: Cuerpos que giran
 # @nota: Con `"gira": verdadero` un cuerpo gira al chocar: vuelca, rueda y se apila de verdad, y lleva su `angulo` (en grados, el mismo que usa `dibujar`) y su `vgiro` (grados por segundo). Con `"puntos"` es un polígono convexo (una rampa, una cuña, una piedra), con los puntos medidos desde su `x`, `y`.
-# @nota: `juego.dibujar_cuerpo(c, color)` lo dibuja tal cual es, para probar o para juegos de formas; con imágenes se dibuja con `juego.dibujar(imagen, c["x"], c["y"], {"angulo": c["angulo"]})`, porque `x`, `y` siguen siendo la esquina de la caja sin girar.
+# @nota: `juego.fisica.dibujar(c, color)` lo dibuja tal cual es, para probar o para juegos de formas; con imágenes se dibuja con `juego.dibujar(imagen, c["x"], c["y"], {"angulo": c["angulo"]})`, porque `x`, `y` siguen siendo la esquina de la caja sin girar.
 # @fotogramas: 120
 importar "juego"
 

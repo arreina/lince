@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
         }
         if (!rutas) {
             fprintf(stderr, "\n❌ Uso: lince migrar [--comprobar | --mostrar] <archivo o carpeta>...\n"
-                            "   Cambia a la forma de la 2.0 lo que en la 1.9 avisa «obsoleto». Con --comprobar\n"
+                            "   Pasa el código de la 1.x a la forma de la 2.0. Con --comprobar\n"
                             "   solo dice qué cambiaría, sin tocar nada.\n\n");
             return 1;
         }
@@ -249,18 +249,23 @@ int main(int argc, char *argv[]) {
                 total++;
                 int linea = 0;
                 char msg[1024];
-                if (lsp_comprobar_texto(codigo, &linea, msg, sizeof msg)) {
-                    printf("⏭️  %s: tiene un error de sintaxis en la línea %d; arréglalo antes de migrarlo.\n", archivos[k], linea);
-                    free(codigo);
-                    continue;
-                }
                 MigrarInforme inf;
                 char *nuevo = migrar_codigo(codigo, &inf);
                 int cambia = strcmp(nuevo, codigo) != 0;
-                if (cambia && lsp_comprobar_texto(nuevo, &linea, msg, sizeof msg)) {
-                    fprintf(stderr, "\n❌ No sé migrar '%s' sin romperlo (la línea %d quedaría mal): lo dejo como estaba.\n"
-                                    "   (Es un fallo de Lince: cuéntalo con el archivo, por favor.)\n\n", archivos[k], linea);
-                    return 1;
+                /* Lo migrado tiene que ser Lince de la 2.0 (lo de la 1.x, con 'val', no
+                   lo es: por eso se mira después). Si no lo es, ¿ya estaba roto antes? */
+                if (lsp_comprobar_texto(nuevo, &linea, msg, sizeof msg)) {
+                    int roto = cambia ? lsp_comprobar_texto(codigo, &linea, msg, sizeof msg) : 1;
+                    if (!roto) {
+                        fprintf(stderr, "\n❌ No sé migrar '%s' sin romperlo (la línea %d quedaría mal): lo dejo como estaba.\n"
+                                        "   (Es un fallo de Lince: cuéntalo con el archivo, por favor.)\n\n", archivos[k], linea);
+                        return 1;
+                    }
+                    printf("⏭️  %s: tiene un error de sintaxis en la línea %d; arréglalo antes de migrarlo.\n", archivos[k], linea);
+                    migrar_informe_liberar(&inf);
+                    free(nuevo);
+                    free(codigo);
+                    continue;
                 }
                 if (cambia || inf.nmano) {
                     printf("%s %s", comprobar ? "📄" : cambia ? "✨" : "📄", archivos[k]);
