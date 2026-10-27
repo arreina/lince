@@ -129,8 +129,53 @@ detalle de cada uno está en PROPUESTA_2.0.md:
 - [x] La 2.x se congela igual que la 1.x: desde la 2.0.0 solo se añade lo que no rompe juegos ya escritos.
 - [ ] Probar `lince migrar` con lince-motor y con los juegos de otros, y pasar a la 2.0 las demos de lucha (el autor).
 
+## Camino a la 3.0
+
+Decidido por el autor el 2026-10-27. Cada 2.x solo añade: nada de lo que funciona en la 2.0 se
+rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes otra cosa.
+
+### 2.1 — Pantalla de opciones
+- [ ] `juego.menu_opciones()` hecha: volumen de música, efectos y voces, pantalla completa,
+  controles (`menu_controles`) e idioma (`menu_idiomas`), que se guarda sola y se aplica al
+  abrir el juego. Que el juego pueda añadir sus propias opciones.
+
+### 2.2 — Accesibilidad
+- [ ] En las opciones: texto más grande, colores para daltonismo (paletas seguras y, si se puede,
+  un filtro), subtítulos de los sonidos (`reproducir(s, {"subtitulo": "Puerta"})`) y quitar el
+  temblor de la cámara y los destellos.
+
+### 2.3 — Luces y sombras 2D
+- [ ] Oscurecer la escena y poner luces con su color, radio y forma (antorchas, linternas, el
+  brillo de un disparo), que respeten la cámara y las capas.
+
+### 2.4 — Enemigos con cabeza
+- [ ] Máquinas de estados (patrullar, perseguir, atacar, huir) y comportamientos de movimiento
+  (seguir, huir, esquivar, rodear, en grupo), escritos en Lince.
+
+### 2.5 — Pruebas de juegos
+- [ ] Que `lince probar` juegue solo: guion de entradas (teclas, mando, toques), comprobar
+  píxeles y capturas, y comparar con la vez anterior para ver qué ha cambiado.
+
+### 2.6 — Paquetes de escritorio
+- [ ] `lince repartir`: instalador de Windows, AppImage de Linux y un `.zip` listo para itch.io,
+  con el icono y el nombre del juego.
+
+### 2.7 — Google Play de verdad
+- [ ] `lince repartir --aab` deja el juego listo para subir: iconos en todos los tamaños,
+  versión, firma de subida y lo que pide la ficha de la tienda. Probado subiendo uno de prueba
+  (hace falta la cuenta de desarrollador de Google Play del autor).
+
+### 2.8 — Preparar la 3.0 (solo si hay limpieza)
+- [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.
+
+### 3.0 — Otra limpieza, solo si hace falta
+- [ ] Lo que haya quedado mal en la 2.x se va apuntando aquí. Si al llegar hay algo, propuesta,
+  el autor aprueba cada cambio y `lince migrar`, como en la 2.0. Si no hay nada, no hay 3.0.
+
 Fuera del plan (decisión del autor): juego en red (se quitó a propósito), consolas (depende de
 que Nintendo y Sony aprueben; iría en un repositorio privado), macOS y navegador (descartados).
+Solo si un juego lo pide: la máquina virtual (ver Rendimiento) y los mapas isométricos y
+hexagonales de Tiled.
 
 ## Lenguaje
 
