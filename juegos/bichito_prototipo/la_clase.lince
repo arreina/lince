@@ -1,0 +1,315 @@
+# 🐆 Bichito — prototipo gris del capítulo «La clase»
+#
+# Prototipo para probar el BUCLE JUGABLE, no el arte: todo son cajas grises y
+# un muñeco de píxeles. Sirve para contestar a las preguntas que el documento
+# de diseño deja abiertas (sección 13): qué hace el jugador minuto a minuto,
+# si hace falta salto o basta el desplazamiento lateral, y si la pausa se
+# siente como algo que ayuda sin resolverlo todo.
+#
+# Sigue los seis pasos de la sección 7 del documento, con dos decisiones
+# tomadas a propósito y explicadas abajo:
+#
+#   1. Exploración     andar por el aula y acercarse a las cosas
+#   2. Atención        lo que está cerca gana presencia y lo demás se aparta
+#   3. Acumulación     al fondo se juntan varias capas a la vez
+#   4. Pausa           detenerse baja las capas, pero NO las apaga
+#   5. Patrón          mirar los pupitres: un rato de calma, opcional
+#   6. Salida          la puerta está abierta desde el principio
+#
+# DECISIÓN 1 — No hay barra de estrés. El documento avisa de que un número de
+# saturación se parece demasiado a gestionar una enfermedad. Aquí no se mide
+# nada: lo que cambia es QUÉ SE OYE. El panel de arriba a la izquierda enseña
+# la mezcla para poder leerla mientras se prueba; en el juego de verdad eso no
+# se vería, se oiría.
+#
+# DECISIÓN 2 — El puzle de alinear pupitres NO está. El propio documento pide
+# revisarlo para que no sugiera que el niño tiene que ordenar el mundo para
+# merecer salir. En su lugar, los pupitres tienen un ritmo que se puede MIRAR:
+# no abre ninguna puerta, solo da un rato de concentración agradable. Es una
+# propuesta, no una decisión: se cambia o se quita.
+#
+# Teclas: ← → o A D andar · ABAJO o S quedarse quieto · Z o ESPACIO mirar
+#         1 intensidad suave · ESC salir
+
+importar "juego"
+importar "matematica"
+
+fijo ANCHO = 800
+fijo ALTO = 450
+fijo MUNDO = 2400                   # el aula es tres veces la pantalla
+fijo SUELO = 362
+fijo PUERTA = 2280
+# Cuánto tarda el aula en asentarse encima: el reloj y el zumbido tardan
+# esto en llegar arriba del todo. Es el reloj de la escena.
+fijo ASENTARSE = 35
+
+juego.abrir("Bichito — La clase (prototipo gris)", ANCHO, ALTO)
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izquierda", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:derecha", "mando:izq_x+"])
+juego.definir_accion("quieto", ["abajo", "s", "mando:abajo", "mando:izq_y+"])
+juego.definir_accion("mirar", ["z", "espacio", "mando:a"])
+juego.definir_accion("suave", ["1", "mando:y"])
+
+# ── El muñeco ───────────────────────────────────────────────────────
+# Un dibujo y nada más: juego.animar() saca de él los cuadros de andar y de
+# respirar. Las gafas son lo único que se respeta del diseño del personaje.
+fijo MUNECO = juego.sprite([
+    "....PPPPPP....",
+    "...PPPPPPPP...",
+    "..PPPPPPPPPP..",
+    "..PPcccccPPP..",
+    "..Pcc.cc.ccP..",
+    "..PGGGGGGGGP..",
+    "..Pcccccccc...",
+    "...ccccccc....",
+    "....cc.cc.....",
+    "...RRRRRRR....",
+    "..RRRRRRRRR...",
+    "..RRRRRRRRR...",
+    "..RRRRRRRRR...",
+    "...RR...RR....",
+    "...MM...MM....",
+    "...MM...MM....",
+    "...MM...MM....",
+    "..ZZZ...ZZZ...",
+    "..ZZZ...ZZZ..."
+], {"P": [92, 82, 74], "c": [168, 156, 146], "G": [40, 38, 36],
+    "R": [112, 118, 124], "M": [86, 90, 78], "Z": [70, 92, 108]})
+
+fijo QUIETO = juego.animar(MUNECO, "respirar")
+fijo ANDAR  = juego.animar(MUNECO, "andar")
+
+sea pj = juego.animador(QUIETO, {
+    "quieto": {"hoja": QUIETO, "por_segundo": 4},
+    "andar":  {"hoja": ANDAR,  "por_segundo": 9}
+})
+
+# ── Las fuentes de sonido del aula ──────────────────────────────────
+# Cada una tiene sitio, alcance y un color para poder leer la mezcla.
+# "base" es cuánto se oye desde lejos; algunas, como el zumbido, están
+# siempre ahí aunque no te acerques.
+fijo FUENTES = [
+    {"nombre": "RELOJ",   "x": 300,  "y": 110, "alcance": 420, "base": 0.10,
+     "color": [214, 196, 128], "ritmo": 1.0, "sube": verdadero},
+    {"nombre": "VENTANA", "x": 650,  "y": 150, "alcance": 380, "base": 0.06,
+     "color": [150, 190, 200], "ritmo": 0.35},
+    {"nombre": "ZUMBIDO", "x": 1150, "y": 70,  "alcance": 900, "base": 0.22,
+     "color": [206, 206, 178], "ritmo": 7.0, "sube": verdadero},
+    {"nombre": "VOCES",   "x": 1600, "y": 250, "alcance": 560, "base": 0.14,
+     "color": [198, 150, 150], "ritmo": 2.4},
+    {"nombre": "LAPIZ",   "x": 1980, "y": 300, "alcance": 260, "base": 0.03,
+     "color": [170, 180, 150], "ritmo": 5.0}
+]
+
+# Los pupitres, a distancia regular. El ritmo del que habla el paso 5 es
+# este: uno de cada tres es más alto. Van cada 160 y la pantalla mide 800,
+# así que siempre se ven dos altos a la vez — si no, no es un patrón, es
+# un pupitre suelto.
+fijo PASO_PUPITRE = 160
+fijo RITMO = 3
+sea lista PUPITRES = []
+para cada numero i en rango(0, 12) { PUPITRES.agregar(360 + i * PASO_PUPITRE) }
+
+# ── Estado ──────────────────────────────────────────────────────────
+sea x = 120                          # dónde está Bichito
+sea mira_izquierda = falso
+sea quieto_desde = 0                 # cuánto lleva parado (0 = andando)
+sea mirando = 0                      # cuánto lleva mirando el patrón
+sea intensidad_suave = falso         # accesibilidad: lo pedía el documento
+sea salido = falso
+sea t_salida = 0
+
+# ── Cuánto se oye cada cosa ─────────────────────────────────────────
+# Cerca se oye más. Quedarse quieto baja el conjunto, pero deja siempre un
+# resto: la autorregulación ayuda, no borra el aula.
+funcion presencia(diccionario f): numero {
+    sea d = matematica.abs(x - f["x"])
+    sea cerca = si d >= f["alcance"] { 0 } sino { 1 - d / f["alcance"] }
+    sea p = f["base"] + cerca * (1 - f["base"])
+    # El reloj y el zumbido no están desde el principio: se van colando.
+    si f.contiene("sube") {
+        p = p * (0.22 + 0.78 * matematica.limitar(juego.tiempo() / ASENTARSE, 0, 1))
+    }
+    si quieto_desde > 0 {
+        sea calma = matematica.minimo(quieto_desde / 1.6, 1)
+        sea resto = 0.30 + cerca * 0.25          # lo que no se va
+        p = p * (1 - calma) + p * resto * calma
+    }
+    si mirando > 0.5 { p = p * 0.55 }            # al mirar el patrón, el aula se aleja
+    si salido {                                  # y al cruzar la puerta se queda atrás
+        p = p * matematica.limitar(1 - t_salida / 1.8, 0, 1)
+    }
+    devolver matematica.limitar(p, 0, 1)
+}
+
+# Lo lleno que está el aula ahora mismo: para teñir la pantalla, no para
+# enseñarlo como un número.
+funcion carga(): numero {
+    sea suma = 0
+    para cada diccionario f en FUENTES { suma = suma + presencia(f) }
+    sea c = matematica.limitar(suma / 2.6, 0, 1)
+    si intensidad_suave { c = c * 0.45 }
+    devolver c
+}
+
+# ── Dibujo ──────────────────────────────────────────────────────────
+funcion dibujar_aula(numero cam, numero c): nulo {
+    juego.limpiar([198, 198, 196])
+
+    # Pared del fondo, con parallax: se mueve menos que el suelo
+    para cada numero i en rango(0, 10) {
+        sea px = i * 300 - cam * 0.45
+        juego.rectangulo(px, 60, 240, 300, [180, 179, 177])
+        juego.linea(px + 240, 60, px + 240, 360, [168, 167, 165])
+    }
+    # Ventanas: van en la pared del aula, no en el fondo, así que se mueven
+    # con la cámara (1:1). La primera cae justo sobre la fuente VENTANA.
+    para cada numero i en rango(0, 4) {
+        sea vx = 575 + i * 560
+        juego.rectangulo(vx, 95, 150, 130, [242, 243, 238])
+        juego.contorno(vx, 95, 150, 130, [150, 150, 148])
+    }
+
+    # Suelo
+    juego.rectangulo(cam, SUELO, ANCHO, ALTO - SUELO, [160, 156, 150])
+    juego.linea(cam, SUELO, cam + ANCHO, SUELO, [126, 122, 118])
+
+    # Pupitres: cada cuatro, uno un poco más alto. Ese es el patrón.
+    para cada numero i en rango(0, PUPITRES.longitud()) {
+        sea px = PUPITRES[i]
+        sea alto = si i % RITMO == 0 { 76 } sino { 46 }
+        sea col = [134, 132, 128]
+        si mirando > 0.5 y i % RITMO == 0 { col = [196, 180, 120] }
+        juego.rectangulo(px, SUELO - alto, 86, alto, col)
+        juego.rectangulo(px + 8, SUELO - alto - 8, 70, 10, [152, 150, 146])
+    }
+
+    # La puerta: abierta desde el principio, no hay que merecerla
+    juego.rectangulo(PUERTA, SUELO - 150, 90, 150, [228, 224, 214])
+    juego.contorno(PUERTA, SUELO - 150, 90, 150, [110, 106, 100])
+    juego.texto("SALIDA", PUERTA + 8, SUELO - 172, {"escala": 2, "color": [90, 88, 84]})
+
+    # Las fuentes: un aro que crece con lo que se oye
+    para cada diccionario f en FUENTES {
+        sea p = presencia(f)
+        si intensidad_suave { p = p * 0.6 }
+        sea r = 14 + p * 54
+        sea pulso = matematica.seno(juego.tiempo() * f["ritmo"]) * 0.5 + 0.5
+        sea col = f["color"]
+        juego.circulo(f["x"], f["y"], r, [col[0], col[1], col[2], matematica.piso(40 + p * 90)])
+        juego.circulo(f["x"], f["y"], 12 + pulso * p * 10, col)
+        juego.texto(f["nombre"], f["x"] - 26, f["y"] + r + 6, {"escala": 1, "color": [86, 84, 80]})
+    }
+}
+
+# El panel de la mezcla. Es un andamio para probar: enseña lo que en el
+# juego de verdad se oiría en vez de verse.
+funcion dibujar_mezcla(numero c): nulo {
+    juego.camara()
+    juego.rectangulo(10, 10, 210, 108, [255, 255, 255, 190])
+    juego.texto("LO QUE SE OYE", 18, 16, {"escala": 1, "color": [90, 86, 80]})
+    para cada numero i en rango(0, FUENTES.longitud()) {
+        sea f = FUENTES[i]
+        sea p = presencia(f)
+        sea fy = 32 + i * 16
+        juego.texto(f["nombre"], 18, fy, {"escala": 1, "color": [120, 116, 110]})
+        juego.rectangulo(92, fy, 118, 9, [228, 226, 222])
+        juego.rectangulo(92, fy, matematica.piso(118 * p), 9, f["color"])
+    }
+    juego.texto(si quieto_desde > 0 { "QUIETO" } sino { "ANDANDO" }, 18, 122, {"escala": 1, "color": [245, 245, 242]})
+    si intensidad_suave { juego.texto("INTENSIDAD SUAVE", 110, 122, {"escala": 1, "color": [120, 150, 120]}) }
+}
+
+funcion dibujar_ayuda(): nulo {
+    juego.camara()
+    juego.texto("FLECHAS ANDAR   ABAJO QUEDARSE QUIETO   Z MIRAR   1 SUAVE   ESC SALIR",
+                14, ALTO - 20, {"escala": 1, "color": [245, 245, 242]})
+}
+
+# ── El bucle ────────────────────────────────────────────────────────
+mientras juego.abierto() {
+    si juego.tecla_pulsada("escape") { juego.salir() }
+    si juego.accion_pulsada("suave") { intensidad_suave = no intensidad_suave }
+    sea dt = juego.dt()
+
+    # Andar. No hay salto: el documento deja abierto si hace falta, y este
+    # prototipo sirve justo para ver si se echa de menos.
+    sea dir = juego.direccion("izquierda", "derecha")
+    sea parado = juego.accion("quieto")
+
+    si parado {
+        dir = 0
+        quieto_desde = quieto_desde + dt
+    } sino si dir != 0 {
+        quieto_desde = 0
+        mira_izquierda = dir < 0
+        x = matematica.limitar(x + dir * 120 * dt, 40, PUERTA + 40)
+    } sino {
+        quieto_desde = 0
+    }
+
+    # Mirar el patrón de los pupitres: solo cerca de uno de los altos
+    sea cerca_patron = falso
+    para cada numero i en rango(0, PUPITRES.longitud()) {
+        si i % RITMO == 0 y matematica.abs(x - PUPITRES[i]) < 90 { cerca_patron = verdadero }
+    }
+    si juego.accion("mirar") y cerca_patron {
+        mirando = mirando + dt
+    } sino {
+        mirando = matematica.maximo(mirando - dt * 2, 0)
+    }
+
+    juego.animacion(pj, si dir != 0 { "andar" } sino { "quieto" })
+    # Los pasos de Bichito son otra capa de sonido, y es la única que él
+    # controla: por eso quedarse quieto se nota de verdad.
+    si juego.pisada(pj) {
+        juego.efecto("golpe", {"tono": 2.2, "largo": 0.25, "volumen": 0.22})
+    }
+
+    # Cámara: sigue a Bichito sin salirse del aula
+    sea cam = matematica.limitar(x - ANCHO / 2, 0, MUNDO - ANCHO)
+    juego.camara(cam, 0)
+
+    sea c = carga()
+    dibujar_aula(cam, c)
+
+    # Bichito. Al quedarse quieto se mece un poco: no es una animación
+    # nueva, es el mismo respirar desplazado.
+    sea balanceo = si quieto_desde > 0 { matematica.seno(juego.tiempo() * 2.2) * 3 } sino { 0 }
+    juego.dibujar(pj, x + balanceo, SUELO - 4, {
+        "escala": 3, "centrado": verdadero, "espejo": mira_izquierda
+    })
+
+    # Acumulación: cuanto más llena está el aula, más se cierra la imagen
+    # por los bordes. Es a propósito un estrechamiento de la atención, no un
+    # efecto de pánico: nada tiembla ni parpadea. Con la tecla 1 se baja.
+    si c > 0.38 {
+        sea cierre = matematica.limitar((c - 0.38) / 0.62, 0, 1)
+        fijo CAPAS = 18
+        sea borde = 70 + cierre * 240                  # cuánto entra por los lados
+        para cada numero i en rango(0, CAPAS) {
+            sea ancho_capa = borde * (1 - i / CAPAS)
+            si ancho_capa < 1 { ancho_capa = 1 }
+            juego.rectangulo(cam, 0, ancho_capa, ALTO, [58, 62, 72, 11])
+            juego.rectangulo(cam + ANCHO - ancho_capa, 0, ancho_capa, ALTO, [58, 62, 72, 11])
+        }
+        juego.cubrir([70, 76, 92, matematica.piso(cierre * 34)])
+    }
+    # Al mirar el patrón pasa lo contrario: el aula se aparta
+    si mirando > 0.5 {
+        sea m = matematica.limitar((mirando - 0.5) / 1.5, 0, 1)
+        juego.cubrir([236, 232, 222, matematica.piso(m * 90)])
+    }
+
+    # Salir por la puerta: el sonido y la imagen se van yendo
+    si x > PUERTA y no salido { salido = verdadero }
+    si salido {
+        t_salida = t_salida + dt
+        juego.cubrir([240, 238, 232, matematica.piso(matematica.limitar(t_salida / 2, 0, 1) * 255)])
+        si t_salida > 2.4 { juego.salir() }
+    }
+
+    dibujar_mezcla(c)
+    dibujar_ayuda()
+    juego.presentar()
+}
