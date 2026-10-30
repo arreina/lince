@@ -88,18 +88,35 @@ sea pj = juego.animador(QUIETO, {
 # Cada una tiene sitio, alcance y un color para poder leer la mezcla.
 # "base" es cuánto se oye desde lejos; algunas, como el zumbido, están
 # siempre ahí aunque no te acerques.
+# "apagado" es lo amortiguada que está esa capa de por sí: las voces del fondo
+# se oyen como un murmullo, no como palabras, y la ventana llega a través del
+# cristal. "sube" es la que se va colando con el rato (el paso 2).
 fijo FUENTES = [
     {"nombre": "RELOJ",   "x": 300,  "y": 110, "alcance": 420, "base": 0.10,
-     "color": [214, 196, 128], "ritmo": 1.0, "sube": verdadero},
+     "color": [214, 196, 128], "ritmo": 1.0, "sube": verdadero,
+     "onda": "cuadrada", "hz": 1400, "apagado": 0.15, "vol": 0.05},
     {"nombre": "VENTANA", "x": 650,  "y": 150, "alcance": 380, "base": 0.06,
-     "color": [150, 190, 200], "ritmo": 0.35},
+     "color": [150, 190, 200], "ritmo": 0.35,
+     "onda": "ruido", "hz": 400, "apagado": 0.80, "vol": 0.30},
     {"nombre": "ZUMBIDO", "x": 1150, "y": 70,  "alcance": 900, "base": 0.22,
-     "color": [206, 206, 178], "ritmo": 7.0, "sube": verdadero},
+     "color": [206, 206, 178], "ritmo": 7.0, "sube": verdadero,
+     "onda": "cuadrada", "hz": 100, "apagado": 0.30, "vol": 0.10},
     {"nombre": "VOCES",   "x": 1600, "y": 250, "alcance": 560, "base": 0.14,
-     "color": [198, 150, 150], "ritmo": 2.4},
+     "color": [198, 150, 150], "ritmo": 2.4,
+     "onda": "ruido", "hz": 300, "apagado": 0.62, "vol": 0.35},
     {"nombre": "LAPIZ",   "x": 1980, "y": 300, "alcance": 260, "base": 0.03,
-     "color": [170, 180, 150], "ritmo": 5.0}
+     "color": [170, 180, 150], "ritmo": 5.0,
+     "onda": "sierra", "hz": 2200, "apagado": 0.25, "vol": 0.05}
 ]
+
+# Cada capa es un tono sostenido en bucle, sin un solo archivo de audio.
+# Cuando haya sonido de verdad grabado, lo único que cambia es esta línea:
+# en vez de crear_tono() va juego.sonido("voces.ogg").
+para cada diccionario f en FUENTES {
+    sea son = juego.crear_tono(f["hz"], 1.5, {"forma": f["onda"], "volumen": f["vol"]})
+    f["voz"] = juego.reproducir(son, {"bucle": verdadero, "volumen": 0,
+                                      "amortiguado": f["apagado"]})
+}
 
 # Los pupitres, a distancia regular. El ritmo del que habla el paso 5 es
 # este: uno de cada tres es más alto. Van cada 160 y la pantalla mide 800,
@@ -271,6 +288,33 @@ mientras juego.abierto() {
     juego.camara(cam, 0)
 
     sea c = carga()
+
+    # ── El sonido ───────────────────────────────────────────────────
+    # Lo que se ve en el panel es exactamente lo que se oye.
+    para cada diccionario f en FUENTES {
+        juego.cambiar_voz(f["voz"], {"volumen": matematica.limitar(presencia(f), 0, 1),
+                                     "lado": matematica.limitar((f["x"] - x) / 420, -1, 1),
+                                     "fundido": 0.08})
+    }
+    # Amortiguar el conjunto: el aula se aleja cuando se acumula, al pararse y
+    # al mirar el patrón. Es el recurso del documento — apagar la mezcla sin
+    # bajarla — y por eso NO vale con tocar los volúmenes.
+    sea lejos = c * 0.45
+    si quieto_desde > 0 { lejos = lejos + matematica.minimo(quieto_desde / 1.6, 1) * 0.40 }
+    si mirando > 0.5 { lejos = lejos + 0.45 }
+    si salido { lejos = lejos + matematica.limitar(t_salida / 1.5, 0, 1) }
+    juego.amortiguar(matematica.limitar(lejos, 0, 0.95), {"fundido": 0.25})
+
+    # ...y al mismo tiempo, el detalle que SÍ se oye claro. El reloj y el
+    # zumbido dejan de pasar por el filtro cuando se han hecho su sitio: el
+    # aula se apaga y ellos se quedan nítidos encima. Eso es el paso 2.
+    para cada diccionario f en FUENTES {
+        si f.contiene("sube") {
+            juego.cambiar_voz(f["voz"],
+                {"nitido": juego.tiempo() > ASENTARSE * 0.45 y no salido})
+        }
+    }
+
     dibujar_aula(cam, c)
 
     # Bichito. Al quedarse quieto se mece un poco: no es una animación

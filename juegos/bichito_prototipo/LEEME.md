@@ -25,7 +25,24 @@ contestarlas jugando, no discutiendo:
 ## Cómo está montado el sonido
 
 Cada cosa que suena en el aula (reloj, ventana, zumbido del fluorescente, voces,
-lápiz) está **en un sitio** del aula. Lo que se oye depende de dónde esté Bichito.
+lápiz) está **en un sitio** del aula. Lo que se oye depende de dónde esté Bichito:
+el volumen y el lado salen de la distancia, en cada fotograma.
+
+**Suena de verdad, y sin un solo archivo de audio.** Cada capa es un
+`juego.crear_tono()` en bucle: el zumbido es una cuadrada de 100 Hz, las voces son
+ruido amortiguado (un murmullo, no palabras), el reloj una cuadrada aguda. Cuando
+haya sonido grabado, lo único que cambia es una línea por capa: donde pone
+`crear_tono(...)` pondrá `juego.sonido("voces.ogg")`. Todo lo demás sigue igual.
+
+El recurso central de la sección 9 del documento —«la mezcla puede amortiguar el
+conjunto y, al mismo tiempo, hacer que ciertos detalles se perciban con gran
+nitidez»— es `juego.amortiguar()` más la opción `"nitido"`. Amortiguar **no es
+bajar el volumen**: se van los agudos y queda el cuerpo del sonido, como oír el
+aula desde el pasillo. Aquí el aula se amortigua cuando se acumulan estímulos, al
+pararse y al mirar el patrón; y el reloj y el zumbido, una vez se han hecho su
+sitio, dejan de pasar por el filtro y se quedan nítidos encima de todo lo demás.
+Eso es exactamente el paso 2.
+
 El panel de arriba a la izquierda enseña la mezcla; eso es un andamio para poder
 probar, en el juego de verdad no se vería, se oiría.
 
@@ -63,9 +80,10 @@ Además, lo que pide la sección 6:
 
 ## Lo que no es
 
-No tiene arte final, ni música, ni la hermana, ni el aula de verdad. El sonido son
-cuatro efectos de 8 bits generados por Lince (`juego.efecto`), no las capas
-cuidadas que pide el documento: para eso hacen falta archivos de audio.
+No tiene arte final, ni música, ni la hermana, ni el aula de verdad. Las capas de
+sonido son tonos generados: tienen la forma correcta y se mueven como deben, pero
+un zumbido sintético no es el zumbido grabado de un fluorescente. Eso llega con los
+archivos de audio, y no hace falta tocar la lógica para meterlos.
 
 Cuando Bichito pase de prototipo a proyecto, esta carpeta se va a su propio
 repositorio. Aquí está de momento porque sirve de banco de pruebas del lenguaje.
@@ -87,3 +105,6 @@ LINCE_JUEGO_CAPTURA=/tmp/voces.bmp ./lince juegos/bichito_prototipo/la_clase.lin
 | pausa en medio del ruido | `2:derecha:750,756:abajo:400` con 980 |
 | mirar el patrón | `2:derecha:360,370:z:260` con 640 |
 | salir por la puerta | `2:derecha:1120` con 1180 |
+
+Con `LINCE_JUEGO_AUDIO=mezcla.wav` se guarda además el sonido sincronizado con esos
+fotogramas, que es como se ha comprobado que la mezcla hace lo que dice.
