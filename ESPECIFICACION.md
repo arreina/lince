@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.0
+# 🐆 Lince — Especificación del Lenguaje v2.1
 
 ## Filosofía
 
@@ -1344,13 +1344,15 @@ Para escribir un nombre (por ejemplo para un récord): `nombre = juego.editar(no
 | Función | Qué hace |
 |---|---|
 | `sonido(ruta)` | carga un `.wav` o un `.ogg` (Ogg Vorbis, mucho más pequeño: mejor para la música); devuelve `{"sonido", "duracion", "ruta"}` |
-| `reproducir(sonido[, opciones])` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz. Opciones: `volumen` (0 a 1), `bucle`, `lado` (−1 izquierda, 0 en medio, 1 derecha: que suene de donde pasa), `tono` (1 normal, 2 una octava más agudo y el doble de rápido, 0,5 más grave; variarlo un poco, de 0,9 a 1,1, hace que un golpe repetido no suene siempre igual), `grupo` (`"efectos"`, el de siempre; `"voces"` o `"musica"`) y `fundido` (segundos que tarda en subir desde 0) |
+| `reproducir(sonido[, opciones])` | lo hace sonar (se mezclan hasta 32 a la vez); devuelve el número de la voz. Opciones: `volumen` (0 a 1), `bucle`, `lado` (−1 izquierda, 0 en medio, 1 derecha: que suene de donde pasa), `tono` (1 normal, 2 una octava más agudo y el doble de rápido, 0,5 más grave; variarlo un poco, de 0,9 a 1,1, hace que un golpe repetido no suene siempre igual), `grupo` (`"efectos"`, el de siempre; `"voces"` o `"musica"`), `fundido` (segundos que tarda en subir desde 0), `amortiguado` (0 nítido a 1 apagado: lo que suena tras una puerta o al fondo de la sala) y `nitido` (esta voz no la toca `amortiguar()`) |
 | `reproducir_en(sonido, x, y[, opciones])` · `mover_voz(voz, x, y)` | como `reproducir`, pero suena por la izquierda o por la derecha según dónde se ve el punto (x, y) del mundo, y más bajo cuanto más lejos queda de la pantalla: a `alcance` píxeles fuera (la mitad del ancho de la pantalla) ya no se oye. `mover_voz` lo vuelve a calcular, para lo que suena mientras se mueve; devuelve si sigue sonando |
-| `cambiar_voz(voz, opciones)` · `sonando(voz)` | cambia lo que ya suena (`volumen`, `lado`, `tono`, `grupo`, y `fundido`: los segundos en que cambia el volumen) y devuelve si sigue sonando · ¿sigue sonando? |
+| `cambiar_voz(voz, opciones)` · `sonando(voz)` | cambia lo que ya suena (`volumen`, `lado`, `tono`, `grupo`, `amortiguado`, `nitido`, y `fundido`: los segundos en que cambia el volumen y la amortiguación) y devuelve si sigue sonando · ¿sigue sonando? |
 | `detener([voz[, segundos]])` | para esa voz (con segundos, bajando poco a poco) o, sin argumento, todo |
 | `musica(ruta o sonido[, opciones])` · `musica(nulo[, opciones])` | suena en bucle y sustituye a la anterior / la para. Opciones: `volumen` (0,6) y `fundido` (los segundos en que la anterior se va bajando mientras la nueva entra subiendo; con `nulo`, lo que tarda en apagarse). Con la ruta de un `.ogg` (`juego.musica("tema.ogg")`) se lee poco a poco mientras suena: una canción de 3 minutos ocupa unos cientos de KB en vez de unos 30 MB. Si ya suena esa misma, solo cambia el volumen (no vuelve a empezar al recargar en caliente) |
 | `volumen([v])` · `volumen(grupo[, v])` | volumen general de 0 a 1 · el de un grupo (`"efectos"`, `"musica"` o `"voces"`), que se multiplica por el general: para el menú de opciones (`juego.volumen("musica", 0.5)`). Los diálogos suenan en `"voces"` |
-| `pitido(frecuencia, segundos[, volumen])` | tono sencillo, sin archivos: `pitido(440, 0.1)` |
+| `amortiguar([cuanto[, opciones]])` | apaga la mezcla entera, como oírla desde otra habitación o debajo del agua: 0 es nítido y 1 muy apagado. No es bajar el volumen — se van los agudos y queda el cuerpo del sonido. Las voces con `nitido` no pasan por aquí, así que se puede amortiguar todo y dejar un detalle sonando claro. Opción: `fundido` (los segundos que tarda en llegar). Sin argumentos, dice cuánto hay puesto |
+| `pitido(frecuencia, segundos[, volumen])` | tono sencillo, sin archivos: `pitido(440, 0.1)`; devuelve el número de la voz, como `reproducir()` |
+| `crear_tono(frecuencia, segundos[, opciones])` | un tono sostenido como sonido, sin archivos, para las capas de ambiente (un zumbido, un murmullo). Opciones: `forma` (`"seno"`, `"cuadrada"`, `"sierra"`, `"triangulo"` o `"ruido"`) y `volumen`. No lleva rampa en los extremos y dura un número entero de ciclos, así que en bucle empalma sin chasquido (la duración que devuelve puede ser un pelo menor que la pedida, por eso) |
 | `efecto(tipo[, opciones])` | genera y hace sonar un efecto al estilo de los juegos de 8 bits, sin archivos: `"moneda"`, `"salto"`, `"disparo"`, `"explosion"`, `"golpe"`, `"subir"`, `"clic"` o `"perder"`. Cada vez suena un poco distinto. Opciones: `volumen` (0,5), `tono` y `largo` (multiplican la frecuencia y la duración: `{"tono": 1.5}` más agudo) y `semilla` (siempre el mismo sonido) |
 | `crear_efecto(tipo[, opciones])` | el efecto como sonido, para `reproducir()` o `guardar_sonido()`; sin `semilla` usa la 1 |
 | `guardar_sonido(sonido, ruta)` | guarda un sonido como `.wav` |

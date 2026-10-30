@@ -3,6 +3,36 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.1.0
+
+Sonido amortiguado y tonos de ambiente. Solo añade: nada de la 2.0 cambia.
+
+- **`juego.amortiguar(cuanto[, {fundido}])`**: apaga la mezcla entera, como oírla desde otra
+  habitación o debajo del agua. 0 es nítido y 1 muy apagado. No es bajar el volumen: se van los
+  agudos y queda el cuerpo del sonido, que es otra cosa.
+- **`"nitido"` en `reproducir()` y `cambiar_voz()`**: esa voz no pasa por `amortiguar()`. Sirve
+  para amortiguar todo el entorno y dejar que un detalle se siga oyendo con claridad.
+- **`"amortiguado"` (0 a 1) en `reproducir()` y `cambiar_voz()`**: una voz apagada ella sola, para
+  lo que suena tras una puerta o al fondo de la sala. Con `"fundido"` cambia poco a poco.
+- **`juego.crear_tono(frecuencia, segundos[, {forma, volumen}])`**: un tono sostenido como sonido,
+  sin archivos, para las capas de ambiente. Formas: `"seno"`, `"cuadrada"`, `"sierra"`,
+  `"triangulo"` y `"ruido"`. No lleva rampa en los extremos y dura un número entero de ciclos, así
+  que en bucle empalma sin chasquido.
+- **`juego.pitido()` ahora devuelve el número de la voz**, como `reproducir()`, para poder
+  cambiarla o pararla. Antes devolvía `nulo`; nada que dependiera de eso se rompe.
+
+El filtro es de un polo y va de 18 kHz a 260 Hz. Se recalcula una vez por bloque de audio (unos
+23 ms) en vez de por muestra: se oye igual de suave y ahorra un `exp()` por muestra y por voz.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.1.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-2.1.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.1.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.1.0.vsix` |
+
 ## 2.0.0
 
 Una limpieza, no un lenguaje nuevo: lo que la 1.9 avisaba como obsoleto ya no está, y cada cosa

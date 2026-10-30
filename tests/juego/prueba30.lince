@@ -1,0 +1,56 @@
+# Amortiguar: el filtro de la mezcla (per voz y general) y crear_tono.
+# El audio se mide en tests/juego/smoke.sh sobre amortiguar.wav.
+importar "juego"
+
+juego.abrir("amortiguar", 160, 120)
+
+# ── crear_tono ──────────────────────────────────────────────────────
+fijo AGUDO = juego.crear_tono(8000, 0.5, {"forma": "cuadrada", "volumen": 0.7})
+fijo GRAVE = juego.crear_tono(180, 0.5, {"forma": "seno", "volumen": 0.7})
+escribir("tono: " + (AGUDO["duracion"] > 0) + " " + (GRAVE["duracion"] > 0))
+# dura un número entero de ciclos, así que en bucle empalma sin chasquido
+fijo RARO = juego.crear_tono(997, 0.2, {"forma": "seno"})
+escribir("ciclos enteros: " + (RARO["duracion"] < 0.2))
+
+intentar { juego.crear_tono(8000, 0.5, {"forma": "triangular"}) }
+capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.crear_tono(10, 0.5) }
+capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.crear_tono(440, 0.5, {"volumen": 3}) }
+capturar (error e) { escribir("error: {e.mensaje}") }
+
+# ── amortiguar() ────────────────────────────────────────────────────
+escribir("amortiguar de salida: " + juego.amortiguar())
+intentar { juego.amortiguar(2) }
+capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.amortiguar(0.5, {"segundos": 1}) }
+capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.reproducir(AGUDO, {"amortiguado": 5}) }
+capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.reproducir(AGUDO, {"nitido": 1}) }
+capturar (error e) { escribir("error: {e.mensaje}") }
+
+sea voz = 0
+sea f = 0
+mientras juego.abierto() {
+    f = f + 1
+    # 0-30: el tono agudo tal cual, para tener la referencia
+    si f == 2 { voz = juego.reproducir(AGUDO, {"bucle": verdadero, "volumen": 0.8}) }
+    # 40-70: la misma voz, amortiguada ella sola
+    si f == 36 { juego.cambiar_voz(voz, {"amortiguado": 1}) }
+    # 80-110: nítida otra vez, pero amortiguando el conjunto
+    si f == 76 {
+        juego.cambiar_voz(voz, {"amortiguado": 0})
+        juego.amortiguar(1)
+    }
+    # 120-150: amortiguado el conjunto, pero esta voz se lo salta
+    si f == 116 { juego.cambiar_voz(voz, {"nitido": verdadero}) }
+    si f == 156 {
+        escribir("sigue sonando: " + juego.sonando(voz))
+        escribir("amortiguar puesto: " + juego.amortiguar())
+        juego.amortiguar(0)
+        juego.detener(voz)
+    }
+    juego.limpiar([0, 0, 0])
+    juego.presentar()
+}

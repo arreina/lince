@@ -714,4 +714,39 @@ for l in "caja-caja: verdadero falso" "punto-caja: verdadero falso falso" "círc
          '1.x: reproducir(): el volumen y el bucle van en las opciones: reproducir(sonido, {"volumen": 0.5, "bucle": verdadero})'; do
     grep -qxF "$l" salida35.txt && ok "2.0: ${l:0:70}" || mal "falta la línea: $l"
 done
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida5b.txt; exit 1; }
+# ── 2.1: amortiguar (el filtro de la mezcla) y crear_tono ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=170 LINCE_JUEGO_AUDIO=amortiguar.wav \
+    timeout 60 "$LINCE" "$DIR/prueba30.lince" > salida36.txt 2>&1
+for l in "tono: verdadero verdadero" "ciclos enteros: verdadero" "amortiguar de salida: 0" \
+         "sigue sonando: verdadero" "amortiguar puesto: 1" \
+         'error: crear_tono(): "forma" es "seno", "cuadrada", "sierra", "triangulo" o "ruido"' \
+         "error: crear_tono(): la frecuencia va de 20 a 20000 Hz y la duración, en segundos, hasta 30" \
+         'error: crear_tono(): "volumen" va de 0 a 1' \
+         "error: amortiguar() va de 0 (nítido) a 1 (como de otra habitación)" \
+         "error: amortiguar(): no conozco la opción 'segundos' (hay \"fundido\")" \
+         'error: reproducir(): "amortiguado" va de 0 (nítido) a 1 (como de otra habitación)' \
+         'error: reproducir(): "nitido" es verdadero o falso: con verdadero, esta voz no la toca amortiguar()'; do
+    grep -qxF "$l" salida36.txt && ok "2.1: ${l:0:70}" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys, wave
+mal = 0
+def mira(bien, nombre):
+    global mal
+    print("  ✅ 2.1:" if bien else "  ❌ 2.1:", nombre)
+    mal += not bien
+w = wave.open("amortiguar.wav"); n = w.getnframes()
+d = struct.unpack("<%dh" % (n * 2), w.readframes(n))
+def rms(f0, f1, c=0):                      # por fotogramas (735 muestras cada uno)
+    s = d[f0 * 1470 + c:f1 * 1470:2]
+    return (sum(x * x for x in s) / len(s)) ** 0.5 if s else 0
+# un tono de 8 kHz: el filtro corta en 260 Hz, así que tiene que hundirlo
+base, voz, general, nitido = rms(10, 30), rms(45, 70), rms(85, 110), rms(125, 150)
+mira(base > 2000, "crear_tono suena")
+mira(voz < base / 8, "amortiguado=1 en la voz apaga el agudo")
+mira(general < base / 8, "amortiguar(1) apaga el conjunto")
+mira(nitido > base / 2, "nitido se salta amortiguar(): el detalle sigue nitido")
+sys.exit(1 if mal else 0)
+PY
+
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida5b.txt; exit 1; }

@@ -159,6 +159,9 @@ typedef struct {
     short *propio;        /* pitidos: la voz es dueña de sus datos */
     int grupo;            /* JG_G_EFECTOS, JG_MUSICA o JG_VOCES: su volumen se multiplica */
     float objetivo, rampa; int parar;   /* un fundido: el volumen va hacia 'objetivo' (y para al llegar) */
+    /* amortiguar: 0 nítido, 1 muy apagado (como de otra habitación). 'coef' y
+       'lp' son el filtro de un polo; 'nitido' se salta el filtro general. */
+    float amort, amort_obj, amort_rampa, coef, lp[2]; int nitido, parar_amort;
 } JgVoz;
 /* los grupos de volumen: volumen("musica", 0.5) baja toda la música */
 enum { JG_G_EFECTOS, JG_MUSICA, JG_VOCES, JG_GRUPOS };
@@ -278,6 +281,8 @@ static struct {
     JgSonido sonidos[JG_MAX_SONIDOS];
     int nsonidos;
     JgVoz voces[JG_VOCES];
+    /* amortiguar() general: lo que no es "nitido" pasa por aquí */
+    float amort, amort_obj, amort_rampa, lp[2];
     int siguiente_voz, voz_musica;
     float volumen;
     void *mandos[JG_MANDOS];
@@ -1002,6 +1007,8 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     _jgs.completa = 0;
     _jgs.njoy = -1;
     _jgs.volumen = 1;
+    _jgs.amort = _jgs.amort_obj = _jgs.amort_rampa = 0;     /* sin amortiguar(), como el volumen */
+    _jgs.lp[0] = _jgs.lp[1] = 0;
     for (int g = 0; g < JG_GRUPOS; g++) _jgs.grupos[g] = 1;
     _jgs.voz_musica = 0;
     _jgs.t_inicio = jg_ahora();
@@ -2015,12 +2022,42 @@ static int jg_rampa(float *vol, float objetivo, float *rampa, int parar) {
     return 0;
 }
 
+/* Amortiguar de 0 (nítido) a 1 (muy apagado), como el coeficiente de un
+   filtro de un polo: 18 kHz (no toca nada) bajando hasta 260 Hz. Devuelve 1
+   cuando no hay que filtrar, para poder saltarse el filtro entero. */
+static float jg_coef_amortiguar(float a) {
+    if (a <= 0.001f) return 1.0f;
+    if (a > 1) a = 1;
+    double fc = 18000.0 * pow(260.0 / 18000.0, (double)a);
+    double c = 1.0 - exp(-2.0 * 3.14159265358979 * fc / JG_FRECUENCIA);
+    return c >= 1 ? 1.0f : (float)c;
+}
+
+/* Avanza una amortiguación que se está fundiendo. Va por bloque (unos 23 ms)
+   y no por muestra: barrer un filtro así se oye igual de suave y ahorra un
+   exp() por muestra y por voz. */
+static void jg_avanzar_amort(float *v, float obj, float *rampa, int cuadros) {
+    if (*rampa == 0) return;
+    *v += *rampa * cuadros;
+    if ((*rampa > 0 && *v >= obj) || (*rampa < 0 && *v <= obj)) { *v = obj; *rampa = 0; }
+}
+
 static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
     (void)datos;
     short *salida = (short *)flujo;
     int muestras = largo / (int)sizeof(short);           /* L y R intercaladas */
+    int cuadros = muestras / 2;
+    for (int v = 0; v < JG_VOCES; v++) {                 /* el filtro, una vez por bloque */
+        JgVoz *vz = &_jgs.voces[v];
+        if (!vz->activa) continue;
+        jg_avanzar_amort(&vz->amort, vz->amort_obj, &vz->amort_rampa, cuadros);
+        vz->coef = jg_coef_amortiguar(vz->amort);
+    }
+    jg_avanzar_amort(&_jgs.amort, _jgs.amort_obj, &_jgs.amort_rampa, cuadros);
+    float coef_general = jg_coef_amortiguar(_jgs.amort);
     for (int i = 0; i + 1 < muestras; i += 2) {
-        float acc[2] = {0, 0};
+        float acc[2] = {0, 0};                           /* pasa por amortiguar() */
+        float nit[2] = {0, 0};                           /* se lo salta: los detalles nítidos */
         for (int v = 0; v < JG_VOCES; v++) {
             JgVoz *voz = &_jgs.voces[v];
             if (!voz->activa) continue;
@@ -2031,8 +2068,16 @@ static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
             if (jg_rampa(&voz->vol, voz->objetivo, &voz->rampa, voz->parar)) { voz->activa = 0; continue; }
             const short *m = voz->datos + (size_t)voz->pos * JG_CANALES;
             float g = voz->vol * _jgs.grupos[voz->grupo];
-            acc[0] += m[0] * g * voz->izq;
-            acc[1] += m[1] * g * voz->der;
+            float s[2] = {m[0] * g * voz->izq, m[1] * g * voz->der};
+            for (int c = 0; c < 2; c++) {               /* amortiguada ella sola */
+                voz->lp[c] += voz->coef * (s[c] - voz->lp[c]);
+                s[c] = voz->lp[c];                      /* con coef 1 no la toca, pero
+                                                           deja el filtro al día: así
+                                                           volver a amortiguar no chasca */
+            }
+            float *destino = voz->nitido ? nit : acc;
+            destino[0] += s[0];
+            destino[1] += s[1];
             voz->pos += voz->paso;
         }
         for (int k = 0; k < 2; k++) {                          /* música en streaming */
@@ -2047,7 +2092,9 @@ static void jg_mezclar(void *datos, unsigned char *flujo, int largo) {
             f->lleno -= 2;
         }
         for (int c = 0; c < 2; c++) {
-            int t = (int)(acc[c] * _jgs.volumen);
+            _jgs.lp[c] += coef_general * (acc[c] - _jgs.lp[c]);   /* amortiguar() el conjunto */
+            acc[c] = _jgs.lp[c];
+            int t = (int)((acc[c] + nit[c]) * _jgs.volumen);
             salida[i + c] = (short)(t > 32767 ? 32767 : t < -32768 ? -32768 : t);
         }
     }
@@ -2115,6 +2162,10 @@ static int jg_sonar(const short *datos, int muestras, float vol, int bucle, shor
     voz->vol = vol; voz->bucle = bucle; voz->propio = propio;
     voz->izq = voz->der = voz->paso = 1;
     voz->grupo = JG_G_EFECTOS; voz->objetivo = vol; voz->rampa = 0; voz->parar = 0;
+    voz->amort = voz->amort_obj = voz->amort_rampa = 0;   /* nítida, y el filtro a cero:
+                                                             si no, arrastraría el ruido
+                                                             de la voz anterior */
+    voz->coef = 1; voz->lp[0] = voz->lp[1] = 0; voz->nitido = 0;
     voz->id = ++_jgs.siguiente_voz;
     voz->activa = 1;
     _jg.UnlockAudio(_jgs.audio);
@@ -2294,8 +2345,7 @@ static Valor *fn_jg_pitido(Valor **a, int n) {
         short muestra = (short)(m * env * 12000);
         buf[2 * i] = buf[2 * i + 1] = muestra;
     }
-    jg_sonar(buf, total, vol, 0, buf);
-    return valor_nulo();
+    return valor_numero(jg_sonar(buf, total, vol, 0, buf));   /* la voz, como reproducir() */
 }
 
 /* Un OGG decodificado a estéreo de 16 bits (aún a su frecuencia original) */
@@ -2470,10 +2520,25 @@ static int jg_ajustar_voz(JgVoz *vz, Valor *op, const char *fn, int con_volumen)
         jg_error("ErrorArgumento", msg);
         return 0;
     }
+    double amort = -1;
+    if (jg_opcion(op, "amortiguado", &amort) && (amort < 0 || amort > 1)) {
+        snprintf(msg, sizeof msg, "%s(): \"amortiguado\" va de 0 (nítido) a 1 (como de otra habitación)", fn);
+        jg_error("ErrorArgumento", msg);
+        return 0;
+    }
+    Valor *nv = jg_opcion_valor(op, "nitido");
+    if (nv && nv->tipo != VAL_BOOLEANO) {
+        snprintf(msg, sizeof msg, "%s(): \"nitido\" es verdadero o falso: con verdadero, esta voz no la toca amortiguar()", fn);
+        jg_error("ErrorTipo", msg);
+        return 0;
+    }
     Valor *gv = jg_opcion_valor(op, "grupo");
     int grupo = gv ? jg_grupo(gv, fn) : vz->grupo;
     if (grupo < 0) return 0;
     vz->grupo = grupo;
+    if (nv) vz->nitido = nv->booleano;
+    if (amort >= 0) jg_fundir(&vz->amort, &vz->amort_obj, &vz->amort_rampa, &vz->parar_amort,
+                              (float)amort, fundido, 0);
     if (vol >= 0) jg_fundir(&vz->vol, &vz->objetivo, &vz->rampa, &vz->parar, (float)vol, fundido, 0);
     if (lado <= 1) {
         vz->izq = (float)(lado > 0 ? 1 - lado : 1);
@@ -2503,7 +2568,7 @@ static Valor *fn_jg_reproducir(Valor **a, int n) {
     if (!s) return valor_nulo();
     if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
         Valor *op = a[1];
-        static const char *const V[] = {"volumen", "bucle", "lado", "tono", "grupo", "fundido", NULL};
+        static const char *const V[] = {"volumen", "bucle", "lado", "tono", "grupo", "fundido", "amortiguado", "nitido", NULL};
         if (!jg_opciones_validas(op, "reproducir", V)) return valor_nulo();
         double vol = 1, b = 0;
         jg_opcion(op, "volumen", &vol);
@@ -2537,7 +2602,7 @@ static Valor *fn_jg_cambiar_voz(Valor **a, int n) {
     if (n < 1 || a[0]->tipo != VAL_NUMERO) return jg_error("ErrorTipo", "cambiar_voz() espera (voz, opciones): la voz es lo que devuelve reproducir()");
     if (n > 1) {
         if (a[1]->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo", "cambiar_voz(): las opciones son un diccionario: \"volumen\", \"lado\", \"tono\", \"fundido\", \"grupo\"");
-        static const char *const V[] = {"volumen", "lado", "tono", "grupo", "fundido", NULL};
+        static const char *const V[] = {"volumen", "lado", "tono", "grupo", "fundido", "amortiguado", "nitido", NULL};
         if (!jg_opciones_validas(a[1], "cambiar_voz", V)) return valor_nulo();
         JgVoz prueba;
         memset(&prueba, 0, sizeof prueba);
@@ -2680,6 +2745,35 @@ static Valor *fn_jg_volumen(Valor **a, int n) {
         _jgs.volumen = (float)(v < 0 ? 0 : v > 1 ? 1 : v);
     }
     return valor_numero(_jgs.volumen);
+}
+
+/* amortiguar([cuanto[, opciones]]): apaga el conjunto de la mezcla, como oírla
+   desde otra habitación o debajo del agua. 0 es nítido y 1 muy apagado. Las
+   voces con "nitido" no pasan por aquí: así se puede amortiguar todo y dejar
+   que un detalle se siga oyendo con claridad. Con "fundido", los segundos que
+   tarda en llegar. Sin argumentos, devuelve cuánto hay puesto. */
+static Valor *fn_jg_amortiguar(Valor **a, int n) {
+    if (n > 0) {
+        double v, fundido = 0;
+        if (!jg_num(a, n, 0, &v, "amortiguar")) return valor_nulo();
+        if (v < 0 || v > 1) return jg_error("ErrorArgumento",
+            "amortiguar() va de 0 (nítido) a 1 (como de otra habitación)");
+        if (n > 1) {
+            static const char *const V[] = {"fundido", NULL};
+            if (a[1]->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo",
+                "amortiguar(): las opciones son un diccionario: {\"fundido\": 1.5}");
+            if (!jg_opciones_validas(a[1], "amortiguar", V)) return valor_nulo();
+            if (jg_opcion(a[1], "fundido", &fundido) && (fundido < 0 || fundido > 60))
+                return jg_error("ErrorArgumento",
+                    "amortiguar(): \"fundido\" son los segundos que tarda (de 0 a 60)");
+        }
+        if (!jg_audio()) return valor_numero(_jgs.amort);
+        _jg.LockAudio(_jgs.audio);
+        int tirar = 0;      /* jg_fundir pide dónde dejar el "parar": aquí no para nada */
+        jg_fundir(&_jgs.amort, &_jgs.amort_obj, &_jgs.amort_rampa, &tirar, (float)v, fundido, 0);
+        _jg.UnlockAudio(_jgs.audio);
+    }
+    return valor_numero(_jgs.amort);
 }
 
 /* ── Imágenes ── */
@@ -6099,6 +6193,83 @@ static Valor *fn_jg_efecto(Valor **a, int n) {
     return valor_numero(jg_sonar(buf, muestras, vol, 0, buf));
 }
 
+/* crear_tono(frecuencia, segundos[, opciones]): un sonido sostenido, sin
+   archivos, pensado para las capas de ambiente (un zumbido, un murmullo).
+   A diferencia de pitido(), no lleva rampa en los extremos y dura un número
+   entero de ciclos, así que en bucle empalma sin chasquido. Opciones:
+   "forma" ("seno", "cuadrada", "sierra", "triangulo" o "ruido") y "volumen". */
+static Valor *fn_jg_crear_tono(Valor **a, int n) {
+    JG_ABIERTA();
+    double f, seg;
+    if (!jg_num(a, n, 0, &f, "crear_tono") || !jg_num(a, n, 1, &seg, "crear_tono")) return valor_nulo();
+    if (f < 20 || f > 20000 || seg <= 0 || seg > 30)
+        return jg_error("ErrorArgumento", "crear_tono(): la frecuencia va de 20 a 20000 Hz y la duración, en segundos, hasta 30");
+    const char *forma = "seno";
+    double vol = 0.5;
+    if (n > 2) {
+        static const char *const V[] = {"forma", "volumen", NULL};
+        if (a[2]->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo",
+            "crear_tono(): las opciones son un diccionario: {\"forma\": \"ruido\", \"volumen\": 0.3}");
+        if (!jg_opciones_validas(a[2], "crear_tono", V)) return valor_nulo();
+        Valor *fv = jg_opcion_valor(a[2], "forma");
+        if (fv) {
+            if (fv->tipo != VAL_TEXTO) return jg_error("ErrorTipo",
+                "crear_tono(): \"forma\" es \"seno\", \"cuadrada\", \"sierra\", \"triangulo\" o \"ruido\"");
+            forma = fv->texto;
+        }
+        if (jg_opcion(a[2], "volumen", &vol) && (vol < 0 || vol > 1))
+            return jg_error("ErrorArgumento", "crear_tono(): \"volumen\" va de 0 a 1");
+    }
+    int onda = !strcmp(forma, "seno") ? 0 : !strcmp(forma, "cuadrada") ? 1 :
+               !strcmp(forma, "sierra") ? 2 : !strcmp(forma, "triangulo") ? 3 :
+               !strcmp(forma, "ruido") ? 4 : -1;
+    if (onda < 0) return jg_error("ErrorArgumento",
+        "crear_tono(): \"forma\" es \"seno\", \"cuadrada\", \"sierra\", \"triangulo\" o \"ruido\"");
+
+    int total = (int)(JG_FRECUENCIA * seg);
+    if (onda != 4) {                        /* ciclos enteros: así el bucle empalma */
+        double por_ciclo = JG_FRECUENCIA / f;
+        int ciclos = (int)(total / por_ciclo);
+        if (ciclos < 1) ciclos = 1;
+        total = (int)(ciclos * por_ciclo + 0.5);
+    }
+    if (total < 2) return jg_error("ErrorArgumento", "crear_tono(): esa duración no da ni para un ciclo");
+    short *buf = malloc((size_t)total * JG_CANALES * sizeof(short));
+    if (!buf) return jg_error("ErrorJuego", "sin memoria para el tono");
+    unsigned semilla = 22222;
+    for (int i = 0; i < total; i++) {
+        double fase = fmod(i * f / JG_FRECUENCIA, 1.0), m;
+        if (onda == 0)      m = sin(2 * 3.14159265358979 * fase);
+        else if (onda == 1) m = fase < 0.5 ? 1.0 : -1.0;
+        else if (onda == 2) m = 2 * fase - 1;
+        else if (onda == 3) m = fase < 0.5 ? 4 * fase - 1 : 3 - 4 * fase;
+        else {                              /* ruido: la base de un murmullo o un siseo */
+            semilla = semilla * 1103515245u + 12345u;
+            m = (double)((semilla >> 16) & 0x7fff) / 16384.0 - 1.0;
+        }
+        short muestra = (short)(m * vol * 24000);
+        buf[2 * i] = buf[2 * i + 1] = muestra;
+    }
+    char clave[200];
+    snprintf(clave, sizeof clave, "<tono %s %g %g %g>", forma, f, seg, vol);
+    int k = -1;
+    for (int i = 0; i < _jgs.nsonidos; i++) if (strcmp(_jgs.sonidos[i].ruta, clave) == 0) { k = i; break; }
+    if (k >= 0) free(buf);
+    else {
+        if (_jgs.nsonidos == JG_MAX_SONIDOS) { free(buf); return jg_error("ErrorJuego", "demasiados sonidos cargados"); }
+        k = _jgs.nsonidos++;
+        _jgs.sonidos[k].datos = buf;
+        _jgs.sonidos[k].muestras = total;
+        _jgs.sonidos[k].ruta = strdup(clave);
+        _jgs.sonidos[k].mtime = _jgs.sonidos[k].tam = -1;
+    }
+    Valor *d = valor_diccionario_crear();
+    valor_diccionario_agregar(d, "sonido", valor_numero(k));
+    valor_diccionario_agregar(d, "duracion", valor_numero((double)total / JG_FRECUENCIA));
+    valor_diccionario_agregar(d, "ruta", valor_texto(clave));
+    return d;
+}
+
 /* crear_efecto(tipo[, opciones]): el efecto como sonido, para reproducir() o guardar_sonido() */
 static Valor *fn_jg_crear_efecto(Valor **a, int n) {
     JG_ABIERTA();
@@ -7290,6 +7461,8 @@ static void cargar_juego(Entorno *entorno) {
         {"musica",          fn_jg_musica,          -1},
         {"volumen",         fn_jg_volumen,         -1},
         {"cambiar_voz",     fn_jg_cambiar_voz,     -1},
+        {"amortiguar",      fn_jg_amortiguar,      -1},
+        {"crear_tono",      fn_jg_crear_tono,      -1},
         {"sonando",         fn_jg_sonando,          1},
         {"camara",          fn_jg_camara,          -1},
         {"camara_actual",   fn_jg_camara_actual,    0},
