@@ -1,0 +1,115 @@
+# 2.5: enemigos con cabeza (estados y movimientos). smoke.sh mira la salida.
+importar "juego"
+importar "matematica"
+importar "texto"
+juego.abrir("2.5", 200, 100)
+
+funcion r(cualquiera v): texto { devolver "{matematica.redondear(v[0])} {matematica.redondear(v[1])}" }
+
+fijo NIVEL = juego.mapa.crear([
+    "##########",
+    "#........#",
+    "#.####...#",
+    "#........#",
+    "##########"
+], 20)
+
+sea yo = {"x": 150, "y": 30}
+sea diario = []
+fijo GUARDIA = {
+    "patrullar": {
+        "entrar": funcion(cualquiera e): nulo { diario.agregar("entra patrullar") },
+        "hacer": funcion(cualquiera e): cualquiera {
+            si juego.distancia(e, yo) < 60 { devolver "perseguir" }
+            devolver nulo
+        },
+        "salir": funcion(cualquiera e): nulo { diario.agregar("sale patrullar") }
+    },
+    "perseguir": {
+        "entrar": funcion(cualquiera e): nulo { diario.agregar("entra perseguir de {e["estado_anterior"]}") },
+        "hacer": funcion(cualquiera e): cualquiera {
+            diario.agregar("lleva {e["tiempo_estado"] > 0}")
+            devolver nulo
+        }
+    },
+    "huir": {"entrar": funcion(cualquiera e): nulo { diario.agregar("entra huir") }}
+}
+sea guardia = {"x": 0, "y": 30}
+sea f = 0
+mientras juego.abierto() y f < 6 {
+    juego.limpiar()
+    sea antes = juego.pensar(guardia, GUARDIA)
+    si f == 2 { guardia["x"] = 100 }
+    si f == 4 { juego.cambiar_estado(guardia, "huir") }
+    diario.agregar("{f}: {antes}")
+    juego.presentar()
+    f = f + 1
+}
+escribir("estados: " + texto.unir(diario, " / "))
+escribir("tiempo_estado: {guardia["tiempo_estado"]}")
+
+# movimientos
+sea dt = juego.dt()
+escribir("dt: {dt > 0}")
+escribir("seguir: " + r(juego.seguir({"x": 0, "y": 0}, [100, 0], 60)))
+escribir("seguir centro: " + r(juego.seguir({"x": 0, "y": 0, "ancho": 20, "alto": 20}, [10, 110], 50)))
+escribir("frenar: " + r(juego.seguir({"x": 0, "y": 0}, [50, 0], 60, {"frenar": 100})))
+escribir("llegado: " + r(juego.seguir({"x": 50, "y": 0}, [50, 0], 60)))
+# en el mapa: de (30, 70) a (30, 30) hay pared en medio; da la vuelta por la izquierda
+escribir("seguir mapa: " + r(juego.seguir({"x": 30, "y": 70}, [70, 30], 60, {"mapa": NIVEL})))
+escribir("seguir mapa cerca: " + r(juego.seguir({"x": 30, "y": 30}, [50, 30], 60, {"mapa": NIVEL})))
+escribir("huir: " + r(juego.huir({"x": 0, "y": 0}, [0, 10], 40)))
+escribir("huir lejos: " + r(juego.huir({"x": 0, "y": 0}, [0, 100], 40, {"lejos": 50})))
+escribir("rodear: " + r(juego.rodear({"x": 100, "y": 0}, [0, 0], 100, 30)))
+escribir("rodear al revés: " + r(juego.rodear({"x": 100, "y": 0}, [0, 0], 100, 30, {"sentido": -1})))
+escribir("rodear lejos: " + r(juego.rodear({"x": 300, "y": 0}, [0, 0], 100, 30)))
+escribir("esquivar nada: " + r(juego.esquivar({"x": 0, "y": 0}, [[200, 0]], 50)))
+escribir("esquivar: " + r(juego.esquivar({"x": 0, "y": 0}, [[25, 0]], 50)))
+escribir("esquivar pared: " + r(juego.esquivar({"x": 30, "y": 25}, NIVEL, 50, {"distancia": 10})))
+sea bandada = [{"x": 0, "y": 0, "vx": 10, "vy": 0}, {"x": 10, "y": 0, "vx": 10, "vy": 0}, {"x": 500, "y": 0}]
+escribir("en_grupo: " + r(juego.en_grupo(bandada[0], bandada, 10, {"juntar": 0, "alinear": 0})))
+escribir("en_grupo alinear: " + r(juego.en_grupo(bandada[0], bandada, 10, {"separar": 0, "juntar": 0})))
+escribir("en_grupo solo: " + r(juego.en_grupo(bandada[2], bandada, 10)))
+escribir("mezclar: " + r(juego.mezclar([[10, 0], [[0, 10], 2]])))
+escribir("mezclar máximo: " + r(juego.mezclar([[30, 0], [0, 40]], 10)))
+sea e = {"x": 0, "y": 0, "vx": 0, "vy": 0}
+juego.dirigir(e, [10, 20])
+escribir("dirigir: {e["vx"]} {e["vy"]}")
+juego.dirigir(e, [100, 20], 5)
+escribir("dirigir suave: {e["vx"] > 10 y e["vx"] < 100}")
+# ve
+sea ojo = {"x": 30, "y": 30, "vx": 1, "vy": 0}
+escribir("ve: {juego.ve(ojo, [150, 30])} {juego.ve(ojo, [150, 30], {"distancia": 50})}")
+escribir("ve delante: {juego.ve(ojo, [150, 30], {"vision": 90})} {juego.ve(ojo, [-100, 30], {"vision": 90})}")
+ojo["vx"] = 0
+escribir("ve se acuerda: {juego.ve(ojo, [-100, 30], {"vision": 90})} {juego.ve(ojo, [-100, 30], {"vision": 90, "mira": 180})}")
+escribir("ve paredes: {juego.ve({"x": 70, "y": 30}, [70, 70], {"mapa": NIVEL})} {juego.ve({"x": 30, "y": 30}, [150, 30], {"mapa": NIVEL})}")
+escribir("distancia: {juego.distancia({"x": 0, "y": 0, "ancho": 6, "alto": 8}, [3, 0])}")
+# patrullar: va al primero, espera y al siguiente
+sea ronda = {"x": 0, "y": 0}
+sea puntos = [[0, 0], [1000, 0]]
+sea v = juego.patrullar(ronda, puntos, 30, {"espera": 5})
+escribir("patrullar: " + r(v) + " punto {ronda["punto"]}")
+sea ida = {"x": 0, "y": 0, "punto": 1, "_paso_patrulla": 1}
+v = juego.patrullar(ida, [[50, 0], [0, 0]], 30, {"ida_y_vuelta": verdadero})
+escribir("ida y vuelta: " + r(v) + " punto {ida["punto"]}")
+
+para cada funcion intento en [
+    funcion(): nulo { juego.pensar({"x": 0, "y": 0}, {}) },
+    funcion(): nulo { juego.pensar({"x": 0, "y": 0}, {"a": {"hacr": funcion(cualquiera e): nulo {}}}) },
+    funcion(): nulo { juego.pensar({"x": 0, "y": 0}, {"a": {"hacer": 3}}) },
+    funcion(): nulo { juego.pensar({"x": 0, "y": 0}, {"a": {"hacer": funcion(cualquiera e): cualquiera { devolver "b" }}}) },
+    funcion(): nulo { juego.pensar({"x": 0, "y": 0}, {"a": {"entrar": funcion(cualquiera e): nulo { juego.cambiar_estado(e, "b") }},
+        "b": {"entrar": funcion(cualquiera e): nulo { juego.cambiar_estado(e, "a") }}}) },
+    funcion(): nulo { juego.seguir({"x": 0}, [0, 0], 1) },
+    funcion(): nulo { juego.seguir({"x": 0, "y": 0}, [0, 0], -1) },
+    funcion(): nulo { juego.seguir({"x": 0, "y": 0}, [0, 0], 1, {"frenr": 2}) },
+    funcion(): nulo { juego.seguir({"x": 0, "y": 0}, [0, 0], 1, {"mapa": 3}) },
+    funcion(): nulo { juego.rodear({"x": 0, "y": 0}, [0, 0], 10, 1, {"sentido": 2}) },
+    funcion(): nulo { juego.esquivar({"x": 0, "y": 0}, 3, 1) },
+    funcion(): nulo { juego.mezclar([[1]]) },
+    funcion(): nulo { juego.ve({"x": 0, "y": 0}, [1, 1], {"vision": 0}) },
+    funcion(): nulo { juego.patrullar({"x": 0, "y": 0}, [], 1) }
+] {
+    intentar { intento() } capturar (error x) { escribir("error: {x.mensaje}") }
+}

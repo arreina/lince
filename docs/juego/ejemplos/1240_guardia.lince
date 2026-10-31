@@ -1,0 +1,73 @@
+# @seccion: Enemigos
+# @titulo: Un guardia con cabeza
+# @nota: `juego.pensar(cosa, estados)` lleva lo que hace un enemigo según su estado: cada estado tiene su función `"hacer"` (en cada fotograma; si devuelve el nombre de otro estado, pasa a ese) y, si quieres, `"entrar"` y `"salir"`. Los nombres los pones tú, y la cosa guarda su `"estado"` y su `"tiempo_estado"`. Desde fuera, `juego.cambiar_estado(cosa, nombre)`.
+# @nota: `juego.ve(cosa, objetivo)` mira si lo ve, hasta una `distancia`, con su `vision` (lo ancho que ve, en grados) y con las paredes de un `mapa` tapando. `juego.patrullar` y `juego.seguir` (con `"mapa"`, por el camino más corto) dicen hacia dónde ir, y `juego.dirigir` lo pone en la cosa, poco a poco si se le da rapidez.
+# @fotogramas: 80
+importar "juego"
+
+juego.abrir("Guardia", 480, 270)
+juego.definir_accion("izquierda", ["izquierda", "a"])
+juego.definir_accion("derecha", ["derecha", "d"])
+juego.definir_accion("arriba", ["arriba", "w"])
+juego.definir_accion("abajo", ["abajo", "s"])
+fijo NIVEL = juego.mapa.crear([
+    "################",
+    "#..............#",
+    "#.###......###.#",
+    "#..............#",
+    "#......##......#",
+    "#..............#",
+    "#.###......###.#",
+    "#..............#",
+    "################"
+], 30)
+fijo RONDA = [[45, 45], [435, 45], [435, 225], [45, 225]]
+fijo COLORES = {"patrullar": [90, 200, 120], "perseguir": [240, 80, 80], "buscar": [240, 200, 80]}
+sea yo = {"x": 400, "y": 36, "ancho": 18, "alto": 18, "vx": 0, "vy": 0}
+sea guardia = {"x": 170, "y": 35, "ancho": 20, "alto": 20, "vx": 0, "vy": 0, "punto": 1}
+
+funcion me_ve(cualquiera g): logico {
+    devolver juego.ve(g, yo, {"distancia": 200, "vision": 100, "mapa": NIVEL})
+}
+
+fijo ESTADOS = {
+    "patrullar": {
+        "hacer": funcion(cualquiera g): cualquiera {
+            juego.dirigir(g, juego.patrullar(g, RONDA, 70, {"espera": 0.5}), 8)
+            si me_ve(g) { devolver "perseguir" }
+            devolver nulo
+        }
+    },
+    "perseguir": {
+        "entrar": funcion(cualquiera g): nulo { g["visto"] = juego.tiempo() },
+        "hacer": funcion(cualquiera g): cualquiera {
+            juego.dirigir(g, juego.seguir(g, yo, 100, {"mapa": NIVEL}), 8)
+            si me_ve(g) { g["visto"] = juego.tiempo() }
+            si juego.tiempo() - g["visto"] > 2 { devolver "buscar" }      # te ha perdido
+            devolver nulo
+        }
+    },
+    "buscar": {
+        "hacer": funcion(cualquiera g): cualquiera {                       # se para un rato
+            juego.dirigir(g, [0, 0], 8)
+            si me_ve(g) { devolver "perseguir" }
+            si g["tiempo_estado"] > 1.5 { devolver "patrullar" }
+            devolver nulo
+        }
+    }
+}
+
+mientras juego.abierto() {
+    yo["vx"] = juego.direccion("izquierda", "derecha") * 120
+    yo["vy"] = juego.direccion("arriba", "abajo") * 120
+    juego.mapa.mover(NIVEL, yo)
+    sea estado = juego.pensar(guardia, ESTADOS)
+    juego.mapa.mover(NIVEL, guardia)
+
+    juego.limpiar([25, 25, 35])
+    juego.mapa.dibujar(NIVEL, {"#": [70, 70, 100]})
+    juego.rectangulo(yo["x"], yo["y"], 18, 18, [90, 160, 255])
+    juego.rectangulo(guardia["x"], guardia["y"], 20, 20, COLORES[estado])
+    juego.texto(estado, guardia["x"] - 10, guardia["y"] - 14, {"escala": 1})
+    juego.presentar()
+}

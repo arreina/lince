@@ -154,8 +154,8 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   brillo de un disparo), que respeten la cámara y las capas.
 - [ ] Sombras que proyectan las paredes (la luz no pasa a través): solo si algún juego lo pide.
 
-### 2.5 — Enemigos con cabeza
-- [ ] Máquinas de estados (patrullar, perseguir, atacar, huir) y comportamientos de movimiento
+### 2.5 — Enemigos con cabeza (publicada)
+- [x] Máquinas de estados (patrullar, perseguir, atacar, huir) y comportamientos de movimiento
   (seguir, huir, esquivar, rodear, en grupo), escritos en Lince.
 
 ### 2.6 — Pruebas de juegos

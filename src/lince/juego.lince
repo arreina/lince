@@ -3490,3 +3490,454 @@ funcion menu_idiomas(cualquiera opciones = nulo): cualquiera {
     }
     devolver "volver"
 }
+
+# ── Enemigos con cabeza ──
+# Para lo que se mueve solo: un diccionario con x, y (si tiene ancho y alto,
+# se mide desde su centro), vx y vy, como los de mapa.mover. pensar() le da
+# estados (patrullar, perseguir, huir... con los nombres que quieras) y las
+# demás funciones dicen hacia dónde moverse: devuelven una velocidad [vx, vy]
+# que se puede mezclar con otras (mezclar) y poner en la cosa (dirigir). Todo
+# es opcional y se puede usar suelto.
+
+fijo _PARTES_ESTADO = ["entrar", "hacer", "salir"]
+
+# Dónde está algo: un punto [x, y] o un diccionario con x, y
+funcion _sitio(cualquiera a, texto fn): lista {
+    si a es lista y a.longitud() == 2 y a[0] es numero y a[1] es numero { devolver a }
+    si a es diccionario y a.contiene("x") y a.contiene("y") y a["x"] es numero y a["y"] es numero {
+        sea x = a["x"]
+        sea y = a["y"]
+        si a.contiene("ancho") y a["ancho"] es numero { x = x + a["ancho"] / 2 }
+        si a.contiene("alto") y a["alto"] es numero { y = y + a["alto"] / 2 }
+        devolver [x, y]
+    }
+    lanzar ErrorTipo("{fn}(): cada cosa es un punto [x, y] o un diccionario con \"x\" e \"y\"")
+}
+
+funcion _velocidad(numero v, texto fn): nulo {
+    si v < 0 { lanzar ErrorArgumento("{fn}(): la velocidad no es negativa") }
+}
+
+# [x, y] con ese largo (o [0, 0] si no tiene dirección)
+funcion _largo(numero x, numero y, numero largo): lista {
+    sea d = matematica.raiz(x * x + y * y)
+    si d < 0.000001 { devolver [0, 0] }
+    devolver [x / d * largo, y / d * largo]
+}
+
+funcion _ser(cualquiera ser, texto fn): diccionario {
+    si no (ser es diccionario) { lanzar ErrorTipo("{fn}() espera primero la cosa que se mueve (un diccionario con \"x\" e \"y\")") }
+    _sitio(ser, fn)
+    devolver ser
+}
+
+# distancia(a, b): cuántos píxeles hay entre dos cosas (de centro a centro) o puntos
+funcion distancia(cualquiera a, cualquiera b): numero {
+    sea p = _sitio(a, "distancia")
+    sea q = _sitio(b, "distancia")
+    devolver matematica.distancia(p[0], p[1], q[0], q[1])
+}
+
+# pensar(cosa, estados): lo que hace la cosa en este fotograma según su estado.
+# 'estados' es {nombre: {"entrar", "hacer", "salir"}}, cada uno una función
+# que recibe la cosa: "hacer" en cada fotograma (si devuelve el nombre de otro
+# estado, pasa a ese), "entrar" al empezar el estado y "salir" al dejarlo.
+# Empieza en el primero. Deja en la cosa "estado", "estado_anterior" y
+# "tiempo_estado" (segundos en el estado). Devuelve el estado en que queda.
+funcion pensar(cualquiera ser, cualquiera estados): texto {
+    _ser(ser, "pensar")
+    si no (estados es diccionario) o estados.longitud() == 0 {
+        lanzar ErrorTipo("pensar() espera (cosa, \{nombre: \{\"hacer\": función, ...}, ...})")
+    }
+    para cada texto nombre en estados {
+        sea e = estados[nombre]
+        si no (e es diccionario) {
+            lanzar ErrorTipo("pensar(): \"{nombre}\" va con un diccionario, por ejemplo \{\"hacer\": perseguir}")
+        }
+        para cada texto c en e {
+            si no _PARTES_ESTADO.contiene(c) {
+                lanzar ErrorArgumento("pensar(): en \"{nombre}\", no conozco '{c}' (hay \"entrar\", \"hacer\" y \"salir\")")
+            }
+            si no (e[c] es funcion) {
+                lanzar ErrorTipo("pensar(): en \"{nombre}\", \"{c}\" es una función que recibe la cosa")
+            }
+        }
+    }
+    si _de(ser, "estado", nulo) == nulo {
+        para cada texto nombre en estados {
+            ser["_cambio"] = nombre
+            romper
+        }
+        ser["estado"] = nulo
+        ser["estado_anterior"] = nulo
+    }
+    _estado_existe(ser["estado"], estados)
+    _pasar_a(ser, estados)
+    sea e = estados[ser["estado"]]
+    ser["tiempo_estado"] = juego.tiempo() - ser["_desde_estado"]
+    si e.contiene("hacer") {
+        sea r = e["hacer"](ser)
+        si r != nulo {
+            si no (r es texto) {
+                lanzar ErrorTipo("pensar(): \"hacer\" devuelve el nombre del estado al que pasar, o nulo para seguir igual")
+            }
+            si r != ser["estado"] { ser["_cambio"] = r }
+        }
+    }
+    _pasar_a(ser, estados)
+    devolver ser["estado"]
+}
+
+funcion _estado_existe(cualquiera nombre, diccionario estados): nulo {
+    si nombre == nulo o (nombre es texto y estados.contiene(nombre)) { devolver nulo }
+    sea hay = []
+    para cada texto n en estados { hay.agregar(n) }
+    sea lista_de = "\"" + texto.unir(hay, "\", \"") + "\""
+    lanzar ErrorArgumento("pensar(): no hay ningún estado \"{nombre}\" (hay {lista_de})")
+}
+
+# Si hay un cambio pendiente, sale del estado que tenía y entra en el nuevo
+funcion _pasar_a(diccionario ser, diccionario estados): nulo {
+    sea vueltas = 0
+    mientras _de(ser, "_cambio", nulo) != nulo {
+        sea nuevo = ser["_cambio"]
+        ser["_cambio"] = nulo
+        _estado_existe(nuevo, estados)
+        sea viejo = ser["estado"]
+        si viejo != nulo y estados[viejo].contiene("salir") { estados[viejo]["salir"](ser) }
+        ser["estado_anterior"] = viejo
+        ser["estado"] = nuevo
+        ser["_desde_estado"] = juego.tiempo()
+        ser["tiempo_estado"] = 0
+        si estados[nuevo].contiene("entrar") { estados[nuevo]["entrar"](ser) }
+        vueltas = vueltas + 1
+        si vueltas > 100 {
+            lanzar ErrorArgumento("pensar(): los estados se cambian unos a otros al entrar sin parar (\"{viejo}\" y \"{nuevo}\")")
+        }
+    }
+}
+
+# cambiar_estado(cosa, nombre): para cambiarle el estado desde fuera (le han
+# dado un golpe, ha sonado una alarma). Se hace en su siguiente pensar().
+funcion cambiar_estado(cualquiera ser, cualquiera nombre): nulo {
+    _ser(ser, "cambiar_estado")
+    si no (nombre es texto) { lanzar ErrorTipo("cambiar_estado() espera (cosa, nombre del estado)") }
+    si nombre != _de(ser, "estado", nulo) { ser["_cambio"] = nombre }
+}
+
+# seguir(cosa, objetivo, velocidad[, opciones]): ir hacia el objetivo (una
+# cosa o un punto). Opciones: "frenar" (a cuántos píxeles empieza a ir más
+# despacio, para llegar sin pasarse; 0: no frena) y "mapa" (va por el camino
+# más corto sin atravesar paredes, como mapa.camino; también en diagonal).
+fijo _SEGUIR_OPCIONES = ["frenar", "mapa"]
+
+funcion seguir(cualquiera ser, cualquiera objetivo, numero velocidad, cualquiera opciones = nulo): lista {
+    _ser(ser, "seguir")
+    _velocidad(velocidad, "seguir")
+    sea aj = _ui_opciones(opciones, _SEGUIR_OPCIONES, "seguir")
+    sea p = _sitio(ser, "seguir")
+    sea q = _sitio(objetivo, "seguir")
+    sea frenar = _de(aj, "frenar", 0)
+    si no (frenar es numero) o frenar < 0 { lanzar ErrorArgumento("seguir(): \"frenar\" es un número de píxeles (0 o más)") }
+    sea mapa = _de(aj, "mapa", nulo)
+    si mapa != nulo {
+        _es_mapa(mapa, "seguir")
+        sea desde = juego.mapa.casilla_en(mapa, p[0], p[1])
+        sea hasta = juego.mapa.casilla_en(mapa, q[0], q[1])
+        si desde != hasta {
+            sea camino = juego.mapa.camino(mapa, desde, hasta, verdadero)
+            si camino.longitud() == 0 { devolver [0, 0] }
+            sea t = mapa["tamaño"]
+            # va a la primera casilla del camino; si está casi en ella, a la siguiente
+            sea i = si camino.longitud() > 1 y desde == camino[0] { 1 } sino { 0 }
+            sea a = [(camino[i][0] + 0.5) * t, (camino[i][1] + 0.5) * t]
+            si camino.longitud() == 1 { a = q }
+            frenar = si camino.longitud() == 1 { frenar } sino { 0 }
+            q = a
+        }
+    }
+    devolver _hacia(p, q, velocidad, frenar)
+}
+
+funcion _hacia(lista p, lista q, numero velocidad, numero frenar): lista {
+    sea dx = q[0] - p[0]
+    sea dy = q[1] - p[1]
+    sea d = matematica.raiz(dx * dx + dy * dy)
+    si d < 0.5 { devolver [0, 0] }
+    sea v = velocidad
+    si frenar > 0 y d < frenar { v = velocidad * d / frenar }
+    sea dt = juego.dt()
+    si dt > 0 { v = matematica.minimo(v, d / dt) }    # no se pasa en este fotograma
+    devolver [dx / d * v, dy / d * v]
+}
+
+funcion _es_mapa(cualquiera m, texto fn): nulo {
+    si no (m es diccionario) o no m.contiene("mapa") o no m.contiene("tamaño") {
+        lanzar ErrorTipo("{fn}(): \"mapa\" es un mapa de juego.mapa.crear() o juego.mapa.tiled()")
+    }
+}
+
+# huir(cosa, de, velocidad[, opciones]): alejarse de algo. Opción: "lejos"
+# (a partir de cuántos píxeles ya no huye; por defecto, siempre).
+funcion huir(cualquiera ser, cualquiera de, numero velocidad, cualquiera opciones = nulo): lista {
+    _ser(ser, "huir")
+    _velocidad(velocidad, "huir")
+    sea aj = _ui_opciones(opciones, ["lejos"], "huir")
+    sea p = _sitio(ser, "huir")
+    sea q = _sitio(de, "huir")
+    sea lejos = _de(aj, "lejos", -1)
+    si no (lejos es numero) { lanzar ErrorTipo("huir(): \"lejos\" es un número de píxeles") }
+    sea dx = p[0] - q[0]
+    sea dy = p[1] - q[1]
+    sea d = matematica.raiz(dx * dx + dy * dy)
+    si lejos >= 0 y d >= lejos { devolver [0, 0] }
+    si d < 0.000001 { devolver [velocidad, 0] }
+    devolver [dx / d * velocidad, dy / d * velocidad]
+}
+
+# rodear(cosa, centro, radio, velocidad[, opciones]): dar vueltas alrededor de
+# algo a esa distancia (como un tiburón o un satélite): se acerca o se aleja
+# hasta el radio y gira. Opción: "sentido" (1, como las agujas del reloj; -1, al revés).
+funcion rodear(cualquiera ser, cualquiera centro, numero radio, numero velocidad, cualquiera opciones = nulo): lista {
+    _ser(ser, "rodear")
+    _velocidad(velocidad, "rodear")
+    si radio <= 0 { lanzar ErrorArgumento("rodear(): el radio es mayor que 0") }
+    sea aj = _ui_opciones(opciones, ["sentido"], "rodear")
+    sea sentido = _de(aj, "sentido", 1)
+    si sentido != 1 y sentido != -1 { lanzar ErrorArgumento("rodear(): \"sentido\" es 1 (como las agujas del reloj) o -1") }
+    sea p = _sitio(ser, "rodear")
+    sea c = _sitio(centro, "rodear")
+    sea ox = p[0] - c[0]
+    sea oy = p[1] - c[1]
+    sea d = matematica.raiz(ox * ox + oy * oy)
+    si d < 0.000001 { devolver [velocidad, 0] }
+    sea fuera = matematica.limitar((radio - d) / matematica.maximo(radio * 0.3, 1), -1, 1)
+    devolver _largo(-oy / d * sentido + ox / d * fuera * 2, ox / d * sentido + oy / d * fuera * 2, velocidad)
+}
+
+# esquivar(cosa, obstáculos, velocidad[, opciones]): apartarse de lo que tiene
+# cerca: 'obstáculos' es un mapa (sus paredes) o una lista de cosas o puntos.
+# Devuelve [0, 0] si no hay nada cerca y más cuanto más cerca está: se mezcla
+# con otro movimiento. Opción: "distancia" (desde cuántos píxeles; 50).
+funcion esquivar(cualquiera ser, cualquiera obstaculos, numero velocidad, cualquiera opciones = nulo): lista {
+    _ser(ser, "esquivar")
+    _velocidad(velocidad, "esquivar")
+    sea aj = _ui_opciones(opciones, ["distancia"], "esquivar")
+    sea lejos = _de(aj, "distancia", 50)
+    si no (lejos es numero) o lejos <= 0 { lanzar ErrorArgumento("esquivar(): \"distancia\" es un número de píxeles mayor que 0") }
+    sea p = _sitio(ser, "esquivar")
+    sea sx = 0
+    sea sy = 0
+    si obstaculos es diccionario y obstaculos.contiene("mapa") y obstaculos.contiene("tamaño") {
+        sea t = obstaculos["tamaño"]
+        sea c0 = matematica.piso((p[0] - lejos) / t)
+        sea c1 = matematica.piso((p[0] + lejos) / t)
+        sea f0 = matematica.piso((p[1] - lejos) / t)
+        sea f1 = matematica.piso((p[1] + lejos) / t)
+        para (f = f0; f <= f1; f++) {
+            para (c = c0; c <= c1; c++) {
+                si juego.mapa.solido(obstaculos, c, f) {
+                    # el punto de la pared más cercano
+                    sea qx = matematica.limitar(p[0], c * t, (c + 1) * t)
+                    sea qy = matematica.limitar(p[1], f * t, (f + 1) * t)
+                    sea dx = p[0] - qx
+                    sea dy = p[1] - qy
+                    sea d = matematica.raiz(dx * dx + dy * dy)
+                    si d < lejos y d > 0.000001 {
+                        sx = sx + dx / d * (1 - d / lejos)
+                        sy = sy + dy / d * (1 - d / lejos)
+                    }
+                }
+            }
+        }
+    } sino si obstaculos es lista {
+        para cada cualquiera o_ en obstaculos {
+            sea q = _sitio(o_, "esquivar")
+            sea dx = p[0] - q[0]
+            sea dy = p[1] - q[1]
+            sea d = matematica.raiz(dx * dx + dy * dy)
+            si d < lejos y d > 0.000001 {
+                sx = sx + dx / d * (1 - d / lejos)
+                sy = sy + dy / d * (1 - d / lejos)
+            }
+        }
+    } sino {
+        lanzar ErrorTipo("esquivar(): los obstáculos son un mapa o una lista de cosas o puntos")
+    }
+    sea fuerza = matematica.minimo(1, matematica.raiz(sx * sx + sy * sy))
+    devolver _largo(sx, sy, velocidad * fuerza)
+}
+
+# en_grupo(cosa, grupo, velocidad[, opciones]): moverse con los demás del
+# grupo (una lista de cosas, ella incluida o no) como una bandada: sin
+# chocarse ("separar"), sin alejarse ("juntar") y yendo hacia donde van ellos
+# ("alinear"). Los tres son cuánto pesa cada cosa (1, 1 y 1; 0, nada). Opción
+# "vecinos": a cuántos píxeles mira (80). [0, 0] si no tiene a nadie cerca.
+fijo _GRUPO_OPCIONES = ["separar", "juntar", "alinear", "vecinos"]
+
+funcion en_grupo(cualquiera ser, cualquiera grupo, numero velocidad, cualquiera opciones = nulo): lista {
+    _ser(ser, "en_grupo")
+    _velocidad(velocidad, "en_grupo")
+    si no (grupo es lista) { lanzar ErrorTipo("en_grupo(): el grupo es una lista de cosas") }
+    sea aj = _ui_opciones(opciones, _GRUPO_OPCIONES, "en_grupo")
+    para cada texto c en aj {
+        si no (aj[c] es numero) o aj[c] < 0 { lanzar ErrorArgumento("en_grupo(): \"{c}\" es un número (0 o más)") }
+    }
+    sea vecinos = _de(aj, "vecinos", 80)
+    sea p = _sitio(ser, "en_grupo")
+    sea sep = [0, 0]
+    sea centro = [0, 0]
+    sea rumbo = [0, 0]
+    sea cuantos = 0
+    para cada cualquiera compa en grupo {
+        sea q = _sitio(compa, "en_grupo")
+        sea dx = p[0] - q[0]
+        sea dy = p[1] - q[1]
+        sea d = matematica.raiz(dx * dx + dy * dy)
+        si d >= vecinos o d < 0.000001 { continuar }
+        cuantos = cuantos + 1
+        sep[0] = sep[0] + dx / d * (1 - d / vecinos)
+        sep[1] = sep[1] + dy / d * (1 - d / vecinos)
+        centro[0] = centro[0] + q[0]
+        centro[1] = centro[1] + q[1]
+        si compa es diccionario {
+            sea r = _largo(_de(compa, "vx", 0), _de(compa, "vy", 0), 1)
+            rumbo[0] = rumbo[0] + r[0]
+            rumbo[1] = rumbo[1] + r[1]
+        }
+    }
+    si cuantos == 0 { devolver [0, 0] }
+    sea juntar = _largo(centro[0] / cuantos - p[0], centro[1] / cuantos - p[1], 1)
+    sea alinear = _largo(rumbo[0], rumbo[1], 1)
+    sea ws = _de(aj, "separar", 1)
+    sea wj = _de(aj, "juntar", 1)
+    sea wa = _de(aj, "alinear", 1)
+    devolver _largo(sep[0] * ws * 2 + juntar[0] * wj + alinear[0] * wa,
+        sep[1] * ws * 2 + juntar[1] * wj + alinear[1] * wa, velocidad)
+}
+
+# patrullar(cosa, puntos, velocidad[, opciones]): ir de un punto a otro de la
+# lista y volver a empezar (o, con "ida_y_vuelta", volver por donde vino),
+# parándose "espera" segundos en cada uno. Se acuerda de por dónde va (en la
+# cosa, "punto": el índice al que va).
+fijo _PATRULLA_OPCIONES = ["ida_y_vuelta", "espera"]
+
+funcion patrullar(cualquiera ser, cualquiera puntos, numero velocidad, cualquiera opciones = nulo): lista {
+    _ser(ser, "patrullar")
+    _velocidad(velocidad, "patrullar")
+    si no (puntos es lista) o puntos.longitud() == 0 { lanzar ErrorTipo("patrullar(): los puntos son una lista de [x, y] (o de cosas)") }
+    sea aj = _ui_opciones(opciones, _PATRULLA_OPCIONES, "patrullar")
+    sea espera = _de(aj, "espera", 0)
+    si no (espera es numero) o espera < 0 { lanzar ErrorArgumento("patrullar(): \"espera\" son segundos (0 o más)") }
+    sea n = puntos.longitud()
+    sea i = _de(ser, "punto", 0)
+    si no (i es numero) o i < 0 o i >= n { i = 0 }
+    si _de(ser, "_hasta_patrulla", 0) > juego.tiempo() { devolver [0, 0] }
+    sea p = _sitio(ser, "patrullar")
+    sea q = _sitio(puntos[i], "patrullar")
+    sea dt = juego.dt()
+    si matematica.distancia(p[0], p[1], q[0], q[1]) <= matematica.maximo(1, velocidad * dt) {
+        sea paso = _de(ser, "_paso_patrulla", 1)
+        si _de(aj, "ida_y_vuelta", falso) y n > 1 {
+            si i + paso < 0 o i + paso >= n { paso = -paso }
+            i = i + paso
+        } sino {
+            i = (i + 1) % n
+        }
+        ser["_paso_patrulla"] = paso
+        ser["punto"] = i
+        si espera > 0 {
+            ser["_hasta_patrulla"] = juego.tiempo() + espera
+            devolver [0, 0]
+        }
+        q = _sitio(puntos[i], "patrullar")
+    }
+    ser["punto"] = i
+    devolver _hacia(p, q, velocidad, 0)
+}
+
+# mezclar(movimientos[, máximo]): suma varios movimientos, cada uno [vx, vy]
+# o [[vx, vy], peso] (por ejemplo, seguir al jugador y esquivar las paredes
+# con el doble de peso), sin pasar de 'máximo' si se da.
+funcion mezclar(cualquiera movimientos, cualquiera maximo = nulo): lista {
+    si no (movimientos es lista) { lanzar ErrorTipo("mezclar() espera una lista de movimientos [vx, vy] o [[vx, vy], peso]") }
+    si maximo != nulo y (no (maximo es numero) o maximo < 0) { lanzar ErrorArgumento("mezclar(): el máximo es un número (0 o más)") }
+    sea x = 0
+    sea y = 0
+    para cada cualquiera m en movimientos {
+        sea v = m
+        sea peso = 1
+        si m es lista y m.longitud() == 2 y m[0] es lista {
+            v = m[0]
+            peso = m[1]
+        }
+        si no (v es lista) o v.longitud() != 2 o no (v[0] es numero) o no (v[1] es numero) o no (peso es numero) {
+            lanzar ErrorTipo("mezclar(): cada movimiento es [vx, vy] o [[vx, vy], peso]")
+        }
+        x = x + v[0] * peso
+        y = y + v[1] * peso
+    }
+    si maximo != nulo y matematica.raiz(x * x + y * y) > maximo { devolver _largo(x, y, maximo) }
+    devolver [x, y]
+}
+
+# dirigir(cosa, velocidad[, rapidez]): pone esa velocidad [vx, vy] en la
+# cosa; con 'rapidez', poco a poco (como acercar: así gira y acelera con
+# inercia, sin cambiar de golpe). Luego la mueve mapa.mover o tu código.
+funcion dirigir(cualquiera ser, cualquiera v, numero rapidez = 0): nulo {
+    _ser(ser, "dirigir")
+    si no (v es lista) o v.longitud() != 2 o no (v[0] es numero) o no (v[1] es numero) {
+        lanzar ErrorTipo("dirigir() espera (cosa, [vx, vy][, rapidez])")
+    }
+    si rapidez < 0 { lanzar ErrorArgumento("dirigir(): la rapidez no es negativa") }
+    sea nueva = v
+    si rapidez > 0 { nueva = acercar([_de(ser, "vx", 0), _de(ser, "vy", 0)], v, rapidez) }
+    ser["vx"] = nueva[0]
+    ser["vy"] = nueva[1]
+}
+
+# ve(cosa, objetivo[, opciones]): ¿lo ve? Opciones: "distancia" (hasta dónde
+# ve; por defecto, sin límite), "vision" (lo ancho que ve, en grados: 90 ve lo
+# que tiene delante; 360, por defecto, todo alrededor), "mira" (hacia dónde
+# mira, en grados: 0 a la derecha, 90 abajo; por defecto, hacia donde se mueve
+# o se movió por última vez) y "mapa" (las paredes tapan).
+fijo _VE_OPCIONES = ["distancia", "vision", "mira", "mapa"]
+
+funcion ve(cualquiera ser, cualquiera objetivo, cualquiera opciones = nulo): logico {
+    _ser(ser, "ve")
+    sea aj = _ui_opciones(opciones, _VE_OPCIONES, "ve")
+    sea p = _sitio(ser, "ve")
+    sea q = _sitio(objetivo, "ve")
+    sea d = matematica.distancia(p[0], p[1], q[0], q[1])
+    sea alcance = _de(aj, "distancia", nulo)
+    si alcance != nulo {
+        si no (alcance es numero) { lanzar ErrorTipo("ve(): \"distancia\" es un número de píxeles") }
+        si d > alcance { devolver falso }
+    }
+    sea vx = _de(ser, "vx", 0)
+    sea vy = _de(ser, "vy", 0)
+    si vx es numero y vy es numero y vx * vx + vy * vy > 0.0001 { ser["_mira"] = matematica.angulo(0, 0, vx, vy) }
+    sea vision = _de(aj, "vision", 360)
+    si no (vision es numero) o vision <= 0 { lanzar ErrorArgumento("ve(): \"vision\" son grados (más de 0, hasta 360)") }
+    si vision < 360 y d > 0.000001 {
+        sea mira = _de(aj, "mira", _de(ser, "_mira", 0))
+        si no (mira es numero) { lanzar ErrorTipo("ve(): \"mira\" son grados") }
+        sea dif = (matematica.angulo(p[0], p[1], q[0], q[1]) - mira) % 360
+        si dif < 0 { dif = dif + 360 }
+        si dif > 180 { dif = 360 - dif }
+        si dif > vision / 2 { devolver falso }
+    }
+    sea mapa = _de(aj, "mapa", nulo)
+    si mapa != nulo {
+        _es_mapa(mapa, "ve")
+        # mira las casillas de la línea, a pasos de un cuarto de casilla
+        sea pasos = matematica.techo(d / (mapa["tamaño"] / 4))
+        para (k = 1; k < pasos; k++) {
+            sea x = p[0] + (q[0] - p[0]) * k / pasos
+            sea y = p[1] + (q[1] - p[1]) * k / pasos
+            sea c = juego.mapa.casilla_en(mapa, x, y)
+            si juego.mapa.solido(mapa, c[0], c[1]) { devolver falso }
+        }
+    }
+    devolver verdadero
+}

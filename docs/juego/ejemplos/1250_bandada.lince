@@ -1,0 +1,37 @@
+# @seccion: Enemigos
+# @titulo: En bandada
+# @nota: Cada movimiento devuelve una velocidad `[vx, vy]`, y `juego.mezclar` los suma con su peso (sin pasar de un máximo): aquí cada murciélago va `en_grupo` con los demás (sin chocarse, sin separarse y hacia donde van ellos) y `rodear` la farola, que sigue al ratón.
+# @nota: Hay también `huir` (con `"lejos"`: hasta dónde huye) y `esquivar` (se aparta de las paredes de un mapa o de una lista de cosas: es `[0, 0]` si no hay nada cerca, para mezclarlo con otro). Todo está escrito en Lince, y se puede usar suelto o hacerlo a tu manera.
+# @fotogramas: 90
+importar "juego"
+importar "matematica"
+
+juego.abrir("Bandada", 480, 270)
+matematica.semilla(7)
+sea murcielagos = []
+para (i = 0; i < 14; i++) {
+    murcielagos.agregar({"x": matematica.aleatorio(0, 480), "y": matematica.aleatorio(0, 270), "vx": 0, "vy": 0})
+}
+sea farola = [240, 135]
+
+mientras juego.abierto() {
+    sea r = juego.raton()
+    si r[0] > 0 o r[1] > 0 { farola = r }
+    para cada diccionario m en murcielagos {
+        sea v = juego.mezclar([
+            [juego.en_grupo(m, murcielagos, 130, {"vecinos": 60}), 1],
+            [juego.rodear(m, farola, 70, 130), 1.5]
+        ], 140)
+        juego.dirigir(m, v, 4)
+        m["x"] = m["x"] + m["vx"] * juego.dt()
+        m["y"] = m["y"] + m["vy"] * juego.dt()
+    }
+
+    juego.limpiar([20, 20, 40])
+    juego.circulo(farola[0], farola[1], 6, [255, 230, 150])
+    para cada diccionario m en murcielagos {
+        sea ala = si matematica.seno(juego.tiempo() * 30 + m["y"]) > 0 { 4 } sino { -2 }
+        juego.poligono([[m["x"] - 8, m["y"] - ala], [m["x"], m["y"] + 2], [m["x"] + 8, m["y"] - ala]], [150, 120, 170])
+    }
+    juego.presentar()
+}

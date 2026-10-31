@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v2.4</span>
+  <span class="version">v2.5</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -173,6 +173,7 @@
 <div class="grupo"><a href="#tareas" class="sec">Tareas</a><a href="#tareas-0" class="sub">Esperar sin parar el juego</a></div>
 <div class="grupo"><a href="#peleas" class="sec">Peleas</a><a href="#peleas-0" class="sub">Golpes que se notan</a></div>
 <div class="grupo"><a href="#compartir-el-juego" class="sec">Compartir el juego</a><a href="#compartir-el-juego-0" class="sub">Un ejecutable, un .zip, un .apk</a></div>
+<div class="grupo"><a href="#enemigos" class="sec">Enemigos</a><a href="#enemigos-0" class="sub">Un guardia con cabeza</a><a href="#enemigos-1" class="sub">En bandada</a></div>
 </nav>
 
 <main>
@@ -181,7 +182,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>43 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>45 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -988,6 +989,105 @@ lince repartir mi_juego.lince                       # mi_juego-linux.zip o mi_ju
 lince repartir mi_juego.lince --incluir niveles     # con una carpeta que el código no nombra
 lince repartir mi_juego.lince --android --nombre &quot;Mi juego&quot; --id org.tunombre.mijuego
 lince repartir mi_juego.lince --aab --version 2</code></pre></div></article></section>
+<section id="enemigos"><h2>Enemigos</h2><article class="ej" id="enemigos-0"><h3>Un guardia con cabeza</h3><p class="nota"><code>juego.pensar(cosa, estados)</code> lleva lo que hace un enemigo según su estado: cada estado tiene su función <code>&quot;hacer&quot;</code> (en cada fotograma; si devuelve el nombre de otro estado, pasa a ese) y, si quieres, <code>&quot;entrar&quot;</code> y <code>&quot;salir&quot;</code>. Los nombres los pones tú, y la cosa guarda su <code>&quot;estado&quot;</code> y su <code>&quot;tiempo_estado&quot;</code>. Desde fuera, <code>juego.cambiar_estado(cosa, nombre)</code>.</p><p class="nota"><code>juego.ve(cosa, objetivo)</code> mira si lo ve, hasta una <code>distancia</code>, con su <code>vision</code> (lo ancho que ve, en grados) y con las paredes de un <code>mapa</code> tapando. <code>juego.patrullar</code> y <code>juego.seguir</code> (con <code>&quot;mapa&quot;</code>, por el camino más corto) dicen hacia dónde ir, y <code>juego.dirigir</code> lo pone en la cosa, poco a poco si se le da rapidez.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+juego.abrir(<span class="s">&quot;Guardia&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>])
+juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;d&quot;</span>])
+juego.definir_accion(<span class="s">&quot;arriba&quot;</span>, [<span class="s">&quot;arriba&quot;</span>, <span class="s">&quot;w&quot;</span>])
+juego.definir_accion(<span class="s">&quot;abajo&quot;</span>, [<span class="s">&quot;abajo&quot;</span>, <span class="s">&quot;s&quot;</span>])
+<span class="k">fijo</span> NIVEL = juego.mapa.crear([
+    <span class="s">&quot;################&quot;</span>,
+    <span class="s">&quot;#..............#&quot;</span>,
+    <span class="s">&quot;#.###......###.#&quot;</span>,
+    <span class="s">&quot;#..............#&quot;</span>,
+    <span class="s">&quot;#......##......#&quot;</span>,
+    <span class="s">&quot;#..............#&quot;</span>,
+    <span class="s">&quot;#.###......###.#&quot;</span>,
+    <span class="s">&quot;#..............#&quot;</span>,
+    <span class="s">&quot;################&quot;</span>
+], <span class="n">30</span>)
+<span class="k">fijo</span> RONDA = [[<span class="n">45</span>, <span class="n">45</span>], [<span class="n">435</span>, <span class="n">45</span>], [<span class="n">435</span>, <span class="n">225</span>], [<span class="n">45</span>, <span class="n">225</span>]]
+<span class="k">fijo</span> COLORES = {<span class="s">&quot;patrullar&quot;</span>: [<span class="n">90</span>, <span class="n">200</span>, <span class="n">120</span>], <span class="s">&quot;perseguir&quot;</span>: [<span class="n">240</span>, <span class="n">80</span>, <span class="n">80</span>], <span class="s">&quot;buscar&quot;</span>: [<span class="n">240</span>, <span class="n">200</span>, <span class="n">80</span>]}
+<span class="k">sea</span> yo = {<span class="s">&quot;x&quot;</span>: <span class="n">400</span>, <span class="s">&quot;y&quot;</span>: <span class="n">36</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">18</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">18</span>, <span class="s">&quot;vx&quot;</span>: <span class="n">0</span>, <span class="s">&quot;vy&quot;</span>: <span class="n">0</span>}
+<span class="k">sea</span> guardia = {<span class="s">&quot;x&quot;</span>: <span class="n">170</span>, <span class="s">&quot;y&quot;</span>: <span class="n">35</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">20</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">20</span>, <span class="s">&quot;vx&quot;</span>: <span class="n">0</span>, <span class="s">&quot;vy&quot;</span>: <span class="n">0</span>, <span class="s">&quot;punto&quot;</span>: <span class="n">1</span>}
+
+<span class="k">funcion</span> me_ve(cualquiera g): <span class="t">logico</span> {
+    <span class="k">devolver</span> juego.ve(g, yo, {<span class="s">&quot;distancia&quot;</span>: <span class="n">200</span>, <span class="s">&quot;vision&quot;</span>: <span class="n">100</span>, <span class="s">&quot;mapa&quot;</span>: NIVEL})
+}
+
+<span class="k">fijo</span> ESTADOS = {
+    <span class="s">&quot;patrullar&quot;</span>: {
+        <span class="s">&quot;hacer&quot;</span>: <span class="k">funcion</span>(cualquiera g): cualquiera {
+            juego.dirigir(g, juego.patrullar(g, RONDA, <span class="n">70</span>, {<span class="s">&quot;espera&quot;</span>: <span class="n">0.5</span>}), <span class="n">8</span>)
+            <span class="k">si</span> me_ve(g) { <span class="k">devolver</span> <span class="s">&quot;perseguir&quot;</span> }
+            <span class="k">devolver</span> <span class="k">nulo</span>
+        }
+    },
+    <span class="s">&quot;perseguir&quot;</span>: {
+        <span class="s">&quot;entrar&quot;</span>: <span class="k">funcion</span>(cualquiera g): <span class="k">nulo</span> { g[<span class="s">&quot;visto&quot;</span>] = juego.tiempo() },
+        <span class="s">&quot;hacer&quot;</span>: <span class="k">funcion</span>(cualquiera g): cualquiera {
+            juego.dirigir(g, juego.seguir(g, yo, <span class="n">100</span>, {<span class="s">&quot;mapa&quot;</span>: NIVEL}), <span class="n">8</span>)
+            <span class="k">si</span> me_ve(g) { g[<span class="s">&quot;visto&quot;</span>] = juego.tiempo() }
+            <span class="k">si</span> juego.tiempo() - g[<span class="s">&quot;visto&quot;</span>] &gt; <span class="n">2</span> { <span class="k">devolver</span> <span class="s">&quot;buscar&quot;</span> }      <span class="c"># te ha perdido</span>
+            <span class="k">devolver</span> <span class="k">nulo</span>
+        }
+    },
+    <span class="s">&quot;buscar&quot;</span>: {
+        <span class="s">&quot;hacer&quot;</span>: <span class="k">funcion</span>(cualquiera g): cualquiera {                       <span class="c"># se para un rato</span>
+            juego.dirigir(g, [<span class="n">0</span>, <span class="n">0</span>], <span class="n">8</span>)
+            <span class="k">si</span> me_ve(g) { <span class="k">devolver</span> <span class="s">&quot;perseguir&quot;</span> }
+            <span class="k">si</span> g[<span class="s">&quot;tiempo_estado&quot;</span>] &gt; <span class="n">1.5</span> { <span class="k">devolver</span> <span class="s">&quot;patrullar&quot;</span> }
+            <span class="k">devolver</span> <span class="k">nulo</span>
+        }
+    }
+}
+
+<span class="k">mientras</span> juego.abierto() {
+    yo[<span class="s">&quot;vx&quot;</span>] = juego.direccion(<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;derecha&quot;</span>) * <span class="n">120</span>
+    yo[<span class="s">&quot;vy&quot;</span>] = juego.direccion(<span class="s">&quot;arriba&quot;</span>, <span class="s">&quot;abajo&quot;</span>) * <span class="n">120</span>
+    juego.mapa.mover(NIVEL, yo)
+    <span class="k">sea</span> estado = juego.pensar(guardia, ESTADOS)
+    juego.mapa.mover(NIVEL, guardia)
+
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">35</span>])
+    juego.mapa.dibujar(NIVEL, {<span class="s">&quot;#&quot;</span>: [<span class="n">70</span>, <span class="n">70</span>, <span class="n">100</span>]})
+    juego.rectangulo(yo[<span class="s">&quot;x&quot;</span>], yo[<span class="s">&quot;y&quot;</span>], <span class="n">18</span>, <span class="n">18</span>, [<span class="n">90</span>, <span class="n">160</span>, <span class="n">255</span>])
+    juego.rectangulo(guardia[<span class="s">&quot;x&quot;</span>], guardia[<span class="s">&quot;y&quot;</span>], <span class="n">20</span>, <span class="n">20</span>, COLORES[estado])
+    juego.<span class="t">texto</span>(estado, guardia[<span class="s">&quot;x&quot;</span>] - <span class="n">10</span>, guardia[<span class="s">&quot;y&quot;</span>] - <span class="n">14</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1240_guardia.png" alt="Captura de «Un guardia con cabeza»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1240_guardia.lince</span></article><article class="ej" id="enemigos-1"><h3>En bandada</h3><p class="nota">Cada movimiento devuelve una velocidad <code>[vx, vy]</code>, y <code>juego.mezclar</code> los suma con su peso (sin pasar de un máximo): aquí cada murciélago va <code>en_grupo</code> con los demás (sin chocarse, sin separarse y hacia donde van ellos) y <code>rodear</code> la farola, que sigue al ratón.</p><p class="nota">Hay también <code>huir</code> (con <code>&quot;lejos&quot;</code>: hasta dónde huye) y <code>esquivar</code> (se aparta de las paredes de un mapa o de una lista de cosas: es <code>[0, 0]</code> si no hay nada cerca, para mezclarlo con otro). Todo está escrito en Lince, y se puede usar suelto o hacerlo a tu manera.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+
+juego.abrir(<span class="s">&quot;Bandada&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+matematica.semilla(<span class="n">7</span>)
+<span class="k">sea</span> murcielagos = []
+<span class="k">para</span> (i = <span class="n">0</span>; i &lt; <span class="n">14</span>; i++) {
+    murcielagos.agregar({<span class="s">&quot;x&quot;</span>: matematica.aleatorio(<span class="n">0</span>, <span class="n">480</span>), <span class="s">&quot;y&quot;</span>: matematica.aleatorio(<span class="n">0</span>, <span class="n">270</span>), <span class="s">&quot;vx&quot;</span>: <span class="n">0</span>, <span class="s">&quot;vy&quot;</span>: <span class="n">0</span>})
+}
+<span class="k">sea</span> farola = [<span class="n">240</span>, <span class="n">135</span>]
+
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">sea</span> r = juego.raton()
+    <span class="k">si</span> r[<span class="n">0</span>] &gt; <span class="n">0</span> <span class="k">o</span> r[<span class="n">1</span>] &gt; <span class="n">0</span> { farola = r }
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> m <span class="k">en</span> murcielagos {
+        <span class="k">sea</span> v = juego.mezclar([
+            [juego.en_grupo(m, murcielagos, <span class="n">130</span>, {<span class="s">&quot;vecinos&quot;</span>: <span class="n">60</span>}), <span class="n">1</span>],
+            [juego.rodear(m, farola, <span class="n">70</span>, <span class="n">130</span>), <span class="n">1.5</span>]
+        ], <span class="n">140</span>)
+        juego.dirigir(m, v, <span class="n">4</span>)
+        m[<span class="s">&quot;x&quot;</span>] = m[<span class="s">&quot;x&quot;</span>] + m[<span class="s">&quot;vx&quot;</span>] * juego.dt()
+        m[<span class="s">&quot;y&quot;</span>] = m[<span class="s">&quot;y&quot;</span>] + m[<span class="s">&quot;vy&quot;</span>] * juego.dt()
+    }
+
+    juego.limpiar([<span class="n">20</span>, <span class="n">20</span>, <span class="n">40</span>])
+    juego.circulo(farola[<span class="n">0</span>], farola[<span class="n">1</span>], <span class="n">6</span>, [<span class="n">255</span>, <span class="n">230</span>, <span class="n">150</span>])
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> m <span class="k">en</span> murcielagos {
+        <span class="k">sea</span> ala = <span class="k">si</span> matematica.seno(juego.tiempo() * <span class="n">30</span> + m[<span class="s">&quot;y&quot;</span>]) &gt; <span class="n">0</span> { <span class="n">4</span> } <span class="k">sino</span> { -<span class="n">2</span> }
+        juego.poligono([[m[<span class="s">&quot;x&quot;</span>] - <span class="n">8</span>, m[<span class="s">&quot;y&quot;</span>] - ala], [m[<span class="s">&quot;x&quot;</span>], m[<span class="s">&quot;y&quot;</span>] + <span class="n">2</span>], [m[<span class="s">&quot;x&quot;</span>] + <span class="n">8</span>, m[<span class="s">&quot;y&quot;</span>] - ala]], [<span class="n">150</span>, <span class="n">120</span>, <span class="n">170</span>])
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1250_bandada.png" alt="Captura de «En bandada»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1250_bandada.lince</span></article></section>
 </main>
 </div>
 

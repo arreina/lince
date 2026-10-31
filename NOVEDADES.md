@@ -3,6 +3,25 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.5.0
+
+Enemigos con cabeza. Solo añade: nada de la 2.0 cambia. Todo está escrito en Lince (en `juego.lince`), así que se puede usar suelto, leer y copiar para hacer una versión propia.
+
+- **`juego.pensar(cosa, estados)`**: estados con los nombres que quieras (patrullar, perseguir, atacar, huir...), cada uno con su `"hacer"` (que devuelve a qué estado pasar) y, si quieres, `"entrar"` y `"salir"`. La cosa guarda su `"estado"`, `"estado_anterior"` y `"tiempo_estado"`. Desde fuera, **`juego.cambiar_estado(cosa, nombre)`**.
+- **`juego.ve(cosa, objetivo)`**: si lo ve, con `distancia`, `vision` (lo ancho que ve), `mira` y un `mapa` cuyas paredes tapan. Y **`juego.distancia(a, b)`**.
+- **Movimientos** que devuelven una velocidad `[vx, vy]`: **`seguir`** (con `"frenar"`, y con `"mapa"` por el camino más corto), **`huir`**, **`rodear`**, **`patrullar`** (con `"ida_y_vuelta"` y `"espera"`), **`esquivar`** (las paredes de un mapa o una lista de cosas) y **`en_grupo`** (como una bandada).
+- **`juego.mezclar(movimientos[, máximo])`** los suma con su peso y **`juego.dirigir(cosa, velocidad[, rapidez])`** la pone en la cosa, con inercia si se le da rapidez.
+- Dos ejemplos nuevos en la página del módulo: un guardia que patrulla, te ve y te persigue por el mapa, y una bandada de murciélagos.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.5.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-2.5.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.5.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.5.0.vsix` |
+
 ## 2.4.0
 
 Luces y oscuridad. Solo añade: nada de la 2.0 cambia.

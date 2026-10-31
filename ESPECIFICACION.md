@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.4
+# 🐆 Lince — Especificación del Lenguaje v2.5
 
 ## Filosofía
 
@@ -1731,6 +1731,54 @@ convierte en uno normal que empieza en la casilla de más arriba a la izquierda 
 objetos se mueven lo mismo, así que siguen en su sitio. Los mapas
 y lo que usan (tilesets e imágenes) van dentro del juego al hacer `lince compilar` o `lince
 repartir`, como las imágenes.
+
+**Enemigos con cabeza.** Para lo que se mueve solo (enemigos, animales, compañeros): una «cosa»
+es un diccionario con `x` e `y` (si tiene `ancho` y `alto`, se mide desde su centro) y `vx`,
+`vy`, como las de `mapa.mover`. `pensar` le da **estados** con los nombres que quieras
+(patrullar, perseguir, atacar, huir, dormir...) y las demás funciones dicen **hacia dónde
+moverse**: devuelven una velocidad `[vx, vy]` que se mezcla con otras (`mezclar`) y se pone en la
+cosa (`dirigir`). Todo es opcional y está escrito en Lince: se puede usar una parte suelta, o
+copiarlo y hacer una versión propia.
+
+```lince
+fijo ESTADOS = {
+    "patrullar": {
+        "hacer": funcion(cualquiera g): cualquiera {
+            juego.dirigir(g, juego.patrullar(g, RONDA, 70), 8)
+            si juego.ve(g, yo, {"distancia": 200, "vision": 100, "mapa": NIVEL}) { devolver "perseguir" }
+            devolver nulo
+        }
+    },
+    "perseguir": {
+        "entrar": funcion(cualquiera g): nulo { juego.reproducir(GRITO) },
+        "hacer": funcion(cualquiera g): cualquiera {
+            juego.dirigir(g, juego.seguir(g, yo, 110, {"mapa": NIVEL}), 8)
+            si g["tiempo_estado"] > 5 { devolver "patrullar" }
+            devolver nulo
+        }
+    }
+}
+# en cada fotograma:
+juego.pensar(guardia, ESTADOS)
+juego.mapa.mover(NIVEL, guardia)
+```
+
+| Función | Qué hace |
+|---|---|
+| `pensar(cosa, estados)` | hace lo de su estado en este fotograma. `estados` es `{nombre: {"hacer", "entrar", "salir"}}`, cada una una función que recibe la cosa: `"hacer"` en cada fotograma (si devuelve el nombre de otro estado, pasa a ese; `nulo`, sigue), `"entrar"` al empezar el estado y `"salir"` al dejarlo. Empieza en el primero. Deja en la cosa `"estado"`, `"estado_anterior"` y `"tiempo_estado"` (segundos en él) y devuelve el estado en que queda |
+| `cambiar_estado(cosa, nombre)` | le cambia el estado desde fuera (un golpe, una alarma), en su siguiente `pensar` |
+| `ve(cosa, objetivo[, opciones])` | ¿lo ve? Opciones: `distancia` (hasta dónde), `vision` (lo ancho que ve, en grados: 90, lo de delante; 360 por defecto), `mira` (hacia dónde mira, en grados: 0 a la derecha, 90 abajo; por defecto, hacia donde se mueve o se movió por última vez) y `mapa` (las paredes tapan) |
+| `distancia(a, b)` | píxeles entre dos cosas (de centro a centro) o puntos |
+| `seguir(cosa, objetivo, velocidad[, opciones])` | hacia el objetivo (una cosa o un punto), sin pasarse. Opciones: `frenar` (desde cuántos píxeles va más despacio para llegar suave) y `mapa` (va por el camino más corto sin atravesar paredes, también en diagonal) |
+| `huir(cosa, de, velocidad[, opciones])` | alejarse. Opción: `lejos` (desde cuántos píxeles ya no huye) |
+| `rodear(cosa, centro, radio, velocidad[, opciones])` | dar vueltas alrededor a esa distancia. Opción: `sentido` (1, como las agujas del reloj; −1) |
+| `patrullar(cosa, puntos, velocidad[, opciones])` | de un punto de la lista al siguiente y vuelta a empezar. Opciones: `ida_y_vuelta` (volver por donde vino) y `espera` (segundos parada en cada uno). Guarda en la cosa `"punto"`: el índice al que va |
+| `esquivar(cosa, obstáculos, velocidad[, opciones])` | apartarse de las paredes de un mapa o de una lista de cosas o puntos; más cuanto más cerca, y `[0, 0]` si no hay nada. Opción: `distancia` (50) |
+| `en_grupo(cosa, grupo, velocidad[, opciones])` | moverse con los demás de la lista, como una bandada: `separar` (no chocarse), `juntar` (no alejarse) y `alinear` (ir hacia donde van), cada uno con su peso (1; 0 lo quita), y `vecinos` (a cuántos píxeles mira; 80) |
+| `mezclar(movimientos[, máximo])` | suma movimientos `[vx, vy]` o `[[vx, vy], peso]`, sin pasar del máximo si se da |
+| `dirigir(cosa, [vx, vy][, rapidez])` | pone esa velocidad en la cosa; con `rapidez`, poco a poco (como `acercar`), así gira y acelera con inercia |
+
+Ejemplos: `1240_guardia` y `1250_bandada` en la página del módulo.
 
 **Física sencilla.** Cosas que caen, rebotan, se empujan y chocan entre ellas y con un mapa:
 cajas, pelotas, plataformas que se mueven y el propio personaje. Las que llevan `"gira"` (o

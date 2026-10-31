@@ -825,4 +825,23 @@ for bien, nombre in casos:
     mal += not bien
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida5b.txt; exit 1; }
+# ── 2.5: enemigos con cabeza (estados y movimientos) ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 timeout 60 "$LINCE" "$DIR/prueba34.lince" > salida39.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de enemigos termina bien" || mal "la prueba de enemigos falló"
+for l in "estados: entra patrullar / 0: patrullar / 1: patrullar / 2: patrullar / sale patrullar / entra perseguir de patrullar / 3: perseguir / lleva verdadero / 4: perseguir / entra huir / 5: huir" \
+         "seguir: 60 0" "seguir centro: 0 50" "frenar: 30 0" "llegado: 0 0" "seguir mapa: 0 -60" "seguir mapa cerca: 60 0" \
+         "huir: 0 -40" "huir lejos: 0 0" "rodear: 0 30" "rodear al revés: 0 -30" "rodear lejos: -27 13" \
+         "esquivar nada: 0 0" "esquivar: -25 0" "esquivar pared: 0 25" "en_grupo: -10 0" "en_grupo alinear: 10 0" "en_grupo solo: 0 0" \
+         "mezclar: 10 20" "mezclar máximo: 6 8" "dirigir: 10 20" "dirigir suave: verdadero" "ve: verdadero falso" \
+         "ve delante: verdadero falso" "ve se acuerda: falso verdadero" "ve paredes: falso verdadero" "distancia: 4" \
+         "patrullar: 0 0 punto 1" "ida y vuelta: 30 0 punto 0" \
+         "error: pensar(): en \"a\", no conozco 'hacr' (hay \"entrar\", \"hacer\" y \"salir\")" \
+         'error: pensar(): en "a", "hacer" es una función que recibe la cosa' \
+         'error: pensar(): no hay ningún estado "b" (hay "a")' \
+         'error: pensar(): los estados se cambian unos a otros al entrar sin parar ("b" y "a")' \
+         "error: seguir(): no conozco la opción 'frenr' (hay \"frenar\" y \"mapa\")" \
+         'error: rodear(): "sentido" es 1 (como las agujas del reloj) o -1' \
+         "error: mezclar(): cada movimiento es [vx, vy] o [[vx, vy], peso]"; do
+    grep -qxF "$l" salida39.txt && ok "2.5: $l" || mal "falta la línea: $l"
+done
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida5b.txt; exit 1; }
