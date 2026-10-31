@@ -853,7 +853,7 @@ for l in "ok: verdadero 0" "x: 50" "toques: 2" "botones: 1" "escrito: hola" "vis
          'capturas: ["capturas/fotograma_0.png", "capturas/fotograma_40.png"]' "pixel: [250, 200, 60, 255] [20, 20, 40, 255]" \
          "otra: x: 10 / toques: 0 / botones: 0 / escrito:  / visitas: 1 / azar: $azar / escena: menu" \
          "roja: [250, 60, 60, 255]" "comparar: 200 de 14400 verdadero" "consigo misma: 0" "tolerancia: 0" \
-         "📸 andando: guardada como referencia en referencias/andando.png" "primera: verdadero" "segunda: verdadero" \
+         "primera: verdadero" "segunda: verdadero" \
          "cambia: falso" "con margen: verdadero" "diferencias: [255, 0, 255, 255]" \
          "error: jugar(): no encuentro el juego 'no_existe.lince'" \
          "error: jugar(): la captura del fotograma 10 no llega a hacerse: juega 5 (del 0 al 4)" \
@@ -861,6 +861,8 @@ for l in "ok: verdadero 0" "x: 50" "toques: 2" "botones: 1" "escrito: hola" "vis
          'error: comparar_imagenes(): "tolerancia" va de 0 a 255' 'error: igual_que_antes(): "margen" va de 0 a 1'; do
     grep -qxF "$l" salida40.txt && ok "2.6: $l" || mal "falta la línea: $l"
 done
+# el 📸 sin buscarlo: el grep de Windows no casa los caracteres de 4 bytes
+grep -qE "^.+ andando: guardada como referencia en referencias/andando.png$" salida40.txt && ok "2.6: guarda la referencia" || mal "falta la referencia nueva"
 grep -qF "error: jugar(): no entiendo «5:toque:3» en el guion" salida40.txt && ok "2.6: guion mal escrito" || mal "falta el error del guion"
 grep -qF "❌ andando: ha cambiado el 1.4 % de la imagen (200 píxeles)" salida40.txt && ok "2.6: dice cuánto cambia" || mal "falta el aviso de que cambia"
 # con lince probar: la primera vez guarda las referencias, luego pasa, al cambiar el juego falla y --aceptar lo da por bueno
@@ -877,7 +879,7 @@ printf '%s\n' 'importar "juego"' 'importar "pruebas"' \
 for l in "primera=0" "segunda=0" "cambiada=1" "aceptada=0" "despues=0"; do
     grep -qxF "$l" salida41.txt && ok "2.6, lince probar: $l" || mal "falta: $l"
 done
-grep -qF "📸 dibujo: guardada como referencia en referencias/dibujo.png" salida41.txt && ok "2.6: lince probar enseña la referencia nueva" || mal "falta el 📸 en lince probar"
+grep -qF " dibujo: guardada como referencia en referencias/dibujo.png" salida41.txt && ok "2.6: lince probar enseña la referencia nueva" || mal "falta el 📸 en lince probar"
 grep -qE "100% +juego35.lince" salida41.txt && ok "2.6: la cobertura cuenta el juego" || mal "la cobertura no cuenta el juego"
 grep -qF "lince probar --aceptar" salida41.txt && ok "2.6: dice cómo aceptar el cambio" || mal "falta cómo aceptar"
 [ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida5b.txt; exit 1; }
