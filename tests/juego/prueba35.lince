@@ -1,16 +1,24 @@
-# 2.6: pruebas de juegos. Juega juego35.lince (que smoke.sh copia aquí) con
-# jugar(), mira píxeles y compara capturas. smoke.sh mira la salida.
+# 2.6: pruebas de juegos. Juega juego35.lince (que smoke.sh copia junto a esta
+# prueba y la lanza desde otra carpeta) con jugar(), mira píxeles y compara
+# capturas. smoke.sh mira la salida.
 importar "juego"
+importar "sistema"
+importar "archivos"
 
 sea r = juego.jugar("juego35.lince", {"guion": "10:derecha:20,5:toque:80:45\n8:raton:1:1:2, 12:mando1:a",
     "capturas": [0, 40], "escribir": "hola", "semilla": 7})
 escribir("ok: {r["ok"]} {r["codigo"]}")
 escribir(r["salida"].recortar())
-escribir("capturas: {r["capturas"]}")
+escribir("capturas: {r["capturas"][0].termina_con("/capturas/prueba35_1/fotograma_0.png")} {r["capturas"][1].termina_con("/capturas/prueba35_1/fotograma_40.png")}")
+escribir("entorno: {sistema.entorno("LINCE_JUEGO_GUION")} {sistema.entorno("SDL_VIDEODRIVER")}")
 escribir("pixel: {juego.pixel(r["capturas"][1], 52, 45)} {juego.pixel(r["capturas"][0], 0, 0)}")
 sea otra = juego.jugar("juego35.lince", {"fotogramas": 3, "semilla": 7, "escena": "menu", "argumentos": ["rojo"], "capturas": [2]})
 escribir("otra: " + otra["salida"].recortar().reemplazar("\n", " / "))
 escribir("roja: {juego.pixel(otra["capturas"][0], 12, 42)}")
+escribir("cada una en su carpeta: {otra["capturas"][0].termina_con("/prueba35_2/fotograma_2.png")} {juego.pixel(r["capturas"][1], 52, 45)}")
+sea absoluta = r["capturas"][0].reemplazar("prueba35_1/fotograma_0.png", "absoluta/dentro")
+sea en_absoluta = juego.jugar("juego35.lince", {"carpeta": absoluta, "capturas": [0]})
+escribir("absoluta: {en_absoluta["capturas"][0] == absoluta + "/fotograma_0.png"} {archivos.existe(absoluta + "/fotograma_0.png")}")
 
 # comparar
 sea c = juego.comparar_imagenes(r["capturas"][0], r["capturas"][1])
@@ -22,13 +30,16 @@ escribir("tolerancia: {juego.comparar_imagenes(r["capturas"][1], otra["capturas"
 escribir("primera: {juego.igual_que_antes(r["capturas"][1], "andando")}")
 escribir("segunda: {juego.igual_que_antes(r["capturas"][1], "andando")}")
 escribir("cambia: {juego.igual_que_antes(r["capturas"][0], "andando")}")
+escribir("diferencias: {juego.pixel(r["capturas"][0].reemplazar(".png", "_diferencias.png"), 52, 45)}")
 escribir("con margen: {juego.igual_que_antes(r["capturas"][0], "andando", {"margen": 0.1})}")
-escribir("diferencias: {juego.pixel("capturas/fotograma_0_diferencias.png", 52, 45)}")
+escribir("sin diferencias si es igual: {archivos.existe(r["capturas"][1].reemplazar(".png", "_diferencias.png"))}")
 
 para cada funcion intento en [
     funcion(): nulo { juego.jugar("no_existe.lince") },
     funcion(): nulo { juego.jugar("juego35.lince", {"guion": ["derecha"]}) },
     funcion(): nulo { juego.jugar("juego35.lince", {"guion": ["5:toque:3"]}) },
+    funcion(): nulo { juego.jugar("juego35.lince", {"guion": ["30:drecha:20"]}) },
+    funcion(): nulo { juego.jugar("juego35.lince", {"guion": ["30:mando1:xx"]}) },
     funcion(): nulo { juego.jugar("juego35.lince", {"capturas": [10], "fotogramas": 5}) },
     funcion(): nulo { juego.jugar("juego35.lince", {"fotograma": 5}) },
     funcion(): nulo { juego.pixel("no_existe.png", 0, 0) },

@@ -3,6 +3,28 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.6.1
+
+Arreglos de las pruebas de juegos de la 2.6.0, tras revisar el código.
+
+- **Las rutas de una prueba se buscan junto a ella**: el juego, las capturas y las referencias. Antes dependían de la carpeta desde la que se lanzaba `lince probar`, y desde otra carpeta `igual_que_antes` no encontraba la referencia, guardaba otra nueva y la prueba pasaba sin comparar nada. El juego se juega desde su carpeta, como cuando se lanza a mano.
+- **Cada `jugar()` deja sus capturas en su propia carpeta** (`capturas/prueba_x_1`, `capturas/prueba_x_2`...): antes, un segundo `jugar()` pisaba las capturas del primero.
+- **El guion avisa de las teclas y los botones que no conoce** (`"30:drecha:20"`): antes se saltaban sin decir nada y el juego se jugaba sin pulsarlas.
+- Una `carpeta` con ruta absoluta (`/tmp/capturas`, `C:\capturas`) ya no se crea dentro de la carpeta actual.
+- `pixel()` ya no puede dar los colores de antes cuando la captura se reescribe en el mismo segundo con el mismo tamaño.
+- `jugar()` deja las variables de entorno como estaban, también si no estaban o si el juego no se pudo lanzar. Para eso, **`sistema.establecer_entorno(clave, nulo)`** quita una variable.
+- Sin límite en la lista de capturas, `comparar_imagenes` una sola vez en `igual_que_antes`, y `pixel` y `comparar_imagenes` leen también las imágenes que van dentro de un juego empaquetado.
+- Preguntar por una tecla que no está en la lista de Lince antes de abrir la ventana ya no puede cerrar Lince de golpe.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.6.1-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-2.6.1-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.6.1.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.6.1.vsix` |
+
 ## 2.6.0
 
 Pruebas de juegos: que `lince probar` juegue el juego solo. Solo añade: nada de la 2.0 cambia.

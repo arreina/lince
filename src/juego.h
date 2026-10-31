@@ -232,6 +232,9 @@ typedef struct {
     unsigned char mezcla;                /* como en SDL: 1 normal, 2 "sumar" (brilla), 4 "multiplicar" (oscurece) */
 } JgParticula;
 
+/* Una entrada del guion de prueba (LINCE_JUEGO_GUION): tecla -1 es del mando; -2, un toque en x, y */
+typedef struct { long desde, cuantos; int tecla, x, y; JgEntrada mando; } JgPaso;
+
 static struct {
     int cargada, abierta, ancho, alto, cierre;
     void *ventana, *render;
@@ -347,7 +350,7 @@ static struct {
     double hist_id;     /* número de la última pulsación apuntada */
     int nhist;
     /* LINCE_JUEGO_GUION: teclas mantenidas desde un fotograma durante otros tantos */
-    struct { long desde, cuantos; int tecla, x, y; JgEntrada mando; } guion[JG_GUION];   /* tecla -1: del mando; -2: un toque en x, y */
+    JgPaso guion[JG_GUION];
     unsigned char mando_prueba[JG_MANDOS];   /* prueba: un mando del guion cuenta como conectado */
     int nguion;
     int zoom;                   /* la "escala" de abrir() */
@@ -1035,6 +1038,69 @@ static char *jg_entorno_utf8(const char *nombre) {
 /* abrir(titulo, ancho, alto[, {"escala": n}]): con escala, la ventana es n
    veces mayor y cada píxel del juego se ve como un cuadrado de n × n (para
    juegos de píxeles grandes, como los de las consolas portátiles) */
+/* Una entrada del guion: "30:derecha:20" (tecla desde el fotograma 30 durante
+   20), "30:mando2:a:5" (un botón o un eje de un mando) o "30:toque:240:135:5"
+   (un dedo, o el ratón, ahí). 0 y el porqué en 'msg' si no se entiende. */
+static int jg_paso_guion(const char *t, JgPaso *p, char *msg, size_t max) {
+    char tecla[32], boton[32], resto[8];
+    long desde, cuantos = 1;
+    int tx, ty, n;
+    memset(p, 0, sizeof *p);
+    if (strstr(t, ":toque:") || strstr(t, ":raton:")) {
+        n = sscanf(t, "%ld:%31[^:]:%d:%d:%ld%7s", &desde, tecla, &tx, &ty, &cuantos, resto);
+        if ((n != 4 && n != 5) || desde < 0 || cuantos < 1) {
+            snprintf(msg, max, "«%s»: un toque es \"fotograma:toque:x:y[:cuántos]\"", t);
+            return 0;
+        }
+        p->desde = desde; p->cuantos = cuantos; p->tecla = -2; p->x = tx; p->y = ty;
+        return 1;
+    }
+    if (strstr(t, ":mando")) {
+        n = sscanf(t, "%ld:%31[^:]:%31[^:]:%ld%7s", &desde, tecla, boton, &cuantos, resto);
+        char entrada[80], porque[200] = "";
+        snprintf(entrada, sizeof entrada, "%s:%s", tecla, boton);
+        if ((n != 3 && n != 4) || desde < 0 || cuantos < 1 || !jg_entrada(entrada, &p->mando, porque, sizeof porque) ||
+            (p->mando.tipo != 'b' && p->mando.tipo != 'e')) {
+            snprintf(msg, max, "«%s»: del mando es \"fotograma:mando1:botón[:cuántos]\"%s%s", t, *porque ? ": " : "", porque);
+            return 0;
+        }
+        if (p->mando.mando < 0) p->mando.mando = 0;
+        p->desde = desde; p->cuantos = cuantos; p->tecla = -1;
+        return 1;
+    }
+    n = sscanf(t, "%ld:%31[^:]:%ld%7s", &desde, tecla, &cuantos, resto);
+    if ((n != 2 && n != 3) || desde < 0 || cuantos < 1) {
+        snprintf(msg, max, "«%s»: es \"fotograma:tecla[:cuántos]\", \"fotograma:mando1:botón[:cuántos]\" o \"fotograma:toque:x:y[:cuántos]\"", t);
+        return 0;
+    }
+    int c = jg_tecla_codigo(tecla);
+    if (c < 0) { snprintf(msg, max, "«%s»: no conozco la tecla '%s'", t, tecla); return 0; }
+    p->desde = desde; p->cuantos = cuantos; p->tecla = c;
+    return 1;
+}
+
+/* _paso_guion(texto) (para jugar() de juego.lince): nulo si se entiende; si no, por qué */
+static Valor *fn_jg_paso_guion(Valor **a, int n) {
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return valor_texto("cada entrada es un texto");
+    JgPaso p;
+    char msg[400];
+    return jg_paso_guion(a[0]->texto, &p, msg, sizeof msg) ? valor_nulo() : valor_texto(msg);
+}
+
+/* _programa(): la ruta completa del programa que se está ejecutando (para que
+   jugar() e igual_que_antes() busquen las cosas junto a la prueba) */
+static Valor *fn_jg_programa(Valor **a, int n) {
+    (void)a; (void)n;
+    const char *pr = interprete_archivo_principal();
+    char ruta[4096];
+#ifdef _WIN32
+    if (!pr || !_fullpath(ruta, pr, sizeof ruta)) return valor_nulo();
+#else
+    if (!pr || !realpath(pr, ruta)) return valor_nulo();
+#endif
+    return valor_texto(ruta);
+}
+
 static Valor *fn_jg_abrir(Valor **a, int n) {
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "abrir() espera (título, ancho, alto)");
     double w = 800, h = 600, z = 1;
@@ -1152,39 +1218,10 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         char buf[4096];
         snprintf(buf, sizeof buf, "%s", e);
         for (char *t = strtok(buf, ","); t && _jgs.nguion < JG_GUION; t = strtok(NULL, ",")) {
-            char tecla[32], boton[32], msg[200];
-            long desde, cuantos = 1;
-            int tx, ty;
-            if ((sscanf(t, "%ld:toque:%d:%d:%ld", &desde, &tx, &ty, &cuantos) >= 3 ||
-                 sscanf(t, "%ld:raton:%d:%d:%ld", &desde, &tx, &ty, &cuantos) >= 3) && cuantos >= 1) {
-                _jgs.guion[_jgs.nguion].desde = desde;          /* "30:toque:240:135:5": un dedo (o el ratón) ahí */
-                _jgs.guion[_jgs.nguion].cuantos = cuantos;
-                _jgs.guion[_jgs.nguion].x = tx;
-                _jgs.guion[_jgs.nguion++].tecla = -2;
-                _jgs.guion[_jgs.nguion - 1].y = ty;
-                continue;
-            }
-            cuantos = 1;
-            if (strstr(t, ":mando")) {                    /* "30:mando2:a:5": un botón (o eje) de un mando */
-                if (sscanf(t, "%ld:%31[^:]:%31[^:]:%ld", &desde, tecla, boton, &cuantos) < 3 || cuantos < 1) continue;
-                char entrada[80];
-                snprintf(entrada, sizeof entrada, "%s:%s", tecla, boton);
-                JgEntrada me;
-                if (!jg_entrada(entrada, &me, msg, sizeof msg) || (me.tipo != 'b' && me.tipo != 'e')) continue;
-                if (me.mando < 0) me.mando = 0;
-                _jgs.guion[_jgs.nguion].desde = desde;
-                _jgs.guion[_jgs.nguion].cuantos = cuantos;
-                _jgs.guion[_jgs.nguion].mando = me;
-                _jgs.guion[_jgs.nguion++].tecla = -1;
-                _jgs.mando_prueba[me.mando] = 1;
-                continue;
-            }
-            if (sscanf(t, "%ld:%31[^:]:%ld", &desde, tecla, &cuantos) < 2) continue;
-            int c = jg_tecla_codigo(tecla);
-            if (c < 0 || cuantos < 1) continue;
-            _jgs.guion[_jgs.nguion].desde = desde;
-            _jgs.guion[_jgs.nguion].cuantos = cuantos;
-            _jgs.guion[_jgs.nguion++].tecla = c;
+            char msg[300];
+            if (!jg_paso_guion(t, &_jgs.guion[_jgs.nguion], msg, sizeof msg)) continue;
+            if (_jgs.guion[_jgs.nguion].tecla == -1) _jgs.mando_prueba[_jgs.guion[_jgs.nguion].mando.mando] = 1;
+            _jgs.nguion++;
         }
     }
     jg_grabar_guion_empezar();
@@ -1609,6 +1646,7 @@ static int jg_tecla_codigo(const char *nombre) {
         int k = atoi(nombre + 1);
         if (k >= 1 && k <= 12) return 57 + k;
     }
+    if (!_jg.ScancodeFromName && !jg_cargar()) return -1;   /* sin ventana (el guion de jugar()): SDL aún sin cargar */
     int c = _jg.ScancodeFromName(nombre);
     return c > 0 && c < 512 ? c : -1;
 }
@@ -2111,20 +2149,24 @@ int juego_esperar_arreglo(const char *msg) {
 }
 
 /* Guarda la imagen actual de la ventana como BMP; 1 si va bien */
+/* Los píxeles de lo que hay en la ventana, en ese formato de SDL (liberar con free) */
+static unsigned char *jg_leer_fotograma(unsigned formato, int *w, int *h) {
+    *w = _jgs.ancho; *h = _jgs.alto;
+    _jg.OutputSize(_jgs.render, w, h);
+    unsigned char *px = malloc((size_t)*w * *h * 4);
+    if (px && _jg.ReadPixels(_jgs.render, NULL, formato, px, *w * 4) != 0) { free(px); px = NULL; }
+    return px;
+}
+
 static int jg_guardar_bmp(const char *ruta) {
-    int w = _jgs.ancho, h = _jgs.alto;
-    _jg.OutputSize(_jgs.render, &w, &h);
-    size_t tam = (size_t)w * h * 4;
-    unsigned char *px = malloc(tam);
+    int w, h;
+    unsigned char *px = jg_leer_fotograma(0x16362004, &w, &h);
     if (!px) return 0;
     int ok = 0;
-    if (_jg.ReadPixels(_jgs.render, NULL, 0x16362004, px, w * 4) == 0) {
-        void *sup = _jg.SurfaceFrom(px, w, h, 32, w * 4,
-                                    0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-        void *rw = _jg.RWFromFile(ruta, "wb");
-        if (sup && rw) ok = _jg.SaveBMP_RW(sup, rw, 1) == 0;
-        if (sup) _jg.FreeSurface(sup);
-    }
+    void *sup = _jg.SurfaceFrom(px, w, h, 32, w * 4, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+    void *rw = _jg.RWFromFile(ruta, "wb");
+    if (sup && rw) ok = _jg.SaveBMP_RW(sup, rw, 1) == 0;
+    if (sup) _jg.FreeSurface(sup);
     free(px);
     return ok;
 }
@@ -2132,22 +2174,24 @@ static int jg_guardar_bmp(const char *ruta) {
 /* LINCE_JUEGO_CAPTURAS=30,60 (lo que usa jugar() de juego.lince): guarda esos
    fotogramas como PNG (fotograma_30.png...) en LINCE_JUEGO_CAPTURAS_CARPETA */
 static void jg_capturas_prueba(void) {
-    char lista[1024];
-    snprintf(lista, sizeof lista, ",%s,", getenv("LINCE_JUEGO_CAPTURAS"));
+    const char *e = getenv("LINCE_JUEGO_CAPTURAS");
     char buscar[40];
     snprintf(buscar, sizeof buscar, ",%ld,", _jgs.total);
-    if (!strstr(lista, buscar)) return;
+    size_t largo = strlen(e) + 3;
+    char *lista = malloc(largo);
+    if (!lista) return;
+    snprintf(lista, largo, ",%s,", e);
+    int toca = strstr(lista, buscar) != NULL;
+    free(lista);
+    if (!toca) return;
     const char *carpeta = getenv("LINCE_JUEGO_CAPTURAS_CARPETA");
     char ruta[1200];
     snprintf(ruta, sizeof ruta, "%s/fotograma_%ld.png", carpeta && *carpeta ? carpeta : ".", _jgs.total);
-    int w = _jgs.ancho, h = _jgs.alto;
-    _jg.OutputSize(_jgs.render, &w, &h);
-    unsigned char *px = malloc((size_t)w * h * 4);
+    int w, h;
+    unsigned char *px = jg_leer_fotograma(0x16762004, &w, &h);      /* ABGR8888: R, G, B, A en memoria */
     if (!px) return;
-    if (_jg.ReadPixels(_jgs.render, NULL, 0x16762004, px, w * 4) == 0) {      /* ABGR8888: R, G, B, A en memoria */
-        for (size_t i = 3; i < (size_t)w * h * 4; i += 4) px[i] = 255;
-        if (!imagen_guardar_png(ruta, px, w, h)) fprintf(stderr, "⚠️  No se pudo guardar la captura %s\n", ruta);
-    }
+    for (size_t i = 3; i < (size_t)w * h * 4; i += 4) px[i] = 255;
+    if (!imagen_guardar_png(ruta, px, w, h)) fprintf(stderr, "⚠️  No se pudo guardar la captura %s\n", ruta);
     free(px);
 }
 
@@ -4565,43 +4609,33 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
    Leen PNG (o BMP, JPG...) del disco sin abrir la ventana. pixel() se queda
    con la última imagen que leyó mientras el archivo no cambie. */
 static unsigned char *jg_leer_rgba(const char *ruta, int *w, int *h, char *msg, size_t max, const char *fn) {
-    FILE *f = fopen(ruta, "rb");
-    if (!f) { snprintf(msg, max, "%s(): no encuentro la imagen '%s'", fn, ruta); return NULL; }
-    fseek(f, 0, SEEK_END);
-    long n = ftell(f);
-    rewind(f);
-    unsigned char *b = n > 0 ? malloc((size_t)n) : NULL;
-    size_t leido = b ? fread(b, 1, (size_t)n, f) : 0;
-    fclose(f);
+    size_t n = 0;
+    char *b = interprete_leer_bytes(ruta, &n);
+    if (!b) { snprintf(msg, max, "%s(): no encuentro la imagen '%s'", fn, ruta); return NULL; }
     const char *por = "está vacía";
-    unsigned char *px = b && leido == (size_t)n ? imagen_decodificar(b, (size_t)n, w, h, &por) : NULL;
+    unsigned char *px = n ? imagen_decodificar((const unsigned char *)b, n, w, h, &por) : NULL;
     free(b);
     if (!px) snprintf(msg, max, "%s(): no entiendo la imagen '%s' (%s)", fn, ruta, por ? por : "?");
     return px;
 }
 
-static struct { char ruta[1024]; long tam; long long cambio; int w, h; unsigned char *px; } _jg_pixel;
+static struct { char ruta[1024]; long long tam, cambio; int w, h; unsigned char *px; } _jg_pixel;
 
 /* pixel(ruta, x, y): [r, g, b, a] de ese punto de una imagen guardada (una captura) */
 static Valor *fn_jg_pixel(Valor **a, int n) {
     if (n < 3 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO || a[2]->tipo != VAL_NUMERO)
         return jg_error("ErrorTipo", "pixel() espera (ruta de la imagen, x, y)");
-    struct stat st;
-    if (stat(a[0]->texto, &st) != 0) {
-        char m[1200];
-        snprintf(m, sizeof m, "pixel(): no encuentro la imagen '%s'", a[0]->texto);
-        return jg_error("ErrorArgumento", m);
-    }
-    if (!_jg_pixel.px || strcmp(_jg_pixel.ruta, a[0]->texto) || _jg_pixel.tam != (long)st.st_size ||
-        _jg_pixel.cambio != (long long)st.st_mtime) {
+    long long cambio = 0, tam = -1;
+    recarga_huella(a[0]->texto, &cambio, &tam);          /* con más precisión que segundos */
+    if (!_jg_pixel.px || strcmp(_jg_pixel.ruta, a[0]->texto) || _jg_pixel.tam != tam || _jg_pixel.cambio != cambio) {
         free(_jg_pixel.px);
         _jg_pixel.px = NULL;
         char m[1200];
         _jg_pixel.px = jg_leer_rgba(a[0]->texto, &_jg_pixel.w, &_jg_pixel.h, m, sizeof m, "pixel");
         if (!_jg_pixel.px) return jg_error("ErrorArgumento", m);
         snprintf(_jg_pixel.ruta, sizeof _jg_pixel.ruta, "%s", a[0]->texto);
-        _jg_pixel.tam = (long)st.st_size;
-        _jg_pixel.cambio = (long long)st.st_mtime;
+        _jg_pixel.tam = tam;
+        _jg_pixel.cambio = cambio;
     }
     int x = (int)floor(a[1]->numero), y = (int)floor(a[2]->numero);
     if (x < 0 || y < 0 || x >= _jg_pixel.w || y >= _jg_pixel.h) {
@@ -7927,6 +7961,8 @@ static void cargar_juego(Entorno *entorno) {
         {"camara_actual",   fn_jg_camara_actual,    0},
         {"capa",            fn_jg_capa,            -1},
         {"_idioma_sistema", fn_jg_idioma_sistema,   0},
+        {"_paso_guion",     fn_jg_paso_guion,       1},
+        {"_programa",       fn_jg_programa,         0},
         {"temblor",         fn_jg_temblor,         -1},
         {"congelar",        fn_jg_congelar,         1},
         {"velocidad",       fn_jg_velocidad,       -1},

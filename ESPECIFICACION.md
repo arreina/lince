@@ -1127,6 +1127,8 @@ sistema.ejecutar("ls -la")             # devuelve lo que escribe el comando
 sistema.proceso("make")                # {"salida", "error", "codigo", "ok"}
 sistema.existe("archivo.txt")
 sistema.ejecutable()                   # la ruta del propio lince (para lanzar otro programa con él)
+sistema.entorno("CLAVE")               # una variable de entorno (nulo si no está)
+sistema.establecer_entorno("CLAVE", "valor")   # con nulo, la quita
 sistema.salir(0)
 ```
 
@@ -2498,6 +2500,11 @@ pruebas.afirmar("el salto se ve igual", juego.igual_que_antes(r["capturas"][0], 
 pruebas.resumen()
 ```
 
+Las rutas (el juego, las capturas y las referencias) se buscan **junto a la prueba**, se lance
+`lince probar` desde donde se lance, y el juego se juega desde su carpeta, como cuando se lanza a
+mano. Cada `jugar` deja sus capturas en su propia carpeta (`capturas/prueba_salto_1`,
+`capturas/prueba_salto_2`...), así que las de un `jugar` no pisan las de otro.
+
 La primera vez, `igual_que_antes` guarda la captura como **referencia** (en `referencias/salto.png`,
 para subirla con el juego) y `lince probar` lo dice con un 📸. Las siguientes, la compara: si algo
 cambia, la prueba falla, dice qué parte de la imagen ha cambiado y deja junto a la captura una
@@ -2507,7 +2514,7 @@ el código del juego que se ha ejecutado al jugarlo.
 
 | Función | Qué hace |
 |---|---|
-| `juego.jugar(archivo[, opciones])` | juega ese juego en otro proceso y devuelve `{"ok", "codigo", "salida", "error", "capturas"}` (las rutas, en el orden pedido). Opciones: `guion` (lista de entradas: `"30:derecha:20"` mantiene derecha desde el fotograma 30 durante 20, `"50:espacio"` la pulsa en el 50, `"40:mando1:a"` es un botón o un eje del mando 1, `"70:toque:240:135"` toca la pantalla —o hace clic— ahí), `capturas` (los fotogramas, contando desde 0), `fotogramas` (cuántos juega: por defecto, hasta la última captura, o 300), `carpeta` (dónde van las capturas: `"capturas"`), `semilla` (1), `escena` (empezar en esa escena), `escribir` (lo que teclea cuando el juego pide texto) y `argumentos` |
+| `juego.jugar(archivo[, opciones])` | juega ese juego en otro proceso y devuelve `{"ok", "codigo", "salida", "error", "capturas"}` (las rutas, en el orden pedido). Opciones: `guion` (lista de entradas: `"30:derecha:20"` mantiene derecha desde el fotograma 30 durante 20, `"50:espacio"` la pulsa en el 50, `"40:mando1:a"` es un botón o un eje del mando 1, `"70:toque:240:135"` toca la pantalla —o hace clic— ahí), `capturas` (los fotogramas, contando desde 0), `fotogramas` (cuántos juega: por defecto, hasta la última captura, o 300), `carpeta` (dónde van las capturas; por defecto, una para cada `jugar`), `semilla` (1), `escena` (empezar en esa escena), `escribir` (lo que teclea cuando el juego pide texto) y `argumentos` |
 | `juego.igual_que_antes(captura, nombre[, opciones])` | ¿se ve como la referencia? (la primera vez la guarda y dice que sí). Opciones: `carpeta` (`"referencias"`), `tolerancia` (cuánto puede cambiar cada color sin contar, de 0 a 255) y `margen` (qué parte de la imagen puede cambiar, de 0 a 1) |
 | `juego.pixel(ruta, x, y)` | `[r, g, b, a]` de ese punto de una imagen guardada |
 | `juego.comparar_imagenes(a, b[, opciones])` | `{"distintos", "total", "parte", "ancho", "alto", "mismo_tamaño"}`: cuántos píxeles cambian. Opciones: `tolerancia` y `diferencias` (la ruta de un PNG con lo que cambia en magenta) |

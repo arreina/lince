@@ -3950,8 +3950,44 @@ funcion ve(cualquiera ser, cualquiera objetivo, cualquiera opciones = nulo): log
 #   sea r = juego.jugar("mi_juego.lince", {"guion": ["30:derecha:20", "60:espacio"], "capturas": [90]})
 #   pruebas.afirmar("termina bien", r["ok"])
 #   pruebas.afirmar("el salto", juego.igual_que_antes(r["capturas"][0], "salto"))
+# Las rutas (el juego, las capturas, las referencias) se buscan junto a la
+# prueba, se lance 'lince probar' desde donde se lance, y el juego se juega
+# desde su carpeta, como cuando se lanza a mano.
 
 fijo _JUGAR_OPCIONES = ["fotogramas", "guion", "capturas", "carpeta", "semilla", "escena", "escribir", "argumentos"]
+sea _jugadas = 0     # cuántas veces ha jugado este programa: cada vez, sus capturas en su carpeta
+
+# La ruta completa del programa (la prueba), con "/"
+funcion _ruta_prueba(): texto {
+    sea p = juego._programa()
+    devolver si p == nulo { "./prueba.lince" } sino { p.reemplazar("\\", "/") }
+}
+
+# La carpeta de una ruta (sin la "/" del final)
+funcion _carpeta_de(texto ruta): texto {
+    sea r = ruta.reemplazar("\\", "/")
+    sea desde_el_final = r.invertir().posicion("/")
+    si desde_el_final < 0 { devolver "." }
+    sea i = r.longitud() - 1 - desde_el_final
+    devolver si i == 0 { "/" } sino { r.extraer(0, i) }
+}
+
+funcion _es_absoluta(texto r): logico {
+    devolver r.empieza_con("/") o r.empieza_con("\\") o (r.longitud() >= 2 y r[1] == ":")
+}
+
+# Una ruta de la prueba: tal cual si es absoluta; si no, junto a la prueba
+funcion _junto_a_prueba(texto ruta): texto {
+    si _es_absoluta(ruta) { devolver ruta }
+    devolver _carpeta_de(_ruta_prueba()) + "/" + ruta
+}
+
+# Para los mensajes: la ruta desde la carpeta de la prueba, si está dentro
+funcion _bonita(texto ruta): texto {
+    sea base = _carpeta_de(_ruta_prueba()) + "/"
+    sea r = ruta.reemplazar("\\", "/")
+    devolver si r.empieza_con(base) { r.extraer(base.longitud(), r.longitud()) } sino { ruta }
+}
 
 # Entre comillas para la consola de cada sistema
 funcion _comillas(texto t): texto {
@@ -3959,41 +3995,22 @@ funcion _comillas(texto t): texto {
     devolver "'" + t.reemplazar("'", "'\\''") + "'"
 }
 
-# Crea la carpeta y las de encima que falten
+# Crea la carpeta y las de encima que falten (también con rutas absolutas:
+# /tmp/capturas, C:\capturas, \\servidor\recurso\capturas)
 funcion _crear_carpeta(texto ruta): nulo {
-    sea partes = ruta.reemplazar("\\", "/").dividir("/")
-    sea hecha = ""
-    para cada texto p en partes {
-        hecha = si hecha == "" { p } sino { hecha + "/" + p }
-        si hecha == "" o hecha == "." o hecha == ".." { continuar }
+    sea r = ruta.reemplazar("\\", "/")
+    sea hecha = si r.empieza_con("//") { "//" } sino si r.empieza_con("/") { "/" } sino { "" }
+    sea saltar = si r.empieza_con("//") { 2 } sino { 0 }    # el servidor y el recurso ya existen
+    para cada texto p en r.dividir("/") {
         si p == "" { continuar }
+        hecha = si hecha == "" o hecha.termina_con("/") { hecha + p } sino { hecha + "/" + p }
+        si saltar > 0 {
+            saltar = saltar - 1
+            continuar
+        }
+        si p == "." o p == ".." o p.termina_con(":") { continuar }
         si no archivos.es_directorio(hecha) { archivos.crear_directorio(hecha) }
     }
-}
-
-funcion _entrada_de_guion(cualquiera g): nulo {
-    si no (g es texto) { lanzar ErrorTipo("jugar(): el guion es una lista de textos como \"30:derecha:20\"") }
-    sea partes = g.dividir(":")
-    sea bien = partes.longitud() >= 2 y _es_entero(partes[0])
-    si bien y (partes[1] == "toque" o partes[1] == "raton") {
-        bien = (partes.longitud() == 4 o partes.longitud() == 5) y _es_entero(partes[2]) y _es_entero(partes[3]) y
-            (partes.longitud() == 4 o _es_entero(partes[4]))
-    } sino si bien y partes[1].empieza_con("mando") {
-        bien = (partes.longitud() == 3 o partes.longitud() == 4) y (partes.longitud() == 3 o _es_entero(partes[3]))
-    } sino si bien {
-        bien = (partes.longitud() == 2 o partes.longitud() == 3) y (partes.longitud() == 2 o _es_entero(partes[2]))
-    }
-    si no bien {
-        lanzar ErrorArgumento("jugar(): no entiendo «{g}» en el guion (es \"fotograma:tecla[:cuántos]\", " +
-                "\"fotograma:mando1:botón[:cuántos]\" o \"fotograma:toque:x:y[:cuántos]\")")
-    }
-}
-
-funcion _es_entero(texto t): logico {
-    para cada texto c en t.a_lista() {
-        si no "0123456789".contiene(c) { devolver falso }
-    }
-    devolver t != ""
 }
 
 # jugar(archivo[, opciones]): juega ese juego en otro proceso, sin ventana.
@@ -4002,7 +4019,8 @@ funcion _es_entero(texto t): logico {
 # como el de LINCE_JUEGO_GRABAR_GUION: "30:derecha:20" mantiene derecha desde el
 # fotograma 30 durante 20, "50:espacio" la pulsa en el 50, "40:mando1:a" es un
 # botón del mando 1 y "70:toque:240:135" toca la pantalla ahí), "capturas"
-# (los fotogramas que se guardan como PNG), "carpeta" (dónde: "capturas"),
+# (los fotogramas que se guardan como PNG), "carpeta" (dónde; por defecto,
+# una para cada jugar(): capturas/<prueba>_1, capturas/<prueba>_2...),
 # "semilla" (la de los números aleatorios: 1), "escena" (para empezar en una
 # escena), "escribir" (lo que teclea cuando el juego pide texto) y
 # "argumentos". Las partidas guardadas empiezan vacías en cada jugar().
@@ -4010,7 +4028,8 @@ funcion _es_entero(texto t): logico {
 # orden pedido).
 funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
     si no (archivo es texto) { lanzar ErrorTipo("jugar() espera la ruta del juego (un .lince)") }
-    si no archivos.existe(archivo) { lanzar ErrorArgumento("jugar(): no encuentro el juego '{archivo}'") }
+    sea juego_ruta = _junto_a_prueba(archivo)
+    si no archivos.existe(juego_ruta) { lanzar ErrorArgumento("jugar(): no encuentro el juego '{archivo}' (junto a la prueba)") }
     sea aj = _ui_opciones(opciones, _JUGAR_OPCIONES, "jugar")
     sea guion = _de(aj, "guion", [])
     si guion es texto {                     # como el de LINCE_JUEGO_GRABAR_GUION: "30:derecha:20,50:z"
@@ -4021,7 +4040,11 @@ funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
         guion = partes
     }
     si no (guion es lista) { lanzar ErrorTipo("jugar(): el guion es una lista de textos como \"30:derecha:20\"") }
-    para cada cualquiera g en guion { _entrada_de_guion(g) }
+    para cada cualquiera g en guion {
+        si no (g es texto) { lanzar ErrorTipo("jugar(): el guion es una lista de textos como \"30:derecha:20\"") }
+        sea mal = juego._paso_guion(g)
+        si mal != nulo { lanzar ErrorArgumento("jugar(): en el guion, {mal}") }
+    }
     sea capturas = _de(aj, "capturas", [])
     si no (capturas es lista) { lanzar ErrorTipo("jugar(): \"capturas\" es una lista de fotogramas, por ejemplo [60, 120]") }
     sea ultima = -1
@@ -4038,8 +4061,11 @@ funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
     si ultima >= fotogramas {
         lanzar ErrorArgumento("jugar(): la captura del fotograma {ultima} no llega a hacerse: juega {fotogramas} (del 0 al {fotogramas - 1})")
     }
-    sea carpeta = _de(aj, "carpeta", "capturas")
+    _jugadas = _jugadas + 1
+    sea nombre = _ruta_prueba().dividir("/")[-1].reemplazar(".lince", "")
+    sea carpeta = _de(aj, "carpeta", "capturas/{nombre}_{_jugadas}")
     si no (carpeta es texto) { lanzar ErrorTipo("jugar(): \"carpeta\" es la ruta de una carpeta") }
+    carpeta = _junto_a_prueba(carpeta)
     _crear_carpeta(carpeta)
     sea partidas = carpeta + "/partidas"
     _crear_carpeta(partidas)
@@ -4054,7 +4080,10 @@ funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
         }
         rutas.agregar(ruta)
     }
-    sea comando = _comillas(sistema.ejecutable()) + " " + _comillas(archivo)
+    # desde la carpeta del juego, como cuando se lanza a mano
+    sea donde = _carpeta_de(juego_ruta)
+    sea comando = si sistema.plataforma() == "windows" { "cd /d " } sino { "cd " }
+    comando = comando + _comillas(donde) + " && " + _comillas(sistema.ejecutable()) + " " + _comillas(juego_ruta)
     para cada cualquiera a en _de(aj, "argumentos", []) { comando = comando + " " + _comillas("{a}") }
     sea textos_capturas = []
     para cada numero c en capturas { textos_capturas.agregar("{c}") }
@@ -4069,31 +4098,37 @@ funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
         "LINCE_JUEGO_ESCRIBIR": "{_de(aj, "escribir", "")}",
         "LINCE_JUEGO_GUARDADO": partidas
     }
+    # el juego las hereda; luego se dejan como estaban (nulo: no estaba)
     sea antes = {}
     para cada texto k en entorno {
-        antes[k] = sistema.entorno(k, "")
+        antes[k] = sistema.entorno(k)
         sistema.establecer_entorno(k, entorno[k])
     }
-    sea r = sistema.proceso(comando)
+    sea r = nulo
+    sea fallo = ""
+    intentar {
+        r = sistema.proceso(comando)
+    } capturar (error e) {
+        fallo = e.mensaje
+    }
     para cada texto k en antes { sistema.establecer_entorno(k, antes[k]) }
-    sea hechas = []
+    si r == nulo { lanzar ErrorArgumento("jugar(): no se pudo lanzar el juego {fallo}") }
     para cada texto ruta en rutas {
         si no archivos.existe(ruta) {
-            lanzar ErrorArgumento("jugar(): el juego acabó sin llegar a la captura '{ruta}' (¿se cerró antes, o no llama a juego.presentar()?)" +
+            lanzar ErrorArgumento("jugar(): el juego acabó sin llegar a la captura '{_bonita(ruta)}' (¿se cerró antes, o no llama a juego.presentar()?)" +
                     "\n" + r["error"])
         }
-        hechas.agregar(ruta)
     }
-    devolver {"ok": r["ok"], "codigo": r["codigo"], "salida": r["salida"], "error": r["error"], "capturas": hechas}
+    devolver {"ok": r["ok"], "codigo": r["codigo"], "salida": r["salida"], "error": r["error"], "capturas": rutas}
 }
 
 # igual_que_antes(captura, nombre[, opciones]): ¿se ve igual que la vez
 # anterior? La primera vez (o con 'lince probar --aceptar') la guarda como
-# referencia, en "referencias/nombre.png", y dice que sí. Si cambia, guarda
-# junto a la captura una imagen con lo que cambia en magenta y lo dice.
-# Opciones: "carpeta" (la de las referencias), "tolerancia" (cuánto puede
-# cambiar cada color, de 0 a 255) y "margen" (qué parte de la imagen puede
-# cambiar, de 0 a 1: 0.01 es el 1 %).
+# referencia, en "referencias/nombre.png" junto a la prueba, y dice que sí.
+# Si cambia, guarda junto a la captura una imagen con lo que cambia en
+# magenta y lo dice. Opciones: "carpeta" (la de las referencias),
+# "tolerancia" (cuánto puede cambiar cada color, de 0 a 255) y "margen" (qué
+# parte de la imagen puede cambiar, de 0 a 1: 0.01 es el 1 %).
 fijo _IGUAL_OPCIONES = ["carpeta", "tolerancia", "margen"]
 
 funcion igual_que_antes(cualquiera captura, cualquiera nombre, cualquiera opciones = nulo): logico {
@@ -4102,29 +4137,33 @@ funcion igual_que_antes(cualquiera captura, cualquiera nombre, cualquiera opcion
     }
     sea aj = _ui_opciones(opciones, _IGUAL_OPCIONES, "igual_que_antes")
     sea carpeta = _de(aj, "carpeta", "referencias")
+    si no (carpeta es texto) { lanzar ErrorTipo("igual_que_antes(): \"carpeta\" es la ruta de una carpeta") }
+    carpeta = _junto_a_prueba(carpeta)
     sea margen = _de(aj, "margen", 0)
     si no (margen es numero) o margen < 0 o margen > 1 { lanzar ErrorArgumento("igual_que_antes(): \"margen\" va de 0 a 1") }
-    si no archivos.existe(captura) { lanzar ErrorArgumento("igual_que_antes(): no encuentro la captura '{captura}'") }
+    captura = _junto_a_prueba(captura)
+    si no archivos.existe(captura) { lanzar ErrorArgumento("igual_que_antes(): no encuentro la captura '{_bonita(captura)}'") }
     sea referencia = carpeta + "/" + nombre + ".png"
     si no archivos.existe(referencia) o sistema.entorno("LINCE_PROBAR_ACEPTAR", "") == "1" {
         _crear_carpeta(carpeta)
-        si no archivos.copiar(captura, referencia) { lanzar ErrorArgumento("igual_que_antes(): no se pudo escribir '{referencia}'") }
-        escribir("📸 {nombre}: guardada como referencia en {referencia}")
+        si no archivos.copiar(captura, referencia) { lanzar ErrorArgumento("igual_que_antes(): no se pudo escribir '{_bonita(referencia)}'") }
+        escribir("📸 {nombre}: guardada como referencia en {_bonita(referencia)}")
         devolver verdadero
     }
-    sea cmp = {"tolerancia": _de(aj, "tolerancia", 0)}
-    sea r = juego.comparar_imagenes(referencia, captura, cmp)
-    si r["mismo_tamaño"] y r["parte"] <= margen { devolver verdadero }
     sea base = si captura.termina_con(".png") { captura.extraer(0, captura.longitud() - 4) } sino { captura }
-    cmp["diferencias"] = base + "_diferencias.png"
-    juego.comparar_imagenes(referencia, captura, cmp)
+    sea diferencias = base + "_diferencias.png"
+    sea r = juego.comparar_imagenes(referencia, captura, {"tolerancia": _de(aj, "tolerancia", 0), "diferencias": diferencias})
+    si r["mismo_tamaño"] y r["parte"] <= margen {
+        archivos.eliminar(diferencias)
+        devolver verdadero
+    }
     si no r["mismo_tamaño"] {
-        escribir("❌ {nombre}: ahora mide {r["ancho"]}x{r["alto"]} y la referencia no ({referencia})")
+        escribir("❌ {nombre}: ahora mide {r["ancho"]}x{r["alto"]} y la referencia no ({_bonita(referencia)})")
     } sino {
         sea cuanto = matematica.redondear(r["parte"] * 1000) / 10
         si cuanto == 0 { cuanto = "menos del 0.1" }
         escribir("❌ {nombre}: ha cambiado el {cuanto} % de la imagen ({r["distintos"]} píxeles): " +
-                "lo que cambia, en magenta, en {cmp["diferencias"]}. Si el cambio está bien: lince probar --aceptar")
+                "lo que cambia, en magenta, en {_bonita(diferencias)}. Si el cambio está bien: lince probar --aceptar")
     }
     devolver falso
 }

@@ -845,17 +845,19 @@ for l in "estados: entra patrullar / 0: patrullar / 1: patrullar / 2: patrullar 
     grep -qxF "$l" salida39.txt && ok "2.5: $l" || mal "falta la línea: $l"
 done
 # ── 2.6: pruebas de juegos (jugar, pixel, comparar_imagenes, igual_que_antes y lince probar) ──
-rm -rf p35 && mkdir p35 && cp "$DIR/juego35.lince" p35/
-(cd p35 && timeout 120 "$LINCE" "$DIR/prueba35.lince") > salida40.txt 2>&1
+rm -rf p35 && mkdir p35 && cp "$DIR/juego35.lince" "$DIR/prueba35.lince" p35/
+timeout 120 "$LINCE" p35/prueba35.lince > salida40.txt 2>&1          # desde otra carpeta: busca todo junto a la prueba
 [ $? -eq 0 ] && ok "la prueba de pruebas de juegos termina bien" || mal "la prueba de pruebas de juegos falló"
 azar=$(grep -o 'azar: [0-9]*' salida40.txt | head -1 | cut -d' ' -f2)
 for l in "ok: verdadero 0" "x: 50" "toques: 2" "botones: 1" "escrito: hola" "visitas: 1" \
-         'capturas: ["capturas/fotograma_0.png", "capturas/fotograma_40.png"]' "pixel: [250, 200, 60, 255] [20, 20, 40, 255]" \
+         "capturas: verdadero verdadero" "entorno: nulo nulo" "pixel: [250, 200, 60, 255] [20, 20, 40, 255]" \
+         "cada una en su carpeta: verdadero [250, 200, 60, 255]" "absoluta: verdadero verdadero" "sin diferencias si es igual: falso" \
          "otra: x: 10 / toques: 0 / botones: 0 / escrito:  / visitas: 1 / azar: $azar / escena: menu" \
          "roja: [250, 60, 60, 255]" "comparar: 200 de 14400 verdadero" "consigo misma: 0" "tolerancia: 0" \
          "primera: verdadero" "segunda: verdadero" \
          "cambia: falso" "con margen: verdadero" "diferencias: [255, 0, 255, 255]" \
-         "error: jugar(): no encuentro el juego 'no_existe.lince'" \
+         "error: jugar(): no encuentro el juego 'no_existe.lince' (junto a la prueba)" \
+         "error: jugar(): en el guion, «30:drecha:20»: no conozco la tecla 'drecha'" \
          "error: jugar(): la captura del fotograma 10 no llega a hacerse: juega 5 (del 0 al 4)" \
          "error: pixel(): la imagen mide 160x90 y el punto (500, 0) se sale" \
          'error: comparar_imagenes(): "tolerancia" va de 0 a 255' 'error: igual_que_antes(): "margen" va de 0 a 1'; do
@@ -863,8 +865,8 @@ for l in "ok: verdadero 0" "x: 50" "toques: 2" "botones: 1" "escrito: hola" "vis
 done
 # el 📸 sin buscarlo: el grep de Windows no casa los caracteres de 4 bytes
 grep -qE "^.+ andando: guardada como referencia en referencias/andando.png$" salida40.txt && ok "2.6: guarda la referencia" || mal "falta la referencia nueva"
-grep -qF "error: jugar(): no entiendo «5:toque:3» en el guion" salida40.txt && ok "2.6: guion mal escrito" || mal "falta el error del guion"
-grep -qF "❌ andando: ha cambiado el 1.4 % de la imagen (200 píxeles)" salida40.txt && ok "2.6: dice cuánto cambia" || mal "falta el aviso de que cambia"
+grep -qF 'error: jugar(): en el guion, «5:toque:3»: un toque es "fotograma:toque:x:y[:cuántos]"' salida40.txt && ok "2.6: guion mal escrito" || mal "falta el error del guion"
+grep -qF "❌ andando: ha cambiado el 1.4 % de la imagen (200 píxeles): lo que cambia, en magenta, en capturas/prueba35_1/fotograma_0_diferencias.png" salida40.txt && ok "2.6: dice cuánto cambia" || mal "falta el aviso de que cambia"
 # con lince probar: la primera vez guarda las referencias, luego pasa, al cambiar el juego falla y --aceptar lo da por bueno
 printf '%s\n' 'importar "juego"' 'importar "pruebas"' \
     'sea r = juego.jugar("juego35.lince", {"guion": ["10:derecha:20"], "capturas": [40]})' \
@@ -875,8 +877,9 @@ printf '%s\n' 'importar "juego"' 'importar "pruebas"' \
  sed -i 's/250, 200, 60/250, 200, 61/' juego35.lince
  "$LINCE" probar --sin-cobertura prueba_dibujo.lince; echo "cambiada=$?"
  "$LINCE" probar --sin-cobertura --aceptar prueba_dibujo.lince; echo "aceptada=$?"
- "$LINCE" probar --sin-cobertura prueba_dibujo.lince; echo "despues=$?") > salida41.txt 2>&1
-for l in "primera=0" "segunda=0" "cambiada=1" "aceptada=0" "despues=0"; do
+ "$LINCE" probar --sin-cobertura prueba_dibujo.lince; echo "despues=$?"
+ cd .. && "$LINCE" probar --sin-cobertura p35/prueba_dibujo.lince; echo "desde_fuera=$?") > salida41.txt 2>&1
+for l in "primera=0" "segunda=0" "cambiada=1" "aceptada=0" "despues=0" "desde_fuera=0"; do
     grep -qxF "$l" salida41.txt && ok "2.6, lince probar: $l" || mal "falta: $l"
 done
 grep -qF " dibujo: guardada como referencia en referencias/dibujo.png" salida41.txt && ok "2.6: lince probar enseña la referencia nueva" || mal "falta el 📸 en lince probar"

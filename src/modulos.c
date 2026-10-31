@@ -1179,6 +1179,15 @@ static Valor *fn_sis_entorno(Valor **a, int n) {
 
 static Valor *fn_sis_establecer_entorno(Valor **a, int n) {
     (void)n;
+    if (a[0]->tipo == VAL_TEXTO && a[1]->tipo == VAL_NULO) {     /* con nulo, la quita */
+#ifdef _WIN32
+        char buf[4096];
+        snprintf(buf, sizeof(buf), "%s=", a[0]->texto);
+        return valor_booleano(_putenv(buf) == 0);
+#else
+        return valor_booleano(unsetenv(a[0]->texto) == 0);
+#endif
+    }
     if (a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO) return valor_booleano(0);
 #ifdef _WIN32
     char buf[4096];
