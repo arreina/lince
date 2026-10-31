@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v2.3</span>
+  <span class="version">v2.4</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -151,7 +151,7 @@
 <div class="envoltorio">
 <nav id="lateral">
 <div class="grupo"><a href="#empezar" class="sec">Empezar</a><a href="#empezar-0" class="sub">La ventana y el bucle</a><a href="#empezar-1" class="sub">Píxeles grandes</a></div>
-<div class="grupo"><a href="#dibujar" class="sec">Dibujar</a><a href="#dibujar-0" class="sub">Formas y colores</a><a href="#dibujar-1" class="sub">Capas</a><a href="#dibujar-2" class="sub">Oscurecer la pantalla</a></div>
+<div class="grupo"><a href="#dibujar" class="sec">Dibujar</a><a href="#dibujar-0" class="sub">Formas y colores</a><a href="#dibujar-1" class="sub">Capas</a><a href="#dibujar-2" class="sub">Oscurecer la pantalla</a><a href="#dibujar-3" class="sub">Luces y oscuridad</a></div>
 <div class="grupo"><a href="#texto-y-letras" class="sec">Texto y letras</a><a href="#texto-y-letras-0" class="sub">Texto con la letra incluida</a><a href="#texto-y-letras-1" class="sub">Fuentes .ttf</a><a href="#texto-y-letras-2" class="sub">Texto en una caja</a></div>
 <div class="grupo"><a href="#imagenes-y-sprites" class="sec">Imágenes y sprites</a><a href="#imagenes-y-sprites-0" class="sub">Dibujos hechos con texto</a><a href="#imagenes-y-sprites-1" class="sub">Girar, voltear, teñir</a></div>
 <div class="grupo"><a href="#hojas-de-sprites" class="sec">Hojas de sprites</a><a href="#hojas-de-sprites-0" class="sub">Una hoja con todos los fotogramas</a><a href="#hojas-de-sprites-1" class="sub">Hojas desordenadas</a><a href="#hojas-de-sprites-2" class="sub">Animaciones a partir de un dibujo</a></div>
@@ -181,7 +181,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>42 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>43 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -254,7 +254,28 @@ juego.abrir(<span class="s">&quot;Pausa&quot;</span>, <span class="n">480</span>
     juego.cubrir([<span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>, <span class="n">150</span>])
     juego.<span class="t">texto</span>(<span class="s">&quot;PAUSA&quot;</span>, <span class="n">240</span>, <span class="n">120</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">4</span>, <span class="s">&quot;alinear&quot;</span>: <span class="s">&quot;centro&quot;</span>})
     juego.presentar()
-}</code></pre></div><figure><img src="img/juego/120_cubrir.png" alt="Captura de «Oscurecer la pantalla»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/120_cubrir.lince</span></article></section>
+}</code></pre></div><figure><img src="img/juego/120_cubrir.png" alt="Captura de «Oscurecer la pantalla»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/120_cubrir.lince</span></article><article class="ej" id="dibujar-3"><h3>Luces y oscuridad</h3><p class="nota"><code>juego.luz(x, y, radio)</code> pone una luz en el mundo (respeta la cámara), con <code>color</code>, <code>intensidad</code> y <code>forma</code>: <code>&quot;circulo&quot;</code> o <code>&quot;cono&quot;</code>, una linterna que apunta hacia su <code>angulo</code> con su <code>apertura</code>. <code>juego.dibujar_luces(ambiente)</code> oscurece lo dibujado hasta ese color salvo donde hay luz, y las luces de colores se suman.</p><p class="nota">Se llama después de dibujar el mundo y antes del marcador, que así no se oscurece (o con <code>&quot;capa&quot;</code>). Las luces valen para ese fotograma: se ponen otra vez en cada uno, y si se mueven o parpadean, se mueve la luz.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+
+juego.abrir(<span class="s">&quot;Luces&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">sea</span> t = juego.tiempo()
+    juego.camara(<span class="n">20</span>, <span class="n">0</span>)
+    juego.limpiar([<span class="n">60</span>, <span class="n">70</span>, <span class="n">60</span>])
+    <span class="k">para</span> (x = <span class="n">0</span>; x &lt; <span class="n">520</span>; x += <span class="n">40</span>) {                  <span class="c"># un suelo de baldosas de colores</span>
+        <span class="k">para</span> (<span class="k">y</span> = <span class="n">0</span>; <span class="k">y</span> &lt; <span class="n">280</span>; <span class="k">y</span> += <span class="n">40</span>) {
+            juego.rectangulo(x, <span class="k">y</span>, <span class="n">38</span>, <span class="n">38</span>, <span class="k">si</span> (x + <span class="k">y</span>) % <span class="n">80</span> == <span class="n">0</span> { [<span class="n">120</span>, <span class="n">140</span>, <span class="n">110</span>] } <span class="k">sino</span> { [<span class="n">100</span>, <span class="n">110</span>, <span class="n">150</span>] })
+        }
+    }
+    juego.rectangulo(<span class="n">118</span>, <span class="n">168</span>, <span class="n">8</span>, <span class="n">24</span>, [<span class="n">120</span>, <span class="n">80</span>, <span class="n">40</span>])                                     <span class="c"># la antorcha</span>
+    juego.luz(<span class="n">122</span>, <span class="n">165</span>, <span class="n">110</span> + matematica.seno(t * <span class="n">13</span>) * <span class="n">6</span>, {<span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">170</span>, <span class="n">80</span>]})   <span class="c"># parpadea un poco</span>
+    juego.luz(<span class="n">330</span>, <span class="n">200</span>, <span class="n">260</span>, {<span class="s">&quot;forma&quot;</span>: <span class="s">&quot;cono&quot;</span>, <span class="s">&quot;angulo&quot;</span>: -<span class="n">40</span>, <span class="s">&quot;apertura&quot;</span>: <span class="n">50</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">220</span>]})
+    juego.luz(<span class="n">400</span> + matematica.seno(t * <span class="n">2</span>) * <span class="n">30</span>, <span class="n">80</span>, <span class="n">45</span>, {<span class="s">&quot;color&quot;</span>: [<span class="n">80</span>, <span class="n">160</span>, <span class="n">255</span>], <span class="s">&quot;intensidad&quot;</span>: <span class="n">0.9</span>})
+    juego.dibujar_luces([<span class="n">25</span>, <span class="n">25</span>, <span class="n">50</span>])
+    juego.camara()
+    juego.<span class="t">texto</span>(<span class="s">&quot;NOCHE EN EL CASTILLO&quot;</span>, <span class="n">10</span>, <span class="n">10</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>]})   <span class="c"># el marcador, sin oscurecer</span>
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/125_luces.png" alt="Captura de «Luces y oscuridad»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/125_luces.lince</span></article></section>
 <section id="texto-y-letras"><h2>Texto y letras</h2><article class="ej" id="texto-y-letras-0"><h3>Texto con la letra incluida</h3><p class="nota">Lince trae una letra de píxeles (mayúsculas, cifras, signos; las tildes y la ñ se marcan). <code>escala</code> la agranda, <code>color</code> la pinta y <code>alinear</code> (<code>&quot;centro&quot;</code> o <code>&quot;derecha&quot;</code>) cambia de qué lado cuenta la <code>x</code>. <code>juego.ancho_texto()</code> dice lo que ocupa, para centrar a mano.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Texto&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)

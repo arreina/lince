@@ -794,4 +794,35 @@ for bien, nombre in casos:
     mal += not bien
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida5b.txt; exit 1; }
+# ── 2.4: luces (con la cámara, con zoom, en una capa y en cono) ──
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 timeout 60 "$LINCE" "$DIR/prueba33.lince" > salida38.txt 2>&1
+for l in "error: luz(): el radio es mayor que 0" 'error: luz(): "forma" es "circulo" o "cono" (una linterna)' \
+         'error: luz(): "intensidad" va de 0 a 1' "a_pantalla: [60, 30]" \
+         "error: dibujar_luces() espera el color de lo que no está iluminado, por ejemplo [30, 30, 60]"; do
+    grep -qxF "$l" salida38.txt && ok "2.4: $l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+def lee(n):
+    d = open(n, "rb").read()
+    off = struct.unpack_from("<I", d, 10)[0]; w, h = struct.unpack_from("<ii", d, 18); B = struct.unpack_from("<H", d, 28)[0] // 8
+    fila = (w * B + 3) & ~3
+    def px(x, y):
+        f = (abs(h) - 1 - y) if h > 0 else y
+        i = off + f * fila + x * B
+        return (d[i + 2], d[i + 1], d[i])
+    return px
+a, b, c = lee("luces1.bmp"), lee("luces2.bmp"), lee("luces3.bmp")
+casos = [(min(a(50, 50)) > 240, "la luz, donde está en el mundo (con la cámara movida)"),
+         (a(10, 50) == (0, 0, 0), "lejos de la luz, oscuro"),
+         (a(5, 5) == (255, 0, 0), "el marcador, después, sin oscurecer"),
+         (min(b(60, 30)) > 240 and b(72, 30) == (0, 0, 0) and 60 < b(66, 30)[0] < 200, "con zoom 2: donde dice a_pantalla y el doble de grande"),
+         (c(60, 80)[1] > 30 and c(60, 80)[0] == 0 and c(5, 80) == (0, 0, 0), "un cono verde hacia la derecha"),
+         (c(155, 15) == (255, 0, 0) and c(105, 15) == (0, 0, 0), "en la capa 5: lo de la capa 10, encima y sin oscurecer")]
+mal = 0
+for bien, nombre in casos:
+    print("  ✅ 2.4, píxel:" if bien else "  ❌ 2.4, píxel:", nombre)
+    mal += not bien
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida5b.txt; exit 1; }

@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.3
+# 🐆 Lince — Especificación del Lenguaje v2.4
 
 ## Filosofía
 
@@ -1260,6 +1260,26 @@ juego.capa(1000)
 juego.texto("Vidas: {vidas}", 10, 10)                         # el marcador, encima de todo
 juego.capa()
 ```
+
+**Luces.** Para la noche, una cueva o una casa a oscuras: `luz(x, y, radio[, opciones])` pone una
+luz en el mundo y `dibujar_luces(ambiente)` oscurece lo dibujado hasta el color `ambiente` salvo
+donde hay luz (las de colores se suman). Las luces respetan la cámara (también el zoom, el giro y
+la pantalla partida) y valen para ese fotograma: en cada uno se ponen otra vez, así una antorcha
+que parpadea es una luz con el radio cambiando. `dibujar_luces` va después del mundo y antes del
+marcador, que así no se oscurece, o con `"capa"` (como `cubrir`).
+
+```lince
+juego.luz(antorcha["x"], antorcha["y"], 110, {"color": [255, 170, 80]})
+juego.luz(yo["x"], yo["y"], 250, {"forma": "cono", "angulo": mira, "apertura": 50})   # una linterna
+juego.dibujar_luces([25, 25, 50])                                                     # la noche
+juego.camara()
+juego.texto("Vidas: {vidas}", 10, 10)                                                 # sin oscurecer
+```
+
+| Función | Qué hace |
+|---|---|
+| `luz(x, y, radio[, opciones])` | una luz en ese punto del mundo, para este fotograma. Opciones: `color` ([255, 255, 255]), `intensidad` (0 a 1), `forma` (`"circulo"` o `"cono"`), `angulo` (hacia dónde apunta el cono, en grados) y `apertura` (lo ancho del cono, 60) |
+| `dibujar_luces(ambiente[, opciones])` | oscurece todo lo dibujado hasta el color `ambiente` (`[0, 0, 0]` es negro del todo) salvo donde hay luces, y las olvida. Opción: `capa` |
 
 **Texto en una caja.** `texto_caja(t, x, y, ancho, alto[, opciones])` escribe el texto partido en
 líneas dentro de la caja; si no cabe entero, la última línea acaba en `...` y devuelve lo que falta

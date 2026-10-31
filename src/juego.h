@@ -972,10 +972,13 @@ static Valor *fn_jg_accesibilidad(Valor **a, int n) {
     return r;
 }
 
+static void jg_luces_liberar(void);
+static int _jg_nluces;                  /* las luces de este fotograma (ver «Luces») */
 static void jg_cerrar_todo(void) {
     jg_capas_olvidar();
     if (_jgs.cam_tex) { _jg.DestroyTexture(_jgs.cam_tex); _jgs.cam_tex = NULL; }
     if (_jga.tex) { _jg.DestroyTexture(_jga.tex); _jga.tex = NULL; }
+    jg_luces_liberar();
     _jgs.cam_tex_activa = _jgs.cam_recorte = 0;
     jg_cerrar_audio_prueba();
     jg_parar_flujo();
@@ -1814,6 +1817,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         if (hay_error) { jg_capas_olvidar(); return valor_nulo(); }
     } else jg_capas_olvidar();
     jg_cam_soltar();                               /* lo de una cámara con zoom o giro, a la ventana */
+    _jg_nluces = 0;                                /* las luces que no se dibujaron, olvidadas */
     interprete_perfil_categoria(PERFIL_PRESENTAR);     /* desde aquí, mostrarlo y esperar */
     if (recarga_error()) jg_aviso_error(recarga_error(), 0);
     jg_filtro_color();                             /* el de daltonismo, si el jugador lo eligió */
@@ -6168,6 +6172,176 @@ static Valor *fn_jg_cubrir(Valor **a, int n) {
     return valor_nulo();
 }
 
+/* ── Luces ──
+   luz(x, y, radio[, opciones]) apunta una luz para este fotograma, en el mundo
+   (con la cámara de ese momento: zoom, giro, zona y temblor). dibujar_luces(
+   ambiente) oscurece lo dibujado hasta el color 'ambiente' salvo donde hay
+   luz: se pintan las luces, sumadas, en una textura del tamaño de la pantalla
+   que empieza en ese color, y se multiplica con lo que hay. Se llama después
+   del mundo y antes del marcador (o con "capa"). */
+#define JG_LUCES 256
+typedef struct { float x, y, r, angulo, apertura; unsigned char color[3], alfa; int cono; } JgLuz;
+static JgLuz _jg_luces[JG_LUCES];
+static int _jg_nluces;
+static void *_jg_mapa_luz, *_jg_tex_luz;           /* el mapa de luz y el degradado de una luz redonda */
+static struct { int apertura; void *tex; } _jg_conos[16];
+static int _jg_nconos;
+
+/* Una luz blanca que se apaga hacia el borde (de 256 × 256): redonda, o un cono
+   hacia la derecha de 'apertura' grados (entonces el centro de la textura es la
+   punta del cono). El color va en los canales: se dibuja sumando. */
+static void *jg_textura_luz(int apertura) {
+    enum { L = 256 };
+    unsigned char *px = malloc(L * L * 4);
+    if (!px) return NULL;
+    double medio = apertura * 3.14159265358979 / 360.0;
+    for (int y = 0; y < L; y++)
+        for (int x = 0; x < L; x++) {
+            double dx = (x + 0.5 - L / 2.0) / (L / 2.0), dy = (y + 0.5 - L / 2.0) / (L / 2.0);
+            double d = sqrt(dx * dx + dy * dy);
+            double v = d >= 1 ? 0 : 1 - d * d * (3 - 2 * d);        /* suave hasta el borde */
+            if (apertura > 0) {                                     /* fuera del cono, nada; en su borde, suave */
+                double a = fabs(atan2(dy, dx));
+                double borde = medio * 0.25 + 0.02;
+                double f = a <= medio - borde ? 1 : a >= medio ? 0 : (medio - a) / borde;
+                v *= f;
+            }
+            unsigned char c = (unsigned char)(v * 255 + 0.5);
+            unsigned char *p = px + (y * L + x) * 4;
+            p[0] = p[1] = p[2] = c; p[3] = 255;
+        }
+    void *t = jg_textura_rgba(px, L, L);
+    free(px);
+    if (t) _jg.TextureBlend(t, 2);                               /* sumar */
+    return t;
+}
+
+/* Dónde se ve en la ventana el punto (x, y) del mundo con la cámara de ahora, y
+   cuánto se agranda (el zoom) */
+static void jg_a_ventana(double x, double y, double *sx, double *sy, double *escala, double *giro) {
+    double zx, zy, zw, zh;
+    jg_cam_zona(&zx, &zy, &zw, &zh);
+    double bx = _jgs.cu_x + (_jgs.cam_quieta ? 0 : _jgs.tem_x);
+    double by = _jgs.cu_y + (_jgs.cam_quieta ? 0 : _jgs.tem_y);
+    double zoom = _jgs.cam_zoom > 0 ? _jgs.cam_zoom : 1, g = _jgs.cam_giro * 3.14159265358979 / 180;
+    double dx = (x - bx - zw / 2) * zoom, dy = (y - by - zh / 2) * zoom;
+    *sx = zx + zw / 2 + dx * cos(g) - dy * sin(g);
+    *sy = zy + zh / 2 + dx * sin(g) + dy * cos(g);
+    *escala = zoom;
+    *giro = _jgs.cam_giro;
+}
+
+/* luz(x, y, radio[, opciones]): opciones "color" ([255, 255, 255]), "intensidad"
+   (0 a 1), "forma" ("circulo" o "cono", una linterna), "angulo" (hacia dónde
+   apunta el cono, en grados) y "apertura" (lo ancho del cono, 60) */
+static Valor *fn_jg_luz(Valor **a, int n) {
+    JG_ABIERTA();
+    double x, y, r;
+    if (!jg_num(a, n, 0, &x, "luz") || !jg_num(a, n, 1, &y, "luz") || !jg_num(a, n, 2, &r, "luz")) return valor_nulo();
+    if (r <= 0) return jg_error("ErrorArgumento", "luz(): el radio es mayor que 0");
+    JgLuz l = {0};
+    l.color[0] = l.color[1] = l.color[2] = 255;
+    double inten = 1, ang = 0, aper = 60;
+    if (n > 3) {
+        Valor *op = a[3];
+        if (op->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo", "luz(): las opciones van en un diccionario: {\"color\": [255, 200, 120]}");
+        static const char *const V[] = {"color", "intensidad", "forma", "angulo", "apertura", NULL};
+        if (!jg_opciones_validas(op, "luz", V)) return valor_nulo();
+        Valor *cv = jg_opcion_valor(op, "color");
+        if (cv) {
+            unsigned char c[4];
+            Valor *arg[1] = {cv};
+            if (!jg_color(arg, 1, 0, c)) return valor_nulo();
+            l.color[0] = c[0]; l.color[1] = c[1]; l.color[2] = c[2];
+        }
+        if (jg_opcion(op, "intensidad", &inten) && (inten < 0 || inten > 1))
+            return jg_error("ErrorArgumento", "luz(): \"intensidad\" va de 0 a 1");
+        Valor *fv = jg_opcion_valor(op, "forma");
+        if (fv) {
+            if (fv->tipo != VAL_TEXTO || (strcmp(fv->texto, "circulo") && strcmp(fv->texto, "cono")))
+                return jg_error("ErrorArgumento", "luz(): \"forma\" es \"circulo\" o \"cono\" (una linterna)");
+            l.cono = !strcmp(fv->texto, "cono");
+        }
+        jg_opcion(op, "angulo", &ang);
+        if (jg_opcion(op, "apertura", &aper) && (aper <= 0 || aper > 359))
+            return jg_error("ErrorArgumento", "luz(): \"apertura\" son los grados del cono (más de 0 y menos de 360)");
+    }
+    if (_jg_nluces == JG_LUCES) return valor_nulo();          /* demasiadas: las de más no se ven */
+    double sx, sy, esc, giro;
+    jg_a_ventana(x, y, &sx, &sy, &esc, &giro);
+    l.x = (float)sx; l.y = (float)sy; l.r = (float)(r * esc);
+    l.angulo = (float)(ang + giro);
+    l.apertura = (float)aper;
+    l.alfa = (unsigned char)(inten * 255 + 0.5);
+    _jg_luces[_jg_nluces++] = l;
+    return valor_nulo();
+}
+
+/* dibujar_luces(ambiente[, opciones]): oscurece lo dibujado hasta 'ambiente'
+   (un color: [0, 0, 0] es negro del todo, [80, 80, 120] una noche azulada) salvo
+   donde hay luces de luz(). Las luces se olvidan al acabar. Opción: "capa". */
+static void jg_luces_liberar(void) {
+    if (_jg_mapa_luz) _jg.DestroyTexture(_jg_mapa_luz);
+    if (_jg_tex_luz) _jg.DestroyTexture(_jg_tex_luz);
+    for (int k = 0; k < _jg_nconos; k++) if (_jg_conos[k].tex) _jg.DestroyTexture(_jg_conos[k].tex);
+    _jg_mapa_luz = _jg_tex_luz = NULL;
+    _jg_nconos = _jg_nluces = 0;
+}
+
+static Valor *fn_jg_dibujar_luces(Valor **a, int n) {
+    JG_ABIERTA();
+    unsigned char amb[4] = {0, 0, 0, 255};
+    if (n < 1) return jg_error("ErrorArgumento", "dibujar_luces() espera el color de lo que no está iluminado, por ejemplo [30, 30, 60]");
+    if (!jg_color(a, n, 0, amb)) return valor_nulo();
+    if (n > 1) {
+        if (a[1]->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo", "dibujar_luces(): las opciones van en un diccionario: {\"capa\": 500}");
+        static const char *const V[] = {"capa", NULL};
+        if (!jg_opciones_validas(a[1], "dibujar_luces", V)) return valor_nulo();
+    }
+    if (jg_diferir(fn_jg_dibujar_luces, a, n)) return valor_nulo();
+    jg_cam_soltar();                                /* lo de la cámara, a la ventana: aquí todo va en la ventana */
+    if (!_jg.CreateTexture || !_jg.SetRenderTarget) { _jg_nluces = 0; return valor_nulo(); }
+    if (_jg_mapa_luz) {
+        unsigned f; int acc, w, h;
+        _jg.QueryTexture(_jg_mapa_luz, &f, &acc, &w, &h);
+        if (w != _jgs.ancho || h != _jgs.alto) { _jg.DestroyTexture(_jg_mapa_luz); _jg_mapa_luz = NULL; }
+    }
+    if (!_jg_mapa_luz) {
+        _jg_mapa_luz = _jg.CreateTexture(_jgs.render, 0x16362004, 2, _jgs.ancho, _jgs.alto);
+        if (!_jg_mapa_luz) { _jg_nluces = 0; return valor_nulo(); }
+    }
+    if (!_jg_tex_luz) _jg_tex_luz = jg_textura_luz(0);
+    _jg.SetRenderTarget(_jgs.render, _jg_mapa_luz);
+    _jg.SetDrawColor(_jgs.render, amb[0], amb[1], amb[2], 255);
+    _jg.RenderClear(_jgs.render);
+    for (int i = 0; i < _jg_nluces; i++) {
+        JgLuz *l = &_jg_luces[i];
+        void *t = _jg_tex_luz;
+        if (l->cono) {
+            int ap = (int)(l->apertura / 5 + 0.5) * 5;           /* un degradado por cada 5 grados de apertura */
+            if (ap < 5) ap = 5;
+            t = NULL;
+            for (int k = 0; k < _jg_nconos; k++) if (_jg_conos[k].apertura == ap) t = _jg_conos[k].tex;
+            if (!t) {
+                t = jg_textura_luz(ap);
+                if (_jg_nconos < 16) { _jg_conos[_jg_nconos].apertura = ap; _jg_conos[_jg_nconos++].tex = t; }
+                else { _jg.DestroyTexture(_jg_conos[15].tex); _jg_conos[15].apertura = ap; _jg_conos[15].tex = t; }
+            }
+        }
+        if (!t) continue;
+        _jg.TextureColor(t, l->color[0], l->color[1], l->color[2]);
+        _jg.TextureAlpha(t, l->alfa);
+        JgRect d = {(int)floor(l->x - l->r), (int)floor(l->y - l->r), (int)ceil(l->r * 2), (int)ceil(l->r * 2)};
+        _jg.RenderCopyEx(_jgs.render, t, NULL, &d, l->cono ? l->angulo : 0, NULL, 0);
+    }
+    _jg.SetRenderTarget(_jgs.render, NULL);
+    _jg.TextureBlend(_jg_mapa_luz, 4);                          /* multiplicar */
+    JgRect todo = {0, 0, _jgs.ancho, _jgs.alto};
+    _jg.RenderCopyEx(_jgs.render, _jg_mapa_luz, NULL, &todo, 0, NULL, 0);
+    _jg_nluces = 0;
+    return valor_nulo();
+}
+
 /* tiempo_real(): segundos desde que se abrió la ventana, sin parar con
    congelar() ni ir más despacio con velocidad() */
 static Valor *fn_jg_tiempo_real(Valor **a, int n) { (void)a; (void)n; return valor_numero(jg_reloj_real()); }
@@ -7629,6 +7803,8 @@ static void cargar_juego(Entorno *entorno) {
         {"cuadro",          fn_jg_cuadro,          -1},
         {"particulas",      fn_jg_particulas,      -1},
         {"dibujar_particulas", fn_jg_dibujar_particulas, 0},
+        {"luz",             fn_jg_luz,             -1},
+        {"dibujar_luces",   fn_jg_dibujar_luces,   -1},
         {"cubrir",          fn_jg_cubrir,          -1},
         {"tiempo_real",     fn_jg_tiempo_real,      0},
         {"mapa",            fn_jg_mapa,            -1},

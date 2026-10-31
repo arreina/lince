@@ -1,0 +1,27 @@
+# @seccion: Dibujar
+# @titulo: Luces y oscuridad
+# @nota: `juego.luz(x, y, radio)` pone una luz en el mundo (respeta la cámara), con `color`, `intensidad` y `forma`: `"circulo"` o `"cono"`, una linterna que apunta hacia su `angulo` con su `apertura`. `juego.dibujar_luces(ambiente)` oscurece lo dibujado hasta ese color salvo donde hay luz, y las luces de colores se suman.
+# @nota: Se llama después de dibujar el mundo y antes del marcador, que así no se oscurece (o con `"capa"`). Las luces valen para ese fotograma: se ponen otra vez en cada uno, y si se mueven o parpadean, se mueve la luz.
+# @fotogramas: 30
+importar "juego"
+importar "matematica"
+
+juego.abrir("Luces", 480, 270)
+mientras juego.abierto() {
+    sea t = juego.tiempo()
+    juego.camara(20, 0)
+    juego.limpiar([60, 70, 60])
+    para (x = 0; x < 520; x += 40) {                  # un suelo de baldosas de colores
+        para (y = 0; y < 280; y += 40) {
+            juego.rectangulo(x, y, 38, 38, si (x + y) % 80 == 0 { [120, 140, 110] } sino { [100, 110, 150] })
+        }
+    }
+    juego.rectangulo(118, 168, 8, 24, [120, 80, 40])                                     # la antorcha
+    juego.luz(122, 165, 110 + matematica.seno(t * 13) * 6, {"color": [255, 170, 80]})   # parpadea un poco
+    juego.luz(330, 200, 260, {"forma": "cono", "angulo": -40, "apertura": 50, "color": [255, 255, 220]})
+    juego.luz(400 + matematica.seno(t * 2) * 30, 80, 45, {"color": [80, 160, 255], "intensidad": 0.9})
+    juego.dibujar_luces([25, 25, 50])
+    juego.camara()
+    juego.texto("NOCHE EN EL CASTILLO", 10, 10, {"escala": 2, "color": [255, 255, 255]})   # el marcador, sin oscurecer
+    juego.presentar()
+}

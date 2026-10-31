@@ -149,9 +149,10 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   un filtro), subtítulos de los sonidos (`reproducir(s, {"subtitulo": "Puerta"})`) y quitar el
   temblor de la cámara y los destellos.
 
-### 2.4 — Luces y sombras 2D
-- [ ] Oscurecer la escena y poner luces con su color, radio y forma (antorchas, linternas, el
+### 2.4 — Luces y sombras 2D (publicada)
+- [x] Oscurecer la escena y poner luces con su color, radio y forma (antorchas, linternas, el
   brillo de un disparo), que respeten la cámara y las capas.
+- [ ] Sombras que proyectan las paredes (la luz no pasa a través): solo si algún juego lo pide.
 
 ### 2.5 — Enemigos con cabeza
 - [ ] Máquinas de estados (patrullar, perseguir, atacar, huir) y comportamientos de movimiento

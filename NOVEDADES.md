@@ -3,6 +3,22 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.4.0
+
+Luces y oscuridad. Solo añade: nada de la 2.0 cambia.
+
+- **`juego.luz(x, y, radio[, opciones])`**: una luz en el mundo, con su `color`, su `intensidad` y su forma: redonda o un **cono** (una linterna) que apunta hacia su `angulo` con su `apertura`. Respeta la cámara, también con zoom, giro y pantalla partida.
+- **`juego.dibujar_luces(ambiente)`**: oscurece lo dibujado hasta ese color salvo donde hay luz, y las luces de colores se suman. Va después del mundo y antes del marcador, o con `"capa"`.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.4.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-2.4.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.4.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.4.0.vsix` |
+
 ## 2.3.0
 
 Accesibilidad. Solo añade: nada de la 2.0 cambia.

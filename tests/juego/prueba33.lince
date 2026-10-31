@@ -1,0 +1,41 @@
+# 2.4: luces. Tres escenas, cada una a su captura; smoke.sh mira los píxeles.
+importar "juego"
+juego.abrir("2.4", 200, 100)
+para cada funcion intento en [
+    funcion(): nulo { juego.luz(0, 0, 0) },
+    funcion(): nulo { juego.luz(0, 0, 5, {"forma": "estrella"}) },
+    funcion(): nulo { juego.luz(0, 0, 5, {"intensidad": 2}) },
+    funcion(): nulo { juego.dibujar_luces() }
+] {
+    intentar { intento() } capturar (error e) { escribir("error: {e.mensaje}") }
+}
+sea f = 0
+mientras juego.abierto() y f < 3 {
+    juego.limpiar([255, 255, 255])
+    si f == 0 {                                   # la cámara movida: la luz va con el mundo
+        juego.camara(100, 0)
+        juego.luz(150, 50, 30)
+        juego.dibujar_luces([0, 0, 0])
+        juego.camara()
+        juego.rectangulo(0, 0, 10, 10, [255, 0, 0])            # el marcador, sin oscurecer
+        juego.captura("luces1.bmp")
+    } sino si f == 1 {                            # con zoom: donde dice a_pantalla
+        juego.camara(0, 0, {"zoom": 2})
+        sea p = juego.a_pantalla(80, 40)
+        escribir("a_pantalla: {p}")
+        juego.luz(80, 40, 6)
+        juego.dibujar_luces([0, 0, 0])
+        juego.camara()
+        juego.captura("luces2.bmp")
+    } sino {                                      # en una capa, y un cono
+        juego.dibujar_luces([0, 0, 0], {"capa": 5})
+        juego.luz(20, 80, 60, {"forma": "cono", "angulo": 0, "apertura": 40, "color": [0, 255, 0]})
+        juego.rectangulo(100, 10, 10, 10, [0, 0, 255])
+        juego.capa(10)
+        juego.rectangulo(150, 10, 10, 10, [255, 0, 0])        # encima de las luces
+        juego.capa()
+        juego.captura("luces3.bmp")
+    }
+    juego.presentar()
+    f = f + 1
+}
