@@ -3,13 +3,16 @@
 CC      = gcc
 CFLAGS  = -Wall -Wextra -O2 -Wno-maybe-uninitialized -Wno-format-truncation -Wno-stringop-truncation
 LDFLAGS = -lm
-SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c src/ogg.c src/recarga.c src/imagen.c src/repartir.c src/nuevo.c src/letra.c src/corrutina.c src/android.c src/firmar.c src/apk.c src/tiled.c src/revisor.c src/formatear.c src/documentar.c src/probar.c src/zstd.c src/migrar.c
+SRC     = src/main.c src/lexer.c src/parser.c src/interprete.c src/modulos.c src/repl.c src/paquetes.c src/lsp.c src/empaquetado.c src/depurador.c src/ogg.c src/recarga.c src/imagen.c src/repartir.c src/nuevo.c src/letra.c src/corrutina.c src/android.c src/firmar.c src/apk.c src/tiled.c src/revisor.c src/formatear.c src/documentar.c src/probar.c src/zstd.c src/migrar.c src/escritorio.c
 
 # ── Detección de plataforma ───────────────
 UNAME := $(shell uname 2>/dev/null || echo Windows)
 
 ifeq ($(OS),Windows_NT)
     BIN     = lince.exe
+    # el icono (src/recursos/lince.rc) y lo que usan el instalador y los accesos directos
+    RES     = lince_res.o
+    LDFLAGS += -lole32 -luuid
 else ifeq ($(UNAME),Darwin)
     BIN     = lince
     LDFLAGS += -ldl -lpthread
@@ -22,15 +25,21 @@ RM = rm -f
 # ── Compilar ──────────────────────────────
 all: $(BIN)
 
-$(BIN): $(SRC) src/version.h src/corrutina.h src/juego.h src/ogg.h src/imagen.h src/letra.h src/biblioteca_juego.h
-	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(LDFLAGS)
+lince_res.o: src/recursos/lince.rc src/recursos/lince.ico src/recursos/lince.manifest
+	windres src/recursos/lince.rc -O coff -o $@
+
+$(BIN): $(SRC) $(RES) src/version.h src/corrutina.h src/juego.h src/ogg.h src/imagen.h src/letra.h src/biblioteca_juego.h src/icono_lince.h
+	$(CC) $(CFLAGS) -o $(BIN) $(SRC) $(RES) $(LDFLAGS)
 	@echo "✅ Lince compilado — usa: ./$(BIN) archivo.lince"
 
 # ── Windows desde Linux (compilación cruzada con MinGW) ──
 # Necesita x86_64-w64-mingw32-gcc (paquete gcc-mingw-w64-x86-64). Se prueba con wine.
 MINGW ?= x86_64-w64-mingw32-gcc
-windows: $(SRC) src/juego.h
-	$(MINGW) $(CFLAGS) -o lince.exe $(SRC) -lm
+WINDRES ?= $(patsubst %gcc,%windres,$(MINGW))
+windows: $(SRC) src/juego.h src/icono_lince.h src/recursos/lince.ico src/recursos/lince.manifest
+	$(WINDRES) src/recursos/lince.rc -O coff -o lince_res_cruzado.o
+	$(MINGW) $(CFLAGS) -o lince.exe $(SRC) lince_res_cruzado.o -lm -lole32 -luuid
+	$(RM) lince_res_cruzado.o
 	@echo "✅ lince.exe compilado para Windows"
 
 # ── Android: 'lince repartir --android' con la plantilla (se salta si no la hay) ──
@@ -116,10 +125,14 @@ test-editores: $(BIN)
 	@node tests/editores/extension_mock.js ./$(BIN)
 
 # Todo lo que corre la integración continua.
-test-todo: test test-compilador test-ejemplos test-lsp test-herramientas test-editores editores-check bibliotecas-check test-depurador test-juego test-android test-asan
+test-todo: test test-compilador test-ejemplos test-lsp test-herramientas test-editores editores-check bibliotecas-check test-depurador test-juego test-escritorio test-android test-asan
 
 test-juego: $(BIN)
 	@bash tests/juego/smoke.sh ./$(BIN)
+
+# lince repartir para el escritorio (con LINCE_WINDOWS=carpeta, también el de Windows)
+test-escritorio: $(BIN)
+	@bash tests/escritorio/probar.sh ./$(BIN)
 
 # ── Manual ────────────────────────────────
 # docs/manual.html se genera: los ejemplos son .lince de verdad y la salida
@@ -171,7 +184,7 @@ vsix:
 
 # ── Limpiar ───────────────────────────────
 clean:
-	$(RM) $(BIN) lince_debug lince.exe lince_debug.exe
+	$(RM) $(BIN) lince_debug lince.exe lince_debug.exe lince_res.o
 	@echo "🧹 Limpiado"
 
 # ── Instalar en el sistema ────────────────
@@ -195,5 +208,5 @@ endif
 
 .PHONY: all windows debug ejemplo test test-compilador test-ejemplos \
         test-asan test-depurador test-lsp test-editores editores editores-check bench vsix \
-        test-juego test-android test-todo clean install uninstall docs docs-check bibliotecas bibliotecas-check
+        test-juego test-escritorio test-android test-todo clean install uninstall docs docs-check bibliotecas bibliotecas-check
 

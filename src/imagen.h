@@ -17,5 +17,7 @@ unsigned char *imagen_decodificar(const unsigned char *bytes, size_t largo,
 /* Guarda los píxeles (RGBA, como los de imagen_decodificar) en un PNG.
    Devuelve 1 si se pudo escribir. */
 int imagen_guardar_png(const char *ruta, const unsigned char *px, int ancho, int alto);
+/* Lo mismo, en memoria: el PNG entero (liberar con free) y su largo */
+unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *largo);
 
 #endif

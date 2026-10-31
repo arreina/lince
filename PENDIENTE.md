@@ -162,9 +162,11 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 - [x] Que `lince probar` juegue solo: guion de entradas (teclas, mando, toques), comprobar
   píxeles y capturas, y comparar con la vez anterior para ver qué ha cambiado.
 
-### 2.7 — Paquetes de escritorio
-- [ ] `lince repartir`: instalador de Windows, AppImage de Linux y un `.zip` listo para itch.io,
-  con el icono y el nombre del juego.
+### 2.7 — Paquetes de escritorio (publicada)
+- [x] `lince repartir`: instalador de Windows, archivo único de Linux y un `.zip` listo para itch.io,
+  con el icono y el nombre del juego. En vez de una AppImage (que pide FUSE en el ordenador del
+  jugador y un programa de terceros dentro), un archivo de Lince con SDL2 dentro que se pone solo
+  en el menú; y el instalador es el propio juego, sin NSIS ni Inno Setup.
 
 ### 2.8 — Google Play de verdad
 - [ ] `lince repartir --aab` deja el juego listo para subir: iconos en todos los tamaños,

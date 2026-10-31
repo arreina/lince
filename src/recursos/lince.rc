@@ -1,0 +1,5 @@
+/* 🐆 Lince — los recursos de lince.exe: el icono (y el de los juegos para
+   Windows, que lince repartir cambia por el suyo; lo hace hacer_icono.py) y el
+   manifiesto (UTF-8 en las rutas). */
+1 ICON "lince.ico"
+1 24 "lince.manifest"

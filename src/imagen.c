@@ -62,15 +62,13 @@ static void png_u32(unsigned char *b, unsigned long v) {
     b[0] = (unsigned char)(v >> 24); b[1] = (unsigned char)(v >> 16); b[2] = (unsigned char)(v >> 8); b[3] = (unsigned char)v;
 }
 
-static int png_trozo(FILE *f, const char *tipo, const unsigned char *datos, size_t n) {
-    unsigned char cab[8];
-    png_u32(cab, (unsigned long)n);
-    memcpy(cab + 4, tipo, 4);
-    unsigned long c = png_crc(0xFFFFFFFFUL, cab + 4, 4);
-    c = png_crc(c, datos, n) ^ 0xFFFFFFFFUL;
-    unsigned char fin[4];
-    png_u32(fin, c);
-    return fwrite(cab, 1, 8, f) == 8 && (n == 0 || fwrite(datos, 1, n, f) == n) && fwrite(fin, 1, 4, f) == 4;
+/* Un trozo del PNG (largo, tipo, datos y su CRC) al final de 'o' */
+static void png_trozo(unsigned char *o, size_t *pos, const char *tipo, const unsigned char *datos, size_t n) {
+    png_u32(o + *pos, (unsigned long)n);
+    memcpy(o + *pos + 4, tipo, 4);
+    if (n) memcpy(o + *pos + 8, datos, n);
+    png_u32(o + *pos + 8 + n, png_crc(0xFFFFFFFFUL, o + *pos + 4, 4 + n) ^ 0xFFFFFFFFUL);
+    *pos += 12 + n;
 }
 
 /* Bits de deflate: se escriben del menos al más significativo */
@@ -161,12 +159,12 @@ static int png_paeth(int a, int b, int c) {
     return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 }
 
-int imagen_guardar_png(const char *ruta, const unsigned char *px, int ancho, int alto) {
-    if (ancho < 1 || alto < 1 || ancho > 16384 || alto > 16384) return 0;
+unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *largo) {
+    if (ancho < 1 || alto < 1 || ancho > 16384 || alto > 16384) return NULL;
     size_t ancho4 = (size_t)ancho * 4, fila = ancho4 + 1, crudo = fila * alto;
     unsigned char *f = malloc(crudo), *prueba = malloc(ancho4);
     PngBits o = {malloc(crudo + crudo / 7 + 64), 0, 0, 0};
-    if (!f || !prueba || !o.b) { free(f); free(prueba); free(o.b); return 0; }
+    if (!f || !prueba || !o.b) { free(f); free(prueba); free(o.b); return NULL; }
     for (int y = 0; y < alto; y++) {                    /* el filtro que deja la fila con números más pequeños */
         const unsigned char *a = px + (size_t)y * ancho4, *arriba = y > 0 ? a - ancho4 : NULL;
         long mejor = -1;
@@ -192,13 +190,28 @@ int imagen_guardar_png(const char *ruta, const unsigned char *px, int ancho, int
     for (size_t i = 0; i < crudo; i++) { a1 = (a1 + f[i]) % 65521; a2 = (a2 + a1) % 65521; }
     free(f);
     png_u32(o.b + o.n, a2 << 16 | a1); o.n += 4;
-    FILE *fa = fopen(ruta, "wb");
-    if (!fa) { free(o.b); return 0; }
+    unsigned char *png = malloc(8 + 25 + 12 + o.n + 12);
+    if (!png) { free(o.b); return NULL; }
     unsigned char ihdr[13];
     png_u32(ihdr, (unsigned long)ancho); png_u32(ihdr + 4, (unsigned long)alto);
     ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = ihdr[11] = ihdr[12] = 0;      /* 8 bits, RGBA */
-    int ok = fwrite("\x89PNG\r\n\x1a\n", 1, 8, fa) == 8 && png_trozo(fa, "IHDR", ihdr, 13) &&
-             png_trozo(fa, "IDAT", o.b, o.n) && png_trozo(fa, "IEND", NULL, 0);
+    size_t pos = 8;
+    memcpy(png, "\x89PNG\r\n\x1a\n", 8);
+    png_trozo(png, &pos, "IHDR", ihdr, 13);
+    png_trozo(png, &pos, "IDAT", o.b, o.n);
+    png_trozo(png, &pos, "IEND", NULL, 0);
     free(o.b);
-    return fclose(fa) == 0 && ok;
+    *largo = pos;
+    return png;
+}
+
+int imagen_guardar_png(const char *ruta, const unsigned char *px, int ancho, int alto) {
+    size_t largo = 0;
+    unsigned char *png = imagen_png(px, ancho, alto, &largo);
+    if (!png) return 0;
+    FILE *f = fopen(ruta, "wb");
+    int ok = f && fwrite(png, 1, largo, f) == largo;
+    if (f) ok = fclose(f) == 0 && ok;
+    free(png);
+    return ok;
 }

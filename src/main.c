@@ -17,6 +17,7 @@
 #include "modulos.h"
 #include "recarga.h"
 #include "repartir.h"
+#include "escritorio.h"
 #include "apk.h"
 #include "nuevo.h"
 #include "formatear.h"
@@ -52,7 +53,8 @@ static void mostrar_ayuda(void) {
     printf("  lince compilar <archivo.lince>           Crea un ejecutable autónomo\n");
     printf("  lince compilar <archivo.lince> -o <bin>  Con nombre personalizado\n");
     printf("  lince compilar <a.lince> --incluir <ruta> Incluye niveles u otros archivos (varias veces)\n");
-    printf("  lince repartir <juego.lince>             Carpeta y .zip para compartir el juego (con SDL2)\n");
+    printf("  lince repartir <juego.lince>             Carpeta y .zip (para itch.io), y el instalador de Windows\n");
+    printf("                                           o el archivo único de Linux, con su icono y su nombre\n");
     printf("  lince repartir <juego.lince> --android   El .apk para instalarlo en un móvil Android\n");
     printf("  lince repartir <juego.lince> --aab       El .aab para publicarlo en Google Play\n");
     printf("  lince comprobar <archivo.lince>          Sin ejecutar: la sintaxis, y avisos de descuidos\n");
@@ -80,6 +82,8 @@ static void mostrar_ayuda(void) {
 
 /* Ejecuta el programa que lleva dentro un ejecutable creado con 'lince compilar' */
 static int ejecutar_empaquetado(int argc, char *argv[]) {
+    int al_salir = 0;
+    if (escritorio_arrancar(argc, argv, &al_salir)) return al_salir;   /* el instalador, o --desinstalar */
     const char *ruta   = empaquetado_ruta_principal();
     const char *codigo = empaquetado_codigo_principal();
     interprete_fijar_lector(empaquetado_buscar);
@@ -477,6 +481,7 @@ int main(int argc, char *argv[]) {
     /* Repartir: carpeta y .zip con el juego y SDL2, listos para compartir */
     if (strcmp(cmd, "repartir") == 0) {
         const char *uso = "   Uso: lince repartir <juego.lince> [-o carpeta] [--incluir carpeta_o_archivo]...\n"
+                          "                       [--nombre \"Mi juego\"] [--icono icono.png] [--para windows|linux]\n"
                           "        lince repartir <juego.lince> --android [--aab] [-o juego.apk] [--nombre \"Mi juego\"]\n"
                           "                       [--id org.lince.mijuego] [--version 1]\n\n";
         if (argc < 3) { fprintf(stderr, "\n❌ Falta el juego.\n%s", uso); return 1; }
@@ -485,7 +490,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "\n❌ El archivo '%s' no tiene la extensión '.lince'.\n\n", argv[2]);
             return 1;
         }
-        const char *carpeta = NULL, *nombre = NULL, *id = NULL;
+        const char *carpeta = NULL, *nombre = NULL, *id = NULL, *icono = NULL, *para = NULL;
         const char *extras[64];
         int num_extras = 0, android = 0, aab = 0, version = 1;
         for (int i = 3; i < argc; i++) {
@@ -503,6 +508,14 @@ int main(int argc, char *argv[]) {
             }
             else if (strcmp(argv[i], "--nombre") == 0 && i + 1 < argc) nombre = argv[++i];
             else if (strcmp(argv[i], "--id") == 0 && i + 1 < argc) id = argv[++i];
+            else if (strcmp(argv[i], "--icono") == 0 && i + 1 < argc) icono = argv[++i];
+            else if (strcmp(argv[i], "--para") == 0 && i + 1 < argc) {
+                para = argv[++i];
+                if (strcmp(para, "windows") != 0 && strcmp(para, "linux") != 0) {
+                    fprintf(stderr, "\n❌ --para es windows o linux (para Android, --android).\n\n");
+                    return 1;
+                }
+            }
             else if (strcmp(argv[i], "--incluir") == 0 && i + 1 < argc) {
                 if (num_extras < 64) extras[num_extras++] = argv[++i];
                 else i++;
@@ -544,7 +557,9 @@ int main(int argc, char *argv[]) {
             return apk_crear(argv[2], carpeta, nombre ? nombre : (*nombre_auto ? nombre_auto : base), id, version, aab,
                              extras, num_extras);
         }
-        return repartir_crear(argv[2], carpeta, extras, num_extras);
+        if (nombre && !nombre[0]) { fprintf(stderr, "\n❌ --nombre no puede ir vacío.\n\n"); return 1; }
+        RepartirOpciones op = {carpeta, nombre, icono, para};
+        return repartir_crear(argv[2], &op, extras, num_extras);
     }
 
     /* Subcomandos del gestor de paquetes */

@@ -37,4 +37,15 @@ const char *empaquetado_buscar(const char *ruta, size_t *largo);
 int empaquetado_cantidad(void);
 const char *empaquetado_clave(int i);
 
+/* Para 'lince repartir': el ejecutable de Lince del que parte el próximo
+   empaquetado_crear (NULL: el propio; otro, para hacer el de otro sistema) y
+   datos de más que lleva dentro (claves "lince:...": el icono, SDL2, cómo se
+   llama el juego). Se olvidan al crear. */
+void empaquetado_poner_base(const char *exe);
+void empaquetado_poner_dato(const char *clave, const char *datos, size_t largo);
+/* Copia el propio ejecutable (un juego ya empaquetado) en 'salida' sin las
+   entradas que empiezan por 'quitar' y con 'clave' cambiada a 'datos' (lo que
+   hace el instalador de Windows con el juego que instala). 0 si va bien. */
+int empaquetado_copiar_propio(const char *salida, const char *quitar, const char *clave, const char *datos, size_t largo);
+
 #endif /* LINCE_EMPAQUETADO_H */

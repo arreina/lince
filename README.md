@@ -9,7 +9,7 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-2.6-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-2.7-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-38%2F38-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows%20·%20Android-6A2D72.svg)]()
 
@@ -61,7 +61,7 @@ Trece minijuegos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, m
 - **Recarga en caliente** — guarda el archivo con el juego en marcha y se actualiza sin cerrar la ventana, con el jugador donde estaba; si hay un error, sale en la propia ventana
 - **Sin dependencias para compilar** — un solo binario, compilado con `gcc` y `make` (SDL2 se carga al abrir la ventana)
 - **Errores claros** — mensajes literales con número de línea exacto
-- **Ejecutables autónomos** — `lince compilar` empaqueta tu programa en un único ejecutable, y `lince repartir` prepara un `.zip` con el juego y SDL2 para pasárselo a quien sea
+- **Ejecutables autónomos** — `lince compilar` empaqueta tu programa en un único ejecutable, y `lince repartir` prepara el juego con su nombre y su icono: un `.zip` para itch.io, el instalador de Windows y un archivo único para Linux
 
 ## Instalación
 
@@ -92,10 +92,11 @@ Desde Linux también se puede crear `lince.exe` con `make windows` (necesita Min
 ### Compartir un juego
 
 ```bash
-lince repartir mi_juego.lince
+lince repartir mi_juego.lince --nombre "Mi juego" --icono icono.png
+lince repartir mi_juego.lince --para windows      # el de Windows, desde Linux
 ```
 
-Crea la carpeta `mi_juego-linux` (o `mi_juego-windows`) y un `.zip` con ella: el juego con sus imágenes y sonidos dentro, SDL2 y un `LEEME.txt`. Quien lo reciba lo descomprime y juega, sin instalar Lince. Las imágenes y sonidos que nombra el código van dentro solos; los niveles u otros archivos, con `--incluir`.
+Crea la carpeta `mi_juego-linux` (o `mi_juego-windows`) y un `.zip` con ella, listo para subirlo a itch.io: el juego con sus imágenes y sonidos dentro, SDL2 y un `LEEME.txt`. Quien lo reciba lo descomprime y juega, sin instalar Lince. Y además, todo en un archivo: en Windows, el instalador `mi_juego-instalar.exe` (menú Inicio y se desinstala como cualquier programa); en Linux, `mi_juego.x86_64`, con SDL2 dentro, que se ofrece a ponerse en el menú de aplicaciones. Las imágenes y sonidos que nombra el código van dentro solos; los niveles u otros archivos, con `--incluir`.
 
 ### En un móvil Android
 
@@ -113,7 +114,7 @@ Para publicarlo en Google Play, `lince repartir mi_juego.lince --aab --version 1
 lince programa.lince              # ejecutar
 lince nuevo mi_juego              # crear un juego nuevo listo para cambiarlo
 lince compilar programa.lince     # crear un ejecutable autónomo
-lince repartir juego.lince        # carpeta y .zip para compartir el juego
+lince repartir juego.lince        # .zip (itch.io), instalador de Windows o archivo único de Linux
 lince depurar programa.lince      # depurar paso a paso
 lince comprobar programa.lince    # sin ejecutar: la sintaxis y avisos de descuidos
 lince formatear programa.lince    # dejarlo con el estilo de Lince

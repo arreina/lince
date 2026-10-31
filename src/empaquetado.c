@@ -299,6 +299,99 @@ static void recoger(const char *codigo, const char *actual) {
 }
 
 static int _solo_datos = 0;
+static char *_base = NULL;                 /* el ejecutable de Lince del que se parte (NULL: el propio) */
+static Entrada *_datos = NULL;             /* lo que se añade al final (empaquetado_poner_dato) */
+static int _num_datos = 0;
+
+void empaquetado_poner_base(const char *exe) {
+    free(_base);
+    _base = exe ? strdup(exe) : NULL;
+}
+
+void empaquetado_poner_dato(const char *clave, const char *datos, size_t largo) {
+    _datos = realloc(_datos, sizeof(Entrada) * (size_t)(_num_datos + 1));
+    char *copia = malloc(largo + 1);
+    memcpy(copia, datos, largo); copia[largo] = '\0';
+    _datos[_num_datos++] = (Entrada){ strdup(clave), copia, largo };
+}
+
+static void olvidar_datos(void) {
+    for (int i = 0; i < _num_datos; i++) { free(_datos[i].clave); free(_datos[i].contenido); }
+    free(_datos);
+    _datos = NULL; _num_datos = 0;
+    empaquetado_poner_base(NULL);
+}
+
+/* Abre el ejecutable de Lince 'exe' y dice dónde acaba el intérprete (si ya
+   lleva un programa, la copia tiene que empezar antes) */
+static FILE *abrir_interprete(const char *exe, long *fin_ejecutable) {
+    FILE *in = fopen(exe, "rb");
+    if (!in) return NULL;
+    unsigned char pie[PIE_TAM];
+    fseek(in, 0, SEEK_END);
+    *fin_ejecutable = ftell(in);
+    if (*fin_ejecutable >= PIE_TAM && fseek(in, -PIE_TAM, SEEK_END) == 0 &&
+        fread(pie, 1, PIE_TAM, in) == PIE_TAM && memcmp(pie, MAGIA, 8) == 0)
+        *fin_ejecutable -= PIE_TAM + (long)leer_u64(pie + 8);
+    rewind(in);
+    return in;
+}
+
+static void copiar_interprete(FILE *in, FILE *out, long resta) {
+    char buf[65536];
+    while (resta > 0) {
+        size_t n = fread(buf, 1, (size_t)(resta > (long)sizeof(buf) ? (long)sizeof(buf) : resta), in);
+        if (n == 0) break;
+        fwrite(buf, 1, n, out);
+        resta -= (long)n;
+    }
+}
+
+/* La carga y el pie: las entradas que no empiezan por 'quitar', con 'clave' cambiada */
+static void escribir_carga(FILE *out, const char *quitar, const char *clave, const char *datos, size_t largo_datos) {
+    int cuantas = 0;
+    for (int i = 0; i < _num_entradas; i++)
+        if (!quitar || strncmp(_entradas[i].clave, quitar, strlen(quitar)) != 0) cuantas++;
+    uint64_t total = 4;
+    unsigned char tmp[8];
+    poner_u32(tmp, (uint32_t)cuantas);
+    fwrite(tmp, 1, 4, out);
+    for (int i = 0; i < _num_entradas; i++) {
+        if (quitar && strncmp(_entradas[i].clave, quitar, strlen(quitar)) == 0) continue;
+        int cambia = clave && strcmp(_entradas[i].clave, clave) == 0;
+        const char *c = cambia ? datos : _entradas[i].contenido;
+        size_t lc = cambia ? largo_datos : _entradas[i].largo;
+        size_t lk = strlen(_entradas[i].clave);
+        poner_u32(tmp, (uint32_t)lk); fwrite(tmp, 1, 4, out);
+        fwrite(_entradas[i].clave, 1, lk, out);
+        poner_u64(tmp, lc); fwrite(tmp, 1, 8, out);
+        fwrite(c, 1, lc, out);
+        total += 4 + lk + 8 + lc;
+    }
+    unsigned char pie[PIE_TAM];
+    memcpy(pie, MAGIA, 8);
+    poner_u64(pie + 8, total);
+    fwrite(pie, 1, PIE_TAM, out);
+}
+
+int empaquetado_copiar_propio(const char *salida, const char *quitar, const char *clave, const char *datos, size_t largo) {
+    char yo[PATH_MAXIMO + 1];
+    long fin;
+    if (!ruta_ejecutable(NULL, yo, sizeof(yo))) return 1;
+    FILE *in = abrir_interprete(yo, &fin);
+    if (!in) return 1;
+    FILE *out = fopen(salida, "wb");
+    if (!out) { fclose(in); return 1; }
+    copiar_interprete(in, out, fin);
+    fclose(in);
+    escribir_carga(out, quitar, clave, datos, largo);
+    int mal = ferror(out);
+    mal = fclose(out) != 0 || mal;
+#ifndef _WIN32
+    if (!mal) chmod(salida, 0755);
+#endif
+    return mal;
+}
 
 int empaquetado_crear_datos(const char *archivo, const char *salida, const char *const *extras, int num_extras) {
     _solo_datos = 1;
@@ -324,62 +417,36 @@ int empaquetado_crear(const char *archivo, const char *salida, const char *const
     recoger(codigo, principal);
     free(codigo);
     for (int i = 0; i < num_extras; i++)
-        if (!anadir_extra(extras[i])) return 1;
+        if (!anadir_extra(extras[i])) { olvidar_datos(); return 1; }
+    for (int i = 0; i < _num_datos; i++)
+        if (!ya_esta(_datos[i].clave)) anadir_bin(_datos[i].clave, _datos[i].contenido, _datos[i].largo);
 
     FILE *out;
     if (_solo_datos) {                  /* solo el programa y sus archivos, sin el intérprete */
+        olvidar_datos();
         out = fopen(salida, "wb");
         if (!out) { fprintf(stderr, "\n❌ No se pudo crear '%s'.\n\n", salida); return 1; }
-        goto carga;
+        escribir_carga(out, NULL, NULL, NULL, 0);
+        goto cerrar;
     }
     char yo[PATH_MAXIMO + 1];
-    if (!ruta_ejecutable(NULL, yo, sizeof(yo))) {
+    if (_base) snprintf(yo, sizeof yo, "%s", _base);
+    else if (!ruta_ejecutable(NULL, yo, sizeof(yo))) {
         fprintf(stderr, "\n❌ No se pudo localizar el ejecutable de Lince.\n\n");
+        olvidar_datos();
         return 1;
     }
-    FILE *in = fopen(yo, "rb");
-    if (!in) { fprintf(stderr, "\n❌ No se pudo leer '%s'.\n\n", yo); return 1; }
-    /* Si este mismo ejecutable ya lleva un programa, la copia empieza antes */
+    olvidar_datos();
     long fin_ejecutable;
-    {
-        unsigned char pie[PIE_TAM];
-        fseek(in, 0, SEEK_END);
-        fin_ejecutable = ftell(in);
-        if (fin_ejecutable >= PIE_TAM && fseek(in, -PIE_TAM, SEEK_END) == 0 &&
-            fread(pie, 1, PIE_TAM, in) == PIE_TAM && memcmp(pie, MAGIA, 8) == 0)
-            fin_ejecutable -= PIE_TAM + (long)leer_u64(pie + 8);
-        rewind(in);
-    }
+    FILE *in = abrir_interprete(yo, &fin_ejecutable);
+    if (!in) { fprintf(stderr, "\n❌ No se pudo leer '%s'.\n\n", yo); return 1; }
     out = fopen(salida, "wb");
     if (!out) { fclose(in); fprintf(stderr, "\n❌ No se pudo crear '%s'.\n\n", salida); return 1; }
-
-    char buf[65536];
-    long resta = fin_ejecutable;
-    while (resta > 0) {
-        size_t n = fread(buf, 1, (size_t)(resta > (long)sizeof(buf) ? (long)sizeof(buf) : resta), in);
-        if (n == 0) break;
-        fwrite(buf, 1, n, out);
-        resta -= (long)n;
-    }
+    copiar_interprete(in, out, fin_ejecutable);
     fclose(in);
+    escribir_carga(out, NULL, NULL, NULL, 0);
 
-carga:;
-    uint64_t total = 4;
-    unsigned char tmp[8];
-    poner_u32(tmp, (uint32_t)_num_entradas);
-    fwrite(tmp, 1, 4, out);
-    for (int i = 0; i < _num_entradas; i++) {
-        size_t lk = strlen(_entradas[i].clave);
-        poner_u32(tmp, (uint32_t)lk); fwrite(tmp, 1, 4, out);
-        fwrite(_entradas[i].clave, 1, lk, out);
-        poner_u64(tmp, _entradas[i].largo); fwrite(tmp, 1, 8, out);
-        fwrite(_entradas[i].contenido, 1, _entradas[i].largo, out);
-        total += 4 + lk + 8 + _entradas[i].largo;
-    }
-    unsigned char pie[PIE_TAM];
-    memcpy(pie, MAGIA, 8);
-    poner_u64(pie + 8, total);
-    fwrite(pie, 1, PIE_TAM, out);
+cerrar:;
     int mal = ferror(out);
     fclose(out);
     if (mal) { fprintf(stderr, "\n❌ Error al escribir '%s'.\n\n", salida); return 1; }

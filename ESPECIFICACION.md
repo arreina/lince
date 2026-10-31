@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.6
+# 🐆 Lince — Especificación del Lenguaje v2.7
 
 ## Filosofía
 
@@ -2288,19 +2288,39 @@ Notas:
 ### Compartir un juego (`lince repartir`)
 
 ```bash
-lince repartir juego.lince                   # crea juego-linux/ y juego-linux.zip
+lince repartir juego.lince                             # para este sistema
+lince repartir juego.lince --nombre "La piedra del lince" --icono icono.png
+lince repartir juego.lince --para windows              # el de Windows, desde Linux (o al revés)
 lince repartir juego.lince -o carpeta --incluir niveles
 ```
 
-Prepara un juego para pasárselo a alguien: una carpeta (`juego-linux` o `juego-windows`)
-con el ejecutable (como el de `lince compilar`, con sus imágenes y sonidos dentro), SDL2
-y un `LEEME.txt`, y un `.zip` con esa carpeta. Quien lo reciba lo descomprime y juega.
+Prepara un juego para pasárselo a alguien, con su **nombre** (`--nombre`; si no, el del archivo
+sin los números del principio) y su **icono** (`--icono`, una imagen cualquiera, mejor cuadrada y
+de 256×256 o más; si no se dice, `icono.png` junto al juego si lo hay). Hace dos cosas:
 
-- **Windows**: lleva `SDL2.dll` y las DLL de las que dependa (si las hay en su carpeta).
-- **Linux**: lleva `libSDL2-2.0.so.0`. El juego usa la SDL2 del sistema si está
-  instalada y, si no, la de su carpeta.
-- El ejecutable es para el sistema en el que se crea: para Windows, se reparte desde
-  Windows (o con el `lince.exe` de `make windows` bajo Wine).
+- **Una carpeta y su `.zip`** (`juego-windows` o `juego-linux`): el ejecutable (como el de
+  `lince compilar`, con sus imágenes y sonidos dentro), SDL2 y un `LEEME.txt`. Quien la recibe la
+  descomprime y juega. El `.zip` lleva el `.itch.toml` que espera [itch.io](https://itch.io), así
+  que se sube tal cual (también con su programa, `butler push juego-windows.zip usuario/juego:windows`).
+- **Todo en un solo archivo**:
+  - En **Windows**, el instalador `juego-instalar.exe`: con doble clic, pregunta y se instala solo
+    para quien lo abre, sin pedir permiso de administrador, en `%LOCALAPPDATA%\Programs`, con su
+    acceso en el menú Inicio (y en el escritorio, si se quiere). Se desinstala desde Configuración
+    → Aplicaciones, como cualquier programa; las partidas guardadas se quedan.
+  - En **Linux**, `juego.x86_64`: lleva SDL2 dentro (la usa si el sistema no tiene la suya), así
+    que funciona con doble clic en casi cualquier Linux. La primera vez pregunta si ponerse en el
+    **menú de aplicaciones**, con su icono (se copia a `~/.local/share/lince-juegos`);
+    `juego.x86_64 --desinstalar` lo quita.
+
+En Windows, el ejecutable lleva el icono del juego y no abre una consola, y la ventana del juego
+lleva el icono en los dos sistemas.
+
+**Para el otro sistema.** Con `--para windows` (desde Linux) o `--para linux` (desde Windows), hace
+falta el Lince de ese sistema de la misma versión: lo que hay en su descarga
+(`lince-<versión>-windows.zip` o `lince-<versión>-linux.tar.gz`), descomprimido en `~/.lince/windows` o
+`~/.lince/linux`, en una carpeta `lince-windows` o `lince-linux` junto a este `lince`, o donde diga
+`LINCE_WINDOWS` o `LINCE_LINUX`. El juego no se compila: se pega al Lince de ese sistema, así que no
+hace falta nada más.
 
 ### Android
 

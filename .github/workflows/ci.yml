@@ -50,8 +50,11 @@ jobs:
 
       - name: Juego (SDL2 sin pantalla)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
+          sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0 python3-pil
           make test-juego test-ejemplos
+
+      - name: Escritorio (lince repartir para Linux)
+        run: make test-escritorio
 
       - name: Los editores están al día
         run: make editores-check
@@ -141,6 +144,9 @@ jobs:
           bash tests/juego/smoke.sh ./lince.exe
           bash tests/juego/ejemplos.sh ./lince.exe
 
+      - name: Escritorio (lince repartir, el instalador de verdad)
+        run: bash tests/escritorio/probar.sh ./lince.exe
+
       # Para la versión: lince.exe con SDL2.dll y las DLL de MSYS2 que necesiten
       - name: Lince para Windows
         if: startsWith(github.ref, 'refs/tags/v')
@@ -222,7 +228,9 @@ jobs:
           echo "V=$V" >> "$GITHUB_ENV"
 
       - name: Compilar Lince
-        run: make
+        run: |
+          make
+          sudo apt-get update -qq && sudo apt-get install -y -qq libsdl2-2.0-0
 
       - uses: actions/download-artifact@v4
         with:
@@ -235,6 +243,9 @@ jobs:
           # Linux
           L="lince-$V-linux"
           mkdir "$L" && cp -r lince $comun "$plantilla" "$L"/
+          # SDL2 al lado: lince la usa si el sistema no la tiene, y 'lince repartir
+          # --para linux' (desde Windows) la mete en el juego
+          cp -L "$(ldconfig -p | awk '/libSDL2-2.0.so.0 .*x86-64/ {print $NF; exit}')" "$L"/libSDL2-2.0.so.0
           tar -czf "$L.tar.gz" "$L"
           # Windows
           W="lince-$V-windows"

@@ -3,6 +3,27 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.7.0
+
+Paquetes de escritorio: `lince repartir` deja el juego listo para pasarlo, instalarlo o subirlo a itch.io, con su nombre y su icono. Solo añade: nada de la 2.0 cambia.
+
+- **`--nombre "La piedra del lince"`** y **`--icono icono.png`** (o `icono.png` junto al juego): el ejecutable se llama como el juego y lleva su icono, también en la ventana y en la barra de tareas. En Windows, además, el juego ya no abre una consola.
+- **El instalador de Windows**, `juego-instalar.exe`: se instala con doble clic solo para quien lo abre (sin permiso de administrador), con su acceso en el menú Inicio y, si se quiere, en el escritorio, y se desinstala desde Configuración → Aplicaciones como cualquier programa. No hace falta NSIS ni nada más: el instalador es el propio juego.
+- **El archivo único de Linux**, `juego.x86_64`: lleva SDL2 dentro y funciona con doble clic en casi cualquier Linux (sin FUSE, que pediría una AppImage). La primera vez pregunta si ponerse en el menú de aplicaciones con su icono; `--desinstalar` lo quita.
+- **El `.zip`, listo para itch.io**: lleva su `.itch.toml`, así que se sube tal cual.
+- **El juego de Windows desde Linux** (y al revés) con `--para windows` o `--para linux`, con el Lince de ese sistema de esta versión en `~/.lince/windows` o `~/.lince/linux`.
+- `lince.exe` tiene icono, y en Windows las rutas con tildes o eñes van bien en todo Lince (los textos de Windows van en UTF-8).
+- La descarga de Linux lleva SDL2 al lado de `lince`: si el sistema no la tiene, Lince usa esa.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.7.0-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.7.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.7.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.7.0.vsix` |
+
 ## 2.6.1
 
 Arreglos de las pruebas de juegos de la 2.6.0, tras revisar el código.

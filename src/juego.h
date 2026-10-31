@@ -15,6 +15,10 @@
 static void *jg_abrir_lib(void) {
     static const char *const nombres[] = {
         "libSDL2-2.0.so.0", "libSDL2.so", "libSDL2-2.0.0.dylib", "libSDL2.dylib", NULL };
+    if (getenv("LINCE_PROBAR_SDL_DENTRO")) {          /* prueba: la que lleva dentro, aunque haya otra */
+        const char *dentro = escritorio_sdl_del_paquete();
+        return dentro ? dlopen(dentro, RTLD_NOW) : NULL;
+    }
     for (int i = 0; nombres[i]; i++) {
         void *h = dlopen(nombres[i], RTLD_NOW);
         if (h) return h;
@@ -25,7 +29,11 @@ static void *jg_abrir_lib(void) {
     char *barra = strrchr(ruta, '/');
     if (!barra) return NULL;
     strcpy(barra + 1, "libSDL2-2.0.so.0");
-    return dlopen(ruta, RTLD_NOW);
+    void *h = dlopen(ruta, RTLD_NOW);
+    if (h) return h;
+    /* y si no, la que lleva dentro (el archivo único de lince repartir) */
+    const char *dentro = escritorio_sdl_del_paquete();
+    return dentro ? dlopen(dentro, RTLD_NOW) : NULL;
 }
 #define JG_ABRIR_LIB()   jg_abrir_lib()
 #define JG_SIMBOLO(h, n) dlsym(h, n)
@@ -119,6 +127,8 @@ static struct {
     void *(*SensorOpen)(int);
     int  (*SensorData)(void *, float *, int);
     int  (*DisplayOrientation)(int);
+    void (*SetWindowIcon)(void *, void *);
+    int  (*ShowMessageBox)(const void *, int *);
     /* cámaras con zoom o giro: se dibuja en una textura y se pega girada */
     void *(*CreateTexture)(void *, unsigned, int, int, int);
     int  (*SetRenderTarget)(void *, void *);
@@ -778,6 +788,8 @@ static int jg_cargar(void) {
     *(void **)(&_jg.SensorOpen) = JG_SIMBOLO(h, "SDL_SensorOpen");
     *(void **)(&_jg.SensorData) = JG_SIMBOLO(h, "SDL_SensorGetData");
     *(void **)(&_jg.DisplayOrientation) = JG_SIMBOLO(h, "SDL_GetDisplayOrientation");
+    *(void **)(&_jg.SetWindowIcon) = JG_SIMBOLO(h, "SDL_SetWindowIcon");
+    *(void **)(&_jg.ShowMessageBox) = JG_SIMBOLO(h, "SDL_ShowMessageBox");
     return 1;
 }
 
@@ -1038,6 +1050,37 @@ static char *jg_entorno_utf8(const char *nombre) {
 /* abrir(titulo, ancho, alto[, {"escala": n}]): con escala, la ventana es n
    veces mayor y cada píxel del juego se ve como un cuadrado de n × n (para
    juegos de píxeles grandes, como los de las consolas portátiles) */
+/* La ventana de un juego repartido lleva su icono (el de la barra de tareas) */
+static void jg_icono_ventana(void) {
+    size_t largo = 0;
+    const char *png = empaquetado_buscar("lince:icono.png", &largo);
+    if (!png || !_jg.SetWindowIcon) return;
+    int w, h;
+    const char *por = NULL;
+    unsigned char *px = imagen_decodificar((const unsigned char *)png, largo, &w, &h, &por);
+    if (!px) return;
+    void *sup = _jg.SurfaceFrom(px, w, h, 32, w * 4, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+    if (sup) { _jg.SetWindowIcon(_jgs.ventana, sup); _jg.FreeSurface(sup); }
+    free(px);
+}
+
+/* El archivo único de Linux, la primera vez: ¿ponerlo en el menú de aplicaciones? */
+static void jg_preguntar_menu(void) {
+    if (!_jg.ShowMessageBox) return;
+    EscritorioPaquete pq;
+    if (!escritorio_paquete(&pq)) return;
+    typedef struct { unsigned flags; int id; const char *texto; } Boton;          /* SDL_MessageBoxButtonData */
+    typedef struct { unsigned flags; void *ventana; const char *titulo, *mensaje; int nbotones;
+                     const Boton *botones; const void *colores; } Caja;          /* SDL_MessageBoxData */
+    static const Boton botones[] = {{2, 0, "No"}, {1, 1, "Sí, ponerlo"}};
+    char mensaje[600];
+    snprintf(mensaje, sizeof mensaje, "¿Pongo «%s» en el menú de aplicaciones, con su icono?\n\n"
+             "Así lo encontrarás como cualquier otro programa. No se vuelve a preguntar.", pq.nombre);
+    Caja caja = {0x40, _jgs.ventana, pq.nombre, mensaje, 2, botones, NULL};
+    int elegido = 0;
+    if (_jg.ShowMessageBox(&caja, &elegido) == 0) escritorio_responder(elegido == 1);
+}
+
 /* Una entrada del guion: "30:derecha:20" (tecla desde el fotograma 30 durante
    20), "30:mando2:a:5" (un botón o un eje de un mando) o "30:toque:240:135:5"
    (un dedo, o el ratón, ahí). 0 y el porqué en 'msg' si no se entiende. */
@@ -1139,6 +1182,17 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     /* en el móvil, el acelerómetro no es un mando (sí los de Bluetooth o cable) */
     if (_jg.SetHint) _jg.SetHint("SDL_ACCELEROMETER_AS_JOYSTICK", "0");
 #endif
+#if !defined(_WIN32) && !defined(__ANDROID__)
+    {   /* un juego repartido: la clase de su ventana, la que dice su .desktop (así sale con su icono) */
+        EscritorioPaquete pq;
+        char clase[160];
+        if (escritorio_paquete(&pq)) {
+            snprintf(clase, sizeof clase, "lince-%s", pq.id);
+            setenv("SDL_VIDEO_X11_WMCLASS", clase, 0);
+            setenv("SDL_VIDEO_WAYLAND_WMCLASS", clase, 0);
+        }
+    }
+#endif
     /* vídeo, y si se puede audio y mandos (0x10 audio, 0x200 joystick, 0x2000 mando) */
     /* (y 0x1000 vibración, 0x8000 sensores: el acelerómetro del móvil) */
     if (_jg.Init(0x20 | 0x10 | 0x200 | 0x2000 | 0x1000 | 0x8000) != 0 && _jg.Init(0x20 | 0x10 | 0x200 | 0x2000) != 0 &&
@@ -1172,6 +1226,8 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     }
     _jg.LogicalSize(_jgs.render, (int)w, (int)h);    /* en pantalla completa se escala */
     jg_texturas_pendientes();                        /* las imágenes cargadas antes, sin ventana */
+    jg_icono_ventana();
+    if (escritorio_toca_preguntar()) jg_preguntar_menu();
     memset(_jgs.teclas, 0, sizeof(_jgs.teclas));
     memset(_jgs.previas, 0, sizeof(_jgs.previas));
     memset(_jgs.botones, 0, sizeof(_jgs.botones));
