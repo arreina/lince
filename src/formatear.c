@@ -255,7 +255,10 @@ char *formatear_codigo(const char *codigo) {
             int bloque = t->tipo == TOK_LLAVE_IZQ ? abre_bloque(previo)
                        : (t->tipo == TOK_LLAVE_DER && alto > 0) ? pila[alto - 1].bloque : 0;
             if (previo->tipo == TOK_LLAVE_IZQ && alto > 0) bloque = pila[alto - 1].bloque;
-            int operador = es_dudosa(previo) && antes && acaba_valor(antes->tipo);
+            /* 'o' / 'y' son el operador entre dos valores; pero al principio de
+               una línea y seguidos de [, ., =... empiezan otra sentencia: o[k] = 1 */
+            int operador = es_dudosa(previo) && antes && acaba_valor(antes->tipo) &&
+                           !(antes->linea != previo->linea && empieza_sentencia(t->tipo));
             int e = espacios(previo, t, previo_unario, unario, habia, operador, bloque);
             for (int b = 0; b < e; b++) poner(&s, " ");
         }

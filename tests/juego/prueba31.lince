@@ -1,0 +1,39 @@
+# 2.2: menu_opciones(). smoke.sh lo ejecuta dos veces con la misma carpeta de
+# partidas: la primera cambia cosas con el guion; la segunda ve que se aplican solas.
+importar "juego"
+importar "sistema"
+juego.abrir("2.2", 320, 240)
+juego.definir_accion("saltar", ["espacio", "mando:a"])
+fijo PROPIAS = [
+    {"clave": "dificultad", "nombre": "Dificultad", "valores": ["Fácil", "Normal", "Difícil"], "inicial": "Normal"},
+    {"clave": "ver_fps", "nombre": "Ver FPS", "inicial": falso},
+    {"clave": "sensibilidad", "nombre": "Sensibilidad", "inicial": 5, "minimo": 1, "maximo": 10}]
+sea segunda = sistema.entorno("SEGUNDA", "") != ""
+sea f = 0
+mientras juego.abierto() {
+    juego.limpiar([20, 20, 30])
+    si segunda {
+        si f == 1 {
+            escribir("al abrir: {juego.volumen("musica")} {juego.volumen("efectos")} {juego.volumen("voces")}")
+            escribir("propias: {juego.opcion("dificultad", "Normal")} {juego.opcion("ver_fps", falso)} {juego.opcion("sensibilidad", 5)} {juego.opcion("otra", 7)}")
+            juego.cerrar()
+            romper
+        }
+    } sino {
+        sea r = juego.menu_opciones({"propias": PROPIAS, "mostrar": ["musica", "efectos", "voces", "pantalla_completa", "controles"]})
+        si f == 26 { juego.captura("opciones.bmp") }
+        si r != nulo {
+            escribir("menu_opciones en {f}: {r}")
+            escribir("ahora: {juego.volumen("musica")} {juego.volumen("efectos")} {juego.volumen("voces")}")
+            escribir("propias: {juego.opcion("dificultad")} {juego.opcion("ver_fps")} {juego.opcion("sensibilidad")}")
+            juego.cerrar()
+            romper
+        }
+    }
+    juego.presentar()
+    f = f + 1
+}
+juego.abrir("x", 10, 10)
+intentar { juego.menu_opciones({"color_raro": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.menu_opciones({"propias": [{"clave": "x", "nombre": "X"}]}) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.menu_opciones({"mostrar": ["volumen"]}) } capturar (error e) { escribir("error: {e.mensaje}") }

@@ -275,6 +275,10 @@ funcion tiempo_escena(): numero {
 # En cada presentar(), después de las tareas: la caja de diálogo, el fundido
 # de las escenas y, encima de todo, el mando de la pantalla táctil
 funcion _presentar(): nulo {
+    si no _opc_aplicadas {                      # lo que el jugador eligió en las opciones, al empezar
+        _opc_aplicadas = verdadero
+        _aplicar_opciones()
+    }
     _aplicar_forzada()
     _dibujar_dialogo()
     _fundido_escenas()
@@ -859,6 +863,8 @@ funcion _dibujar_mando(): nulo {
 
 sea _ui_eje = 0             # la palanca, arriba (-1), abajo (1) o en medio: para moverse a saltos
 sea _ui_paso = 0            # -1 / 1 si en este fotograma se pide subir / bajar
+sea _ui_lado = 0            # -1 / 1 si en este fotograma se pide izquierda / derecha (cambiar un valor)
+sea _ui_eje_x = 0
 sea _menus = {}             # por menú (sus opciones): cuál está elegida y cuándo se vio
 
 # Lo que se pide en este fotograma (en _entrada_ui, con la entrada recién leída)
@@ -870,6 +876,13 @@ funcion _ui_leer(): nulo {
     si juego.tecla_pulsada("abajo") o juego.tecla_pulsada("s") o juego.boton_pulsado("abajo") { _ui_paso = 1 }
     si ahora != 0 y ahora != _ui_eje { _ui_paso = ahora }
     _ui_eje = ahora
+    sea ex = juego.eje("izq_x")
+    sea lado = si ex < -0.5 { -1 } sino si ex > 0.5 { 1 } sino { 0 }
+    _ui_lado = 0
+    si juego.tecla_pulsada("izquierda") o juego.tecla_pulsada("a") o juego.boton_pulsado("izquierda") { _ui_lado = -1 }
+    si juego.tecla_pulsada("derecha") o juego.tecla_pulsada("d") o juego.boton_pulsado("derecha") { _ui_lado = 1 }
+    si lado != 0 y lado != _ui_eje_x { _ui_lado = lado }
+    _ui_eje_x = lado
 }
 
 funcion _ui_aceptar(): logico {
@@ -2816,6 +2829,270 @@ funcion menu_jugadores(cualquiera opciones = nulo): cualquiera {
     }
     para (k = 0; k < pie.longitud(); k++) { escribir_en(pie[k], arriba + (maximo + 2.5 + k * 0.7) * paso, gris) }
     juego.camara(camara)
+    devolver resultado
+}
+
+# ── Pantalla de opciones ──
+# menu_opciones() es la pantalla de opciones de cualquier juego: el volumen de
+# la música, los efectos y las voces, la pantalla completa, los controles
+# (menu_controles) y el idioma (menu_idiomas), más las opciones propias del
+# juego. Lo que se cambia se aplica en el acto, se guarda solo ("lince_opciones")
+# y vuelve a aplicarse en el primer fotograma la próxima vez que se abra el
+# juego. Se maneja como los demás menús: arriba y abajo para elegir, izquierda
+# y derecha (o aceptar) para cambiar, atrás para salir.
+# Las propias van en "propias", y el juego las lee con opcion(clave, defecto):
+#   juego.menu_opciones({"propias": [
+#       {"clave": "dificultad", "nombre": "Dificultad", "valores": ["Fácil", "Normal", "Difícil"], "inicial": "Normal"},
+#       {"clave": "ver_fps", "nombre": "Ver FPS", "inicial": falso},
+#       {"clave": "sensibilidad", "nombre": "Sensibilidad", "inicial": 5, "minimo": 1, "maximo": 10}]})
+#   si juego.opcion("dificultad", "Normal") == "Difícil" { ... }
+
+fijo _OPCIONES_OPCIONES = ["propias", "mostrar", "titulo", "escala", "fuente", "color", "color_elegido"]
+fijo _OPCIONES_DE_SERIE = ["musica", "efectos", "voces", "pantalla_completa", "controles", "idioma"]
+sea _opc = nulo             # lo elegido: {"musica", "efectos", "voces", "pantalla_completa", "propias": {}}
+sea _opc_aplicadas = falso
+sea _opc_menu = nulo        # el menú abierto: qué fila está elegida y si hay otro dentro (controles, idioma)
+
+# Lo guardado (la primera vez se lee del disco)
+funcion _opciones(): diccionario {
+    si _opc == nulo {
+        _opc = {"propias": {}}
+        sea g = {}
+        intentar { g = juego.cargar_partida("lince_opciones", {}) } capturar (error e) { g = {} }
+        si g es diccionario {
+            para cada texto k en ["musica", "efectos", "voces"] {
+                si g.contiene(k) y g[k] es numero { _opc[k] = matematica.maximo(0, matematica.minimo(1, g[k])) }
+            }
+            si g.contiene("pantalla_completa") y g["pantalla_completa"] es logico { _opc["pantalla_completa"] = g["pantalla_completa"] }
+            si g.contiene("propias") y g["propias"] es diccionario { _opc["propias"] = g["propias"] }
+        }
+    }
+    devolver _opc
+}
+
+funcion _guardar_opciones(): nulo {
+    intentar { juego.guardar_partida("lince_opciones", _opciones()) } capturar (error e) {}
+}
+
+# Solo lo que el jugador ha cambiado alguna vez: lo demás lo deja como lo puso el juego
+funcion _aplicar_opciones(): nulo {
+    sea elegido = _opciones()
+    para cada texto k en ["musica", "efectos", "voces"] { si elegido.contiene(k) { juego.volumen(k, elegido[k]) } }
+    si elegido.contiene("pantalla_completa") { juego.pantalla_completa(elegido["pantalla_completa"]) }
+}
+
+# opcion(clave[, defecto]): lo que el jugador eligió en esa opción de menu_opciones()
+# (las propias del juego, o "musica", "efectos", "voces" y "pantalla_completa"), o el defecto
+funcion opcion(texto clave, cualquiera defecto = nulo): cualquiera {
+    sea elegido = _opciones()
+    si elegido["propias"].contiene(clave) { devolver elegido["propias"][clave] }
+    si _OPCIONES_DE_SERIE.contiene(clave) y elegido.contiene(clave) { devolver elegido[clave] }
+    devolver defecto
+}
+
+# Las filas del menú, según lo que haya en el juego y lo que se pida en "mostrar"
+funcion _filas_opciones(diccionario aj): lista {
+    sea mostrar = _de(aj, "mostrar", nulo)
+    sea hay_acciones = juego.acciones().longitud() > 0
+    sea hay_idiomas = idiomas().longitud() > 0
+    funcion se_ve(texto k, logico de_serie): logico {
+        si mostrar != nulo { devolver mostrar.contiene(k) }
+        devolver de_serie
+    }
+    sea filas = []
+    para cada lista par en [["musica", "Música"], ["efectos", "Efectos"], ["voces", "Voces"]] {
+        si se_ve(par[0], verdadero) { filas.agregar({"tipo": "volumen", "clave": par[0], "nombre": par[1]}) }
+    }
+    si se_ve("pantalla_completa", no juego.tactil()) {
+        filas.agregar({"tipo": "si_no", "clave": "pantalla_completa", "nombre": "Pantalla completa", "inicial": falso, "de_serie": verdadero})
+    }
+    si se_ve("controles", hay_acciones) { filas.agregar({"tipo": "abrir", "que": "controles", "nombre": "Controles"}) }
+    si se_ve("idioma", hay_idiomas) { filas.agregar({"tipo": "abrir", "que": "idioma", "nombre": "Idioma"}) }
+    para cada cualquiera p en _de(aj, "propias", []) {
+        si no (p es diccionario) o no p.contiene("clave") o no (p["clave"] es texto) {
+            lanzar ErrorTipo("menu_opciones(): cada opción propia es un diccionario con \"clave\" y \"nombre\"")
+        }
+        para cada texto c en p {
+            si no ["clave", "nombre", "valores", "inicial", "minimo", "maximo", "paso"].contiene(c) {
+                _no_conozco("menu_opciones", c, ["clave", "nombre", "valores", "inicial", "minimo", "maximo", "paso"])
+            }
+        }
+        sea f = {"clave": p["clave"], "nombre": _de(p, "nombre", p["clave"]), "inicial": _de(p, "inicial", nulo)}
+        si p.contiene("valores") {
+            si no (p["valores"] es lista) o p["valores"].longitud() == 0 { lanzar ErrorTipo("menu_opciones(): \"valores\" es una lista de lo que se puede elegir") }
+            f["tipo"] = "lista"
+            f["valores"] = p["valores"]
+            si f["inicial"] == nulo { f["inicial"] = p["valores"][0] }
+        } sino si f["inicial"] es logico {
+            f["tipo"] = "si_no"
+        } sino si f["inicial"] es numero {
+            f["tipo"] = "numero"
+            f["minimo"] = _de(p, "minimo", 0)
+            f["maximo"] = _de(p, "maximo", 10)
+            f["paso"] = _de(p, "paso", 1)
+        } sino {
+            lanzar ErrorTipo("menu_opciones(): la opción '{p["clave"]}' necesita \"valores\" (una lista), o un \"inicial\" lógico o numérico")
+        }
+        filas.agregar(f)
+    }
+    filas.agregar({"tipo": "volver", "nombre": "Volver"})
+    devolver filas
+}
+
+funcion _valor_opcion(diccionario f): cualquiera {
+    sea elegido = _opciones()
+    si f["tipo"] == "volumen" { devolver _de(elegido, f["clave"], juego.volumen(f["clave"])) }
+    si f.contiene("de_serie") { devolver _de(elegido, f["clave"], f["inicial"]) }
+    devolver _de(elegido["propias"], f["clave"], f["inicial"])
+}
+
+# Cambia la opción de la fila un paso hacia 'lado' (-1 o 1), la aplica y la guarda
+funcion _cambiar_opcion(diccionario f, numero lado): nulo {
+    sea elegido = _opciones()
+    sea v = _valor_opcion(f)
+    si f["tipo"] == "volumen" {
+        v = matematica.redondear(matematica.maximo(0, matematica.minimo(1, v + lado * 0.1)) * 10) / 10
+        elegido[f["clave"]] = v
+        juego.volumen(f["clave"], v)
+    } sino si f["tipo"] == "si_no" {
+        v = no v
+        si f.contiene("de_serie") {
+            elegido[f["clave"]] = v
+            juego.pantalla_completa(v)
+        } sino { elegido["propias"][f["clave"]] = v }
+    } sino si f["tipo"] == "lista" {
+        sea vs = f["valores"]
+        sea i = matematica.maximo(0, vs.posicion(v))
+        elegido["propias"][f["clave"]] = vs[(i + lado + vs.longitud()) % vs.longitud()]
+    } sino si f["tipo"] == "numero" {
+        elegido["propias"][f["clave"]] = matematica.maximo(f["minimo"], matematica.minimo(f["maximo"], v + lado * f["paso"]))
+    }
+    _guardar_opciones()
+}
+
+funcion _ver_valor(diccionario f): texto {
+    si f["tipo"] == "abrir" o f["tipo"] == "volver" { devolver "" }
+    sea v = _valor_opcion(f)
+    si f["tipo"] == "volumen" { devolver "< {matematica.redondear(v * 100)}% >" }
+    si f["tipo"] == "si_no" { devolver "< " + traducir(si v { "Sí" } sino { "No" }) + " >" }
+    si f["tipo"] == "lista" { devolver "< " + traducir(a_texto(v)) + " >" }
+    si f["tipo"] == "numero" { devolver "< {v} >" }
+    devolver ""
+}
+
+# menu_opciones([opciones]): en cada fotograma mientras se vea. Devuelve
+# "volver" al salir (con Volver, atrás, escape o B), y si no, nulo. Opciones:
+# "propias" (las del juego, ver arriba), "mostrar" (cuáles de las de serie:
+# "musica", "efectos", "voces", "pantalla_completa", "controles", "idioma"; por
+# defecto, las que tienen sentido: controles si hay acciones, idioma si hay
+# idiomas, pantalla completa salvo en el móvil), "titulo", "escala" (2; baja
+# sola si no cabe), "fuente", "color" y "color_elegido".
+funcion menu_opciones(cualquiera opciones = nulo): cualquiera {
+    sea aj = _ui_opciones(opciones, _OPCIONES_OPCIONES, "menu_opciones")
+    si aj.contiene("mostrar") {
+        si no (aj["mostrar"] es lista) { lanzar ErrorTipo("menu_opciones(): \"mostrar\" es una lista, como [\"musica\", \"efectos\"]") }
+        para cada cualquiera k en aj["mostrar"] {
+            si no _OPCIONES_DE_SERIE.contiene(k) { _no_conozco("menu_opciones", a_texto(k), _OPCIONES_DE_SERIE) }
+        }
+    }
+    sea filas = _filas_opciones(aj)
+    sea ahora = juego.tiempo_real()
+    si _opc_menu == nulo o ahora - _opc_menu["visto"] > 0.25 { _opc_menu = {"elegida": 0, "dentro": nulo, "visto": ahora} }
+    _opc_menu["visto"] = ahora
+    # los controles y el idioma son otro menú dentro de este
+    sea estilo = {}
+    para cada texto c en ["escala", "fuente", "color", "color_elegido"] { si aj.contiene(c) { estilo[c] = aj[c] } }
+    si _opc_menu["dentro"] == "controles" {
+        si menu_controles(estilo) != nulo { _opc_menu["dentro"] = nulo }
+        devolver nulo
+    }
+    si _opc_menu["dentro"] == "idioma" {
+        si menu_idiomas(estilo) != nulo { _opc_menu["dentro"] = nulo }
+        devolver nulo
+    }
+    # los textos, y la letra más pequeña si no caben
+    sea titulo = traducir(_de(aj, "titulo", "OPCIONES"))
+    sea nombres = []
+    sea valores = []
+    para cada diccionario f en filas {
+        nombres.agregar(traducir(f["nombre"]))
+        valores.agregar(_ver_valor(f))
+    }
+    sea pie = traducir("FLECHAS: CAMBIAR    ESC O B: VOLVER")
+    sea escala = _de(aj, "escala", 2)
+    sea letra = _ui_letra(aj, escala)
+    sea col = 0
+    mientras verdadero {
+        sea hueco = juego.medir_texto("Ay", letra)[1] * 2
+        sea izq = 0
+        sea der = 0
+        para cada texto t en nombres { izq = matematica.maximo(izq, juego.ancho_texto(t, letra)) }
+        para cada texto t en valores { der = matematica.maximo(der, juego.ancho_texto(t, letra)) }
+        col = izq + hueco
+        sea alto = juego.medir_texto("Ay", letra)[1]
+        sea cabe = col + der <= juego.ancho() * 0.9 y juego.ancho_texto(pie, letra) <= juego.ancho() * 0.96 y
+            alto * 1.7 * (filas.longitud() + 4) <= juego.alto() * 0.95
+        si cabe o escala <= 1 o aj.contiene("fuente") { romper }
+        escala = escala - 1
+        letra = _ui_letra(aj, escala)
+    }
+    sea alto = juego.medir_texto("Ay", letra)[1]
+    sea paso = alto * 1.7
+    sea ancho_todo = col + 0
+    para cada texto t en valores { ancho_todo = matematica.maximo(ancho_todo, col + juego.ancho_texto(t, letra)) }
+    sea x0 = (juego.ancho() - ancho_todo) / 2
+    sea arriba = juego.alto() / 2 - paso * (filas.longitud() + 3) / 2
+    # moverse y cambiar
+    sea n = filas.longitud()
+    sea resultado = nulo
+    _opc_menu["elegida"] = (_opc_menu["elegida"] + _ui_paso + n) % n
+    sea r = juego.raton()
+    sea mov = juego.movimiento_raton()
+    sea fila_raton = matematica.piso((r[1] - arriba - paso * 2 + paso * 0.25) / paso)
+    sea clic_en = -1
+    si fila_raton >= 0 y fila_raton < n y r[0] >= x0 - alto y r[0] <= x0 + ancho_todo + alto {
+        si mov[0] != 0 o mov[1] != 0 o juego.clic(1) { _opc_menu["elegida"] = fila_raton }
+        si juego.clic(1) { clic_en = fila_raton }
+    }
+    sea f = filas[_opc_menu["elegida"]]
+    sea aceptar = _ui_aceptar() o clic_en >= 0
+    si _ui_atras() {
+        resultado = "volver"
+    } sino si f["tipo"] == "volver" {
+        si aceptar { resultado = "volver" }
+    } sino si f["tipo"] == "abrir" {
+        si aceptar { _opc_menu["dentro"] = f["que"] }
+    } sino si _ui_lado != 0 {
+        _cambiar_opcion(f, _ui_lado)
+    } sino si aceptar {
+        # con el ratón o el dedo: a la izquierda del valor, baja; si no, sube
+        sea lado = si clic_en >= 0 y r[0] < x0 + col + juego.ancho_texto(valores[clic_en], letra) / 2 { -1 } sino { 1 }
+        si f["tipo"] == "volumen" y clic_en < 0 y _valor_opcion(f) >= 1 { lado = -10 }      # aceptar: vuelve a 0 tras el 100 %
+        _cambiar_opcion(f, lado)
+    }
+    # dibujar
+    sea camara = juego.camara_actual()
+    juego.camara()
+    sea gris = [150, 150, 170]
+    sea normal = _de(aj, "color", [210, 210, 220])
+    sea amarillo = _de(aj, "color_elegido", [255, 220, 80])
+    funcion escribir_en(texto t, numero x, numero y, lista color, texto alinear): nulo {
+        sea o2 = {"color": color, "alinear": alinear}
+        para cada texto c en letra { o2[c] = letra[c] }
+        juego.texto(t, x, y, o2)
+    }
+    escribir_en(titulo, juego.ancho() / 2, arriba, normal, "centro")
+    para (i = 0; i < n; i++) {
+        sea fy = arriba + (i + 2) * paso
+        sea elegida = i == _opc_menu["elegida"]
+        si elegida { juego.rectangulo(x0 - alto * 0.5, fy - alto * 0.35, ancho_todo + alto, alto * 1.7, [255, 255, 255, 40]) }
+        sea color = si elegida { amarillo } sino { normal }
+        escribir_en(nombres[i], x0, fy, color, "izquierda")
+        escribir_en(valores[i], x0 + col, fy, color, "izquierda")
+    }
+    escribir_en(pie, juego.ancho() / 2, arriba + (n + 2.5) * paso, gris, "centro")
+    juego.camara(camara)
+    si resultado != nulo { _opc_menu = nulo }
     devolver resultado
 }
 

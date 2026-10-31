@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v2.1</span>
+  <span class="version">v2.2</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -168,7 +168,7 @@
 <div class="grupo"><a href="#particulas" class="sec">Partículas</a><a href="#particulas-0" class="sub">Chispas, polvo y explosiones</a></div>
 <div class="grupo"><a href="#escenas" class="sec">Escenas</a><a href="#escenas-0" class="sub">Portada, partida y final</a></div>
 <div class="grupo"><a href="#menus-y-dialogos" class="sec">Menús y diálogos</a><a href="#menus-y-dialogos-0" class="sub">Menús</a><a href="#menus-y-dialogos-1" class="sub">Diálogos</a><a href="#menus-y-dialogos-2" class="sub">Idiomas</a></div>
-<div class="grupo"><a href="#controles" class="sec">Controles</a><a href="#controles-0" class="sub">Que el jugador elija sus teclas</a><a href="#controles-1" class="sub">Varios jugadores, cada uno con su mando</a></div>
+<div class="grupo"><a href="#controles" class="sec">Controles</a><a href="#controles-0" class="sub">La pantalla de opciones</a><a href="#controles-1" class="sub">Que el jugador elija sus teclas</a><a href="#controles-2" class="sub">Varios jugadores, cada uno con su mando</a></div>
 <div class="grupo"><a href="#partidas-guardadas" class="sec">Partidas guardadas</a><a href="#partidas-guardadas-0" class="sub">Guardar y cargar</a></div>
 <div class="grupo"><a href="#tareas" class="sec">Tareas</a><a href="#tareas-0" class="sub">Esperar sin parar el juego</a></div>
 <div class="grupo"><a href="#peleas" class="sec">Peleas</a><a href="#peleas-0" class="sub">Golpes que se notan</a></div>
@@ -181,7 +181,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>41 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>42 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -824,7 +824,21 @@ juego.idioma(<span class="s">&quot;en&quot;</span>)
     <span class="k">si</span> eleccion == <span class="s">&quot;Salir&quot;</span> { juego.salir() }
     juego.presentar()
 }</code></pre></div><figure><img src="img/juego/1730_idiomas.png" alt="Captura de «Idiomas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1730_idiomas.lince</span></article></section>
-<section id="controles"><h2>Controles</h2><article class="ej" id="controles-0"><h3>Que el jugador elija sus teclas</h3><p class="nota"><code>juego.menu_controles()</code> enseña cada acción con sus teclas y sus botones, y deja cambiarlos: se elige una y se pulsa lo nuevo. Si otra acción ya lo usaba, se intercambian. Lo cambiado <strong>se guarda solo</strong> y se aplica solo la próxima vez que el juego defina esa acción, sin hacer nada más. Devuelve <code>&quot;volver&quot;</code> al salir. <code>juego.restablecer_controles()</code> vuelve a los del juego.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<section id="controles"><h2>Controles</h2><article class="ej" id="controles-0"><h3>La pantalla de opciones</h3><p class="nota"><code>juego.menu_opciones()</code> es la pantalla de opciones de cualquier juego, ya hecha: el volumen de la música, los efectos y las voces, la pantalla completa, los controles (si hay acciones) y el idioma (si hay idiomas). Arriba y abajo para elegir, izquierda y derecha para cambiar, y atrás (o «Volver») para salir: entonces devuelve <code>&quot;volver&quot;</code>. También con el ratón y el dedo.</p><p class="nota">Lo que se cambia se aplica en el acto y <strong>se guarda solo</strong>: la próxima vez que se abra el juego vuelve a aplicarse sin hacer nada. Las opciones propias del juego van en <code>&quot;propias&quot;</code> (una lista para elegir, sí o no, o un número), y el juego las lee con <code>juego.opcion(clave, defecto)</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+
+juego.abrir(<span class="s">&quot;Opciones&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+juego.definir_accion(<span class="s">&quot;saltar&quot;</span>, [<span class="s">&quot;espacio&quot;</span>, <span class="s">&quot;mando:a&quot;</span>])
+<span class="k">fijo</span> PROPIAS = [
+    {<span class="s">&quot;clave&quot;</span>: <span class="s">&quot;dificultad&quot;</span>, <span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Dificultad&quot;</span>, <span class="s">&quot;valores&quot;</span>: [<span class="s">&quot;Fácil&quot;</span>, <span class="s">&quot;Normal&quot;</span>, <span class="s">&quot;Difícil&quot;</span>], <span class="s">&quot;inicial&quot;</span>: <span class="s">&quot;Normal&quot;</span>},
+    {<span class="s">&quot;clave&quot;</span>: <span class="s">&quot;ver_fps&quot;</span>, <span class="s">&quot;nombre&quot;</span>: <span class="s">&quot;Ver FPS&quot;</span>, <span class="s">&quot;inicial&quot;</span>: <span class="k">falso</span>}
+]
+<span class="k">mientras</span> juego.abierto() {
+    juego.limpiar([<span class="n">20</span>, <span class="n">22</span>, <span class="n">36</span>])
+    <span class="k">si</span> juego.menu_opciones({<span class="s">&quot;propias&quot;</span>: PROPIAS}) == <span class="s">&quot;volver&quot;</span> { juego.salir() }
+    <span class="k">si</span> juego.opcion(<span class="s">&quot;ver_fps&quot;</span>, <span class="k">falso</span>) { juego.<span class="t">texto</span>(<span class="s">&quot;{matematica.redondear(juego.fps())} FPS&quot;</span>, <span class="n">4</span>, <span class="n">4</span>) }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1805_opciones.png" alt="Captura de «La pantalla de opciones»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1805_opciones.lince</span></article><article class="ej" id="controles-1"><h3>Que el jugador elija sus teclas</h3><p class="nota"><code>juego.menu_controles()</code> enseña cada acción con sus teclas y sus botones, y deja cambiarlos: se elige una y se pulsa lo nuevo. Si otra acción ya lo usaba, se intercambian. Lo cambiado <strong>se guarda solo</strong> y se aplica solo la próxima vez que el juego defina esa acción, sin hacer nada más. Devuelve <code>&quot;volver&quot;</code> al salir. <code>juego.restablecer_controles()</code> vuelve a los del juego.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Controles&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
 juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
@@ -837,7 +851,7 @@ juego.definir_accion(<span class="s">&quot;disparar&quot;</span>, [<span class="
         juego.salir()
     }
     juego.presentar()
-}</code></pre></div><figure><img src="img/juego/1810_controles.png" alt="Captura de «Que el jugador elija sus teclas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1810_controles.lince</span></article><article class="ej" id="controles-1"><h3>Varios jugadores, cada uno con su mando</h3><p class="nota">Cada mando es un jugador, y el teclado otro. <code>juego.menu_jugadores()</code> es la pantalla de «pulsa un botón para unirte»: el que pulsa A (o ENTRAR) se une, B (o ESCAPE) se va, e INICIO (o ENTRAR) empieza; devuelve la lista de <code>juego.jugadores()</code>. Para hacer una propia, <code>juego.unirse()</code> en cada fotograma.</p><p class="nota">Las acciones se definen una vez, como siempre, con <code>&quot;mando:a&quot;</code>. Después, <code>juego.accion(&quot;saltar&quot;, 2)</code> o <code>juego.direccion(&quot;izquierda&quot;, &quot;derecha&quot;, 2)</code> son las del jugador 2, que solo miran su mando (o el teclado, si es el suyo). <code>juego.pantalla_partida(n)</code> da la zona de la pantalla de cada uno, para <code>camara()</code>. Si un mando se desconecta, conserva su número: al volver a conectarlo, es el mismo jugador.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+}</code></pre></div><figure><img src="img/juego/1810_controles.png" alt="Captura de «Que el jugador elija sus teclas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1810_controles.lince</span></article><article class="ej" id="controles-2"><h3>Varios jugadores, cada uno con su mando</h3><p class="nota">Cada mando es un jugador, y el teclado otro. <code>juego.menu_jugadores()</code> es la pantalla de «pulsa un botón para unirte»: el que pulsa A (o ENTRAR) se une, B (o ESCAPE) se va, e INICIO (o ENTRAR) empieza; devuelve la lista de <code>juego.jugadores()</code>. Para hacer una propia, <code>juego.unirse()</code> en cada fotograma.</p><p class="nota">Las acciones se definen una vez, como siempre, con <code>&quot;mando:a&quot;</code>. Después, <code>juego.accion(&quot;saltar&quot;, 2)</code> o <code>juego.direccion(&quot;izquierda&quot;, &quot;derecha&quot;, 2)</code> son las del jugador 2, que solo miran su mando (o el teclado, si es el suyo). <code>juego.pantalla_partida(n)</code> da la zona de la pantalla de cada uno, para <code>camara()</code>. Si un mando se desconecta, conserva su número: al volver a conectarlo, es el mismo jugador.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Jugadores&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
 juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izquierda&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])

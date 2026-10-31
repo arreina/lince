@@ -139,8 +139,8 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   el prototipo de Bichito (oír la sala apagada y un detalle nítido encima). Hecho en la sesión de
   Bichito y traído a `main` sin el prototipo, que va en su propio repositorio.
 
-### 2.2 — Pantalla de opciones
-- [ ] `juego.menu_opciones()` hecha: volumen de música, efectos y voces, pantalla completa,
+### 2.2 — Pantalla de opciones (publicada)
+- [x] `juego.menu_opciones()` hecha: volumen de música, efectos y voces, pantalla completa,
   controles (`menu_controles`) e idioma (`menu_idiomas`), que se guarda sola y se aplica al
   abrir el juego. Que el juego pueda añadir sus propias opciones.
 

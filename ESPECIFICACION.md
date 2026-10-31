@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.1
+# 🐆 Lince — Especificación del Lenguaje v2.2
 
 ## Filosofía
 
@@ -1837,6 +1837,31 @@ si juego.respuesta() == "Sí" { ... }
 
 El juego sigue viendo las teclas mientras hay un menú o un diálogo: lo normal es no mover al
 personaje mientras `dialogo_abierto()`, como en el ejemplo. `examples/12_aventura.lince` lo usa todo.
+
+**Pantalla de opciones.** `menu_opciones()` es la pantalla de opciones de cualquier juego, ya hecha:
+el volumen de la música, los efectos y las voces, la pantalla completa (salvo en el móvil), los
+controles (si hay acciones) y el idioma (si hay idiomas), más las opciones propias del juego. Se
+maneja como los demás menús: arriba y abajo para elegir, izquierda y derecha (o aceptar) para
+cambiar, atrás para salir; también con el ratón y el dedo. Lo que se cambia se aplica en el acto
+y **se guarda solo**: la próxima vez que se abra el juego se vuelve a aplicar en el primer
+fotograma, sin hacer nada.
+
+```lince
+fijo PROPIAS = [
+    {"clave": "dificultad", "nombre": "Dificultad", "valores": ["Fácil", "Normal", "Difícil"], "inicial": "Normal"},
+    {"clave": "ver_fps", "nombre": "Ver FPS", "inicial": falso},
+    {"clave": "sensibilidad", "nombre": "Sensibilidad", "inicial": 5, "minimo": 1, "maximo": 10}
+]
+# en la escena de opciones, en cada fotograma:
+si juego.menu_opciones({"propias": PROPIAS}) == "volver" { juego.cambiar_escena("portada") }
+# y en el juego:
+sea enemigos = si juego.opcion("dificultad", "Normal") == "Difícil" { 8 } sino { 5 }
+```
+
+| Función | Qué hace |
+|---|---|
+| `menu_opciones([opciones])` | la pantalla de opciones, en cada fotograma; devuelve `"volver"` al salir, y si no, `nulo`. Opciones: `propias` (las del juego: cada una con `clave`, `nombre` y `valores`, una lista para elegir; o un `inicial` lógico, sí o no; o un `inicial` numérico con `minimo`, `maximo` y `paso`), `mostrar` (cuáles de las de serie: `"musica"`, `"efectos"`, `"voces"`, `"pantalla_completa"`, `"controles"`, `"idioma"`), `titulo`, `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
+| `opcion(clave[, defecto])` | lo que el jugador eligió en esa opción (las propias, o `"musica"`, `"efectos"`, `"voces"` y `"pantalla_completa"`), o `defecto` si no la ha tocado nunca |
 
 **Controles a gusto.** El jugador puede cambiar las teclas y los botones de cada acción:
 

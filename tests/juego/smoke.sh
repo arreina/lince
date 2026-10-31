@@ -749,4 +749,17 @@ mira(nitido > base / 2, "nitido se salta amortiguar(): el detalle sigue nitido")
 sys.exit(1 if mal else 0)
 PY
 
+# ── 2.2: menu_opciones(), y lo elegido se aplica solo la próxima vez ──
+G22="3:izquierda,5:abajo,7:izquierda,9:izquierda,11:abajo,13:abajo,15:entrar,17:abajo,19:entrar,21:escape,23:abajo,25:derecha,27:abajo,29:entrar,31:abajo,33:izquierda,35:escape"
+LINCE_JUEGO_GUARDADO="$T/opciones" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=60 LINCE_JUEGO_GUION="$G22" \
+    timeout 60 "$LINCE" "$DIR/prueba31.lince" > salida36.txt 2>&1
+SEGUNDA=1 LINCE_JUEGO_GUARDADO="$T/opciones" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 \
+    timeout 60 "$LINCE" "$DIR/prueba31.lince" >> salida36.txt 2>&1
+for l in "menu_opciones en 35: volver" "ahora: 0.9 0.8 1" "propias: Difícil verdadero 4" \
+         "al abrir: 0.9 0.8 1" "propias: Difícil verdadero 4 7" \
+         'error: menu_opciones(): no conozco la opción '"'"'color_raro'"'"' (hay "propias", "mostrar", "titulo", "escala", "fuente", "color" y "color_elegido")' \
+         'error: menu_opciones(): la opción '"'"'x'"'"' necesita "valores" (una lista), o un "inicial" lógico o numérico' \
+         'error: menu_opciones(): no conozco la opción '"'"'volumen'"'"' (hay "musica", "efectos", "voces", "pantalla_completa", "controles" y "idioma")'; do
+    grep -qxF "$l" salida36.txt && ok "2.2: ${l:0:70}" || mal "falta la línea: $l"
+done
 [ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida5b.txt; exit 1; }

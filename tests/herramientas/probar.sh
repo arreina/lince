@@ -29,6 +29,9 @@ igual "formatear otra vez no cambia nada" "$(cat "$TMP/bonito.lince")" "$("$LINC
 cp "$DIR/feo.lince" "$TMP/feo.lince"
 "$LINCE" formatear "$TMP/feo.lince" > /dev/null
 igual "formatear cambia el archivo" "$(cat "$TMP/bonito.lince")" "$(sin_r < "$TMP/feo.lince")"
+printf 'sea o = {}\nsea v = 1\no["a"] = v\nsi v > 0 {\n    o["b"] = 2\n}\nescribir(v > 0 o [1] == [1])\n' > "$TMP/o_nombre.lince"
+igual "una variable que se llama o (o y) al empezar una línea no se toma por el operador" \
+      "$(cat "$TMP/o_nombre.lince")" "$("$LINCE" formatear --mostrar "$TMP/o_nombre.lince" | sin_r)"
 printf 'sea x = (1\n' > "$TMP/roto.lince"
 if "$LINCE" formatear "$TMP/roto.lince" > /dev/null 2>&1; then mal "formatear tocó un archivo con un error de sintaxis"
 else [ "$(cat "$TMP/roto.lince")" = "sea x = (1" ] && bien "con un error de sintaxis no lo toca" || mal "cambió un archivo roto"; fi
