@@ -205,4 +205,72 @@ xml_objetos = "\n".join(
  </tile>
 </tileset>
 ''', encoding="utf-8")
+
+# ── Un pueblo isométrico (2.8): rombos de 32 × 16, piezas sueltas y el mapa ──
+from PIL import ImageDraw
+
+
+def csv12(l):
+    return ",\n".join(",".join(str(v) for v in l[r * 12:(r + 1) * 12]) for r in range(12))
+
+
+
+random.seed(28)
+rombos = Image.new("RGBA", (96, 16), (0, 0, 0, 0))
+for i, (base, var) in enumerate([((96, 168, 80), 14), ((196, 160, 110), 10), ((70, 130, 200), 12)]):
+    for y in range(16):
+        ancho = (y + 1) * 2 if y < 8 else (16 - y) * 2     # el rombo, fila a fila
+        for x in range(16 - ancho, 16 + ancho):
+            if 0 <= x < 32:
+                rombos.putpixel((i * 32 + x, y), ruido(base, var))
+rombos.save(AQUI / "rombos.png")
+arbol = Image.new("RGBA", (32, 48), (0, 0, 0, 0))
+d = ImageDraw.Draw(arbol)
+d.rectangle([14, 30, 17, 45], fill=(110, 70, 40))
+for cx, cy, r, color in [(16, 22, 11, (40, 110, 50)), (12, 16, 8, (55, 135, 60)), (19, 12, 7, (70, 155, 70))]:
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=color)
+arbol.save(AQUI / "arbol.png")
+casa = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+d = ImageDraw.Draw(casa)
+d.polygon([(0, 40), (32, 56), (32, 34), (0, 18)], fill=(220, 205, 170))     # la pared de la izquierda
+d.polygon([(32, 56), (64, 40), (64, 18), (32, 34)], fill=(190, 170, 135))   # la de la derecha
+d.polygon([(0, 18), (32, 2), (64, 18), (32, 34)], fill=(180, 70, 60))      # el tejado
+d.rectangle([40, 40, 46, 50], fill=(110, 70, 40))                          # la puerta
+casa.save(AQUI / "casa.png")
+filas_pueblo = [
+    "000000000000", "000000000000", "001111111100", "001000000100", "001000220100", "001000220100",
+    "001000000100", "001111111100", "000000000000", "000002200000", "000002200000", "000000000000"]
+suelo = [{"0": 1, "1": 2, "2": 3}[ch] for fila in filas_pueblo for ch in fila]
+piezas = [0] * 144
+piezas[3 * 12 + 4] = 5                                   # la casa (pisa la casilla 4, 3)
+solidos = [1 if ch == "2" else 0 for fila in filas_pueblo for ch in fila]
+solidos[3 * 12 + 4] = solidos[2 * 12 + 4] = solidos[3 * 12 + 3] = solidos[2 * 12 + 3] = 1
+arboles = [(1, 9), (3, 1), (9, 2), (10, 6), (7, 9), (2, 5)]
+objetos = "".join(f'  <object id="{i + 2}" type="arbol" gid="4" x="{c * 16 + 8}" y="{f * 16 + 8}" width="32" height="48"/>\n'
+                  for i, (c, f) in enumerate(arboles))
+(AQUI / "pueblo.tmx").write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="12" height="12" tilewidth="32" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="{len(arboles) + 2}">
+ <tileset firstgid="1" name="rombos" tilewidth="32" tileheight="16" tilecount="3" columns="3">
+  <image source="rombos.png" width="96" height="16"/>
+ </tileset>
+ <tileset firstgid="4" name="piezas" tilewidth="64" tileheight="64" tilecount="2" columns="0">
+  <grid orientation="orthogonal" width="1" height="1"/>
+  <tile id="0"><image source="arbol.png" width="32" height="48"/></tile>
+  <tile id="1"><image source="casa.png" width="64" height="64"/></tile>
+ </tileset>
+ <layer id="1" name="suelo" width="12" height="12">
+  <data encoding="csv">{csv12(suelo)}</data>
+ </layer>
+ <layer id="2" name="piezas" width="12" height="12">
+  <data encoding="csv">{csv12(piezas)}</data>
+ </layer>
+ <layer id="3" name="colisiones" width="12" height="12" visible="0">
+  <data encoding="csv">{csv12(solidos)}</data>
+ </layer>
+ <objectgroup id="4" name="cosas">
+  <object id="1" type="jugador" x="106" y="134"><point/></object>
+{objetos} </objectgroup>
+</map>
+''', encoding="utf-8")
+
 print("✅ recursos en", AQUI)

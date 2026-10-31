@@ -12,7 +12,7 @@ repensarlo cada vez. Las ideas para el editor visual van en
 
 ## Versión 0.9
 
-- [x] **Mapas de Tiled:** `juego.mapa_tiled` (.tmx y .tmj, tilesets .tsx y .tsj) y `juego.dibujar_tiled`. Quedan fuera los mapas isométricos y hexagonales, los infinitos, los tilesets de imágenes sueltas y las capas comprimidas con zstd.
+- [x] **Mapas de Tiled:** `juego.mapa_tiled` (.tmx y .tmj, tilesets .tsx y .tsj) y `juego.dibujar_tiled`. Después llegaron los infinitos, zstd y, en la 2.8, los isométricos y los tilesets de imágenes sueltas; quedan fuera los hexagonales.
 - [x] **Física sencilla, en Lince:** `juego.fisica`, `juego.cuerpo`, `juego.avanzar_fisica`, `juego.tocando`, `juego.empujar` y `juego.quitar_cuerpo`; `examples/13_fisica.lince`. Sin giros (los cuerpos no rotan) y con choques caja contra caja o círculo contra círculo (un círculo contra una caja cuenta como caja).
 - [x] **Controles a gusto:** `juego.menu_controles()` (se guarda y se aplica solo), `juego.restablecer_controles()` y `juego.entrada_pulsada()`.
 
@@ -82,7 +82,7 @@ está en `juego.lince`.
 - [x] Traducciones: `idiomas/<código>.txt`, `traducir`, `idioma`, `idiomas`, `menu_idiomas`; los menús
   y diálogos de Lince salen traducidos.
 - [x] Tiled: capas con zstd y mapas infinitos.
-- [ ] Tiled isométricos (en la 2.8: los pide Bichito) y hexagonales (solo si algún juego los pide).
+- [x] Tiled isométricos (2.8, los pidió Bichito). Los hexagonales, solo si algún juego los pide.
 
 ### 1.6 — Física y sonido
 - [x] Cuerpos que giran, círculo contra caja de verdad, polígonos, uniones sencillas (cuerda, bisagra).
@@ -168,16 +168,18 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   jugador y un programa de terceros dentro), un archivo de Lince con SDL2 dentro que se pone solo
   en el menú; y el instalador es el propio juego, sin NSIS ni Inno Setup.
 
-### 2.8 — Tiled isométrico (lo pide Bichito)
-- [ ] Leer y dibujar mapas isométricos de Tiled (`orientation="isometric"`) con la cámara, la
+### 2.8 — Tiled isométrico (lo pide Bichito) (publicada)
+- [x] Leer y dibujar mapas isométricos de Tiled (`orientation="isometric"`) con la cámara, la
   opacidad, el desplazamiento, los tiles animados y los tiles más altos que la casilla.
-- [ ] Orden de dibujo: los tiles de una capa, cada uno en la capa de la fila de su base, para que
-  los personajes pasen por delante y por detrás (y decidir si con niveles de altura).
-- [ ] Casilla ↔ pantalla en isométrico; `mapa.mover`, `mapa.camino`, `mapa.casilla_en` y
+- [x] Orden de dibujo: los tiles de una capa, cada uno en la capa de la fila de su base, para que
+  los personajes pasen por delante y por detrás (`{"ordenar": capa}` y `mapa.profundidad`).
+- [ ] Niveles de altura (bancales, escaleras, pasarelas) en el orden de dibujo: cuando Bichito los
+  necesite y veamos juntos cómo.
+- [x] Casilla ↔ pantalla en isométrico; `mapa.mover`, `mapa.camino`, `mapa.casilla_en` y
   `mapa.solido` sobre la rejilla lógica; los objetos de Tiled convertidos a ella.
-- [ ] Tilesets de imágenes sueltas («colección de imágenes») y objetos con imagen, con su punto de
+- [x] Tilesets de imágenes sueltas («colección de imágenes») y objetos con imagen, con su punto de
   base, listos para ordenarlos con los personajes.
-- [ ] Pantalla completa ampliando por múltiplos enteros, para el pixel art.
+- [x] Pantalla completa ampliando por múltiplos enteros, para el pixel art (`"escala_entera"`).
 - [ ] Para lince-motor: el panel de recursos, con los mapas isométricos.
 
 ### 2.9 — Google Play de verdad

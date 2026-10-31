@@ -164,7 +164,11 @@ struct Valor {
 /* ─────────────────────────────────────────
    ENTORNO (ámbito de variables)
 ───────────────────────────────────────── */
-#define MAX_VARS 256
+/* Las variables de un ámbito: las primeras ENT_FIJAS van dentro del propio
+   entorno (lo normal en una función); si hay más (una biblioteca grande, un
+   programa con muchas globales), en memoria aparte que crece. */
+#define ENT_FIJAS 16
+#define MAX_VARS 65536
 
 typedef struct EntradaVar {
     const char *nombre;   /* internado: se compara por puntero */
@@ -175,8 +179,9 @@ typedef struct EntradaVar {
 } EntradaVar;
 
 struct Entorno {
-    EntradaVar vars[MAX_VARS];
-    int        cantidad;
+    EntradaVar *vars;                  /* 'fijas' o, si no caben, memoria aparte */
+    int        cantidad, capacidad;
+    EntradaVar fijas[ENT_FIJAS];
     Entorno   *padre;
     int        refs;    /* conteo de referencias — para closures */
     struct ClaseLince *dueno;   /* clase en cuyo cuerpo se escribió este código */

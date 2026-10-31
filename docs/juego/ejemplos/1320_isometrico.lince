@@ -1,0 +1,46 @@
+# @seccion: Mapas de Tiled
+# @titulo: Un pueblo isométrico
+# @nota: Los mapas **isométricos** de Tiled (casillas en rombo, aquí de 32 × 16) se leen igual, con `juego.mapa.tiled`. Todo se piensa en su **rejilla lógica**, de casillas cuadradas del alto del rombo: ahí están los objetos de Tiled y ahí trabajan `mapa.mover`, `mapa.camino` y `mapa.solido`. `juego.mapa.a_dibujo(mapa, cosa)` dice dónde se dibuja (y `mapa.a_mapa`, al revés).
+# @nota: Para pasar por delante y por detrás de árboles y casas: los tiles con `{"ordenar": 1}` van cada uno a la capa 1 más su **profundidad**, y el personaje a `juego.capa(1 + juego.mapa.profundidad(mapa, yo))`. Las piezas grandes, cada una de su tamaño, son un tileset de imágenes sueltas; los objetos con imagen se dibujan con `mapa.dibujar_objeto`.
+# @fotogramas: 20
+# @guion: 1:derecha:12
+importar "juego"
+importar "matematica"
+
+juego.abrir("Pueblo", 384, 216, {"escala": 2, "escala_entera": verdadero})
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:izq_x+"])
+juego.definir_accion("arriba", ["arriba", "w", "mando:izq_y-"])
+juego.definir_accion("abajo", ["abajo", "s", "mando:izq_y+"])
+fijo PUEBLO = juego.mapa.tiled("recursos/pueblo.tmx")
+sea yo = {"x": 0, "y": 0, "ancho": 8, "alto": 8, "vx": 0, "vy": 0}
+sea arboles = []
+para cada diccionario cosa en PUEBLO["objetos"] {
+    si cosa["tipo"] == "jugador" {
+        yo["x"] = cosa["x"]
+        yo["y"] = cosa["y"]
+    }
+    si cosa["tipo"] == "arbol" { arboles.agregar(cosa) }
+}
+
+mientras juego.abierto() {
+    # las flechas mueven en la pantalla; en la rejilla lógica, eso es en diagonal
+    sea dx = juego.direccion("izquierda", "derecha")
+    sea dy = juego.direccion("arriba", "abajo")
+    sea v = matematica.normalizar(dy + dx / 2, dy - dx / 2)
+    yo["vx"] = v[0] * 50
+    yo["vy"] = v[1] * 50
+    juego.mapa.mover(PUEBLO, yo)
+    sea p = juego.mapa.a_dibujo(PUEBLO, yo)
+    juego.camara(p[0] - 192, p[1] - 108)
+
+    juego.limpiar([30, 40, 60])
+    juego.mapa.dibujar_tiled(PUEBLO, "suelo")
+    juego.mapa.dibujar_tiled(PUEBLO, "piezas", {"ordenar": 1})
+    para cada diccionario a en arboles { juego.mapa.dibujar_objeto(PUEBLO, a, {"ordenar": 1}) }
+    juego.capa(1 + juego.mapa.profundidad(PUEBLO, yo))
+    juego.circulo(p[0], p[1], 5, [0, 0, 0, 80])                  # la sombra
+    juego.circulo(p[0], p[1] - 7, 6, [235, 150, 60])
+    juego.capa(0)
+    juego.presentar()
+}

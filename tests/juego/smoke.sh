@@ -885,4 +885,46 @@ done
 grep -qF " dibujo: guardada como referencia en referencias/dibujo.png" salida41.txt && ok "2.6: lince probar enseña la referencia nueva" || mal "falta el 📸 en lince probar"
 grep -qE "100% +juego35.lince" salida41.txt && ok "2.6: la cobertura cuenta el juego" || mal "la cobertura no cuenta el juego"
 grep -qF "lince probar --aceptar" salida41.txt && ok "2.6: dice cómo aceptar el cambio" || mal "falta cómo aceptar"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida5b.txt; exit 1; }
+# ── 2.8: Tiled isométrico (leer, dibujar en orden, coordenadas, objetos con imagen) ──
+DIR_PRUEBA="$DIR" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 timeout 60 "$LINCE" "$DIR/prueba36.lince" > salida42.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba isométrica termina bien" || mal "la prueba isométrica falló"
+for l in 'mapa: verdadero 16 [32, 16] 6x6 96x96 [192, 96] ["suelo", "arboles", "colisiones"]' \
+         "a_dibujo: [96, 0] [112, 8] [80, 8] [96, 48]" "a_mapa: [0, 0] [16, 0] [48, 48]" "profundidad: 0 0.5 0.999999" \
+         "de una cosa: [96, 48] 0.5" "objeto fuente: tile 72 24 verdadero [72, 24]" "objeto salida: punto 8 88 falso nulo" \
+         "solido: verdadero falso [2, 2]" "camino: [[1, 1], [2, 1], [3, 1], [3, 2]]" "mover: 24 1" "plano: [3, 4] 0.5" \
+         "error: mapa.dibujar_tiled(): no conozco la opción 'ordenr' (hay \"capa\" y \"ordenar\")" \
+         'error: mapa.dibujar_tiled(): "ordenar" es un número entero (0 o más)' \
+         "error: mapa.dibujar_tile(): el mapa no tiene el tile 99" \
+         'error: abrir(): "escala_entera" es verdadero o falso'; do
+    grep -qxF "$l" salida42.txt && ok "2.8: $l" || mal "falta la línea: $l"
+done
+grep -qF "es un mapa «hexagonal»: Lince entiende los ortogonales (casillas en rejilla) y los isométricos (en rombo)" salida42.txt \
+    && ok "2.8: los hexagonales, con un error claro" || mal "falta el error de los hexagonales"
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+def lee(n):
+    d = open(n, "rb").read()
+    off = struct.unpack_from("<I", d, 10)[0]; w, h = struct.unpack_from("<ii", d, 18); B = struct.unpack_from("<H", d, 28)[0] // 8
+    fila = (w * B + 3) & ~3
+    def px(x, y):
+        f = (abs(h) - 1 - y) if h > 0 else y
+        i = off + f * fila + x * B
+        return (d[i + 2], d[i + 1], d[i])
+    return px
+a, b, c = lee("iso1.bmp"), lee("iso2.bmp"), lee("iso3.bmp")
+verde, marron, rojo, azul, amarillo, magenta = (60, 160, 60), (150, 100, 50), (200, 30, 30), (40, 60, 220), (255, 255, 0), (255, 0, 255)
+casos = [(a(96, 88) == verde, "el rombo de la casilla (5, 5), en su sitio"),
+         (a(128, 56) == marron, "el camino en la casilla (4, 2)"),
+         (a(96, 40) == rojo and a(96, 10) == azul, "el árbol (imagen suelta), más alto que la casilla"),
+         (a(5, 5) == (0, 0, 0), "fuera del mapa, nada"),
+         (b(104, 32) == amarillo and b(104, 20) == azul, "ordenar: el de detrás del árbol, tapado"),
+         (b(96, 26) == magenta and b(96, 40) == magenta, "ordenar: el de delante, encima del árbol"),
+         (c(104, 40) == rojo and c(104, 10) == azul, "el objeto con imagen, en su base y con la cámara"),
+         (c(88, 56) == marron, "el suelo, con la cámara movida")]
+mal = 0
+for bien, nombre in casos:
+    print("  ✅ 2.8, píxel:" if bien else "  ❌ 2.8, píxel:", nombre)
+    mal += not bien
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida5b.txt; exit 1; }

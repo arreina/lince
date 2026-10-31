@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" orientation="hexagonal" width="2" height="2" tilewidth="16" tileheight="16" hexsidelength="8" staggeraxis="y" staggerindex="odd" infinite="0">
+ <layer id="1" name="suelo" width="2" height="2"><data encoding="csv">0,0,0,0</data></layer>
+</map>

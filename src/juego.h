@@ -128,6 +128,7 @@ static struct {
     int  (*SensorData)(void *, float *, int);
     int  (*DisplayOrientation)(int);
     void (*SetWindowIcon)(void *, void *);
+    int  (*IntegerScale)(void *, int);
     int  (*ShowMessageBox)(const void *, int *);
     /* cámaras con zoom o giro: se dibuja en una textura y se pega girada */
     void *(*CreateTexture)(void *, unsigned, int, int, int);
@@ -222,6 +223,7 @@ typedef struct {
     int cuantos, columnas, tw, th, margen, sep, ox, oy;
     int *anim_ini, *anim_n, *anim_ms;   /* por tile: dónde empiezan sus cuadros, cuántos y cuánto dura todo */
     int *cuadros;                       /* pares (tile, milisegundos) */
+    int *imgs;                          /* colección de imágenes: la imagen de cada tile (-1 si no hay); si no, NULL */
 } JgTileset;
 typedef struct {
     char *nombre;
@@ -231,6 +233,7 @@ typedef struct {
 } JgCapaTiled;
 typedef struct {
     int usado, cols, filas, tw, th, nts, ncapas;
+    int iso;                            /* isométrico: casillas en rombo de tw × th */
     JgTileset ts[JG_TILED_TS];
     JgCapaTiled *capas;
 } JgTiled;
@@ -789,6 +792,7 @@ static int jg_cargar(void) {
     *(void **)(&_jg.SensorData) = JG_SIMBOLO(h, "SDL_SensorGetData");
     *(void **)(&_jg.DisplayOrientation) = JG_SIMBOLO(h, "SDL_GetDisplayOrientation");
     *(void **)(&_jg.SetWindowIcon) = JG_SIMBOLO(h, "SDL_SetWindowIcon");
+    *(void **)(&_jg.IntegerScale) = JG_SIMBOLO(h, "SDL_RenderSetIntegerScale");
     *(void **)(&_jg.ShowMessageBox) = JG_SIMBOLO(h, "SDL_ShowMessageBox");
     return 1;
 }
@@ -1151,8 +1155,14 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
     if (n > 2 && !jg_num(a, n, 2, &h, "abrir")) return valor_nulo();
     if (n > 3 && a[3]->tipo != VAL_DICCIONARIO && a[3]->tipo != VAL_NULO)
         return jg_error("ErrorTipo", "abrir(): las opciones van en un diccionario, por ejemplo {\"escala\": 3}");
-    static const char *const VA[] = {"escala", NULL};
+    static const char *const VA[] = {"escala", "escala_entera", NULL};
     if (n > 3 && !jg_opciones_validas(a[3], "abrir", VA)) return valor_nulo();
+    /* escala_entera: al agrandar (pantalla completa, ventana más grande) solo
+       por 2, 3, 4...: el pixel art, sin píxeles de dos tamaños (con bandas negras) */
+    double entera = 0;
+    Valor *ve = n > 3 ? jg_opcion_valor(a[3], "escala_entera") : NULL;
+    if (ve && ve->tipo != VAL_BOOLEANO) return jg_error("ErrorTipo", "abrir(): \"escala_entera\" es verdadero o falso");
+    if (ve) entera = ve->booleano;
     if (n > 3 && jg_opcion(a[3], "escala", &z) && (z < 1 || z > 16 || z != floor(z)))
         return jg_error("ErrorArgumento", "abrir(): \"escala\" es un número entero de 1 a 16");
     if (w < 1 || h < 1 || w > 16384 || h > 16384) return jg_error("ErrorArgumento", "abrir(): tamaño de ventana no válido");
@@ -1164,6 +1174,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
             _jg.LogicalSize(_jgs.render, (int)w, (int)h);
             _jgs.ancho = (int)w; _jgs.alto = (int)h; _jgs.zoom = (int)z;
         }
+        if (_jg.IntegerScale) _jg.IntegerScale(_jgs.render, entera != 0);
         /* el tiempo vuelve a correr normal y se olvidan temblor y pulsaciones */
         _jgs.cu_x = _jgs.cu_y = _jgs.tem_x = _jgs.tem_y = 0;
         _jgs.cam_zoom = 1; _jgs.cam_giro = 0; _jgs.cam_hay_zona = 0; _jgs.capa = 0;
@@ -1225,6 +1236,7 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         return jg_error("ErrorJuego", msg);
     }
     _jg.LogicalSize(_jgs.render, (int)w, (int)h);    /* en pantalla completa se escala */
+    if (_jg.IntegerScale) _jg.IntegerScale(_jgs.render, entera != 0);
     jg_texturas_pendientes();                        /* las imágenes cargadas antes, sin ventana */
     jg_icono_ventana();
     if (escritorio_toca_preguntar()) jg_preguntar_menu();
@@ -7444,6 +7456,7 @@ static Valor *fn_jg_dibujar_mapa(Valor **a, int n) {
 static void jg_tiled_liberar(JgTiled *t) {
     for (int i = 0; i < t->nts; i++) {
         free(t->ts[i].anim_ini); free(t->ts[i].anim_n); free(t->ts[i].anim_ms); free(t->ts[i].cuadros);
+        free(t->ts[i].imgs);
     }
     for (int i = 0; i < t->ncapas; i++) { free(t->capas[i].nombre); free(t->capas[i].gids); }
     free(t->capas);
@@ -7515,6 +7528,92 @@ static void jg_tiled_capas(Valor *capas, Valor **salida, int *n, int max, int vi
     }
 }
 
+/* Las animaciones de los tiles de un tileset ("tiles" de Tiled) */
+static void jg_tiled_animaciones(JgTileset *ts, Valor *x) {
+    ts->anim_ini = calloc((size_t)ts->cuantos + 1, sizeof(int));
+    ts->anim_n = calloc((size_t)ts->cuantos + 1, sizeof(int));
+    ts->anim_ms = calloc((size_t)ts->cuantos + 1, sizeof(int));
+    Valor *tiles = jg_campo(x, "tiles");
+    int ncuadros = 0;
+    for (int j = 0; tiles && tiles->tipo == VAL_LISTA && j < tiles->lista.cantidad; j++) {
+        Valor *an = jg_campo(tiles->lista.elementos[j], "animation");
+        if (an && an->tipo == VAL_LISTA) ncuadros += an->lista.cantidad;
+    }
+    ts->cuadros = malloc(sizeof(int) * 2 * (size_t)(ncuadros + 1));
+    int pos = 0;
+    for (int j = 0; tiles && tiles->tipo == VAL_LISTA && j < tiles->lista.cantidad; j++) {
+        Valor *tile = tiles->lista.elementos[j];
+        int tid = (int)jg_campo_num(tile, "id", -1);
+        Valor *an = jg_campo(tile, "animation");
+        if (tid < 0 || tid >= ts->cuantos || !an || an->tipo != VAL_LISTA || an->lista.cantidad == 0) continue;
+        ts->anim_ini[tid] = pos;
+        for (int q = 0; q < an->lista.cantidad; q++) {
+            int cu = (int)jg_campo_num(an->lista.elementos[q], "tileid", 0);
+            int ms = (int)jg_campo_num(an->lista.elementos[q], "duration", 100);
+            ts->cuadros[2 * pos] = cu < 0 || cu >= ts->cuantos ? 0 : cu;
+            ts->cuadros[2 * pos + 1] = ms > 0 ? ms : 1;
+            ts->anim_ms[tid] += ms > 0 ? ms : 1;
+            pos++;
+        }
+        ts->anim_n[tid] = an->lista.cantidad;
+    }
+}
+
+/* Los tiles sólidos y de plataforma de un tileset (sus propiedades) */
+static void jg_tiled_tipos(JgTileset *ts, Valor *x, unsigned char *tipo_gid, unsigned max_gid) {
+    Valor *tiles = jg_campo(x, "tiles");
+    for (int j = 0; tiles && tiles->tipo == VAL_LISTA && j < tiles->lista.cantidad; j++) {
+        Valor *tile = tiles->lista.elementos[j];
+        int tid = (int)jg_campo_num(tile, "id", -1);
+        if (tid < 0 || tid >= ts->cuantos) continue;
+        Valor *props = jg_propiedades(tile);
+        unsigned g = ts->primero + (unsigned)tid;
+        if (g <= max_gid) {
+            if (jg_propiedad_si(props, "solido") || jg_propiedad_si(props, "sólido")) tipo_gid[g] = 1;
+            else if (jg_propiedad_si(props, "plataforma")) tipo_gid[g] = 2;
+        }
+        valor_destruir(props);
+    }
+}
+
+/* Un tileset de imágenes sueltas («colección de imágenes» en Tiled): cada
+   tile es una imagen, de su propio tamaño (casas, árboles, fuentes) */
+static int jg_tiled_coleccion(JgTiled *t, Valor *x, int tw, int th) {
+    Valor *tiles = jg_campo(x, "tiles");
+    int max_id = -1;
+    for (int j = 0; tiles && tiles->tipo == VAL_LISTA && j < tiles->lista.cantidad; j++) {
+        int tid = (int)jg_campo_num(tiles->lista.elementos[j], "id", -1);
+        if (tid > max_id && tid < 1000000) max_id = tid;
+    }
+    JgTileset *ts = &t->ts[t->nts++];
+    ts->imagen = -1;
+    ts->primero = (unsigned)jg_campo_num(x, "firstgid", 1);
+    ts->tw = (int)jg_campo_num(x, "tilewidth", tw);
+    ts->th = (int)jg_campo_num(x, "tileheight", th);
+    ts->columnas = 1;
+    ts->cuantos = max_id + 1;
+    Valor *off = jg_campo(x, "tileoffset");
+    ts->ox = (int)jg_campo_num(off, "x", 0);
+    ts->oy = (int)jg_campo_num(off, "y", 0);
+    ts->imgs = malloc(sizeof(int) * (size_t)(ts->cuantos + 1));
+    for (int j = 0; j <= ts->cuantos; j++) ts->imgs[j] = -1;
+    for (int j = 0; tiles && tiles->tipo == VAL_LISTA && j < tiles->lista.cantidad; j++) {
+        Valor *tile = tiles->lista.elementos[j];
+        int tid = (int)jg_campo_num(tile, "id", -1);
+        const char *ruta = jg_campo_texto(tile, "image");
+        if (tid < 0 || tid >= ts->cuantos || !*ruta) continue;
+        Valor *arg = valor_texto(ruta);
+        Valor *iv = jg_imagen_archivo(&arg, 1);
+        valor_destruir(arg);
+        int id = hay_error ? -1 : jg_id_de(iv, "imagen");
+        valor_destruir(iv);
+        if (id < 0) return 0;
+        ts->imgs[tid] = id;
+    }
+    jg_tiled_animaciones(ts, x);
+    return 1;
+}
+
 static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     JG_ABIERTA();
     if (n < 1 || a[0]->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa.tiled() espera la ruta de un mapa de Tiled (.tmx o .tmj)");
@@ -7531,7 +7630,8 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
         valor_destruir(m);
         return jg_error("ErrorJuego", "mapa.tiled(): el mapa no tiene un tamaño válido");
     }
-    if (tw != th) {
+    int iso = !strcmp(jg_campo_texto(m, "orientation"), "isometric");
+    if (tw != th && !iso) {
         valor_destruir(m);
         return jg_error("ErrorJuego", "mapa.tiled(): las casillas del mapa tienen que ser cuadradas (el ancho y el alto de tile iguales)");
     }
@@ -7543,7 +7643,7 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     }
     JgTiled *t = &_jgs.tiled[k];
     memset(t, 0, sizeof *t);
-    t->usado = 1; t->cols = cols; t->filas = filas; t->tw = tw; t->th = th;
+    t->usado = 1; t->cols = cols; t->filas = filas; t->tw = tw; t->th = th; t->iso = iso;
     /* los tilesets: su imagen, su rejilla y sus animaciones; los tiles sólidos */
     Valor *tss = jg_campo(m, "tilesets");
     unsigned max_gid = 1;
@@ -7558,10 +7658,10 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
         if (t->nts == JG_TILED_TS) { jg_tiled_liberar(t); free(tipo_gid); valor_destruir(m); return jg_error("ErrorJuego", "mapa.tiled(): demasiados tilesets"); }
         Valor *x = tss->lista.elementos[i];
         const char *img = jg_campo_texto(x, "image");
-        if (!*img) {
-            snprintf(msg, sizeof msg, "mapa.tiled(): el tileset '%s' es de imágenes sueltas; Lince usa tilesets de una sola imagen", jg_campo_texto(x, "name"));
-            jg_tiled_liberar(t); free(tipo_gid); valor_destruir(m);
-            return jg_error("ErrorJuego", msg);
+        if (!*img) {                                   /* una colección de imágenes: una por tile */
+            if (!jg_tiled_coleccion(t, x, tw, th)) { jg_tiled_liberar(t); free(tipo_gid); valor_destruir(m); return valor_nulo(); }
+            jg_tiled_tipos(&t->ts[t->nts - 1], x, tipo_gid, max_gid);
+            continue;
         }
         /* con un color transparente, como imagen(ruta, {"fondo": color}) */
         Valor *arg[2] = {valor_texto(img), NULL};
@@ -7597,41 +7697,8 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
         Valor *off = jg_campo(x, "tileoffset");
         ts->ox = (int)jg_campo_num(off, "x", 0);
         ts->oy = (int)jg_campo_num(off, "y", 0);
-        ts->anim_ini = calloc((size_t)ts->cuantos + 1, sizeof(int));
-        ts->anim_n = calloc((size_t)ts->cuantos + 1, sizeof(int));
-        ts->anim_ms = calloc((size_t)ts->cuantos + 1, sizeof(int));
-        Valor *tiles = jg_campo(x, "tiles");
-        int ncuadros = 0;
-        for (int j = 0; tiles && tiles->tipo == VAL_LISTA && j < tiles->lista.cantidad; j++) {
-            Valor *an = jg_campo(tiles->lista.elementos[j], "animation");
-            if (an && an->tipo == VAL_LISTA) ncuadros += an->lista.cantidad;
-        }
-        ts->cuadros = malloc(sizeof(int) * 2 * (size_t)(ncuadros + 1));
-        int pos = 0;
-        for (int j = 0; tiles && tiles->tipo == VAL_LISTA && j < tiles->lista.cantidad; j++) {
-            Valor *tile = tiles->lista.elementos[j];
-            int tid = (int)jg_campo_num(tile, "id", -1);
-            if (tid < 0 || tid >= ts->cuantos) continue;
-            Valor *props = jg_propiedades(tile);
-            unsigned g = ts->primero + (unsigned)tid;
-            if (g <= max_gid) {
-                if (jg_propiedad_si(props, "solido") || jg_propiedad_si(props, "sólido")) tipo_gid[g] = 1;
-                else if (jg_propiedad_si(props, "plataforma")) tipo_gid[g] = 2;
-            }
-            valor_destruir(props);
-            Valor *an = jg_campo(tile, "animation");
-            if (!an || an->tipo != VAL_LISTA || an->lista.cantidad == 0) continue;
-            ts->anim_ini[tid] = pos;
-            for (int q = 0; q < an->lista.cantidad; q++) {
-                int cu = (int)jg_campo_num(an->lista.elementos[q], "tileid", 0);
-                int ms = (int)jg_campo_num(an->lista.elementos[q], "duration", 100);
-                ts->cuadros[2 * pos] = cu < 0 || cu >= ts->cuantos ? 0 : cu;
-                ts->cuadros[2 * pos + 1] = ms > 0 ? ms : 1;
-                ts->anim_ms[tid] += ms > 0 ? ms : 1;
-                pos++;
-            }
-            ts->anim_n[tid] = an->lista.cantidad;
-        }
+        jg_tiled_animaciones(ts, x);
+        jg_tiled_tipos(ts, x, tipo_gid, max_gid);
     }
     /* las capas: las de tiles y de imagen para dibujar; las sólidas, al mapa de choques */
     Valor *capas[512];
@@ -7645,7 +7712,9 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     }
     JgMapa *mp = &_jgs.mapas[k_mapa];
     memset(mp, 0, sizeof *mp);
-    mp->cols = cols; mp->filas = filas; mp->tam = tw; mp->bordes = 1;
+    /* en un isométrico, la rejilla lógica: casillas cuadradas del alto del rombo
+       (las coordenadas que usa Tiled para los objetos) */
+    mp->cols = cols; mp->filas = filas; mp->tam = iso ? th : tw; mp->bordes = 1;
     mp->celdas = malloc((size_t)cols * filas);
     memset(mp->celdas, '.', (size_t)cols * filas);
     mp->solido['#'] = 1;
@@ -7664,7 +7733,15 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
                 Valor *o = objs->lista.elementos[j], *d = valor_diccionario_crear();
                 double ox = jg_campo_num(o, "x", 0), oy = jg_campo_num(o, "y", 0);
                 double ow = jg_campo_num(o, "width", 0), oh = jg_campo_num(o, "height", 0);
-                if (jg_campo_num(o, "gid", 0) > 0) oy -= oh;          /* los objetos de tile van por abajo */
+                double gid = jg_campo_num(o, "gid", 0);
+                if (gid > 0) {                     /* un objeto con imagen: su tile y su base (por donde pisa) */
+                    Valor *b = valor_lista_crear();
+                    lista_agregar(b, valor_numero(ox));
+                    lista_agregar(b, valor_numero(oy));
+                    valor_diccionario_agregar(d, "base", b);
+                    valor_diccionario_agregar(d, "tile", valor_numero(gid));
+                    if (!iso) oy -= oh;            /* en los ortogonales, el rectángulo empieza arriba */
+                }
                 const char *ot = jg_campo_texto(o, "type");
                 if (!*ot) ot = jg_campo_texto(o, "class");
                 valor_diccionario_agregar(d, "id", valor_numero(jg_campo_num(o, "id", 0)));
@@ -7747,9 +7824,18 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     valor_diccionario_agregar(d, "tiled", valor_numero(k));
     valor_diccionario_agregar(d, "columnas", valor_numero(cols));
     valor_diccionario_agregar(d, "filas", valor_numero(filas));
-    valor_diccionario_agregar(d, "tamaño", valor_numero(tw));
-    valor_diccionario_agregar(d, "ancho", valor_numero(cols * tw));
-    valor_diccionario_agregar(d, "alto", valor_numero(filas * th));
+    valor_diccionario_agregar(d, "tamaño", valor_numero(mp->tam));
+    valor_diccionario_agregar(d, "ancho", valor_numero(cols * mp->tam));
+    valor_diccionario_agregar(d, "alto", valor_numero(filas * mp->tam));
+    valor_diccionario_agregar(d, "isometrico", valor_booleano(iso));
+    Valor *rombo = valor_lista_crear();              /* el tamaño de una casilla al dibujarla */
+    lista_agregar(rombo, valor_numero(tw));
+    lista_agregar(rombo, valor_numero(th));
+    valor_diccionario_agregar(d, "tile", rombo);
+    Valor *dibujo = valor_lista_crear();             /* lo que ocupa dibujado */
+    lista_agregar(dibujo, valor_numero(iso ? (cols + filas) * tw / 2.0 : cols * tw));
+    lista_agregar(dibujo, valor_numero(iso ? (cols + filas) * th / 2.0 : filas * th));
+    valor_diccionario_agregar(d, "dibujo", dibujo);
     valor_diccionario_agregar(d, "capas", nombres);
     valor_diccionario_agregar(d, "objetos", objetos);
     valor_diccionario_agregar(d, "propiedades", jg_propiedades(m));
@@ -7757,8 +7843,9 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     return d;
 }
 
-/* El tile que toca dibujar de un gid (con su animación): su tileset y su rectángulo */
-static JgTileset *jg_tiled_tile(JgTiled *t, unsigned id, JgRect *src) {
+/* El tile que toca dibujar de un gid (con su animación): su tileset, su
+   imagen y el rectángulo de la imagen */
+static JgTileset *jg_tiled_tile(JgTiled *t, unsigned id, JgRect *src, int *img) {
     JgTileset *ts = NULL;
     for (int i = 0; i < t->nts; i++) if (t->ts[i].primero <= id && (!ts || t->ts[i].primero > ts->primero)) ts = &t->ts[i];
     if (!ts) return NULL;
@@ -7774,6 +7861,15 @@ static JgTileset *jg_tiled_tile(JgTiled *t, unsigned id, JgRect *src) {
         if (q >= ts->anim_ini[local] + ts->anim_n[local]) q = ts->anim_ini[local] + ts->anim_n[local] - 1;
         local = ts->cuadros[2 * q];
     }
+    if (ts->imgs) {                                     /* colección: la imagen entera del tile */
+        *img = ts->imgs[local];
+        if (*img < 0) return NULL;
+        src->x = src->y = 0;
+        src->w = _jgs.imagenes[*img].ancho;
+        src->h = _jgs.imagenes[*img].alto;
+        return ts;
+    }
+    *img = ts->imagen;
     src->x = ts->margen + (local % ts->columnas) * (ts->tw + ts->sep);
     src->y = ts->margen + (local / ts->columnas) * (ts->th + ts->sep);
     src->w = ts->tw;
@@ -7781,7 +7877,91 @@ static JgTileset *jg_tiled_tile(JgTiled *t, unsigned id, JgRect *src) {
     return ts;
 }
 
-static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c) {
+/* Dibuja el tile 'g' (con sus volteos) con la esquina de abajo a la izquierda
+   de su imagen en (izq, abajo), ya en la pantalla; como en Tiled, más su
+   desplazamiento. 'ultima' guarda la textura con el alfa puesto. */
+static void jg_tile_en(JgTiled *t, unsigned g, double izq, double abajo, int alfa, void **ultima) {
+    unsigned id = g & 0x1FFFFFFFu;
+    JgRect src;
+    int img;
+    JgTileset *ts = id ? jg_tiled_tile(t, id, &src, &img) : NULL;
+    if (!ts) return;
+    void *tex = _jgs.imagenes[img].tex;
+    if (!ultima || tex != *ultima) {
+        if (ultima && *ultima) _jg.TextureAlpha(*ultima, 255);
+        _jg.TextureAlpha(tex, (unsigned char)alfa);
+        _jg.TextureColor(tex, 255, 255, 255);
+        if (ultima) *ultima = tex;
+    }
+    double x = izq + ts->ox, y = abajo - src.h + ts->oy;
+    if (x > _jgs.vista[2] || y > _jgs.vista[3] || x + src.w < _jgs.vista[0] || y + src.h < _jgs.vista[1]) {
+        if (!ultima) _jg.TextureAlpha(tex, 255);
+        return;                                         /* no se ve */
+    }
+    JgRect r = {(int)floor(x), (int)floor(y), (int)floor(x + src.w) - (int)floor(x), (int)floor(y + src.h) - (int)floor(y)};
+    int h = (g >> 31) & 1, v = (g >> 30) & 1, dg = (g >> 29) & 1;
+    /* Tiled: primero la diagonal, luego horizontal y vertical; SDL voltea y luego gira */
+    double angulo = dg ? 90 : 0;
+    int volteo = dg ? ((v ? 1 : 0) | (h ? 0 : 2)) : ((h ? 1 : 0) | (v ? 2 : 0));
+    _jg.RenderCopyEx(_jgs.render, tex, &src, &r, angulo, NULL, volteo);
+    if (!ultima) _jg.TextureAlpha(tex, 255);
+}
+
+/* ¿Se ve el tile 'g' con su abajo a la izquierda en (izq, abajo) de la pantalla? */
+static int jg_tile_se_ve(JgTiled *t, unsigned g, double izq, double abajo) {
+    JgRect src;
+    int img;
+    JgTileset *ts = jg_tiled_tile(t, g & 0x1FFFFFFFu, &src, &img);
+    if (!ts) return 0;
+    double x = izq + ts->ox, y = abajo - src.h + ts->oy;
+    return !(x > _jgs.vista[2] || y > _jgs.vista[3] || x + src.w < _jgs.vista[0] || y + src.h < _jgs.vista[1]);
+}
+
+/* Lo hondo que está un punto del mapa (en la rejilla lógica), de 0 a casi 1:
+   lo de delante, más. Lo mismo que mapa.profundidad() de juego.lince. */
+static double jg_tiled_hondo(JgTiled *t, double x, double y) {
+    double tam = t->iso ? t->th : t->tw;
+    double p = t->iso ? (x + y) / (tam * (t->cols + t->filas)) : y / (tam * t->filas);
+    return p < 0 ? 0 : p > 0.999999 ? 0.999999 : p;
+}
+
+/* Un dibujo guardado a mano en una capa (sin copiar argumentos: ya son suyos) */
+static void jg_diferir_valores(JgFnDibujo fn, Valor **args, int n, double capa) {
+    if (_jgs.ndif == _jgs.cap_dif) {
+        _jgs.cap_dif = _jgs.cap_dif ? _jgs.cap_dif * 2 : 256;
+        _jgs.dif = realloc(_jgs.dif, sizeof(JgDiferido) * (size_t)_jgs.cap_dif);
+    }
+    JgDiferido *d = &_jgs.dif[_jgs.ndif++];
+    d->fn = fn;
+    d->n = n;
+    d->args = malloc(sizeof(Valor *) * (size_t)n);
+    memcpy(d->args, args, sizeof(Valor *) * (size_t)n);
+    d->capa = capa;
+    d->orden = _jgs.orden_dif++;
+    d->cam = jg_cam_leer();
+}
+
+/* Un tile guardado en su capa: (mapa, gid, izq, abajo, alfa, paralaje x, y,
+   desplazamiento x, y), con la izquierda y el abajo en el mapa, sin la cámara */
+static Valor *fn_jg_tile_guardado(Valor **a, int n) {
+    (void)n;
+    int k = (int)a[0]->numero;
+    if (k < 0 || k >= _jgs.ntiled || !_jgs.tiled[k].usado) return valor_nulo();
+    jg_dibujo_listo();
+    double cx = _jgs.cam_x * a[5]->numero - a[7]->numero, cy = _jgs.cam_y * a[6]->numero - a[8]->numero;
+    jg_tile_en(&_jgs.tiled[k], (unsigned)a[1]->numero, a[2]->numero - cx, a[3]->numero - cy, (int)a[4]->numero, NULL);
+    return valor_nulo();
+}
+
+static void jg_guardar_tile(int k, unsigned g, double izq, double abajo, int alfa, const JgCapaTiled *c, double capa) {
+    Valor *args[9] = {valor_numero(k), valor_numero(g), valor_numero(izq), valor_numero(abajo), valor_numero(alfa),
+                      valor_numero(c ? c->px : 1), valor_numero(c ? c->py : 1), valor_numero(c ? c->dx : 0), valor_numero(c ? c->dy : 0)};
+    jg_diferir_valores(fn_jg_tile_guardado, args, 9, capa);
+}
+
+/* Una capa: con 'ordenar' >= 0, cada tile va a la capa ordenar + su profundidad
+   (para pasar por delante y por detrás con los personajes); si no, se dibuja ya */
+static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c, double ordenar) {
     double cx = _jgs.cam_x * c->px - c->dx, cy = _jgs.cam_y * c->py - c->dy;
     int alfa = (int)(c->opacidad * 255 + 0.5);
     if (alfa <= 0) return;
@@ -7794,51 +7974,77 @@ static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c) {
         _jg.RenderCopyEx(_jgs.render, im->tex, NULL, &r, 0, NULL, 0);
         return;
     }
-    /* las casillas que se ven, con margen para los tiles más grandes que una casilla */
-    int c0 = (int)floor((cx + _jgs.vista[0]) / t->tw) - 2, f0 = (int)floor((cy + _jgs.vista[1]) / t->th) - 1;
-    int c1 = (int)floor((cx + _jgs.vista[2]) / t->tw) + 1, f1 = (int)floor((cy + _jgs.vista[3]) / t->th) + 4;
-    if (c0 < 0) c0 = 0;
-    if (f0 < 0) f0 = 0;
-    if (c1 >= t->cols) c1 = t->cols - 1;
-    if (f1 >= t->filas) f1 = t->filas - 1;
+    int k = (int)(t - _jgs.tiled);
     void *ultima = NULL;
-    for (int f = f0; f <= f1; f++)
-        for (int col = c0; col <= c1; col++) {
-            unsigned g = c->gids[f * t->cols + col];
-            unsigned id = g & 0x1FFFFFFFu;
-            if (!id) continue;
-            JgRect src;
-            JgTileset *ts = jg_tiled_tile(t, id, &src);
-            if (!ts) continue;
-            void *tex = _jgs.imagenes[ts->imagen].tex;
-            if (tex != ultima) {
-                _jg.TextureAlpha(tex, (unsigned char)alfa);
-                _jg.TextureColor(tex, 255, 255, 255);
-                ultima = tex;
+    if (t->iso) {
+        /* de atrás adelante (por diagonales), así lo alto tapa lo de detrás */
+        double mitad = t->tw / 2.0, origen = t->filas * mitad;
+        for (int d = 0; d <= t->cols + t->filas - 2; d++) {
+            double y = d * t->th / 2.0 + t->th - cy;          /* el abajo de los rombos de esta diagonal */
+            if (y < _jgs.vista[1] - t->th) continue;           /* encima de lo que se ve: nada de esta fila se ve... */
+            if (y - 4096 > _jgs.vista[3]) break;               /* ...salvo tiles muy altos; debajo, ya nada */
+            int c0 = d - t->filas + 1 < 0 ? 0 : d - t->filas + 1, c1 = d < t->cols - 1 ? d : t->cols - 1;
+            for (int col = c0; col <= c1; col++) {
+                int f = d - col;
+                unsigned g = c->gids[f * t->cols + col];
+                if (!(g & 0x1FFFFFFFu)) continue;
+                double izq = (col - f) * mitad + origen - mitad;  /* la izquierda del rombo */
+                if (ordenar >= 0) {
+                    if (jg_tile_se_ve(t, g, izq - cx, y))
+                        jg_guardar_tile(k, g, izq, d * t->th / 2.0 + t->th, alfa, c, ordenar + (double)(d + 1) / (t->cols + t->filas));
+                }
+                else jg_tile_en(t, g, izq - cx, y, alfa, &ultima);
             }
-            /* abajo a la izquierda de la casilla, como en Tiled */
-            double x = col * t->tw + ts->ox - cx, y = (f + 1) * t->th - ts->th + ts->oy - cy;
-            JgRect r = {(int)floor(x), (int)floor(y), (int)floor(x + ts->tw) - (int)floor(x), (int)floor(y + ts->th) - (int)floor(y)};
-            int h = (g >> 31) & 1, v = (g >> 30) & 1, dg = (g >> 29) & 1;
-            /* Tiled: primero la diagonal, luego horizontal y vertical; SDL voltea y luego gira */
-            double angulo = dg ? 90 : 0;
-            int volteo = dg ? ((v ? 1 : 0) | (h ? 0 : 2)) : ((h ? 1 : 0) | (v ? 2 : 0));
-            _jg.RenderCopyEx(_jgs.render, tex, &src, &r, angulo, NULL, volteo);
         }
+    } else {
+        /* las casillas que se ven, con margen para los tiles más grandes que una casilla */
+        int c0 = (int)floor((cx + _jgs.vista[0]) / t->tw) - 2, f0 = (int)floor((cy + _jgs.vista[1]) / t->th) - 1;
+        int c1 = (int)floor((cx + _jgs.vista[2]) / t->tw) + 1, f1 = (int)floor((cy + _jgs.vista[3]) / t->th) + 4;
+        if (ordenar >= 0) { c0 -= 8; f1 += 32; }                /* los tiles altos, por si acaso */
+        if (c0 < 0) c0 = 0;
+        if (f0 < 0) f0 = 0;
+        if (c1 >= t->cols) c1 = t->cols - 1;
+        if (f1 >= t->filas) f1 = t->filas - 1;
+        for (int f = f0; f <= f1; f++)
+            for (int col = c0; col <= c1; col++) {
+                unsigned g = c->gids[f * t->cols + col];
+                if (!(g & 0x1FFFFFFFu)) continue;
+                /* abajo a la izquierda de la casilla, como en Tiled */
+                if (ordenar >= 0) {
+                    if (jg_tile_se_ve(t, g, col * t->tw - cx, (f + 1) * t->th - cy))
+                        jg_guardar_tile(k, g, col * t->tw, (f + 1) * t->th, alfa, c, ordenar + (f + 0.5) / t->filas);
+                }
+                else jg_tile_en(t, g, col * t->tw - cx, (f + 1) * t->th - cy, alfa, &ultima);
+            }
+    }
     if (ultima) _jg.TextureAlpha(ultima, 255);
 }
 
-/* dibujar_tiled(mapa[, capas]): sus capas visibles, o las nombradas (un nombre
-   o una lista: el fondo antes del personaje y lo de delante después) */
+/* dibujar_tiled(mapa[, capas[, opciones]]): sus capas visibles, o las nombradas
+   (un nombre o una lista: el fondo antes del personaje y lo de delante
+   después). Opciones: "capa" (todo en esa capa) y "ordenar" (cada tile en la
+   capa ordenar + su profundidad, para que los personajes pasen por delante y
+   por detrás: juego.capa(ordenar + mapa.profundidad(mapa, x, y))) */
 static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
     JG_ABIERTA();
-    JG_DIBUJO(fn_jg_dibujar_tiled);
+    Valor *op = n > 2 && a[2]->tipo == VAL_DICCIONARIO ? a[2] : NULL;
+    if (n > 2 && !op && a[2]->tipo != VAL_NULO) return jg_error("ErrorTipo", "mapa.dibujar_tiled(): las opciones van en un diccionario");
+    static const char *const V[] = {"capa", "ordenar", NULL};
+    if (!jg_opciones_validas(op, "mapa.dibujar_tiled", V)) return valor_nulo();
+    double ordenar = -1;
+    if (jg_opcion_valor(op, "ordenar") && !jg_opcion(op, "ordenar", &ordenar))
+        return jg_error("ErrorTipo", "mapa.dibujar_tiled(): \"ordenar\" es un número: la capa de los tiles (más su profundidad)");
+    if (ordenar >= 0) {
+        if (ordenar != floor(ordenar)) return jg_error("ErrorArgumento", "mapa.dibujar_tiled(): \"ordenar\" es un número entero (0 o más)");
+        if (!_jgs.repitiendo) jg_dibujo_listo();        /* cada tile, a su capa: lo de "capa" no cuenta */
+    } else JG_DIBUJO(fn_jg_dibujar_tiled);
     int k = n > 0 ? jg_id_de(a[0], "tiled") : -1;
     if (k < 0 || k >= _jgs.ntiled || !_jgs.tiled[k].usado)
         return jg_error("ErrorTipo", "mapa.dibujar_tiled() espera un mapa de juego.mapa.tiled()");
     JgTiled *t = &_jgs.tiled[k];
+    if (_jgs.repitiendo) ordenar = -1;                   /* ya en su capa: se dibuja ya, en orden */
     if (n < 2 || a[1]->tipo == VAL_NULO) {
-        for (int i = 0; i < t->ncapas; i++) if (t->capas[i].visible) jg_tiled_dibujar_capa(t, &t->capas[i]);
+        for (int i = 0; i < t->ncapas; i++) if (t->capas[i].visible) jg_tiled_dibujar_capa(t, &t->capas[i], ordenar);
         return valor_nulo();
     }
     Valor *l = a[1];
@@ -7849,13 +8055,52 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
         if (nv->tipo != VAL_TEXTO) return jg_error("ErrorTipo", "mapa.dibujar_tiled(): las capas son un nombre o una lista de nombres");
         int hecho = 0;
         for (int i = 0; i < t->ncapas; i++)
-            if (!strcmp(t->capas[i].nombre, nv->texto)) { jg_tiled_dibujar_capa(t, &t->capas[i]); hecho = 1; }
+            if (!strcmp(t->capas[i].nombre, nv->texto)) { jg_tiled_dibujar_capa(t, &t->capas[i], ordenar); hecho = 1; }
         if (!hecho) {
             char m[300];
             snprintf(m, sizeof m, "mapa.dibujar_tiled(): el mapa no tiene la capa '%s' (mira mapa[\"capas\"])", nv->texto);
             return jg_error("ErrorArgumento", m);
         }
     }
+    return valor_nulo();
+}
+
+/* dibujar_tile(mapa, tile, x, y[, opciones]): un tile del mapa (el de un
+   objeto con imagen) con su base en el punto (x, y) de la rejilla lógica: en
+   un isométrico, por el centro de abajo; en uno ortogonal, por la esquina de
+   abajo a la izquierda (como los coloca Tiled). Opciones: "capa" y "ordenar" */
+static Valor *fn_jg_dibujar_tile(Valor **a, int n) {
+    JG_ABIERTA();
+    Valor *op = n > 4 && a[4]->tipo == VAL_DICCIONARIO ? a[4] : NULL;
+    static const char *const V[] = {"capa", "ordenar", NULL};
+    if (!jg_opciones_validas(op, "mapa.dibujar_tile", V)) return valor_nulo();
+    double ordenar = -1;
+    if (jg_opcion_valor(op, "ordenar") && !jg_opcion(op, "ordenar", &ordenar))
+        return jg_error("ErrorTipo", "mapa.dibujar_tile(): \"ordenar\" es un número: la capa (más la profundidad)");
+    if (ordenar >= 0) { if (!_jgs.repitiendo) jg_dibujo_listo(); }
+    else JG_DIBUJO(fn_jg_dibujar_tile);
+    int k = n > 0 ? jg_id_de(a[0], "tiled") : -1;
+    if (k < 0 || k >= _jgs.ntiled || !_jgs.tiled[k].usado || n < 4 || a[1]->tipo != VAL_NUMERO ||
+        a[2]->tipo != VAL_NUMERO || a[3]->tipo != VAL_NUMERO)
+        return jg_error("ErrorTipo", "mapa.dibujar_tile() espera (mapa de juego.mapa.tiled(), tile, x, y[, opciones])");
+    JgTiled *t = &_jgs.tiled[k];
+    unsigned g = (unsigned)a[1]->numero;
+    JgRect src;
+    int img;
+    if (!(g & 0x1FFFFFFFu) || !jg_tiled_tile(t, g & 0x1FFFFFFFu, &src, &img)) {
+        char m[200];
+        snprintf(m, sizeof m, "mapa.dibujar_tile(): el mapa no tiene el tile %u", g & 0x1FFFFFFFu);
+        return jg_error("ErrorArgumento", m);
+    }
+    double x = a[2]->numero, y = a[3]->numero, izq = x, abajo = y;
+    if (t->iso) {                                       /* al rombo: la base, por el centro de abajo */
+        izq = (x - y) * (t->tw / 2.0) / t->th + t->filas * t->tw / 2.0 - src.w / 2.0;
+        abajo = (x + y) / 2.0;
+    }
+    if (ordenar >= 0 && !_jgs.repitiendo) {
+        if (jg_tile_se_ve(t, g, izq - _jgs.cam_x, abajo - _jgs.cam_y)) jg_guardar_tile(k, g, izq, abajo, 255, NULL, ordenar + jg_tiled_hondo(t, x, y));
+    }
+    else jg_tile_en(t, g, izq - _jgs.cam_x, abajo - _jgs.cam_y, 255, NULL);
     return valor_nulo();
 }
 
@@ -8064,6 +8309,7 @@ static void cargar_juego(Entorno *entorno) {
         {"entrada_pulsada", fn_jg_entrada_pulsada,  0},
         {"mapa_tiled",      fn_jg_mapa_tiled,      -1},
         {"dibujar_tiled",   fn_jg_dibujar_tiled,   -1},
+        {"dibujar_tile",    fn_jg_dibujar_tile,    -1},
         {"carpeta_guardado", fn_jg_carpeta_guardado, 0},
         {"casilla",         fn_jg_casilla,          3},
         {"poner_casilla",   fn_jg_poner_casilla,    4},
@@ -8093,7 +8339,9 @@ static void cargar_juego(Entorno *entorno) {
     static const char *const MAPA[][2] = {
         {"crear", "mapa"}, {"tiled", "mapa_tiled"}, {"casilla", "casilla"}, {"poner", "poner_casilla"},
         {"solido", "solido"}, {"casilla_en", "casilla_en"}, {"buscar", "buscar_en_mapa"}, {"mover", "mover_en_mapa"},
-        {"dibujar", "dibujar_mapa"}, {"dibujar_tiled", "dibujar_tiled"}, {"camino", "camino"}, {NULL, NULL}};
+        {"dibujar", "dibujar_mapa"}, {"dibujar_tiled", "dibujar_tiled"}, {"camino", "camino"},
+        {"dibujar_tile", "dibujar_tile"}, {"a_dibujo", "mapa_a_dibujo"}, {"a_mapa", "mapa_a_mapa"},
+        {"profundidad", "mapa_profundidad"}, {"dibujar_objeto", "mapa_dibujar_objeto"}, {NULL, NULL}};
     jg_parte(mod, "fisica", FISICA);
     jg_parte(mod, "mapa", MAPA);
 }

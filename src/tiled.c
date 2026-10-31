@@ -628,7 +628,10 @@ static int infinito_a_normal(Valor *m, const char *ruta, char *error, size_t max
         return 0;
     }
     trozos_juntar(campo(m, "layers"), &l);
-    objetos_mover(campo(m, "layers"), -l.x0 * num_de(m, "tilewidth"), -l.y0 * num_de(m, "tileheight"));
+    /* en un mapa isométrico, los objetos van en casillas de alto × alto */
+    const char *ori = campo_texto(m, "orientation");
+    double ancho_casilla = ori && !strcmp(ori, "isometric") ? num_de(m, "tileheight") : num_de(m, "tilewidth");
+    objetos_mover(campo(m, "layers"), -l.x0 * ancho_casilla, -l.y0 * num_de(m, "tileheight"));
     poner(m, "width", valor_numero(l.x1 - l.x0));
     poner(m, "height", valor_numero(l.y1 - l.y0));
     poner(m, "infinite", valor_booleano(0));
@@ -661,8 +664,9 @@ Valor *tiled_leer(const char *ruta, char *error, size_t max) {
     Valor *m = leer_documento(ruta, 0, error, max);
     if (!m) return NULL;
     const char *ori = campo_texto(m, "orientation");
-    if (ori && strcmp(ori, "orthogonal")) {
-        snprintf(error, max, "'%s' es un mapa «%s»: Lince entiende los ortogonales (casillas en rejilla)", ruta, ori);
+    if (ori && strcmp(ori, "orthogonal") && strcmp(ori, "isometric")) {
+        snprintf(error, max, "'%s' es un mapa «%s»: Lince entiende los ortogonales (casillas en rejilla) y los "
+                 "isométricos (en rombo)", ruta, ori);
         valor_destruir(m);
         return NULL;
     }

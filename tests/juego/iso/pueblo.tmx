@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="6" height="6" tilewidth="32" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="3">
+ <tileset firstgid="1" name="rombos" tilewidth="32" tileheight="16" tilecount="2" columns="2">
+  <image source="rombos.png" width="64" height="16"/>
+ </tileset>
+ <tileset firstgid="3" name="piezas" tilewidth="32" tileheight="48" tilecount="1" columns="0">
+  <grid orientation="orthogonal" width="1" height="1"/>
+  <tile id="0">
+   <image source="arbol.png" width="32" height="48"/>
+  </tile>
+ </tileset>
+ <layer id="1" name="suelo" width="6" height="6">
+  <data encoding="csv">
+1,1,1,1,1,1,
+1,2,2,2,2,1,
+1,1,1,1,2,1,
+1,1,1,1,2,1,
+1,1,1,1,1,1,
+1,1,1,1,1,1
+</data>
+ </layer>
+ <layer id="2" name="arboles" width="6" height="6">
+  <data encoding="csv">
+0,0,0,0,0,0,
+0,0,0,0,0,0,
+0,0,3,0,0,0,
+0,0,0,0,0,0,
+0,0,0,0,0,0,
+0,0,0,0,0,0
+</data>
+ </layer>
+ <layer id="3" name="colisiones" width="6" height="6" visible="0">
+  <data encoding="csv">
+0,0,0,0,0,0,
+0,0,0,0,0,0,
+0,0,1,0,0,0,
+0,0,0,0,0,0,
+0,0,0,0,0,0,
+0,0,0,0,0,0
+</data>
+ </layer>
+ <objectgroup id="4" name="cosas">
+  <object id="1" name="fuente" gid="3" x="72" y="24" width="32" height="48"/>
+  <object id="2" name="salida" x="8" y="88">
+   <point/>
+  </object>
+ </objectgroup>
+</map>

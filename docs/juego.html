@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v2.7</span>
+  <span class="version">v2.8</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -163,7 +163,7 @@
 <div class="grupo"><a href="#camara" class="sec">Cámara</a><a href="#camara-0" class="sub">Cámara y temblor</a><a href="#camara-1" class="sub">Zoom, giro y pantalla partida</a></div>
 <div class="grupo"><a href="#choques" class="sec">Choques</a><a href="#choques-0" class="sub">¿Se tocan?</a></div>
 <div class="grupo"><a href="#mapas" class="sec">Mapas</a><a href="#mapas-0" class="sub">Un nivel escrito con texto</a><a href="#mapas-1" class="sub">Tiles y tiles animados</a><a href="#mapas-2" class="sub">Buscar el camino</a></div>
-<div class="grupo"><a href="#mapas-de-tiled" class="sec">Mapas de Tiled</a><a href="#mapas-de-tiled-0" class="sub">Niveles hechos con Tiled</a></div>
+<div class="grupo"><a href="#mapas-de-tiled" class="sec">Mapas de Tiled</a><a href="#mapas-de-tiled-0" class="sub">Niveles hechos con Tiled</a><a href="#mapas-de-tiled-1" class="sub">Un pueblo isométrico</a></div>
 <div class="grupo"><a href="#fisica" class="sec">Física</a><a href="#fisica-0" class="sub">Cajas, pelotas y ascensores</a><a href="#fisica-1" class="sub">Cuerpos que giran</a><a href="#fisica-2" class="sub">Cuerdas y bisagras</a></div>
 <div class="grupo"><a href="#particulas" class="sec">Partículas</a><a href="#particulas-0" class="sub">Chispas, polvo y explosiones</a></div>
 <div class="grupo"><a href="#escenas" class="sec">Escenas</a><a href="#escenas-0" class="sub">Portada, partida y final</a></div>
@@ -182,7 +182,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>45 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>46 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -693,7 +693,46 @@ juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s
     juego.camara()
     juego.<span class="t">texto</span>(<span class="s">&quot;{NIVEL[&quot;</span>propiedades<span class="s">&quot;][&quot;</span>nombre<span class="s">&quot;]}  CAPAS: {NIVEL[&quot;</span>capas<span class="s">&quot;]}&quot;</span>, <span class="n">8</span>, <span class="n">8</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
     juego.presentar()
-}</code></pre></div><figure><img src="img/juego/1310_tiled.png" alt="Captura de «Niveles hechos con Tiled»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1310_tiled.lince</span></article></section>
+}</code></pre></div><figure><img src="img/juego/1310_tiled.png" alt="Captura de «Niveles hechos con Tiled»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1310_tiled.lince</span></article><article class="ej" id="mapas-de-tiled-1"><h3>Un pueblo isométrico</h3><p class="nota">Los mapas <strong>isométricos</strong> de Tiled (casillas en rombo, aquí de 32 × 16) se leen igual, con <code>juego.mapa.tiled</code>. Todo se piensa en su <strong>rejilla lógica</strong>, de casillas cuadradas del alto del rombo: ahí están los objetos de Tiled y ahí trabajan <code>mapa.mover</code>, <code>mapa.camino</code> y <code>mapa.solido</code>. <code>juego.mapa.a_dibujo(mapa, cosa)</code> dice dónde se dibuja (y <code>mapa.a_mapa</code>, al revés).</p><p class="nota">Para pasar por delante y por detrás de árboles y casas: los tiles con <code>{&quot;ordenar&quot;: 1}</code> van cada uno a la capa 1 más su <strong>profundidad</strong>, y el personaje a <code>juego.capa(1 + juego.mapa.profundidad(mapa, yo))</code>. Las piezas grandes, cada una de su tamaño, son un tileset de imágenes sueltas; los objetos con imagen se dibujan con <code>mapa.dibujar_objeto</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
+
+juego.abrir(<span class="s">&quot;Pueblo&quot;</span>, <span class="n">384</span>, <span class="n">216</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>, <span class="s">&quot;escala_entera&quot;</span>: <span class="k">verdadero</span>})
+juego.definir_accion(<span class="s">&quot;izquierda&quot;</span>, [<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;a&quot;</span>, <span class="s">&quot;mando:izq_x-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;derecha&quot;</span>, [<span class="s">&quot;derecha&quot;</span>, <span class="s">&quot;d&quot;</span>, <span class="s">&quot;mando:izq_x+&quot;</span>])
+juego.definir_accion(<span class="s">&quot;arriba&quot;</span>, [<span class="s">&quot;arriba&quot;</span>, <span class="s">&quot;w&quot;</span>, <span class="s">&quot;mando:izq_y-&quot;</span>])
+juego.definir_accion(<span class="s">&quot;abajo&quot;</span>, [<span class="s">&quot;abajo&quot;</span>, <span class="s">&quot;s&quot;</span>, <span class="s">&quot;mando:izq_y+&quot;</span>])
+<span class="k">fijo</span> PUEBLO = juego.mapa.tiled(<span class="s">&quot;recursos/pueblo.tmx&quot;</span>)
+<span class="k">sea</span> yo = {<span class="s">&quot;x&quot;</span>: <span class="n">0</span>, <span class="s">&quot;y&quot;</span>: <span class="n">0</span>, <span class="s">&quot;ancho&quot;</span>: <span class="n">8</span>, <span class="s">&quot;alto&quot;</span>: <span class="n">8</span>, <span class="s">&quot;vx&quot;</span>: <span class="n">0</span>, <span class="s">&quot;vy&quot;</span>: <span class="n">0</span>}
+<span class="k">sea</span> arboles = []
+<span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> cosa <span class="k">en</span> PUEBLO[<span class="s">&quot;objetos&quot;</span>] {
+    <span class="k">si</span> cosa[<span class="s">&quot;tipo&quot;</span>] == <span class="s">&quot;jugador&quot;</span> {
+        yo[<span class="s">&quot;x&quot;</span>] = cosa[<span class="s">&quot;x&quot;</span>]
+        yo[<span class="s">&quot;y&quot;</span>] = cosa[<span class="s">&quot;y&quot;</span>]
+    }
+    <span class="k">si</span> cosa[<span class="s">&quot;tipo&quot;</span>] == <span class="s">&quot;arbol&quot;</span> { arboles.agregar(cosa) }
+}
+
+<span class="k">mientras</span> juego.abierto() {
+    <span class="c"># las flechas mueven en la pantalla; en la rejilla lógica, eso es en diagonal</span>
+    <span class="k">sea</span> dx = juego.direccion(<span class="s">&quot;izquierda&quot;</span>, <span class="s">&quot;derecha&quot;</span>)
+    <span class="k">sea</span> dy = juego.direccion(<span class="s">&quot;arriba&quot;</span>, <span class="s">&quot;abajo&quot;</span>)
+    <span class="k">sea</span> v = matematica.normalizar(dy + dx / <span class="n">2</span>, dy - dx / <span class="n">2</span>)
+    yo[<span class="s">&quot;vx&quot;</span>] = v[<span class="n">0</span>] * <span class="n">50</span>
+    yo[<span class="s">&quot;vy&quot;</span>] = v[<span class="n">1</span>] * <span class="n">50</span>
+    juego.mapa.mover(PUEBLO, yo)
+    <span class="k">sea</span> p = juego.mapa.a_dibujo(PUEBLO, yo)
+    juego.camara(p[<span class="n">0</span>] - <span class="n">192</span>, p[<span class="n">1</span>] - <span class="n">108</span>)
+
+    juego.limpiar([<span class="n">30</span>, <span class="n">40</span>, <span class="n">60</span>])
+    juego.mapa.dibujar_tiled(PUEBLO, <span class="s">&quot;suelo&quot;</span>)
+    juego.mapa.dibujar_tiled(PUEBLO, <span class="s">&quot;piezas&quot;</span>, {<span class="s">&quot;ordenar&quot;</span>: <span class="n">1</span>})
+    <span class="k">para</span> <span class="k">cada</span> <span class="t">diccionario</span> a <span class="k">en</span> arboles { juego.mapa.dibujar_objeto(PUEBLO, a, {<span class="s">&quot;ordenar&quot;</span>: <span class="n">1</span>}) }
+    juego.capa(<span class="n">1</span> + juego.mapa.profundidad(PUEBLO, yo))
+    juego.circulo(p[<span class="n">0</span>], p[<span class="n">1</span>], <span class="n">5</span>, [<span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>, <span class="n">80</span>])                  <span class="c"># la sombra</span>
+    juego.circulo(p[<span class="n">0</span>], p[<span class="n">1</span>] - <span class="n">7</span>, <span class="n">6</span>, [<span class="n">235</span>, <span class="n">150</span>, <span class="n">60</span>])
+    juego.capa(<span class="n">0</span>)
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/1320_isometrico.png" alt="Captura de «Un pueblo isométrico»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1320_isometrico.lince</span></article></section>
 <section id="fisica"><h2>Física</h2><article class="ej" id="fisica-0"><h3>Cajas, pelotas y ascensores</h3><p class="nota"><code>juego.fisica.mundo()</code> hace un mundo con gravedad (y, si se le da, un mapa con el que chocar), y <code>juego.fisica.cuerpo(mundo, datos)</code> le añade cuerpos: cajas o círculos (<code>radio</code>) con <code>masa</code>, <code>rebote</code> y <code>friccion</code>. <code>juego.fisica.avanzar(mundo)</code> lo mueve todo en cada fotograma: caen, rebotan, se empujan según su masa y se apilan.</p><p class="nota">Un cuerpo <code>fijo</code> no lo mueve nada; con <code>vx</code> o <code>vy</code> es una plataforma o un ascensor que lleva lo que tiene encima. Uno <code>sensor</code> no choca, solo avisa de lo que toca (<code>juego.fisica.tocando</code>), para monedas o zonas. Los cuerpos son diccionarios normales: el personaje puede ser uno más.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Física&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)

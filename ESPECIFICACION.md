@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.7
+# 🐆 Lince — Especificación del Lenguaje v2.8
 
 ## Filosofía
 
@@ -1208,7 +1208,7 @@ mientras juego.abierto() {
 
 | Función | Qué hace |
 |---|---|
-| `abrir(título, ancho, alto[, {"escala": n}])` / `cerrar()` / `salir()` | abre la ventana / la destruye / pide terminar el bucle (`abierto()` pasa a falso, como al pulsar la X). Con `escala`, la ventana es `n` veces mayor y cada píxel del juego se ve como un cuadrado de n × n: `abrir("Pelea", 320, 180, {"escala": 3})` para un juego de píxeles grandes, como los de consola portátil; todo se sigue midiendo en 320 × 180 |
+| `abrir(título, ancho, alto[, {"escala": n}])` / `cerrar()` / `salir()` | abre la ventana / la destruye / pide terminar el bucle (`abierto()` pasa a falso, como al pulsar la X). Con `escala`, la ventana es `n` veces mayor y cada píxel del juego se ve como un cuadrado de n × n: `abrir("Pelea", 320, 180, {"escala": 3})` para un juego de píxeles grandes, como los de consola portátil (con `"escala_entera": verdadero`, al agrandarse solo por 2, 3, 4...: el pixel art sin píxeles de dos tamaños, con bandas negras si hace falta); todo se sigue midiendo en 320 × 180 |
 | `abierto()` · `titulo(t)` · `ancho()` · `alto()` | estado y tamaño |
 | `presentar()` | hace avanzar las [tareas](#tareas), muestra lo dibujado, espera al siguiente fotograma y actualiza la entrada y `dt()` |
 | `dt()` · `fps()` · `tiempo()` | segundos del último fotograma · fotogramas por segundo · segundos desde que se abrió. Son tiempo de juego: se paran con `congelar()` y van más despacio con `velocidad()` (ver **Peleas**) |
@@ -1720,20 +1720,50 @@ juego.mapa.dibujar_tiled(NIVEL, "Delante")                     # lo de delante
 
 | Función | Qué hace |
 |---|---|
-| `mapa.tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa.crear()`, así que `mapa.mover`, `mapa.casilla`, `mapa.solido`, `mapa.buscar` y `mapa.camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`) y `"propiedades"` (las del mapa). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa.crear()`) |
-| `mapa.dibujar_tiled(mapa[, capas])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan |
+| `mapa.tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa.crear()`, así que `mapa.mover`, `mapa.casilla`, `mapa.solido`, `mapa.buscar` y `mapa.camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`; los que tienen imagen, también `tile` y `base`, el punto por donde pisan), `"propiedades"` (las del mapa), `"isometrico"`, `"tile"` (el tamaño de una casilla al dibujarla) y `"dibujo"` (lo que ocupa dibujado). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa.crear()`) |
+| `mapa.dibujar_tiled(mapa[, capas[, opciones]])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan. Opciones: `capa` (todo en esa capa) y `ordenar` (cada tile en la capa `ordenar` más su profundidad, para pasar por delante y por detrás: ver abajo) |
+| `mapa.dibujar_objeto(mapa, objeto[, opciones])` · `mapa.dibujar_tile(mapa, tile, x, y[, opciones])` | un objeto de Tiled con imagen en su sitio · un tile del mapa con su base en el punto (x, y). Opciones: `capa` y `ordenar` |
+| `mapa.a_dibujo(mapa, x, y)` · `mapa.a_mapa(mapa, x, y)` | dónde se dibuja un punto del mapa · el punto del mapa que se dibuja ahí (con el ratón: `mapa.a_mapa(mapa, juego.a_mundo(juego.raton()))`). En un mapa que no es isométrico no cambian nada. También aceptan `[x, y]` o una cosa (su centro) |
+| `mapa.profundidad(mapa, x, y)` | de 0 (al fondo) a casi 1 (delante): lo que se suma a la capa para que lo de delante tape lo de detrás |
 
 Qué es sólido se dice en Tiled de tres maneras: una capa que se llama **Colisiones** (o Sólidos o
 Paredes), una capa o un tile del tileset con la propiedad `solido` (lógica, verdadera), o la
 opción `"solidos"`. Con la propiedad o la opción `plataforma`, se atraviesan desde abajo y se
 pisan desde arriba. Una capa de colisiones se puede dejar oculta en Tiled: sirve para chocar y
-no se dibuja. Lince entiende los mapas ortogonales (rejilla normal) con casillas cuadradas y
-tilesets de una sola imagen (también con margen, separación y un color transparente). Las capas
+no se dibuja. Lince entiende los mapas ortogonales (rejilla normal) con casillas cuadradas y los
+isométricos (abajo), y los tilesets de una sola imagen (también con margen, separación y un color
+transparente) y de **imágenes sueltas** (una por tile, cada una de su tamaño: casas, árboles). Las capas
 pueden ir en CSV o en base64, sin comprimir o con zlib, gzip o zstd. Un mapa **infinito** se
 convierte en uno normal que empieza en la casilla de más arriba a la izquierda que tiene algo; los
 objetos se mueven lo mismo, así que siguen en su sitio. Los mapas
 y lo que usan (tilesets e imágenes) van dentro del juego al hacer `lince compilar` o `lince
 repartir`, como las imágenes.
+
+**Mapas isométricos.** Con casillas en rombo (como 32 × 16), para pueblos y mazmorras vistos en
+diagonal. Todo se piensa en la **rejilla lógica** del mapa, de casillas cuadradas del alto del
+rombo: ahí están los objetos de Tiled, ahí se mueve el personaje (`x`, `y`, `vx`, `vy`) y ahí
+trabajan `mapa.mover`, `mapa.camino`, `mapa.casilla_en` y `mapa.solido`, como en uno ortogonal.
+Solo al dibujar se pasa al rombo, con `mapa.a_dibujo`. Para que el personaje pase por delante y por
+detrás de árboles, vallas y casas, cada tile va a una capa según la fila de su base, y el
+personaje a la suya:
+
+```lince
+fijo PUEBLO = juego.mapa.tiled("pueblo.tmx")
+# en cada fotograma:
+juego.mapa.mover(PUEBLO, yo)                                       # en la rejilla lógica
+sea p = juego.mapa.a_dibujo(PUEBLO, yo)                            # dónde se ve
+juego.camara(p[0] - 192, p[1] - 108)
+juego.mapa.dibujar_tiled(PUEBLO, "suelo")                          # lo de abajo, sin más
+juego.mapa.dibujar_tiled(PUEBLO, "piezas", {"ordenar": 1})         # cada tile en la capa 1 + su profundidad
+juego.capa(1 + juego.mapa.profundidad(PUEBLO, yo))                 # y el personaje, en la suya
+juego.dibujar(lince, p[0] - 8, p[1] - 16)
+juego.capa(0)
+```
+
+`"ordenar"` y `mapa.profundidad` también sirven en un mapa ortogonal visto desde arriba (lo de
+más abajo tapa lo de más arriba). Los niveles de altura (bancales, una pasarela) todavía no tienen
+nada propio: una capa de Tiled por nivel, con su desplazamiento vertical, se dibuja bien, pero
+quien pasa por delante y por detrás de otro nivel lo tiene que ordenar el juego.
 
 **Enemigos con cabeza.** Para lo que se mueve solo (enemigos, animales, compañeros): una «cosa»
 es un diccionario con `x` e `y` (si tiene `ancho` y `alto`, se mide desde su centro) y `vx`,

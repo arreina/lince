@@ -4167,3 +4167,71 @@ funcion igual_que_antes(cualquiera captura, cualquiera nombre, cualquiera opcion
     }
     devolver falso
 }
+
+# ── Mapas isométricos ──
+# En un mapa isométrico de Tiled (casillas en rombo, como 32 × 16), todo se
+# piensa en su rejilla lógica: casillas cuadradas del alto del rombo, donde
+# están los objetos de Tiled y donde trabajan mapa.mover, mapa.camino,
+# mapa.casilla_en y mapa.solido. mapa.a_dibujo dice dónde se dibuja un punto
+# de esa rejilla y mapa.a_mapa, al revés (dónde se ha hecho clic). En los
+# mapas ortogonales no cambian nada, así que el mismo código sirve para los
+# dos. mapa.profundidad (de 0 a casi 1) es lo que va sumado a la capa para
+# que lo de delante tape lo de detrás: lo mismo que usa dibujar_tiled con
+# {"ordenar": capa}.
+
+funcion _mapa_de(cualquiera m, texto fn): diccionario {
+    si no (m es diccionario) o no m.contiene("mapa") o no m.contiene("tamaño") {
+        lanzar ErrorTipo("{fn}() espera primero un mapa de juego.mapa.crear() o juego.mapa.tiled()")
+    }
+    devolver m
+}
+
+# Un punto: (x, y), [x, y] o una cosa con x, y (su centro, si tiene ancho y alto)
+funcion _punto_mapa(cualquiera x, cualquiera y, texto fn): lista {
+    si x es diccionario y y == nulo { devolver _sitio(x, fn) }
+    devolver _punto(x, y, fn)
+}
+
+# mapa.a_dibujo(mapa, x, y): dónde se dibuja el punto (x, y) del mapa
+funcion mapa_a_dibujo(cualquiera m, cualquiera x, cualquiera y = nulo): lista {
+    _mapa_de(m, "mapa.a_dibujo")
+    sea p = _punto_mapa(x, y, "mapa.a_dibujo")
+    si no _de(m, "isometrico", falso) { devolver p }
+    sea tw = m["tile"][0]
+    sea th = m["tile"][1]
+    devolver [(p[0] - p[1]) * tw / 2 / th + m["filas"] * tw / 2, (p[0] + p[1]) / 2]
+}
+
+# mapa.a_mapa(mapa, x, y): el punto del mapa que se dibuja en (x, y); con la
+# cámara, el del ratón es mapa.a_mapa(mapa, juego.a_mundo(juego.raton()))
+funcion mapa_a_mapa(cualquiera m, cualquiera x, cualquiera y = nulo): lista {
+    _mapa_de(m, "mapa.a_mapa")
+    sea p = _punto(x, y, "mapa.a_mapa")
+    si no _de(m, "isometrico", falso) { devolver p }
+    sea tw = m["tile"][0]
+    sea th = m["tile"][1]
+    sea dx = (p[0] - m["filas"] * tw / 2) * th / tw
+    devolver [p[1] + dx, p[1] - dx]
+}
+
+# mapa.profundidad(mapa, x, y): de 0 (al fondo) a casi 1 (delante); para un
+# personaje: juego.capa(1 + juego.mapa.profundidad(mapa, yo)) con los tiles
+# de la misma capa ordenados: mapa.dibujar_tiled(mapa, "arboles", {"ordenar": 1})
+funcion mapa_profundidad(cualquiera m, cualquiera x, cualquiera y = nulo): numero {
+    _mapa_de(m, "mapa.profundidad")
+    sea p = _punto_mapa(x, y, "mapa.profundidad")
+    sea tam = m["tamaño"]
+    sea hondo = si _de(m, "isometrico", falso) { (p[0] + p[1]) / (tam * (m["columnas"] + m["filas"])) } sino { p[1] / (tam * m["filas"]) }
+    devolver matematica.limitar(hondo, 0, 0.999999)
+}
+
+# mapa.dibujar_objeto(mapa, objeto[, opciones]): un objeto de Tiled con imagen
+# (los de mapa["objetos"] que tienen "tile"), en su sitio; con "ordenar",
+# por delante o por detrás de los personajes según su base
+funcion mapa_dibujar_objeto(cualquiera m, cualquiera objeto, cualquiera opciones = nulo): nulo {
+    _mapa_de(m, "mapa.dibujar_objeto")
+    si no (objeto es diccionario) o no objeto.contiene("tile") {
+        lanzar ErrorTipo("mapa.dibujar_objeto() espera un objeto de Tiled con imagen (uno de mapa[\"objetos\"] con \"tile\")")
+    }
+    juego.mapa.dibujar_tile(m, objeto["tile"], objeto["base"][0], objeto["base"][1], opciones)
+}

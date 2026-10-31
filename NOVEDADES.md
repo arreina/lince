@@ -3,6 +3,28 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.8.0
+
+Tiled isométrico, lo que pidió Bichito. Solo añade: nada de la 2.0 cambia.
+
+- **`juego.mapa.tiled` lee mapas isométricos** (casillas en rombo, como 32 × 16) y `mapa.dibujar_tiled` los dibuja de atrás adelante, con la cámara, la opacidad, el desplazamiento, los tiles animados y los tiles más altos que la casilla. Todo se piensa en la **rejilla lógica** del mapa: ahí están los objetos de Tiled y ahí trabajan `mapa.mover`, `mapa.camino`, `mapa.casilla_en` y `mapa.solido`.
+- **`mapa.a_dibujo(mapa, x, y)`** y **`mapa.a_mapa(mapa, x, y)`**: de la rejilla lógica a donde se dibuja, y al revés (dónde ha hecho clic el jugador). En un mapa ortogonal no cambian nada, así que el mismo código sirve para los dos.
+- **Delante y detrás**: `mapa.dibujar_tiled(mapa, "piezas", {"ordenar": 1})` pone cada tile en la capa 1 más su **profundidad**, y el personaje va a `juego.capa(1 + juego.mapa.profundidad(mapa, yo))`. También vale en los mapas ortogonales vistos desde arriba.
+- **Tilesets de imágenes sueltas** («colección de imágenes» en Tiled): cada tile, una imagen de su tamaño (casas, fuentes, árboles).
+- **Objetos con imagen**: llegan con su `tile` y su `base` (por donde pisan), y `mapa.dibujar_objeto(mapa, objeto, {"ordenar": 1})` los dibuja en su sitio, por delante o por detrás de los personajes. Y `mapa.dibujar_tile` para cualquier tile del mapa.
+- **`abrir(..., {"escala_entera": verdadero})`**: al agrandar la ventana o en pantalla completa, solo por 2, 3, 4...: el pixel art, sin píxeles de dos tamaños.
+- Un ejemplo nuevo en la página del módulo: un pueblo isométrico.
+- Una biblioteca o un programa puede tener ya más de 256 nombres en el mismo ámbito, y cada llamada a una función gasta menos memoria.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.8.0-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.8.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.8.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.8.0.vsix` |
+
 ## 2.7.0
 
 Paquetes de escritorio: `lince repartir` deja el juego listo para pasarlo, instalarlo o subirlo a itch.io, con su nombre y su icono. Solo añade: nada de la 2.0 cambia.

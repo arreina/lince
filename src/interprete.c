@@ -1085,11 +1085,9 @@ static int      _ent_libres_num = 0;
 #define MAX_ENT_LIBRES 256   /* tope de retención: ~1,5 MB */
 
 static Entorno *entorno_crear(Entorno *padre) {
-    /* malloc, no calloc: 'vars' ocupa casi todo el struct (MAX_VARS
-       entradas) y cada entrada se escribe por completo en
-       entorno_definir antes de leerse; nadie mira más allá de
-       'cantidad'. Poner a cero ~6 KB en cada creación dominaba el
-       tiempo de ejecución. */
+    /* malloc, no calloc: cada entrada se escribe por completo en
+       entorno_definir antes de leerse; nadie mira más allá de 'cantidad'.
+       Uno reciclado conserva el sitio que ya tenía para sus variables. */
     Entorno *e;
     if (_ent_libres) {
         e = _ent_libres;
@@ -1097,6 +1095,8 @@ static Entorno *entorno_crear(Entorno *padre) {
         _ent_libres_num--;
     } else {
         e = malloc(sizeof(Entorno));
+        e->vars = e->fijas;
+        e->capacidad = ENT_FIJAS;
     }
     e->padre    = padre;
     e->dueno    = padre ? padre->dueno : NULL;
@@ -1237,13 +1237,21 @@ static int redefinido(Entorno *e, const char *nombre, const char *que,
 
 void entorno_definir_i(Entorno *e, const char *nombre, Valor *valor, int constante) {
     if (e->cantidad >= MAX_VARS) {
-        /* Alcanzable por un programa normal (256 variables en un ámbito), no
-           un fallo interno: error capturable y se suelta el valor, que quien
-           llama da por entregado. */
+        /* Error capturable, no un fallo interno: se suelta el valor, que
+           quien llama da por entregado. */
         valor_destruir(valor);
         poner_error("Error", 0,
             "Demasiadas variables en el mismo ámbito (el máximo es %d).", MAX_VARS);
         return;
+    }
+    if (e->cantidad == e->capacidad) {        /* no caben: el doble de sitio, aparte */
+        int nueva = e->capacidad * 2;
+        EntradaVar *v = e->vars == e->fijas ? malloc(sizeof(EntradaVar) * (size_t)nueva)
+                                            : realloc(e->vars, sizeof(EntradaVar) * (size_t)nueva);
+        if (!v) { valor_destruir(valor); poner_error("Error", 0, "Sin memoria para más variables."); return; }
+        if (e->vars == e->fijas) memcpy(v, e->fijas, sizeof(EntradaVar) * (size_t)e->cantidad);
+        e->vars = v;
+        e->capacidad = nueva;
     }
     e->vars[e->cantidad].nombre    = nombre;
     e->vars[e->cantidad].valor     = valor;
@@ -1272,6 +1280,7 @@ static void entorno_destruir(Entorno *e) {
         _ent_libres = e;
         _ent_libres_num++;
     } else {
+        if (e->vars != e->fijas) free(e->vars);
         free(e);
     }
     if (padre) entorno_destruir(padre);

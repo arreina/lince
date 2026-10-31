@@ -9,7 +9,7 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-2.7-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-2.8-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-38%2F38-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows%20·%20Android-6A2D72.svg)]()
 
@@ -57,7 +57,7 @@ Trece minijuegos (Pong, serpiente, rompeladrillos, pájaro saltarín, esquiva, m
 ## ¿Por qué Lince?
 
 - **En español** — la programación no debería requerir saber inglés
-- **Hecho para juegos** — ventana, dibujo 2D, imágenes y sprites, mapas de tiles, animaciones, partículas, escenas, texto, teclado, ratón, mandos (varios jugadores, cada uno con el suyo), sonido (WAV y OGG, con grupos de volumen y fundidos), física (con giros, polígonos, cuerdas y bisagras), cámara (con zoom, giro y pantalla partida), luces, enemigos que piensan (estados, persecución, bandadas), capas, idiomas y colisiones en un solo módulo (`juego`)
+- **Hecho para juegos** — ventana, dibujo 2D, imágenes y sprites, mapas de tiles, animaciones, partículas, escenas, texto, teclado, ratón, mandos (varios jugadores, cada uno con el suyo), sonido (WAV y OGG, con grupos de volumen y fundidos), física (con giros, polígonos, cuerdas y bisagras), cámara (con zoom, giro y pantalla partida), mapas de Tiled (también isométricos), luces, enemigos que piensan (estados, persecución, bandadas), capas, idiomas y colisiones en un solo módulo (`juego`)
 - **Recarga en caliente** — guarda el archivo con el juego en marcha y se actualiza sin cerrar la ventana, con el jugador donde estaba; si hay un error, sale en la propia ventana
 - **Sin dependencias para compilar** — un solo binario, compilado con `gcc` y `make` (SDL2 se carga al abrir la ventana)
 - **Errores claros** — mensajes literales con número de línea exacto

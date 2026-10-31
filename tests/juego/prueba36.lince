@@ -1,0 +1,64 @@
+# 2.8: Tiled isométrico. Lee iso/pueblo.tmx (6 × 6 rombos de 32 × 16, con un
+# árbol de imagen suelta), dibuja, ordena y convierte. smoke.sh mira la salida
+# y los píxeles de las capturas.
+importar "juego"
+importar "sistema"
+
+fijo DIR = sistema.entorno("DIR_PRUEBA", ".")
+funcion base_de(diccionario o): cualquiera { devolver si o.contiene("base") { o["base"] } sino { nulo } }
+juego.abrir("2.8", 200, 120, {"escala_entera": verdadero})
+sea m = juego.mapa.tiled(DIR + "/iso/pueblo.tmx")
+escribir("mapa: {m["isometrico"]} {m["tamaño"]} {m["tile"]} {m["columnas"]}x{m["filas"]} {m["ancho"]}x{m["alto"]} {m["dibujo"]} {m["capas"]}")
+escribir("a_dibujo: {juego.mapa.a_dibujo(m, 0, 0)} {juego.mapa.a_dibujo(m, 16, 0)} {juego.mapa.a_dibujo(m, [0, 16])} {juego.mapa.a_dibujo(m, 48, 48)}")
+escribir("a_mapa: {juego.mapa.a_mapa(m, 96, 0)} {juego.mapa.a_mapa(m, 112, 8)} {juego.mapa.a_mapa(m, [96, 48])}")
+escribir("profundidad: {juego.mapa.profundidad(m, 0, 0)} {juego.mapa.profundidad(m, 48, 48)} {juego.mapa.profundidad(m, 96, 96)}")
+sea cosa = {"x": 40, "y": 40, "ancho": 16, "alto": 16}
+escribir("de una cosa: {juego.mapa.a_dibujo(m, cosa)} {juego.mapa.profundidad(m, cosa)}")
+para cada diccionario o en m["objetos"] {
+    escribir("objeto {o["nombre"]}: {o["forma"]} {o["x"]} {o["y"]} {o.contiene("tile")} {base_de(o)}")
+}
+escribir("solido: {juego.mapa.solido(m, 2, 2)} {juego.mapa.solido(m, 1, 2)} {juego.mapa.casilla_en(m, 40, 40)}")
+escribir("camino: {juego.mapa.camino(m, [1, 2], [3, 2])}")
+sea yo = {"x": 20, "y": 36, "ancho": 8, "alto": 8, "vx": 60, "vy": 0}
+juego.mapa.mover(m, yo, 0.5)
+escribir("mover: {yo["x"]} {yo["pared"]}")
+escribir("plano: {juego.mapa.a_dibujo(juego.mapa.crear(["..", ".."], 10), 3, 4)} {juego.mapa.profundidad(juego.mapa.crear(["..", ".."], 10), 3, 10)}")
+
+sea f = 0
+mientras juego.abierto() y f < 3 {
+    juego.limpiar([0, 0, 0])
+    si f == 0 {                                   # el suelo y el árbol, en orden
+        juego.mapa.dibujar_tiled(m)
+        juego.captura("iso1.bmp")
+    } sino si f == 1 {                            # ordenados con dos personajes: uno detrás del árbol y otro delante
+        juego.mapa.dibujar_tiled(m, "suelo")
+        juego.mapa.dibujar_tiled(m, "arboles", {"ordenar": 1})
+        para cada lista p en [[38, 30], [44, 44]] {
+            sea d = juego.mapa.a_dibujo(m, p)
+            juego.capa(1 + juego.mapa.profundidad(m, p))
+            juego.rectangulo(d[0] - 3, d[1] - 20, 6, 20, si p[0] == 38 { [255, 255, 0] } sino { [255, 0, 255] })
+        }
+        juego.capa(0)
+        juego.presentar()
+        juego.captura("iso2.bmp")
+    } sino {                                      # con la cámara movida, y el objeto con imagen
+        juego.camara(40, 0)
+        juego.mapa.dibujar_tiled(m, "suelo")
+        juego.mapa.dibujar_objeto(m, m["objetos"][0])
+        juego.camara()
+        juego.captura("iso3.bmp")
+    }
+    juego.presentar()
+    f = f + 1
+}
+para cada funcion intento en [
+    funcion(): nulo { juego.mapa.dibujar_tiled(m, nulo, {"ordenr": 1}) },
+    funcion(): nulo { juego.mapa.dibujar_tiled(m, nulo, {"ordenar": 1.5}) },
+    funcion(): nulo { juego.mapa.dibujar_tile(m, 99, 0, 0) },
+    funcion(): nulo { juego.mapa.dibujar_objeto(m, m["objetos"][1]) },
+    funcion(): nulo { juego.mapa.a_dibujo(3, 0, 0) },
+    funcion(): nulo { juego.mapa.tiled(DIR + "/iso/hex.tmx") },
+    funcion(): nulo { juego.abrir("x", 10, 10, {"escala_entera": 3}) }
+] {
+    intentar { intento() } capturar (error e) { escribir("error: {e.mensaje}") }
+}
