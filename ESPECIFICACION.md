@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.5
+# 🐆 Lince — Especificación del Lenguaje v2.6
 
 ## Filosofía
 
@@ -1126,6 +1126,7 @@ tiempo.esperar(0.5) # para el programa medio segundo (en un juego, mejor una tar
 sistema.ejecutar("ls -la")             # devuelve lo que escribe el comando
 sistema.proceso("make")                # {"salida", "error", "codigo", "ok"}
 sistema.existe("archivo.txt")
+sistema.ejecutable()                   # la ruta del propio lince (para lanzar otro programa con él)
 sistema.salir(0)
 ```
 
@@ -2457,6 +2458,7 @@ lince probar                      # las de la carpeta actual y sus subcarpetas
 lince probar pruebas              # las de una carpeta
 lince probar prueba_x.lince       # una sola
 lince probar --sin-cobertura
+lince probar --aceptar            # las capturas de ahora pasan a ser las buenas (ver abajo)
 ```
 
 Una prueba es un archivo que se llama `prueba_algo.lince` o `algo_prueba.lince` (normalmente con
@@ -2471,6 +2473,49 @@ líneas que no ha probado ninguna:
 ```
     70%  libs/cuentas.lince   sin probar: 10, 16-17
 ```
+
+### Pruebas de juegos
+
+Una prueba también puede **jugar el juego sola**: `juego.jugar` lo lanza en otro proceso, sin
+ventana y siempre igual (fotogramas de 1/60 s, la misma semilla de números aleatorios y las
+partidas guardadas vacías), con un **guion** de entradas, y guarda como PNG las **capturas** de los
+fotogramas que se pidan. Luego se mira lo que escribió, un píxel o si una captura se ve **igual que
+la vez anterior**:
+
+```lince
+# prueba_salto.lince
+importar "juego"
+importar "pruebas"
+
+sea r = juego.jugar("mi_juego.lince", {
+    "guion": ["30:derecha:20", "50:espacio", "80:mando1:a", "100:toque:240:135"],
+    "capturas": [60, 120]
+})
+pruebas.afirmar("termina bien", r["ok"])
+pruebas.afirmar("llega a la meta", r["salida"].contiene("¡Meta!"))
+pruebas.igual("el jugador, amarillo", juego.pixel(r["capturas"][0], 100, 200), [250, 200, 60, 255])
+pruebas.afirmar("el salto se ve igual", juego.igual_que_antes(r["capturas"][0], "salto"))
+pruebas.resumen()
+```
+
+La primera vez, `igual_que_antes` guarda la captura como **referencia** (en `referencias/salto.png`,
+para subirla con el juego) y `lince probar` lo dice con un 📸. Las siguientes, la compara: si algo
+cambia, la prueba falla, dice qué parte de la imagen ha cambiado y deja junto a la captura una
+imagen con lo que cambia en magenta. Si el cambio está bien (has cambiado el dibujo a propósito),
+`lince probar --aceptar` guarda las capturas nuevas como referencias. La cobertura también cuenta
+el código del juego que se ha ejecutado al jugarlo.
+
+| Función | Qué hace |
+|---|---|
+| `juego.jugar(archivo[, opciones])` | juega ese juego en otro proceso y devuelve `{"ok", "codigo", "salida", "error", "capturas"}` (las rutas, en el orden pedido). Opciones: `guion` (lista de entradas: `"30:derecha:20"` mantiene derecha desde el fotograma 30 durante 20, `"50:espacio"` la pulsa en el 50, `"40:mando1:a"` es un botón o un eje del mando 1, `"70:toque:240:135"` toca la pantalla —o hace clic— ahí), `capturas` (los fotogramas, contando desde 0), `fotogramas` (cuántos juega: por defecto, hasta la última captura, o 300), `carpeta` (dónde van las capturas: `"capturas"`), `semilla` (1), `escena` (empezar en esa escena), `escribir` (lo que teclea cuando el juego pide texto) y `argumentos` |
+| `juego.igual_que_antes(captura, nombre[, opciones])` | ¿se ve como la referencia? (la primera vez la guarda y dice que sí). Opciones: `carpeta` (`"referencias"`), `tolerancia` (cuánto puede cambiar cada color sin contar, de 0 a 255) y `margen` (qué parte de la imagen puede cambiar, de 0 a 1) |
+| `juego.pixel(ruta, x, y)` | `[r, g, b, a]` de ese punto de una imagen guardada |
+| `juego.comparar_imagenes(a, b[, opciones])` | `{"distintos", "total", "parte", "ancho", "alto", "mismo_tamaño"}`: cuántos píxeles cambian. Opciones: `tolerancia` y `diferencias` (la ruta de un PNG con lo que cambia en magenta) |
+
+El guion es el mismo que el de `LINCE_JUEGO_GUION` y se puede grabar jugando con
+`LINCE_JUEGO_GRABAR_GUION=guion.txt lince mi_juego.lince` (con las teclas), y ese texto vale tal
+cual: `"guion": archivos.leer("guion.txt")`. `jugar` e `igual_que_antes` están escritos en Lince,
+en `juego.lince`; `pixel` y `comparar_imagenes`, en C, por la velocidad.
 
 ---
 

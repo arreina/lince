@@ -1,0 +1,28 @@
+# El juego que juega prueba35.lince (2.6): se mueve con derecha, cuenta toques,
+# botones A del mando 1, lo que se teclea, un número al azar y las partidas.
+importar "juego"
+importar "matematica"
+juego.abrir("35", 160, 90)
+sea x = 10
+sea toques = 0
+sea botones = 0
+sea escrito = ""
+sea color = si argumentos().contiene("rojo") { [250, 60, 60] } sino { [250, 200, 60] }
+mientras juego.abierto() {
+    si juego.tecla("derecha") { x = x + 2 }
+    si juego.clic() { toques = toques + 1 }
+    si juego.boton_pulsado("a", 1) { botones = botones + 1 }
+    escrito = juego.editar(escrito)
+    juego.limpiar([20, 20, 40])
+    juego.rectangulo(x, 40, 10, 10, color)
+    juego.presentar()
+}
+sea visitas = juego.cargar_partida("visitas", 0) + 1
+juego.guardar_partida("visitas", visitas)
+escribir("x: {x}")
+escribir("toques: {toques}")
+escribir("botones: {botones}")
+escribir("escrito: {escrito}")
+escribir("visitas: {visitas}")
+escribir("azar: {matematica.aleatorio(1, 1000000)}")
+escribir("escena: {juego.escena()}")

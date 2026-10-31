@@ -3,6 +3,26 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.6.0
+
+Pruebas de juegos: que `lince probar` juegue el juego solo. Solo añade: nada de la 2.0 cambia.
+
+- **`juego.jugar(archivo[, opciones])`**: juega el juego en otro proceso, sin ventana y siempre igual (fotogramas de 1/60 s, la misma semilla, partidas guardadas vacías), con un **guion** de teclas, botones del mando y toques (`"30:derecha:20"`, `"40:mando1:a"`, `"70:toque:240:135"`; también el texto que graba `LINCE_JUEGO_GRABAR_GUION`), y guarda como PNG las **capturas** de los fotogramas que se pidan. Devuelve lo que escribió, si terminó bien y las capturas.
+- **`juego.igual_que_antes(captura, nombre)`**: la primera vez guarda la captura como referencia; luego dice si se ve igual, y si no, cuánto ha cambiado y deja una imagen con lo que cambia en magenta. **`lince probar --aceptar`** da por buenas las capturas nuevas.
+- **`juego.pixel(ruta, x, y)`** y **`juego.comparar_imagenes(a, b[, opciones])`**, con `tolerancia` y `margen` para lo que puede cambiar un poco.
+- `lince probar` enseña las referencias nuevas (📸) y la cobertura cuenta también el código del juego que se ha jugado.
+- **`sistema.ejecutable()`**: la ruta del propio lince.
+- Los PNG que guarda Lince (`guardar_imagen`, las capturas) salen **comprimidos**: una captura de 480×270 pasa de 500 KB a unos pocos.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.6.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-2.6.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.6.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.6.0.vsix` |
+
 ## 2.5.0
 
 Enemigos con cabeza. Solo añade: nada de la 2.0 cambia. Todo está escrito en Lince (en `juego.lince`), así que se puede usar suelto, leer y copiar para hacer una versión propia.

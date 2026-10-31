@@ -3941,3 +3941,190 @@ funcion ve(cualquiera ser, cualquiera objetivo, cualquiera opciones = nulo): log
     }
     devolver verdadero
 }
+
+# ── Pruebas de juegos ──
+# Para 'lince probar': un archivo prueba_algo.lince juega el juego solo, sin
+# ventana y siempre igual (fotogramas de 1/60 s, la misma semilla), con un
+# guion de entradas, y mira cómo queda: lo que escribe, las capturas de los
+# fotogramas que pida y si se ven como la vez anterior.
+#   sea r = juego.jugar("mi_juego.lince", {"guion": ["30:derecha:20", "60:espacio"], "capturas": [90]})
+#   pruebas.afirmar("termina bien", r["ok"])
+#   pruebas.afirmar("el salto", juego.igual_que_antes(r["capturas"][0], "salto"))
+
+fijo _JUGAR_OPCIONES = ["fotogramas", "guion", "capturas", "carpeta", "semilla", "escena", "escribir", "argumentos"]
+
+# Entre comillas para la consola de cada sistema
+funcion _comillas(texto t): texto {
+    si sistema.plataforma() == "windows" { devolver "\"" + t + "\"" }
+    devolver "'" + t.reemplazar("'", "'\\''") + "'"
+}
+
+# Crea la carpeta y las de encima que falten
+funcion _crear_carpeta(texto ruta): nulo {
+    sea partes = ruta.reemplazar("\\", "/").dividir("/")
+    sea hecha = ""
+    para cada texto p en partes {
+        hecha = si hecha == "" { p } sino { hecha + "/" + p }
+        si hecha == "" o hecha == "." o hecha == ".." { continuar }
+        si p == "" { continuar }
+        si no archivos.es_directorio(hecha) { archivos.crear_directorio(hecha) }
+    }
+}
+
+funcion _entrada_de_guion(cualquiera g): nulo {
+    si no (g es texto) { lanzar ErrorTipo("jugar(): el guion es una lista de textos como \"30:derecha:20\"") }
+    sea partes = g.dividir(":")
+    sea bien = partes.longitud() >= 2 y _es_entero(partes[0])
+    si bien y (partes[1] == "toque" o partes[1] == "raton") {
+        bien = (partes.longitud() == 4 o partes.longitud() == 5) y _es_entero(partes[2]) y _es_entero(partes[3]) y
+            (partes.longitud() == 4 o _es_entero(partes[4]))
+    } sino si bien y partes[1].empieza_con("mando") {
+        bien = (partes.longitud() == 3 o partes.longitud() == 4) y (partes.longitud() == 3 o _es_entero(partes[3]))
+    } sino si bien {
+        bien = (partes.longitud() == 2 o partes.longitud() == 3) y (partes.longitud() == 2 o _es_entero(partes[2]))
+    }
+    si no bien {
+        lanzar ErrorArgumento("jugar(): no entiendo «{g}» en el guion (es \"fotograma:tecla[:cuántos]\", " +
+                "\"fotograma:mando1:botón[:cuántos]\" o \"fotograma:toque:x:y[:cuántos]\")")
+    }
+}
+
+funcion _es_entero(texto t): logico {
+    para cada texto c en t.a_lista() {
+        si no "0123456789".contiene(c) { devolver falso }
+    }
+    devolver t != ""
+}
+
+# jugar(archivo[, opciones]): juega ese juego en otro proceso, sin ventana.
+# Opciones: "fotogramas" (cuántos; por defecto, hasta la última captura, o
+# 300), "guion" (lista de entradas, o un texto con ellas separadas por comas,
+# como el de LINCE_JUEGO_GRABAR_GUION: "30:derecha:20" mantiene derecha desde el
+# fotograma 30 durante 20, "50:espacio" la pulsa en el 50, "40:mando1:a" es un
+# botón del mando 1 y "70:toque:240:135" toca la pantalla ahí), "capturas"
+# (los fotogramas que se guardan como PNG), "carpeta" (dónde: "capturas"),
+# "semilla" (la de los números aleatorios: 1), "escena" (para empezar en una
+# escena), "escribir" (lo que teclea cuando el juego pide texto) y
+# "argumentos". Las partidas guardadas empiezan vacías en cada jugar().
+# Devuelve {"ok", "codigo", "salida", "error", "capturas"} (las rutas, en el
+# orden pedido).
+funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
+    si no (archivo es texto) { lanzar ErrorTipo("jugar() espera la ruta del juego (un .lince)") }
+    si no archivos.existe(archivo) { lanzar ErrorArgumento("jugar(): no encuentro el juego '{archivo}'") }
+    sea aj = _ui_opciones(opciones, _JUGAR_OPCIONES, "jugar")
+    sea guion = _de(aj, "guion", [])
+    si guion es texto {                     # como el de LINCE_JUEGO_GRABAR_GUION: "30:derecha:20,50:z"
+        sea partes = []
+        para cada texto g en guion.reemplazar("\n", ",").dividir(",") {
+            si g.recortar() != "" { partes.agregar(g.recortar()) }
+        }
+        guion = partes
+    }
+    si no (guion es lista) { lanzar ErrorTipo("jugar(): el guion es una lista de textos como \"30:derecha:20\"") }
+    para cada cualquiera g en guion { _entrada_de_guion(g) }
+    sea capturas = _de(aj, "capturas", [])
+    si no (capturas es lista) { lanzar ErrorTipo("jugar(): \"capturas\" es una lista de fotogramas, por ejemplo [60, 120]") }
+    sea ultima = -1
+    para cada cualquiera c en capturas {
+        si no (c es numero) o c < 0 o c != matematica.piso(c) {
+            lanzar ErrorArgumento("jugar(): las capturas son números de fotograma (0, 1, 2...)")
+        }
+        ultima = matematica.maximo(ultima, c)
+    }
+    sea fotogramas = _de(aj, "fotogramas", si ultima >= 0 { ultima + 1 } sino { 300 })
+    si no (fotogramas es numero) o fotogramas < 1 o fotogramas != matematica.piso(fotogramas) {
+        lanzar ErrorArgumento("jugar(): \"fotogramas\" es un número entero mayor que 0")
+    }
+    si ultima >= fotogramas {
+        lanzar ErrorArgumento("jugar(): la captura del fotograma {ultima} no llega a hacerse: juega {fotogramas} (del 0 al {fotogramas - 1})")
+    }
+    sea carpeta = _de(aj, "carpeta", "capturas")
+    si no (carpeta es texto) { lanzar ErrorTipo("jugar(): \"carpeta\" es la ruta de una carpeta") }
+    _crear_carpeta(carpeta)
+    sea partidas = carpeta + "/partidas"
+    _crear_carpeta(partidas)
+    para cada texto a en archivos.listar(partidas) {
+        si a.termina_con(".json") { archivos.eliminar(partidas + "/" + a) }
+    }
+    sea rutas = []
+    para cada numero c en capturas {
+        sea ruta = carpeta + "/fotograma_{c}.png"
+        para cada texto viejo en [ruta, carpeta + "/fotograma_{c}_diferencias.png"] {
+            si archivos.existe(viejo) { archivos.eliminar(viejo) }
+        }
+        rutas.agregar(ruta)
+    }
+    sea comando = _comillas(sistema.ejecutable()) + " " + _comillas(archivo)
+    para cada cualquiera a en _de(aj, "argumentos", []) { comando = comando + " " + _comillas("{a}") }
+    sea textos_capturas = []
+    para cada numero c en capturas { textos_capturas.agregar("{c}") }
+    sea entorno = {
+        "SDL_VIDEODRIVER": "dummy", "SDL_AUDIODRIVER": "dummy",
+        "LINCE_JUEGO_FOTOGRAMAS": "{fotogramas}",
+        "LINCE_JUEGO_GUION": texto.unir(guion, ","),
+        "LINCE_JUEGO_CAPTURAS": texto.unir(textos_capturas, ","),
+        "LINCE_JUEGO_CAPTURAS_CARPETA": carpeta,
+        "LINCE_JUEGO_SEMILLA": "{_de(aj, "semilla", 1)}",
+        "LINCE_JUEGO_ESCENA": "{_de(aj, "escena", "")}",
+        "LINCE_JUEGO_ESCRIBIR": "{_de(aj, "escribir", "")}",
+        "LINCE_JUEGO_GUARDADO": partidas
+    }
+    sea antes = {}
+    para cada texto k en entorno {
+        antes[k] = sistema.entorno(k, "")
+        sistema.establecer_entorno(k, entorno[k])
+    }
+    sea r = sistema.proceso(comando)
+    para cada texto k en antes { sistema.establecer_entorno(k, antes[k]) }
+    sea hechas = []
+    para cada texto ruta en rutas {
+        si no archivos.existe(ruta) {
+            lanzar ErrorArgumento("jugar(): el juego acabó sin llegar a la captura '{ruta}' (¿se cerró antes, o no llama a juego.presentar()?)" +
+                    "\n" + r["error"])
+        }
+        hechas.agregar(ruta)
+    }
+    devolver {"ok": r["ok"], "codigo": r["codigo"], "salida": r["salida"], "error": r["error"], "capturas": hechas}
+}
+
+# igual_que_antes(captura, nombre[, opciones]): ¿se ve igual que la vez
+# anterior? La primera vez (o con 'lince probar --aceptar') la guarda como
+# referencia, en "referencias/nombre.png", y dice que sí. Si cambia, guarda
+# junto a la captura una imagen con lo que cambia en magenta y lo dice.
+# Opciones: "carpeta" (la de las referencias), "tolerancia" (cuánto puede
+# cambiar cada color, de 0 a 255) y "margen" (qué parte de la imagen puede
+# cambiar, de 0 a 1: 0.01 es el 1 %).
+fijo _IGUAL_OPCIONES = ["carpeta", "tolerancia", "margen"]
+
+funcion igual_que_antes(cualquiera captura, cualquiera nombre, cualquiera opciones = nulo): logico {
+    si no (captura es texto) o no (nombre es texto) o nombre == "" {
+        lanzar ErrorTipo("igual_que_antes() espera (ruta de la captura, nombre para la referencia[, opciones])")
+    }
+    sea aj = _ui_opciones(opciones, _IGUAL_OPCIONES, "igual_que_antes")
+    sea carpeta = _de(aj, "carpeta", "referencias")
+    sea margen = _de(aj, "margen", 0)
+    si no (margen es numero) o margen < 0 o margen > 1 { lanzar ErrorArgumento("igual_que_antes(): \"margen\" va de 0 a 1") }
+    si no archivos.existe(captura) { lanzar ErrorArgumento("igual_que_antes(): no encuentro la captura '{captura}'") }
+    sea referencia = carpeta + "/" + nombre + ".png"
+    si no archivos.existe(referencia) o sistema.entorno("LINCE_PROBAR_ACEPTAR", "") == "1" {
+        _crear_carpeta(carpeta)
+        si no archivos.copiar(captura, referencia) { lanzar ErrorArgumento("igual_que_antes(): no se pudo escribir '{referencia}'") }
+        escribir("📸 {nombre}: guardada como referencia en {referencia}")
+        devolver verdadero
+    }
+    sea cmp = {"tolerancia": _de(aj, "tolerancia", 0)}
+    sea r = juego.comparar_imagenes(referencia, captura, cmp)
+    si r["mismo_tamaño"] y r["parte"] <= margen { devolver verdadero }
+    sea base = si captura.termina_con(".png") { captura.extraer(0, captura.longitud() - 4) } sino { captura }
+    cmp["diferencias"] = base + "_diferencias.png"
+    juego.comparar_imagenes(referencia, captura, cmp)
+    si no r["mismo_tamaño"] {
+        escribir("❌ {nombre}: ahora mide {r["ancho"]}x{r["alto"]} y la referencia no ({referencia})")
+    } sino {
+        sea cuanto = matematica.redondear(r["parte"] * 1000) / 10
+        si cuanto == 0 { cuanto = "menos del 0.1" }
+        escribir("❌ {nombre}: ha cambiado el {cuanto} % de la imagen ({r["distintos"]} píxeles): " +
+                "lo que cambia, en magenta, en {cmp["diferencias"]}. Si el cambio está bien: lince probar --aceptar")
+    }
+    devolver falso
+}

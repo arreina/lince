@@ -347,7 +347,7 @@ static struct {
     double hist_id;     /* número de la última pulsación apuntada */
     int nhist;
     /* LINCE_JUEGO_GUION: teclas mantenidas desde un fotograma durante otros tantos */
-    struct { long desde, cuantos; int tecla; JgEntrada mando; } guion[JG_GUION];   /* tecla -1: del mando */
+    struct { long desde, cuantos; int tecla, x, y; JgEntrada mando; } guion[JG_GUION];   /* tecla -1: del mando; -2: un toque en x, y */
     unsigned char mando_prueba[JG_MANDOS];   /* prueba: un mando del guion cuenta como conectado */
     int nguion;
     int zoom;                   /* la "escala" de abrir() */
@@ -372,6 +372,7 @@ static unsigned char *jg_alfa_de(const unsigned char *px, int w, int h) {
 
 static int jg_tecla_codigo(const char *nombre);
 static int jg_guardar_bmp(const char *ruta);
+static void jg_capturas_prueba(void);
 static void jg_leer_mandos(void);
 static void jg_mezclar_virtual(void);
 static void jg_leer_inclinacion(void);
@@ -1153,6 +1154,17 @@ static Valor *fn_jg_abrir(Valor **a, int n) {
         for (char *t = strtok(buf, ","); t && _jgs.nguion < JG_GUION; t = strtok(NULL, ",")) {
             char tecla[32], boton[32], msg[200];
             long desde, cuantos = 1;
+            int tx, ty;
+            if ((sscanf(t, "%ld:toque:%d:%d:%ld", &desde, &tx, &ty, &cuantos) >= 3 ||
+                 sscanf(t, "%ld:raton:%d:%d:%ld", &desde, &tx, &ty, &cuantos) >= 3) && cuantos >= 1) {
+                _jgs.guion[_jgs.nguion].desde = desde;          /* "30:toque:240:135:5": un dedo (o el ratón) ahí */
+                _jgs.guion[_jgs.nguion].cuantos = cuantos;
+                _jgs.guion[_jgs.nguion].x = tx;
+                _jgs.guion[_jgs.nguion++].tecla = -2;
+                _jgs.guion[_jgs.nguion - 1].y = ty;
+                continue;
+            }
+            cuantos = 1;
             if (strstr(t, ":mando")) {                    /* "30:mando2:a:5": un botón (o eje) de un mando */
                 if (sscanf(t, "%ld:%31[^:]:%31[^:]:%ld", &desde, tecla, boton, &cuantos) < 3 || cuantos < 1) continue;
                 char entrada[80];
@@ -1823,6 +1835,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     jg_filtro_color();                             /* el de daltonismo, si el jugador lo eligió */
     if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))
         jg_guardar_bmp(getenv("LINCE_JUEGO_CAPTURA"));      /* prueba: guarda el último fotograma */
+    if (_jgs.limite && getenv("LINCE_JUEGO_CAPTURAS")) jg_capturas_prueba();
     if (_jgs.limite && getenv("LINCE_JUEGO_FOTOS")) {          /* prueba: todos, para hacer un vídeo */
         char ruta[600];
         snprintf(ruta, sizeof ruta, "%s/%05ld.bmp", getenv("LINCE_JUEGO_FOTOS"), _jgs.total);
@@ -1929,6 +1942,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos) {
             const JgEntrada *me = &_jgs.guion[i].mando;
             if (_jgs.guion[i].tecla >= 0) _jgs.teclas[_jgs.guion[i].tecla] = 1;
+            else if (_jgs.guion[i].tecla == -2) { _jgs.rx = _jgs.guion[i].x; _jgs.ry = _jgs.guion[i].y; _jgs.raton |= 1; }
             else if (me->tipo == 'b') _jgs.botones[me->mando][me->codigo] = 1;
             else _jgs.ejes[me->mando][me->codigo] = (float)me->signo;
         }
@@ -2113,6 +2127,28 @@ static int jg_guardar_bmp(const char *ruta) {
     }
     free(px);
     return ok;
+}
+
+/* LINCE_JUEGO_CAPTURAS=30,60 (lo que usa jugar() de juego.lince): guarda esos
+   fotogramas como PNG (fotograma_30.png...) en LINCE_JUEGO_CAPTURAS_CARPETA */
+static void jg_capturas_prueba(void) {
+    char lista[1024];
+    snprintf(lista, sizeof lista, ",%s,", getenv("LINCE_JUEGO_CAPTURAS"));
+    char buscar[40];
+    snprintf(buscar, sizeof buscar, ",%ld,", _jgs.total);
+    if (!strstr(lista, buscar)) return;
+    const char *carpeta = getenv("LINCE_JUEGO_CAPTURAS_CARPETA");
+    char ruta[1200];
+    snprintf(ruta, sizeof ruta, "%s/fotograma_%ld.png", carpeta && *carpeta ? carpeta : ".", _jgs.total);
+    int w = _jgs.ancho, h = _jgs.alto;
+    _jg.OutputSize(_jgs.render, &w, &h);
+    unsigned char *px = malloc((size_t)w * h * 4);
+    if (!px) return;
+    if (_jg.ReadPixels(_jgs.render, NULL, 0x16762004, px, w * 4) == 0) {      /* ABGR8888: R, G, B, A en memoria */
+        for (size_t i = 3; i < (size_t)w * h * 4; i += 4) px[i] = 255;
+        if (!imagen_guardar_png(ruta, px, w, h)) fprintf(stderr, "⚠️  No se pudo guardar la captura %s\n", ruta);
+    }
+    free(px);
 }
 
 /* captura(ruta): guarda la ventana como BMP */
@@ -4523,6 +4559,122 @@ static Valor *fn_jg_guardar_imagen(Valor **a, int n) {
     free(px);
     if (!ok) return jg_error("ErrorJuego", "guardar_imagen(): no se pudo escribir el archivo");
     return valor_nulo();
+}
+
+/* ── Para las pruebas de juegos (jugar() e igual_que_antes() de juego.lince) ──
+   Leen PNG (o BMP, JPG...) del disco sin abrir la ventana. pixel() se queda
+   con la última imagen que leyó mientras el archivo no cambie. */
+static unsigned char *jg_leer_rgba(const char *ruta, int *w, int *h, char *msg, size_t max, const char *fn) {
+    FILE *f = fopen(ruta, "rb");
+    if (!f) { snprintf(msg, max, "%s(): no encuentro la imagen '%s'", fn, ruta); return NULL; }
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    rewind(f);
+    unsigned char *b = n > 0 ? malloc((size_t)n) : NULL;
+    size_t leido = b ? fread(b, 1, (size_t)n, f) : 0;
+    fclose(f);
+    const char *por = "está vacía";
+    unsigned char *px = b && leido == (size_t)n ? imagen_decodificar(b, (size_t)n, w, h, &por) : NULL;
+    free(b);
+    if (!px) snprintf(msg, max, "%s(): no entiendo la imagen '%s' (%s)", fn, ruta, por ? por : "?");
+    return px;
+}
+
+static struct { char ruta[1024]; long tam; long long cambio; int w, h; unsigned char *px; } _jg_pixel;
+
+/* pixel(ruta, x, y): [r, g, b, a] de ese punto de una imagen guardada (una captura) */
+static Valor *fn_jg_pixel(Valor **a, int n) {
+    if (n < 3 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_NUMERO || a[2]->tipo != VAL_NUMERO)
+        return jg_error("ErrorTipo", "pixel() espera (ruta de la imagen, x, y)");
+    struct stat st;
+    if (stat(a[0]->texto, &st) != 0) {
+        char m[1200];
+        snprintf(m, sizeof m, "pixel(): no encuentro la imagen '%s'", a[0]->texto);
+        return jg_error("ErrorArgumento", m);
+    }
+    if (!_jg_pixel.px || strcmp(_jg_pixel.ruta, a[0]->texto) || _jg_pixel.tam != (long)st.st_size ||
+        _jg_pixel.cambio != (long long)st.st_mtime) {
+        free(_jg_pixel.px);
+        _jg_pixel.px = NULL;
+        char m[1200];
+        _jg_pixel.px = jg_leer_rgba(a[0]->texto, &_jg_pixel.w, &_jg_pixel.h, m, sizeof m, "pixel");
+        if (!_jg_pixel.px) return jg_error("ErrorArgumento", m);
+        snprintf(_jg_pixel.ruta, sizeof _jg_pixel.ruta, "%s", a[0]->texto);
+        _jg_pixel.tam = (long)st.st_size;
+        _jg_pixel.cambio = (long long)st.st_mtime;
+    }
+    int x = (int)floor(a[1]->numero), y = (int)floor(a[2]->numero);
+    if (x < 0 || y < 0 || x >= _jg_pixel.w || y >= _jg_pixel.h) {
+        char m[200];
+        snprintf(m, sizeof m, "pixel(): la imagen mide %dx%d y el punto (%d, %d) se sale", _jg_pixel.w, _jg_pixel.h, x, y);
+        return jg_error("ErrorArgumento", m);
+    }
+    unsigned char *p = _jg_pixel.px + ((size_t)y * _jg_pixel.w + x) * 4;
+    Valor *l = valor_lista_crear();
+    for (int i = 0; i < 4; i++) lista_agregar(l, valor_numero(p[i]));
+    return l;
+}
+
+/* comparar_imagenes(a, b[, opciones]): cuántos píxeles cambian de una imagen
+   a otra. Opciones: "tolerancia" (cuánto puede cambiar cada color, de 0 a 255,
+   sin contar como distinto) y "diferencias" (ruta de un PNG con la imagen
+   nueva apagada y lo que cambia en magenta). Devuelve {"distintos", "total",
+   "parte" (de 0 a 1), "ancho", "alto", "mismo_tamaño"} */
+static Valor *fn_jg_comparar_imagenes(Valor **a, int n) {
+    if (n < 2 || a[0]->tipo != VAL_TEXTO || a[1]->tipo != VAL_TEXTO || (n > 2 && a[2]->tipo != VAL_DICCIONARIO && a[2]->tipo != VAL_NULO))
+        return jg_error("ErrorTipo", "comparar_imagenes() espera (ruta de una imagen, ruta de la otra[, opciones])");
+    Valor *op = n > 2 ? a[2] : NULL;
+    static const char *const V[] = {"tolerancia", "diferencias", NULL};
+    if (!jg_opciones_validas(op, "comparar_imagenes", V)) return valor_nulo();
+    double tol = 0;
+    if (jg_opcion_valor(op, "tolerancia") && (!jg_opcion(op, "tolerancia", &tol) || tol < 0 || tol > 255))
+        return jg_error("ErrorArgumento", "comparar_imagenes(): \"tolerancia\" va de 0 a 255");
+    Valor *dif = jg_opcion_valor(op, "diferencias");
+    if (dif && dif->tipo != VAL_TEXTO && dif->tipo != VAL_NULO)
+        return jg_error("ErrorTipo", "comparar_imagenes(): \"diferencias\" es la ruta del .png donde se marcan");
+    char m[1200];
+    int w1, h1, w2, h2;
+    unsigned char *p1 = jg_leer_rgba(a[0]->texto, &w1, &h1, m, sizeof m, "comparar_imagenes");
+    if (!p1) return jg_error("ErrorArgumento", m);
+    unsigned char *p2 = jg_leer_rgba(a[1]->texto, &w2, &h2, m, sizeof m, "comparar_imagenes");
+    if (!p2) { free(p1); return jg_error("ErrorArgumento", m); }
+    int mismo = w1 == w2 && h1 == h2;
+    long total = (long)w2 * h2, distintos = 0;
+    unsigned char *marcas = dif && dif->tipo == VAL_TEXTO ? malloc((size_t)total * 4) : NULL;
+    for (long i = 0; i < total; i++) {
+        int x = (int)(i % w2), y = (int)(i / w2), cambia = 1;
+        const unsigned char *q = p2 + i * 4;
+        if (x < w1 && y < h1) {
+            const unsigned char *p = p1 + ((size_t)y * w1 + x) * 4;
+            cambia = 0;
+            for (int c = 0; c < 4 && !cambia; c++) cambia = abs((int)p[c] - (int)q[c]) > tol;
+        }
+        distintos += cambia;
+        if (marcas) {
+            unsigned char *o = marcas + i * 4;
+            if (cambia) { o[0] = 255; o[1] = 0; o[2] = 255; }
+            else for (int c = 0; c < 3; c++) o[c] = (unsigned char)(q[c] / 4 + 20);
+            o[3] = 255;
+        }
+    }
+    if (!mismo) distintos = total > (long)w1 * h1 ? total : (long)w1 * h1;
+    int ok = 1;
+    if (marcas) { ok = imagen_guardar_png(dif->texto, marcas, w2, h2); free(marcas); }
+    free(p1);
+    free(p2);
+    if (!ok) {
+        snprintf(m, sizeof m, "comparar_imagenes(): no se pudo escribir '%s'", dif->texto);
+        return jg_error("ErrorArgumento", m);
+    }
+    long cuenta = mismo ? total : distintos;
+    Valor *r = valor_diccionario_crear();
+    jg_dic_poner(r, "distintos", valor_numero((double)distintos));
+    jg_dic_poner(r, "total", valor_numero((double)cuenta));
+    jg_dic_poner(r, "parte", valor_numero(cuenta ? (double)distintos / cuenta : 0));
+    jg_dic_poner(r, "ancho", valor_numero(w2));
+    jg_dic_poner(r, "alto", valor_numero(h2));
+    jg_dic_poner(r, "mismo_tamaño", valor_booleano(mismo));
+    return r;
 }
 
 /* La silueta blanca de una imagen (para el destello de "blanco"): se hace la
@@ -7759,6 +7911,8 @@ static void cargar_juego(Entorno *entorno) {
         {"cuadros_de",      fn_jg_cuadros_de,      -1},
         {"animar",          fn_jg_animar,          -1},
         {"guardar_imagen",  fn_jg_guardar_imagen,   2},
+        {"pixel",           fn_jg_pixel,            3},
+        {"comparar_imagenes", fn_jg_comparar_imagenes, -1},
         {"sonido",          fn_jg_sonido,           1},
         {"reproducir",      fn_jg_reproducir,      -1},
         {"detener",         fn_jg_detener,         -1},

@@ -158,8 +158,8 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 - [x] Máquinas de estados (patrullar, perseguir, atacar, huir) y comportamientos de movimiento
   (seguir, huir, esquivar, rodear, en grupo), escritos en Lince.
 
-### 2.6 — Pruebas de juegos
-- [ ] Que `lince probar` juegue solo: guion de entradas (teclas, mando, toques), comprobar
+### 2.6 — Pruebas de juegos (publicada)
+- [x] Que `lince probar` juegue solo: guion de entradas (teclas, mando, toques), comprobar
   píxeles y capturas, y comparar con la vez anterior para ver qué ha cambiado.
 
 ### 2.7 — Paquetes de escritorio

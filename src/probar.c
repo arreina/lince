@@ -169,6 +169,14 @@ int probar_ejecutar(int argc, char *argv[]) {
     int sin_cobertura = 0, rutas = 0;
     for (int i = 0; i < argc; i++) {
         if (strcmp(argv[i], "--sin-cobertura") == 0) { sin_cobertura = 1; continue; }
+        if (strcmp(argv[i], "--aceptar") == 0) {      /* las capturas de ahora pasan a ser las buenas */
+#ifdef _WIN32
+            _putenv_s("LINCE_PROBAR_ACEPTAR", "1");
+#else
+            setenv("LINCE_PROBAR_ACEPTAR", "1", 1);
+#endif
+            continue;
+        }
         rutas++;
         if (es_carpeta(argv[i])) buscar(argv[i], &pruebas, 0);
         else lista_poner(&pruebas, argv[i]);
@@ -204,8 +212,18 @@ int probar_ejecutar(int argc, char *argv[]) {
     int fallos = 0;
     for (int i = 0; i < pruebas.n; i++) {
         int r = ejecutar(exe, pruebas.v[i], salida);
-        if (r == 0) printf("   ✅ %s\n", pruebas.v[i]);
-        else {
+        if (r == 0) {
+            printf("   ✅ %s\n", pruebas.v[i]);
+            char *txt = leer(salida);                  /* las referencias nuevas de igual_que_antes() */
+            for (char *l = txt; l && *l; ) {
+                char *fin = strchr(l, '\n');
+                if (fin) *fin = '\0';
+                if (strstr(l, "📸")) printf("      %s\n", l);
+                if (!fin) break;
+                l = fin + 1;
+            }
+            free(txt);
+        } else {
             fallos++;
             printf("   ❌ %s\n", pruebas.v[i]);
             char *txt = leer(salida);

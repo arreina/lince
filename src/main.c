@@ -56,7 +56,7 @@ static void mostrar_ayuda(void) {
     printf("  lince repartir <juego.lince> --android   El .apk para instalarlo en un móvil Android\n");
     printf("  lince repartir <juego.lince> --aab       El .aab para publicarlo en Google Play\n");
     printf("  lince comprobar <archivo.lince>          Sin ejecutar: la sintaxis, y avisos de descuidos\n");
-    printf("  lince probar [carpeta]                   Las pruebas (prueba_*.lince) y su cobertura\n");
+    printf("  lince probar [carpeta] [--aceptar]       Las pruebas (prueba_*.lince) y su cobertura\n");
     printf("  lince formatear <archivo.lince>...       Deja el código con el estilo de Lince\n");
     printf("  lince migrar [--comprobar] <archivo o carpeta>...  Pasa el código a la forma de la 2.0\n");
     printf("  lince perfil <archivo.lince>             Lo ejecuta y dice en qué se va el tiempo\n");

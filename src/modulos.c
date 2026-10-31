@@ -1200,6 +1200,14 @@ static Valor *fn_sis_plataforma(Valor **a, int n) {
 #endif
 }
 
+/* ejecutable(): la ruta del propio lince (para lanzar otro programa con él) */
+static Valor *fn_sis_ejecutable(Valor **a, int n) {
+    (void)a; (void)n;
+    char ruta[4096];
+    if (!empaquetado_ruta_ejecutable(ruta, sizeof ruta)) return valor_nulo();
+    return valor_texto(ruta);
+}
+
 static Valor *fn_sis_pid(Valor **a, int n) {
     (void)a; (void)n;
 #ifdef _WIN32
@@ -1905,6 +1913,7 @@ static void cargar_sistema(Entorno *entorno) {
         {"establecer_entorno", fn_sis_establecer_entorno,  2},
         {"plataforma",         fn_sis_plataforma,          0},
         {"pid",                fn_sis_pid,                 0},
+        {"ejecutable",         fn_sis_ejecutable,          0},
         {"existe",             fn_sis_existe,              1},
         {"salir",              fn_sis_salir,               1},
     };
