@@ -82,7 +82,7 @@ está en `juego.lince`.
 - [x] Traducciones: `idiomas/<código>.txt`, `traducir`, `idioma`, `idiomas`, `menu_idiomas`; los menús
   y diálogos de Lince salen traducidos.
 - [x] Tiled: capas con zstd y mapas infinitos.
-- [ ] Tiled isométricos y hexagonales: solo si algún juego los pide.
+- [ ] Tiled isométricos (en la 2.8: los pide Bichito) y hexagonales (solo si algún juego los pide).
 
 ### 1.6 — Física y sonido
 - [x] Cuerpos que giran, círculo contra caja de verdad, polígonos, uniones sencillas (cuerda, bisagra).
@@ -168,12 +168,24 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   jugador y un programa de terceros dentro), un archivo de Lince con SDL2 dentro que se pone solo
   en el menú; y el instalador es el propio juego, sin NSIS ni Inno Setup.
 
-### 2.8 — Google Play de verdad
+### 2.8 — Tiled isométrico (lo pide Bichito)
+- [ ] Leer y dibujar mapas isométricos de Tiled (`orientation="isometric"`) con la cámara, la
+  opacidad, el desplazamiento, los tiles animados y los tiles más altos que la casilla.
+- [ ] Orden de dibujo: los tiles de una capa, cada uno en la capa de la fila de su base, para que
+  los personajes pasen por delante y por detrás (y decidir si con niveles de altura).
+- [ ] Casilla ↔ pantalla en isométrico; `mapa.mover`, `mapa.camino`, `mapa.casilla_en` y
+  `mapa.solido` sobre la rejilla lógica; los objetos de Tiled convertidos a ella.
+- [ ] Tilesets de imágenes sueltas («colección de imágenes») y objetos con imagen, con su punto de
+  base, listos para ordenarlos con los personajes.
+- [ ] Pantalla completa ampliando por múltiplos enteros, para el pixel art.
+- [ ] Para lince-motor: el panel de recursos, con los mapas isométricos.
+
+### 2.9 — Google Play de verdad
 - [ ] `lince repartir --aab` deja el juego listo para subir: iconos en todos los tamaños,
   versión, firma de subida y lo que pide la ficha de la tienda. Probado subiendo uno de prueba
   (hace falta la cuenta de desarrollador de Google Play del autor).
 
-### 2.9 — Preparar la 3.0 (solo si hay limpieza)
+### 2.10 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.
 
 ### 3.0 — Otra limpieza, solo si hace falta
