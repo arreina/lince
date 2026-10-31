@@ -1,7 +1,7 @@
 # @seccion: Controles
 # @titulo: La pantalla de opciones
 # @nota: `juego.menu_opciones()` es la pantalla de opciones de cualquier juego, ya hecha: el volumen de la música, los efectos y las voces, la pantalla completa, los controles (si hay acciones) y el idioma (si hay idiomas). Arriba y abajo para elegir, izquierda y derecha para cambiar, y atrás (o «Volver») para salir: entonces devuelve `"volver"`. También con el ratón y el dedo.
-# @nota: Lo que se cambia se aplica en el acto y **se guarda solo**: la próxima vez que se abra el juego vuelve a aplicarse sin hacer nada. Las opciones propias del juego van en `"propias"` (una lista para elegir, sí o no, o un número), y el juego las lee con `juego.opcion(clave, defecto)`.
+# @nota: Lo que se cambia se aplica en el acto y **se guarda solo**: la próxima vez que se abra el juego vuelve a aplicarse sin hacer nada. En «Accesibilidad» están el tamaño del texto, los subtítulos (de los sonidos con `{"subtitulo": "Puerta"}`), un filtro para daltonismo y quitar el temblor y los destellos. Las opciones propias del juego van en `"propias"` (una lista para elegir, sí o no, o un número), y el juego las lee con `juego.opcion(clave, defecto)`.
 # @fotogramas: 3
 importar "juego"
 importar "matematica"

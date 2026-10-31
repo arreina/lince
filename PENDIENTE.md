@@ -144,8 +144,8 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   controles (`menu_controles`) e idioma (`menu_idiomas`), que se guarda sola y se aplica al
   abrir el juego. Que el juego pueda añadir sus propias opciones.
 
-### 2.3 — Accesibilidad
-- [ ] En las opciones: texto más grande, colores para daltonismo (paletas seguras y, si se puede,
+### 2.3 — Accesibilidad (publicada)
+- [x] En las opciones: texto más grande, colores para daltonismo (paletas seguras y, si se puede,
   un filtro), subtítulos de los sonidos (`reproducir(s, {"subtitulo": "Puerta"})`) y quitar el
   temblor de la cámara y los destellos.
 

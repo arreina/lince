@@ -759,7 +759,39 @@ for l in "menu_opciones en 35: volver" "ahora: 0.9 0.8 1" "propias: Difícil ver
          "al abrir: 0.9 0.8 1" "propias: Difícil verdadero 4 7" \
          'error: menu_opciones(): no conozco la opción '"'"'color_raro'"'"' (hay "propias", "mostrar", "titulo", "escala", "fuente", "color" y "color_elegido")' \
          'error: menu_opciones(): la opción '"'"'x'"'"' necesita "valores" (una lista), o un "inicial" lógico o numérico' \
-         'error: menu_opciones(): no conozco la opción '"'"'volumen'"'"' (hay "musica", "efectos", "voces", "pantalla_completa", "controles" y "idioma")'; do
+         'error: menu_opciones(): no conozco la opción '"'"'volumen'"'"' (hay "musica", "efectos", "voces", "pantalla_completa", "controles", "idioma" y "accesibilidad")'; do
     grep -qxF "$l" salida36.txt && ok "2.2: ${l:0:70}" || mal "falta la línea: $l"
 done
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida5b.txt; exit 1; }
+# ── 2.3: accesibilidad (texto, filtro de daltonismo, sin temblor ni destellos, subtítulos) ──
+LINCE_JUEGO_GUARDADO="$T/accesible" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=40 \
+    LINCE_JUEGO_GUION="3:abajo,5:entrar,8:entrar,10:abajo,12:entrar,14:escape,16:escape" LINCE_JUEGO_CAPTURA=accesible.bmp \
+    timeout 60 "$LINCE" "$DIR/prueba32.lince" > salida37.txt 2>&1
+for l in 'de serie: {"texto": 1, "daltonismo": no, "temblor": verdadero, "destellos": verdadero, "subtitulos": falso}' \
+         "texto: 22 33 33" "volver en 16" "elegido: 1.5 verdadero 1.5" \
+         'error: accesibilidad(): "texto" va de 1 (normal) a 4 (cuatro veces más grande)' \
+         'error: accesibilidad(): "daltonismo" es "no", "protanopia", "deuteranopia" o "tritanopia"' \
+         'error: accesibilidad(): "temblor" es verdadero o falso' \
+         'error: reproducir(): "subtitulo" es el texto que sale si el jugador tiene los subtítulos puestos: "Puerta"'; do
+    grep -qxF "$l" salida37.txt && ok "2.3: ${l:0:70}" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+d = open("accesible.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]; w, h = struct.unpack_from("<ii", d, 18); B = struct.unpack_from("<H", d, 28)[0] // 8
+fila = (w * B + 3) & ~3
+def px(x, y):
+    f = (abs(h) - 1 - y) if h > 0 else y
+    i = off + f * fila + x * B
+    return (d[i + 2], d[i + 1], d[i])
+casos = [(px(11, 11) == (0, 0, 0) and px(9, 9) == (255, 255, 255), "sin temblor: el cuadro, justo en su sitio"),
+         (px(50, 20)[2] > 40 and px(50, 20)[1] < 30, "filtro de deuteranopía: el rojo tira a magenta %s" % (px(50, 20),)),
+         (px(80, 20) == (0, 255, 0), "filtro: el verde se queda"),
+         (px(110, 20)[0] > 200 and px(110, 20)[1] < 30, "sin destellos: el sprite sigue rojo"),
+         (max(px(100, 80)) < 120, "subtítulo: su caja oscura abajo %s" % (px(100, 80),))]
+mal = 0
+for bien, nombre in casos:
+    print("  ✅ 2.3, píxel:" if bien else "  ❌ 2.3, píxel:", nombre)
+    mal += not bien
+sys.exit(1 if mal else 0)
+PY
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida5b.txt; exit 1; }

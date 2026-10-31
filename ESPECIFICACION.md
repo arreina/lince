@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.2
+# 🐆 Lince — Especificación del Lenguaje v2.3
 
 ## Filosofía
 
@@ -1860,8 +1860,23 @@ sea enemigos = si juego.opcion("dificultad", "Normal") == "Difícil" { 8 } sino 
 
 | Función | Qué hace |
 |---|---|
-| `menu_opciones([opciones])` | la pantalla de opciones, en cada fotograma; devuelve `"volver"` al salir, y si no, `nulo`. Opciones: `propias` (las del juego: cada una con `clave`, `nombre` y `valores`, una lista para elegir; o un `inicial` lógico, sí o no; o un `inicial` numérico con `minimo`, `maximo` y `paso`), `mostrar` (cuáles de las de serie: `"musica"`, `"efectos"`, `"voces"`, `"pantalla_completa"`, `"controles"`, `"idioma"`), `titulo`, `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
-| `opcion(clave[, defecto])` | lo que el jugador eligió en esa opción (las propias, o `"musica"`, `"efectos"`, `"voces"` y `"pantalla_completa"`), o `defecto` si no la ha tocado nunca |
+| `menu_opciones([opciones])` | la pantalla de opciones, en cada fotograma; devuelve `"volver"` al salir, y si no, `nulo`. Opciones: `propias` (las del juego: cada una con `clave`, `nombre` y `valores`, una lista para elegir; o un `inicial` lógico, sí o no; o un `inicial` numérico con `minimo`, `maximo` y `paso`), `mostrar` (cuáles de las de serie: `"musica"`, `"efectos"`, `"voces"`, `"pantalla_completa"`, `"controles"`, `"idioma"`, `"accesibilidad"`), `titulo`, `escala` (2; baja sola si no cabe), `fuente`, `color` y `color_elegido` |
+| `opcion(clave[, defecto])` | lo que el jugador eligió en esa opción (las propias, o `"musica"`, `"efectos"`, `"voces"`, `"pantalla_completa"`, `"texto"`, `"daltonismo"`, `"temblor"`, `"destellos"` y `"subtitulos"`), o `defecto` si no la ha tocado nunca |
+
+**Accesibilidad.** En `menu_opciones()` hay una entrada «Accesibilidad» con lo que ayuda a jugar a
+más gente: el tamaño del texto, subtítulos de los sonidos, un filtro de color para daltonismo, y
+quitar el temblor de la cámara y los destellos. Como el resto de las opciones, se guarda solo y se
+aplica al abrir el juego; y no hay que hacer nada en el juego para que funcione, salvo poner
+subtítulo a los sonidos que importan:
+
+```lince
+juego.reproducir(PUERTA, {"subtitulo": "Puerta", "lado": -1})     # sale «< Puerta» abajo, si los tiene puestos
+```
+
+| Función | Qué hace |
+|---|---|
+| `accesibilidad([opciones])` | cambia lo que se pida y devuelve cómo está todo: `texto` (1 normal; 1,5 o 2, todo el texto más grande: `texto`, `ancho_texto` y `medir_texto`, así que los menús siguen cabiendo), `daltonismo` (`"no"`, `"protanopia"`, `"deuteranopia"` o `"tritanopia"`: corrige los colores de todo lo que se ve para que se distingan los que esa persona confunde), `temblor` y `destellos` (falso: `temblor()` y el `"blanco"` de `dibujar` no hacen nada) y `subtitulos` |
+| `reproducir(sonido, {"subtitulo": t})` | con los subtítulos puestos, `t` sale abajo mientras suena (al menos 1,5 segundos; los tres últimos), con una flecha si suena por un lado. Vale también en `reproducir_en` |
 
 **Controles a gusto.** El jugador puede cambiar las teclas y los botones de cada acción:
 

@@ -1,0 +1,43 @@
+# 2.3: accesibilidad. smoke.sh mira los píxeles de accesible.bmp (el último
+# fotograma, con el filtro de daltonismo puesto) y las líneas que escribe.
+importar "juego"
+juego.abrir("2.3", 200, 120)
+escribir("de serie: {juego.accesibilidad()}")
+sea antes = juego.medir_texto("AB")[0]
+juego.accesibilidad({"texto": 1.5})
+escribir("texto: {antes} {juego.medir_texto("AB")[0]} {juego.ancho_texto("AB", 2)}")
+juego.accesibilidad({"texto": 1})
+para cada funcion intento en [
+    funcion(): nulo { juego.accesibilidad({"texto": 9}) },
+    funcion(): nulo { juego.accesibilidad({"daltonismo": "rojo"}) },
+    funcion(): nulo { juego.accesibilidad({"temblor": 1}) },
+    funcion(): nulo { juego.reproducir(juego.crear_tono(440, 0.5), {"subtitulo": 3}) }
+] {
+    intentar { intento() } capturar (error e) { escribir("error: {e.mensaje}") }
+}
+fijo ROJO = juego.sprite(["XX", "XX"], {"X": [255, 0, 0]})
+fijo TONO = juego.crear_tono(300, 1)
+sea f = 0
+mientras juego.abierto() {
+    juego.limpiar([255, 255, 255])
+    si f < 30 {
+        # las opciones: se entra en Accesibilidad, texto Grande y subtítulos sí
+        sea r = juego.menu_opciones({"mostrar": ["musica", "accesibilidad"]})
+        si r != nulo { escribir("volver en {f}") }
+    } sino {
+        si f == 30 {
+            escribir("elegido: {juego.opcion("texto")} {juego.opcion("subtitulos")} {juego.accesibilidad()["texto"]}")
+            juego.accesibilidad({"texto": 1, "temblor": falso, "destellos": falso, "daltonismo": "deuteranopia"})
+            juego.temblor(30, 5)
+            juego.reproducir(TONO, {"subtitulo": "Puerta", "lado": -1, "bucle": verdadero})
+        }
+        juego.camara(0, 0)
+        juego.rectangulo(10, 10, 4, 4, [0, 0, 0])            # sin temblor: justo aquí
+        juego.rectangulo(40, 10, 20, 20, [255, 0, 0])        # rojo y verde, con el filtro
+        juego.rectangulo(70, 10, 20, 20, [0, 255, 0])
+        juego.dibujar(ROJO, 100, 10, {"escala": 10, "blanco": 1})   # sin destellos: sigue rojo
+        juego.camara()
+    }
+    juego.presentar()
+    f = f + 1
+}

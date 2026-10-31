@@ -122,6 +122,7 @@ static struct {
     /* cámaras con zoom o giro: se dibuja en una textura y se pega girada */
     void *(*CreateTexture)(void *, unsigned, int, int, int);
     int  (*SetRenderTarget)(void *, void *);
+    int  (*UpdateTexture)(void *, const void *, const void *, int);
     int  (*SetClipRect)(void *, const JgRect *);
     void *(*PreferredLocales)(void);                                 /* SDL ≥ 2.0.14 */
     void (*Free)(void *);
@@ -746,6 +747,7 @@ static int jg_cargar(void) {
     *(void **)(&_jg.JoystickInstanceID) = JG_SIMBOLO(h, "SDL_JoystickInstanceID");
     *(void **)(&_jg.DeviceInstanceID) = JG_SIMBOLO(h, "SDL_JoystickGetDeviceInstanceID");
     *(void **)(&_jg.CreateTexture) = JG_SIMBOLO(h, "SDL_CreateTexture");
+    *(void **)(&_jg.UpdateTexture) = JG_SIMBOLO(h, "SDL_UpdateTexture");
     *(void **)(&_jg.SetRenderTarget) = JG_SIMBOLO(h, "SDL_SetRenderTarget");
     *(void **)(&_jg.SetClipRect) = JG_SIMBOLO(h, "SDL_RenderSetClipRect");
     *(void **)(&_jg.PreferredLocales) = JG_SIMBOLO(h, "SDL_GetPreferredLocales");
@@ -861,9 +863,119 @@ static void jg_cerrar_audio_prueba(void) {
     _jgs.audio_prueba = NULL;
 }
 
+/* ── Accesibilidad (lo elige el jugador en menu_opciones, «Accesibilidad») ──
+   texto: lo que se multiplica la escala de todo el texto; filtro: el de
+   daltonismo (0 ninguno, 1 protanopía, 2 deuteranopía, 3 tritanopía);
+   subtitulos: reproducir() con "subtitulo" avisa a juego.lince */
+static struct { double texto; int filtro, sin_temblor, sin_destellos, subtitulos; void *tex; int tw, th; } _jga = {1, 0, 0, 0, 0, NULL, 0, 0};
+static const char *const JG_FILTROS[] = {"no", "protanopia", "deuteranopia", "tritanopia", NULL};
+
+/* La escala del texto con el tamaño que eligió el jugador; la letra de Lince va en píxeles enteros */
+static double jg_escala_accesible(double e, int de_lince) {
+    if (_jga.texto == 1) return e;
+    return de_lince ? floor(e * _jga.texto + 0.5) : e * _jga.texto;
+}
+
+/* El filtro de daltonismo: corrige los colores para que se distingan los que se
+   confunden (la «daltonización» de siempre: se simula cómo los ve esa persona y
+   lo que se pierde se pasa a los canales que sí ve). Al final del fotograma, sobre
+   lo que hay en la ventana. */
+static void jg_filtro_color(void) {
+    if (!_jga.filtro || !_jg.CreateTexture || !_jg.UpdateTexture) return;
+    static const float SIM[4][9] = {
+        {0},
+        {0.567f, 0.433f, 0, 0.558f, 0.442f, 0, 0, 0.242f, 0.758f},      /* protanopía */
+        {0.625f, 0.375f, 0, 0.7f, 0.3f, 0, 0, 0.3f, 0.7f},              /* deuteranopía */
+        {0.95f, 0.05f, 0, 0, 0.433f, 0.567f, 0, 0.475f, 0.525f}};       /* tritanopía */
+    /* corregido = c + D·(c − simulado), con D el reparto del error */
+    static const float D[9] = {0, 0, 0, 0.7f, 1, 0, 0.7f, 0, 1};
+    float M[9];
+    const float *S = SIM[_jga.filtro];
+    for (int f = 0; f < 3; f++)
+        for (int c = 0; c < 3; c++) {
+            float suma = 0;
+            for (int k = 0; k < 3; k++) suma += D[f * 3 + k] * ((k == c) - S[k * 3 + c]);
+            M[f * 3 + c] = (f == c) + suma;
+        }
+    int w = 0, h = 0;
+    _jg.OutputSize(_jgs.render, &w, &h);
+    if (w <= 0 || h <= 0) return;
+    unsigned *px = malloc((size_t)w * h * 4);
+    if (!px) return;
+    if (_jg.ReadPixels(_jgs.render, NULL, 0x16362004, px, w * 4) != 0) { free(px); return; }
+    for (size_t i = 0; i < (size_t)w * h; i++) {
+        unsigned p = px[i];
+        float r = (float)((p >> 16) & 255), g = (float)((p >> 8) & 255), b = (float)(p & 255);
+        float n[3];
+        for (int f = 0; f < 3; f++) {
+            float v = M[f * 3] * r + M[f * 3 + 1] * g + M[f * 3 + 2] * b;
+            n[f] = v < 0 ? 0 : v > 255 ? 255 : v;
+        }
+        px[i] = 0xFF000000u | ((unsigned)n[0] << 16) | ((unsigned)n[1] << 8) | (unsigned)n[2];
+    }
+    if (!_jga.tex || _jga.tw != w || _jga.th != h) {
+        if (_jga.tex) _jg.DestroyTexture(_jga.tex);
+        _jga.tex = _jg.CreateTexture(_jgs.render, 0x16362004, 1, w, h);     /* 1: se cambia a menudo */
+        _jga.tw = w; _jga.th = h;
+    }
+    if (_jga.tex && _jg.UpdateTexture(_jga.tex, NULL, px, w * 4) == 0) {
+        _jg.LogicalSize(_jgs.render, 0, 0);              /* la ventana entera, píxel a píxel */
+        _jg.RenderCopyEx(_jgs.render, _jga.tex, NULL, NULL, 0, NULL, 0);
+        _jg.LogicalSize(_jgs.render, _jgs.ancho, _jgs.alto);
+    }
+    free(px);
+}
+
+/* accesibilidad([opciones]): cambia lo que se pida y devuelve cómo está todo:
+   {"texto" (1, 1.5, 2...: el tamaño de todo el texto), "daltonismo" ("no",
+   "protanopia", "deuteranopia" o "tritanopia"), "temblor" y "destellos"
+   (falso: la cámara no tiembla y los destellos blancos no salen) y "subtitulos"} */
+static Valor *fn_jg_accesibilidad(Valor **a, int n) {
+    if (n > 0 && a[0]->tipo != VAL_NULO) {
+        Valor *op = a[0];
+        if (op->tipo != VAL_DICCIONARIO) return jg_error("ErrorTipo", "accesibilidad() espera un diccionario: {\"texto\": 1.5, \"subtitulos\": verdadero}");
+        static const char *const V[] = {"texto", "daltonismo", "temblor", "destellos", "subtitulos", NULL};
+        if (!jg_opciones_validas(op, "accesibilidad", V)) return valor_nulo();
+        double t;
+        if (jg_opcion(op, "texto", &t)) {
+            if (t < 1 || t > 4) return jg_error("ErrorArgumento", "accesibilidad(): \"texto\" va de 1 (normal) a 4 (cuatro veces más grande)");
+            _jga.texto = t;
+        }
+        Valor *d = jg_opcion_valor(op, "daltonismo");
+        if (d) {
+            int k = -1;
+            if (d->tipo == VAL_NULO) k = 0;
+            else if (d->tipo == VAL_TEXTO) for (int i = 0; JG_FILTROS[i]; i++) if (!strcmp(d->texto, JG_FILTROS[i])) k = i;
+            if (k < 0) return jg_error("ErrorArgumento", "accesibilidad(): \"daltonismo\" es \"no\", \"protanopia\", \"deuteranopia\" o \"tritanopia\"");
+            _jga.filtro = k;
+        }
+        static const char *const L[] = {"temblor", "destellos", "subtitulos"};
+        int *dest[] = {&_jga.sin_temblor, &_jga.sin_destellos, &_jga.subtitulos};
+        for (int i = 0; i < 3; i++) {
+            Valor *v = jg_opcion_valor(op, L[i]);
+            if (!v) continue;
+            if (v->tipo != VAL_BOOLEANO) {
+                char msg[120];
+                snprintf(msg, sizeof msg, "accesibilidad(): \"%s\" es verdadero o falso", L[i]);
+                return jg_error("ErrorTipo", msg);
+            }
+            *dest[i] = i < 2 ? !v->booleano : v->booleano;
+        }
+        if (_jga.sin_temblor) _jgs.tem_dur = 0;
+    }
+    Valor *r = valor_diccionario_crear();
+    valor_diccionario_agregar(r, "texto", valor_numero(_jga.texto));
+    valor_diccionario_agregar(r, "daltonismo", valor_texto(JG_FILTROS[_jga.filtro]));
+    valor_diccionario_agregar(r, "temblor", valor_booleano(!_jga.sin_temblor));
+    valor_diccionario_agregar(r, "destellos", valor_booleano(!_jga.sin_destellos));
+    valor_diccionario_agregar(r, "subtitulos", valor_booleano(_jga.subtitulos));
+    return r;
+}
+
 static void jg_cerrar_todo(void) {
     jg_capas_olvidar();
     if (_jgs.cam_tex) { _jg.DestroyTexture(_jgs.cam_tex); _jgs.cam_tex = NULL; }
+    if (_jga.tex) { _jg.DestroyTexture(_jga.tex); _jga.tex = NULL; }
     _jgs.cam_tex_activa = _jgs.cam_recorte = 0;
     jg_cerrar_audio_prueba();
     jg_parar_flujo();
@@ -1302,7 +1414,7 @@ static Valor *fn_jg_texto(Valor **a, int n) {
         return jg_error("ErrorTipo", "texto(): la escala, el color y la fuente van en las opciones: texto(t, x, y, {\"escala\": 2, \"color\": [255, 255, 255]})");
     JG_DIBUJO(fn_jg_texto);
     if (n > 3 && a[3]->tipo == VAL_DICCIONARIO) return jg_texto_opciones(a, n, 0);
-    double x, y, esc = 2;
+    double x, y, esc = jg_escala_accesible(2, 1);
     if (!jg_num(a, n, 1, &x, "texto") || !jg_num(a, n, 2, &y, "texto")) return valor_nulo();
     unsigned char c[4];
     if (!jg_color(a, 3, 4, c)) return valor_nulo();
@@ -1373,6 +1485,7 @@ static Valor *fn_jg_ancho_texto(Valor **a, int n) {
     if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) return jg_texto_opciones(a, n, 1);
     double esc = 2;
     if (n > 1 && !jg_num(a, n, 1, &esc, "ancho_texto")) return valor_nulo();
+    esc = jg_escala_accesible(esc, 1);
     return valor_numero(jg_ancho_texto(a[0]->texto, esc < 1 ? 1 : (int)esc));
 }
 
@@ -1703,6 +1816,7 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     jg_cam_soltar();                               /* lo de una cámara con zoom o giro, a la ventana */
     interprete_perfil_categoria(PERFIL_PRESENTAR);     /* desde aquí, mostrarlo y esperar */
     if (recarga_error()) jg_aviso_error(recarga_error(), 0);
+    jg_filtro_color();                             /* el de daltonismo, si el jugador lo eligió */
     if (_jgs.limite && _jgs.total + 1 >= _jgs.limite && getenv("LINCE_JUEGO_CAPTURA"))
         jg_guardar_bmp(getenv("LINCE_JUEGO_CAPTURA"));      /* prueba: guarda el último fotograma */
     if (_jgs.limite && getenv("LINCE_JUEGO_FOTOS")) {          /* prueba: todos, para hacer un vídeo */
@@ -2568,8 +2682,12 @@ static Valor *fn_jg_reproducir(Valor **a, int n) {
     if (!s) return valor_nulo();
     if (n > 1 && a[1]->tipo == VAL_DICCIONARIO) {
         Valor *op = a[1];
-        static const char *const V[] = {"volumen", "bucle", "lado", "tono", "grupo", "fundido", "amortiguado", "nitido", NULL};
+        static const char *const V[] = {"volumen", "bucle", "lado", "tono", "grupo", "fundido", "amortiguado", "nitido",
+                                        "subtitulo", NULL};
         if (!jg_opciones_validas(op, "reproducir", V)) return valor_nulo();
+        Valor *sub = jg_opcion_valor(op, "subtitulo");
+        if (sub && sub->tipo != VAL_TEXTO && sub->tipo != VAL_NULO)
+            return jg_error("ErrorTipo", "reproducir(): \"subtitulo\" es el texto que sale si el jugador tiene los subtítulos puestos: \"Puerta\"");
         double vol = 1, b = 0;
         jg_opcion(op, "volumen", &vol);
         Valor *vb = jg_opcion_valor(op, "bucle");
@@ -2587,6 +2705,15 @@ static Valor *fn_jg_reproducir(Valor **a, int n) {
                 jg_ajustar_voz(vz, op, "reproducir", 1);
             }
             _jg.UnlockAudio(_jgs.audio);
+        }
+        if (id > 0 && _jga.subtitulos && sub && sub->tipo == VAL_TEXTO) {   /* lo dibuja juego.lince */
+            double tono = 1, lado = 0;
+            jg_opcion(op, "tono", &tono);
+            jg_opcion(op, "lado", &lado);
+            Valor *args[4] = {valor_texto(sub->texto), valor_numero(id),
+                              valor_numero(b ? -1 : (double)s->muestras / JG_FRECUENCIA / (tono > 0 ? tono : 1)), valor_numero(lado)};
+            valor_destruir(interprete_llamar_biblioteca(BIBLIOTECA_JUEGO, "_subtitulo", args, 4));
+            if (hay_error) return valor_nulo();
         }
         return valor_numero(id);
     }
@@ -4537,6 +4664,7 @@ static Valor *fn_jg_dibujar(Valor **a, int n) {
     double alfa = 255, blanco = 0;
     jg_opcion(op, "alfa", &alfa);
     jg_opcion(op, "blanco", &blanco);
+    if (_jga.sin_destellos) blanco = 0;             /* el jugador los quitó (accesibilidad) */
     if (alfa < 0) alfa = 0;
     if (alfa > 255) alfa = 255;
     if (blanco < 0 || blanco > 1) return jg_error("ErrorArgumento", "dibujar(): \"blanco\" va de 0 (nada) a 1 (todo blanco)");
@@ -4825,6 +4953,7 @@ static Valor *jg_texto_opciones(Valor **a, int n, int medir) {
     double e = f ? 1 : 2, ancho = 0, v;
     if (jg_opcion(op, "escala", &v)) e = v;
     if (e <= 0) { snprintf(msg, sizeof msg, "%s(): \"escala\" es mayor que 0", fn); return jg_error("ErrorArgumento", msg); }
+    e = jg_escala_accesible(e, !f);                       /* el tamaño de texto que eligió el jugador */
     if (!f) e = e < 1 ? 1 : e > 64 ? 64 : (int)e;        /* la de Lince va en píxeles enteros */
     jg_opcion(op, "ancho", &ancho);
     int alinear = 0;
@@ -5134,6 +5263,7 @@ static Valor *fn_jg_temblor(Valor **a, int n) {
     if (!jg_num(a, n, 0, &f, "temblor")) return valor_nulo();
     if (n > 1 && !jg_num(a, n, 1, &s, "temblor")) return valor_nulo();
     if (f < 0 || s < 0) return jg_error("ErrorArgumento", "temblor(): la fuerza y los segundos no pueden ser negativos");
+    if (_jga.sin_temblor) return valor_nulo();        /* el jugador lo quitó (accesibilidad) */
     double real = jg_reloj_real(), queda = 0;
     if (_jgs.tem_dur > 0 && real < _jgs.tem_desde + _jgs.tem_dur)
         queda = _jgs.tem_fuerza * (1 - (real - _jgs.tem_desde) / _jgs.tem_dur);
@@ -7461,6 +7591,7 @@ static void cargar_juego(Entorno *entorno) {
         {"musica",          fn_jg_musica,          -1},
         {"volumen",         fn_jg_volumen,         -1},
         {"cambiar_voz",     fn_jg_cambiar_voz,     -1},
+        {"accesibilidad",   fn_jg_accesibilidad,   -1},
         {"amortiguar",      fn_jg_amortiguar,      -1},
         {"crear_tono",      fn_jg_crear_tono,      -1},
         {"sonando",         fn_jg_sonando,          1},

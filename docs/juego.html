@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v2.2</span>
+  <span class="version">v2.3</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -824,7 +824,7 @@ juego.idioma(<span class="s">&quot;en&quot;</span>)
     <span class="k">si</span> eleccion == <span class="s">&quot;Salir&quot;</span> { juego.salir() }
     juego.presentar()
 }</code></pre></div><figure><img src="img/juego/1730_idiomas.png" alt="Captura de «Idiomas»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/1730_idiomas.lince</span></article></section>
-<section id="controles"><h2>Controles</h2><article class="ej" id="controles-0"><h3>La pantalla de opciones</h3><p class="nota"><code>juego.menu_opciones()</code> es la pantalla de opciones de cualquier juego, ya hecha: el volumen de la música, los efectos y las voces, la pantalla completa, los controles (si hay acciones) y el idioma (si hay idiomas). Arriba y abajo para elegir, izquierda y derecha para cambiar, y atrás (o «Volver») para salir: entonces devuelve <code>&quot;volver&quot;</code>. También con el ratón y el dedo.</p><p class="nota">Lo que se cambia se aplica en el acto y <strong>se guarda solo</strong>: la próxima vez que se abra el juego vuelve a aplicarse sin hacer nada. Las opciones propias del juego van en <code>&quot;propias&quot;</code> (una lista para elegir, sí o no, o un número), y el juego las lee con <code>juego.opcion(clave, defecto)</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<section id="controles"><h2>Controles</h2><article class="ej" id="controles-0"><h3>La pantalla de opciones</h3><p class="nota"><code>juego.menu_opciones()</code> es la pantalla de opciones de cualquier juego, ya hecha: el volumen de la música, los efectos y las voces, la pantalla completa, los controles (si hay acciones) y el idioma (si hay idiomas). Arriba y abajo para elegir, izquierda y derecha para cambiar, y atrás (o «Volver») para salir: entonces devuelve <code>&quot;volver&quot;</code>. También con el ratón y el dedo.</p><p class="nota">Lo que se cambia se aplica en el acto y <strong>se guarda solo</strong>: la próxima vez que se abra el juego vuelve a aplicarse sin hacer nada. En «Accesibilidad» están el tamaño del texto, los subtítulos (de los sonidos con <code>{&quot;subtitulo&quot;: &quot;Puerta&quot;}</code>), un filtro para daltonismo y quitar el temblor y los destellos. Las opciones propias del juego van en <code>&quot;propias&quot;</code> (una lista para elegir, sí o no, o un número), y el juego las lee con <code>juego.opcion(clave, defecto)</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 <span class="k">importar</span> <span class="s">&quot;matematica&quot;</span>
 
 juego.abrir(<span class="s">&quot;Opciones&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)

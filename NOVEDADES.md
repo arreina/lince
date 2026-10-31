@@ -3,6 +3,26 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.3.0
+
+Accesibilidad. Solo añade: nada de la 2.0 cambia.
+
+- **«Accesibilidad» en la pantalla de opciones** (`juego.menu_opciones()`), que se guarda y se aplica sola como el resto:
+  - **Tamaño del texto**: normal, grande o muy grande, para todo el texto del juego. Los menús lo miden y siguen cabiendo.
+  - **Subtítulos** de los sonidos que el juego marque con `reproducir(s, {"subtitulo": "Puerta"})`, con una flecha si suenan por un lado.
+  - **Daltonismo**: un filtro que corrige los colores de todo lo que se ve (protanopía, deuteranopía o tritanopía) para que se distingan los que se confunden.
+  - **Quitar el temblor de la cámara y los destellos blancos.**
+- **`juego.accesibilidad([opciones])`**: lo mismo desde el código del juego, y para saber qué ha elegido el jugador.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.3.0-linux.tar.gz` | Lince para Linux (x86_64). Para abrir ventanas hace falta SDL2: `sudo apt install libsdl2-2.0-0` |
+| `lince-2.3.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.3.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.3.0.vsix` |
+
 ## 2.2.0
 
 La pantalla de opciones. Solo añade: nada de la 2.0 cambia.
