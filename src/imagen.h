@@ -19,5 +19,7 @@ unsigned char *imagen_decodificar(const unsigned char *bytes, size_t largo,
 int imagen_guardar_png(const char *ruta, const unsigned char *px, int ancho, int alto);
 /* Lo mismo, en memoria: el PNG entero (liberar con free) y su largo */
 unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *largo);
+/* Como imagen_guardar_png, sin transparencia (PNG RGB): lo que pide Google Play */
+int imagen_guardar_png_rgb(const char *ruta, const unsigned char *px, int ancho, int alto);
 
 #endif

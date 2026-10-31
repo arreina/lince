@@ -159,19 +159,30 @@ static int png_paeth(int a, int b, int c) {
     return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
 }
 
-unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *largo) {
+/* 'canales' 4: RGBA; 3: RGB, sin transparencia (lo que pide Google Play en
+   las capturas). Los píxeles de entrada son siempre RGBA. */
+static unsigned char *png_hacer(const unsigned char *px_rgba, int ancho, int alto, int canales, size_t *largo) {
     if (ancho < 1 || alto < 1 || ancho > 16384 || alto > 16384) return NULL;
-    size_t ancho4 = (size_t)ancho * 4, fila = ancho4 + 1, crudo = fila * alto;
+    const unsigned char *px = px_rgba;
+    unsigned char *rgb = NULL;
+    if (canales == 3) {
+        rgb = malloc((size_t)ancho * alto * 3);
+        if (!rgb) return NULL;
+        for (size_t i = 0; i < (size_t)ancho * alto; i++) memcpy(rgb + i * 3, px_rgba + i * 4, 3);
+        px = rgb;
+    }
+    size_t ancho4 = (size_t)ancho * canales, fila = ancho4 + 1, crudo = fila * alto;
     unsigned char *f = malloc(crudo), *prueba = malloc(ancho4);
     PngBits o = {malloc(crudo + crudo / 7 + 64), 0, 0, 0};
-    if (!f || !prueba || !o.b) { free(f); free(prueba); free(o.b); return NULL; }
+    if (!f || !prueba || !o.b) { free(f); free(prueba); free(o.b); free(rgb); return NULL; }
     for (int y = 0; y < alto; y++) {                    /* el filtro que deja la fila con números más pequeños */
         const unsigned char *a = px + (size_t)y * ancho4, *arriba = y > 0 ? a - ancho4 : NULL;
         long mejor = -1;
         for (int t = 0; t < 5; t++) {
             long suma = 0;
             for (size_t x = 0; x < ancho4; x++) {
-                int iz = x >= 4 ? a[x - 4] : 0, ar = arriba ? arriba[x] : 0, di = x >= 4 && arriba ? arriba[x - 4] : 0;
+                int iz = x >= (size_t)canales ? a[x - canales] : 0, ar = arriba ? arriba[x] : 0;
+                int di = x >= (size_t)canales && arriba ? arriba[x - canales] : 0;
                 int p = t == 0 ? 0 : t == 1 ? iz : t == 2 ? ar : t == 3 ? (iz + ar) / 2 : png_paeth(iz, ar, di);
                 prueba[x] = (unsigned char)(a[x] - p);
                 suma += prueba[x] < 128 ? prueba[x] : 256 - prueba[x];
@@ -184,6 +195,7 @@ unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *
         }
     }
     free(prueba);
+    free(rgb);
     o.b[o.n++] = 0x78; o.b[o.n++] = 0x01;               /* zlib */
     png_deflate(&o, f, crudo);
     unsigned long a1 = 1, a2 = 0;                       /* adler-32 de lo que había antes de comprimir */
@@ -194,7 +206,7 @@ unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *
     if (!png) { free(o.b); return NULL; }
     unsigned char ihdr[13];
     png_u32(ihdr, (unsigned long)ancho); png_u32(ihdr + 4, (unsigned long)alto);
-    ihdr[8] = 8; ihdr[9] = 6; ihdr[10] = ihdr[11] = ihdr[12] = 0;      /* 8 bits, RGBA */
+    ihdr[8] = 8; ihdr[9] = canales == 3 ? 2 : 6; ihdr[10] = ihdr[11] = ihdr[12] = 0;   /* 8 bits, RGB o RGBA */
     size_t pos = 8;
     memcpy(png, "\x89PNG\r\n\x1a\n", 8);
     png_trozo(png, &pos, "IHDR", ihdr, 13);
@@ -203,6 +215,21 @@ unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *
     free(o.b);
     *largo = pos;
     return png;
+}
+
+unsigned char *imagen_png(const unsigned char *px, int ancho, int alto, size_t *largo) {
+    return png_hacer(px, ancho, alto, 4, largo);
+}
+
+int imagen_guardar_png_rgb(const char *ruta, const unsigned char *px, int ancho, int alto) {
+    size_t largo = 0;
+    unsigned char *png = png_hacer(px, ancho, alto, 3, &largo);
+    if (!png) return 0;
+    FILE *f = fopen(ruta, "wb");
+    int ok = f && fwrite(png, 1, largo, f) == largo;
+    if (f) ok = fclose(f) == 0 && ok;
+    free(png);
+    return ok;
 }
 
 int imagen_guardar_png(const char *ruta, const unsigned char *px, int ancho, int alto) {

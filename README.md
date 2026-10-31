@@ -9,7 +9,7 @@
 ---
 
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-6A2D72.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-2.8-F1BF00.svg)]()
+[![Versión](https://img.shields.io/badge/versión-2.9-F1BF00.svg)]()
 [![Tests](https://img.shields.io/badge/tests-38%2F38-C60B1E.svg)]()
 [![Plataformas](https://img.shields.io/badge/plataformas-Linux%20·%20Windows%20·%20Android-6A2D72.svg)]()
 
@@ -105,7 +105,7 @@ lince repartir mi_juego.lince --android --nombre "Mi juego"
 ```
 
 Hace `mi_juego.apk`, para instalar el juego en un móvil Android, sin instalar nada más (Lince lo monta y lo firma él mismo a partir de la plantilla `lince-android.apk`, que viene con cada versión): a pantalla completa, con un mando en la pantalla como el de los juegos de móvil (`juego.mando_tactil()`: palanca y botones A/B que funcionan como un mando de verdad), `juego.toques()` y el botón «atrás» para salir. Ver [`android/LEEME.md`](android/LEEME.md).
-
+Para publicarlo en Google Play, `lince repartir mi_juego.lince --aab --version 1 --version-nombre "1.0"` hace el `.aab` que pide Google Play, también firmado por Lince, y una carpeta con lo que pide la ficha de la tienda: el icono, el gráfico destacado, capturas del juego y una guía de Play Console.
 Para publicarlo en Google Play, `lince repartir mi_juego.lince --aab --version 1` hace el `.aab` que pide Google Play, también firmado por Lince.
 
 ## Uso

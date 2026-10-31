@@ -3,6 +3,27 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.9.0
+
+Google Play de verdad: `lince repartir --aab` deja el juego listo para subirlo a la tienda. Solo añade: nada de la 2.0 cambia.
+
+- **El icono del juego** en el `.apk` y el `.aab` (`--icono`, o `icono.png` junto al juego), como en los paquetes de escritorio.
+- **`--version-nombre "1.2"`**: la versión que ve el jugador en la tienda (`--version` sigue siendo el número que sube en cada `.aab`).
+- **La ficha de la tienda**, en la carpeta `juego-google-play/`: el icono de 512 × 512, el gráfico destacado de 1024 × 500, capturas del juego jugando solo (en los fotogramas de `--capturas`, con `--guion "30:espacio"` pulsado), el certificado de la llave de subida y un `LEEME.txt` con lo demás que pregunta Play Console (seguridad de los datos, clasificación, público objetivo...).
+- Avisa si el `--id` empieza por `org.lince.`: en Google Play no se puede cambiar después.
+- Lince escribe PNG sin transparencia cuando hace falta (las capturas y el gráfico, como los pide Google).
+
+Falta probarlo subiendo uno de verdad a Play Console, que necesita la cuenta de desarrollador del autor.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.9.0-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.9.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.9.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.9.0.vsix` |
+
 ## 2.8.0
 
 Tiled isométrico, lo que pidió Bichito. Solo añade: nada de la 2.0 cambia.

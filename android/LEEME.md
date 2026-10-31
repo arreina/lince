@@ -29,17 +29,33 @@ Google Play no quiere un `.apk` sino un `.aab` (Android App Bundle), con el que
 Google hace después el `.apk` justo para cada móvil:
 
 ```bash
-lince repartir mi_juego.lince --aab --nombre "Mi juego" --id org.tunombre.mijuego --version 1
+lince repartir mi_juego.lince --aab --nombre "Mi juego" --id org.tunombre.mijuego --version 1 --version-nombre "1.0"
 ```
 
 Hace `mi_juego.aab`, firmado con tu llave (la firma JAR, la que pide Google
-Play), que se sube en [Play Console](https://play.google.com/console). Hay que
+Play), que se sube en [Play Console](https://play.google.com/console), y la
+carpeta `mi_juego-google-play/` con lo que pide la ficha de la tienda:
+
+- `icono-512.png`: el icono de la tienda.
+- `grafico-destacado.png`: el de 1024 × 500 (una captura con el icono; mejor si
+  luego haces uno tuyo).
+- `captura-1.png`, `captura-2.png`...: capturas del juego jugando solo, sin
+  ventana, en los fotogramas de `--capturas` (60, 180 y 300: a 1, 3 y 5
+  segundos) y con lo que diga `--guion` pulsado (`--guion "30:espacio"`, como
+  el de `juego.jugar`). Agrandadas por un número entero y sin transparencia, como
+  las pide Google.
+- `certificado-de-subida.pem`: el certificado de tu llave, por si Google lo pide.
+- `LEEME.txt`: lo demás que pregunta Play Console, paso a paso.
+
+El icono del juego (`--icono`, o `icono.png` junto al juego) va también en el
+`.apk` y el `.aab`: el que se ve en el móvil. Hay que
 tener cuenta de desarrollador (25 $, una sola vez), y Google pide probar la app
 con un grupo de personas antes de publicarla. Para tener en cuenta:
 
 - **El `--id` no se puede cambiar** después de publicar: elige uno tuyo
   (`org.tunombre.mijuego`), no `org.lince...`.
-- **Cada `.aab` que subas, con `--version` más alto** que el anterior.
+- **Cada `.aab` que subas, con `--version` más alto** que el anterior. Lo que
+  ve el jugador en la tienda es `--version-nombre` (`"1.0"`, `"1.1"`...).
 - **Tu llave es la «llave de subida»**: Google firma el juego que llega a los
   móviles con la suya (la firma de apps de Google Play). Si pierdes tu llave,
   Google te deja cambiarla; si la pierdes sin haber publicado nada, no pasa nada.

@@ -483,14 +483,16 @@ int main(int argc, char *argv[]) {
         const char *uso = "   Uso: lince repartir <juego.lince> [-o carpeta] [--incluir carpeta_o_archivo]...\n"
                           "                       [--nombre \"Mi juego\"] [--icono icono.png] [--para windows|linux]\n"
                           "        lince repartir <juego.lince> --android [--aab] [-o juego.apk] [--nombre \"Mi juego\"]\n"
-                          "                       [--id org.lince.mijuego] [--version 1]\n\n";
+                          "                       [--id org.lince.mijuego] [--version 1] [--version-nombre 1.0]\n"
+                          "                       [--icono icono.png] [--capturas 60,180,300] [--guion \"30:espacio\"]\n\n";
         if (argc < 3) { fprintf(stderr, "\n❌ Falta el juego.\n%s", uso); return 1; }
         const char *ext = strrchr(argv[2], '.');
         if (!ext || strcmp(ext, ".lince") != 0) {
             fprintf(stderr, "\n❌ El archivo '%s' no tiene la extensión '.lince'.\n\n", argv[2]);
             return 1;
         }
-        const char *carpeta = NULL, *nombre = NULL, *id = NULL, *icono = NULL, *para = NULL;
+        const char *carpeta = NULL, *nombre = NULL, *id = NULL, *icono = NULL, *para = NULL, *version_nombre = NULL,
+                   *capturas = NULL, *guion = NULL;
         const char *extras[64];
         int num_extras = 0, android = 0, aab = 0, version = 1;
         for (int i = 3; i < argc; i++) {
@@ -509,6 +511,14 @@ int main(int argc, char *argv[]) {
             else if (strcmp(argv[i], "--nombre") == 0 && i + 1 < argc) nombre = argv[++i];
             else if (strcmp(argv[i], "--id") == 0 && i + 1 < argc) id = argv[++i];
             else if (strcmp(argv[i], "--icono") == 0 && i + 1 < argc) icono = argv[++i];
+            else if (strcmp(argv[i], "--version-nombre") == 0 && i + 1 < argc) version_nombre = argv[++i];
+            else if (strcmp(argv[i], "--guion") == 0 && i + 1 < argc) guion = argv[++i];
+            else if (strcmp(argv[i], "--capturas") == 0 && i + 1 < argc) {
+                capturas = argv[++i];
+                int bien = capturas[0] != '\0';
+                for (const char *c = capturas; *c && bien; c++) bien = (*c >= '0' && *c <= '9') || *c == ',';
+                if (!bien) { fprintf(stderr, "\n❌ --capturas son números de fotograma separados por comas (60,180,300).\n\n"); return 1; }
+            }
             else if (strcmp(argv[i], "--para") == 0 && i + 1 < argc) {
                 para = argv[++i];
                 if (strcmp(para, "windows") != 0 && strcmp(para, "linux") != 0) {
@@ -554,8 +564,9 @@ int main(int argc, char *argv[]) {
             if (!bien) { fprintf(stderr, "\n❌ El --id es como org.lince.mijuego (minúsculas, cada parte empieza por letra).\n\n"); return 1; }
             const char *nombre_auto = base;                /* 01_pong → pong */
             while ((*nombre_auto >= '0' && *nombre_auto <= '9') || *nombre_auto == '_') nombre_auto++;
-            return apk_crear(argv[2], carpeta, nombre ? nombre : (*nombre_auto ? nombre_auto : base), id, version, aab,
-                             extras, num_extras);
+            ApkOpciones ao = {nombre ? nombre : (*nombre_auto ? nombre_auto : base), id, version, version_nombre, aab, icono,
+                              capturas, guion};
+            return apk_crear(argv[2], carpeta, &ao, extras, num_extras);
         }
         if (nombre && !nombre[0]) { fprintf(stderr, "\n❌ --nombre no puede ir vacío.\n\n"); return 1; }
         RepartirOpciones op = {carpeta, nombre, icono, para};

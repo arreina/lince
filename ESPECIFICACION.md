@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.8
+# 🐆 Lince — Especificación del Lenguaje v2.9
 
 ## Filosofía
 
@@ -2366,10 +2366,16 @@ en las acciones, el botón «atrás» cuenta como Esc (abre la pausa, vuelve en 
 lo que haga el juego con Esc) y lo que escribe va a su carpeta privada.
 `examples/11_movil.lince` sirve para probarlo.
 
-`lince repartir juego.lince --aab [--nombre ...] [--id ...] [--version N]` hace en su lugar el `.aab`
-que pide Google Play, firmado con la misma llave (que hace de llave de subida). Cada `.aab` que se
-sube lleva un `--version` más alto que el anterior. El juego apunta a Android 16 (API 36) y sus
-bibliotecas sirven con páginas de memoria de 16 KB, como pide Google Play.
+`lince repartir juego.lince --aab [--nombre ...] [--id ...] [--version N] [--version-nombre "1.0"]`
+hace en su lugar el `.aab` que pide Google Play, firmado con la misma llave (que hace de llave de
+subida), y la carpeta `juego-google-play/` con lo que pide la ficha de la tienda: el icono de
+512 × 512, el gráfico destacado de 1024 × 500, capturas del juego jugando solo (en los fotogramas
+de `--capturas 60,180,300`, con `--guion "30:espacio"` pulsado, como en `juego.jugar`), el
+certificado de la llave de subida y un `LEEME.txt` con lo demás que pregunta Play Console. Cada
+`.aab` que se sube lleva un `--version` más alto que el anterior; `--version-nombre` es lo que ve
+el jugador. El icono del juego (`--icono`, o `icono.png` junto al juego) va en el `.apk` y en el
+`.aab`. El juego apunta a Android 16 (API 36) y sus bibliotecas sirven con páginas de memoria de
+16 KB, como pide Google Play.
 
 `lince compilar juego.lince --datos -o juego.paq` empaqueta solo el programa y sus archivos,
 sin el intérprete: es lo que va dentro del `.apk`.

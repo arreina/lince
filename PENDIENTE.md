@@ -182,10 +182,12 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 - [x] Pantalla completa ampliando por múltiplos enteros, para el pixel art (`"escala_entera"`).
 - [ ] Para lince-motor: el panel de recursos, con los mapas isométricos.
 
-### 2.9 — Google Play de verdad
-- [ ] `lince repartir --aab` deja el juego listo para subir: iconos en todos los tamaños,
-  versión, firma de subida y lo que pide la ficha de la tienda. Probado subiendo uno de prueba
-  (hace falta la cuenta de desarrollador de Google Play del autor).
+### 2.9 — Google Play de verdad (publicada)
+- [x] `lince repartir --aab` deja el juego listo para subir: el icono del juego, la versión que ve
+  el jugador (`--version-nombre`), el certificado de la llave de subida y la ficha de la tienda
+  (icono de 512, gráfico destacado, capturas del juego jugando solo y una guía de Play Console).
+- [ ] Probarlo subiendo uno de prueba: hace falta la cuenta de desarrollador de Google Play del
+  autor. Si Google pide algo más al subirlo, se arregla en una 2.9.x.
 
 ### 2.10 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.

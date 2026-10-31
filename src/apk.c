@@ -19,6 +19,12 @@
 #include "apk.h"
 #include "firmar.h"
 #include "empaquetado.h"
+#include "imagen.h"
+#include "escritorio.h"
+#include "interprete.h"
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 /* de stb_image (imagen.c): descomprime deflate sin cabecera */
 char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen);
@@ -465,9 +471,289 @@ static unsigned char *hacer_aab(Entrada *e, int num, const LlaveRsa *ll, size_t 
     return zip;
 }
 
-int apk_crear(const char *juego, const char *salida, const char *nombre, const char *id, int version, int aab,
-              const char *const *extras, int num_extras) {
-    char plantilla[1200], ruta_llave[1200], error[400], paq[1200], texto_version[16];
+/* El icono del juego (--icono o icono.png junto al juego) a t × t, en RGBA; NULL si no hay */
+static unsigned char *icono_rgba(const char *juego, const char *pedido, int t, int *hay_error) {
+    char ruta[1200];
+    *hay_error = 0;
+    if (pedido) snprintf(ruta, sizeof ruta, "%s", pedido);
+    else {
+        snprintf(ruta, sizeof ruta, "%s", juego);
+        char *b = strrchr(ruta, '/');
+#ifdef _WIN32
+        char *c = strrchr(ruta, '\\');
+        if (!b || (c && c > b)) b = c;
+#endif
+        snprintf(b ? b + 1 : ruta, sizeof ruta - (size_t)(b ? b + 1 - ruta : 0), "icono.png");
+        struct stat st;
+        if (stat(ruta, &st) != 0) return NULL;
+    }
+    size_t n = 0;
+    unsigned char *bytes = (unsigned char *)interprete_leer_bytes(ruta, &n);
+    int w, h;
+    const char *por = "no se puede leer";
+    unsigned char *px = bytes ? imagen_decodificar(bytes, n, &w, &h, &por) : NULL;
+    free(bytes);
+    if (!px) { fprintf(stderr, "\n❌ El icono '%s': %s.\n\n", ruta, por ? por : "?"); *hay_error = 1; return NULL; }
+    unsigned char *t_px = malloc((size_t)t * t * 4);
+    if (t_px) escritorio_escalar(px, w, h, t, t_px);
+    free(px);
+    return t_px;
+}
+
+/* ── La ficha de Google Play ──
+   Lo que pide Play Console además del .aab, en una carpeta: el icono de
+   512 × 512, el gráfico destacado de 1024 × 500, capturas (de lo que se ve al
+   jugar el juego solo, sin ventana, como juego.jugar()), el certificado de la
+   llave de subida y una guía de lo demás. Las capturas y el gráfico, en PNG
+   sin transparencia, como los pide Google. */
+static void base64_pem(FILE *f, const unsigned char *d, size_t n) {
+    static const char T[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    int col = 0;
+    for (size_t i = 0; i < n; i += 3) {
+        uint32_t v = (uint32_t)d[i] << 16 | (i + 1 < n ? (uint32_t)d[i + 1] << 8 : 0) | (i + 2 < n ? d[i + 2] : 0);
+        char q[4] = {T[v >> 18 & 63], T[v >> 12 & 63], i + 1 < n ? T[v >> 6 & 63] : '=', i + 2 < n ? T[v & 63] : '='};
+        fwrite(q, 1, 4, f);
+        if ((col += 4) == 64) { fputc('\n', f); col = 0; }
+    }
+    if (col) fputc('\n', f);
+}
+
+static void poner_entorno(const char *k, const char *v) {
+#ifdef _WIN32
+    _putenv_s(k, v ? v : "");
+#else
+    if (v) setenv(k, v, 1); else unsetenv(k);
+#endif
+}
+
+/* Juega el juego solo (sin ventana) y guarda esos fotogramas en 'carpeta' (fotograma_N.png) */
+static int jugar_para_capturas(const char *juego, const char *fotogramas, const char *guion, const char *carpeta) {
+    char yo[1200], ultimo[32], cmd[4000];
+    if (!empaquetado_ruta_ejecutable(yo, sizeof yo)) return 0;
+    long mayor = 0;
+    for (const char *p = fotogramas; *p; ) {
+        long v = strtol(p, (char **)&p, 10);
+        if (v > mayor) mayor = v;
+        while (*p == ',' || *p == ' ') p++;
+        if (*p && (*p < '0' || *p > '9')) return 0;
+    }
+    snprintf(ultimo, sizeof ultimo, "%ld", mayor + 1);
+    static const char *const VARS[] = {"SDL_VIDEODRIVER", "SDL_AUDIODRIVER", "LINCE_JUEGO_FOTOGRAMAS", "LINCE_JUEGO_CAPTURAS",
+                                       "LINCE_JUEGO_CAPTURAS_CARPETA", "LINCE_JUEGO_GUARDADO", "LINCE_JUEGO_SEMILLA",
+                                       "LINCE_JUEGO_GUION"};
+    char partidas[1300];
+    snprintf(partidas, sizeof partidas, "%s/partidas", carpeta);
+    const char *g = guion ? guion : getenv("LINCE_JUEGO_GUION");
+    const char *valores[] = {"dummy", "dummy", ultimo, fotogramas, carpeta, partidas, "1", g};
+    char *antes[8];
+    for (int i = 0; i < 8; i++) {
+        const char *v = getenv(VARS[i]);
+        antes[i] = v ? strdup(v) : NULL;
+        poner_entorno(VARS[i], valores[i]);
+    }
+#ifdef _WIN32
+    snprintf(cmd, sizeof cmd, "\"\"%s\" \"%s\" > NUL 2>&1\"", yo, juego);
+#else
+    snprintf(cmd, sizeof cmd, "'%s' '%s' > /dev/null 2>&1 < /dev/null", yo, juego);
+#endif
+    int r = system(cmd);
+    for (int i = 0; i < 8; i++) { poner_entorno(VARS[i], antes[i]); free(antes[i]); }
+    return r != -1;
+}
+
+/* Una captura para la tienda: agrandada por un número entero hasta que su lado
+   corto llegue a 1080 (sin pasar de 3840) y, si es más de dos veces más ancha
+   que alta (o al revés), con bandas negras hasta 2:1, como pide Google */
+static int captura_tienda(const char *de, const char *a) {
+    size_t n = 0;
+    unsigned char *bytes = (unsigned char *)interprete_leer_bytes(de, &n);
+    int w, h;
+    const char *por = NULL;
+    unsigned char *px = bytes ? imagen_decodificar(bytes, n, &w, &h, &por) : NULL;
+    free(bytes);
+    if (!px) return 0;
+    int corto = w < h ? w : h, largo = w > h ? w : h;
+    int k = (1080 + corto - 1) / corto;
+    while (k > 1 && largo * k > 3840) k--;
+    if (k < 1) k = 1;
+    int W = w * k, H = h * k;
+    if (W > 2 * H) H = (W + 1) / 2;
+    if (H > 2 * W) W = (H + 1) / 2;
+    unsigned char *o = calloc((size_t)W * H, 4);
+    if (!o) { free(px); return 0; }
+    int ox = (W - w * k) / 2, oy = (H - h * k) / 2;
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            unsigned char *d = o + ((size_t)y * W + x) * 4;
+            int sx = (x - ox) / k, sy = (y - oy) / k;
+            if (x < ox || y < oy || sx >= w || sy >= h) { d[3] = 255; continue; }
+            memcpy(d, px + ((size_t)sy * w + sx) * 4, 4);
+            d[3] = 255;
+        }
+    int ok = imagen_guardar_png_rgb(a, o, W, H);
+    free(o);
+    free(px);
+    return ok;
+}
+
+/* El gráfico destacado (1024 × 500): la primera captura, cubriéndolo, con el icono a la izquierda */
+static int grafico_destacado(const char *captura, const unsigned char *icono, int ti, const char *a) {
+    enum { GW = 1024, GH = 500 };
+    unsigned char *o = calloc(GW * GH, 4);
+    if (!o) return 0;
+    size_t n = 0;
+    unsigned char *bytes = captura ? (unsigned char *)interprete_leer_bytes(captura, &n) : NULL;
+    int w = 0, h = 0;
+    const char *por = NULL;
+    unsigned char *px = bytes ? imagen_decodificar(bytes, n, &w, &h, &por) : NULL;
+    free(bytes);
+    double s = px ? (GW / (double)w > GH / (double)h ? GW / (double)w : GH / (double)h) : 1;
+    for (int y = 0; y < GH; y++)
+        for (int x = 0; x < GW; x++) {
+            unsigned char *d = o + ((size_t)y * GW + x) * 4;
+            d[3] = 255;
+            if (!px) { d[0] = 30; d[1] = 30; d[2] = 40; continue; }
+            int sx = (int)((x - GW / 2.0) / s + w / 2.0), sy = (int)((y - GH / 2.0) / s + h / 2.0);
+            if (sx < 0) sx = 0;
+            if (sy < 0) sy = 0;
+            if (sx >= w) sx = w - 1;
+            if (sy >= h) sy = h - 1;
+            memcpy(d, px + ((size_t)sy * w + sx) * 4, 3);
+        }
+    free(px);
+    if (icono) {                                         /* el icono, a la izquierda, a 200 × 200 */
+        int t = 200, x0 = 60, y0 = (GH - t) / 2;
+        unsigned char *ic = malloc((size_t)t * t * 4);
+        if (ic) {
+            escritorio_escalar(icono, ti, ti, t, ic);
+            for (int y = 0; y < t; y++)
+                for (int x = 0; x < t; x++) {
+                    const unsigned char *c = ic + ((size_t)y * t + x) * 4;
+                    unsigned char *d = o + ((size_t)(y + y0) * GW + x + x0) * 4;
+                    for (int q = 0; q < 3; q++) d[q] = (unsigned char)((c[q] * c[3] + d[q] * (255 - c[3])) / 255);
+                }
+            free(ic);
+        }
+    }
+    int ok = imagen_guardar_png_rgb(a, o, GW, GH);
+    free(o);
+    return ok;
+}
+
+static void hacer_ficha(const char *juego, const char *salida, const ApkOpciones *op, const unsigned char *icono192,
+                        const LlaveRsa *ll) {
+    char carpeta[1300], ruta[1500];
+    snprintf(carpeta, sizeof carpeta, "%s", salida);
+    char *punto = strrchr(carpeta, '.');
+    if (punto && !strchr(punto, '/') && !strchr(punto, '\\')) *punto = '\0';
+    strncat(carpeta, "-google-play", sizeof carpeta - strlen(carpeta) - 1);
+    mkdir(carpeta, 0755);
+    printf("\n   La ficha de Google Play, en %s/:\n", carpeta);
+    /* el icono de 512 */
+    unsigned char *i512 = malloc(512 * 512 * 4);
+    if (i512) {
+        if (icono192) escritorio_escalar(icono192, 192, 192, 512, i512);
+        else {
+            int w, h;
+            const char *por = NULL;
+            size_t nl = 0;
+            const unsigned char *logo = escritorio_icono(&nl);        /* el de Lince */
+            unsigned char *l = imagen_decodificar(logo, nl, &w, &h, &por);
+            if (l) { escritorio_escalar(l, w, h, 512, i512); free(l); }
+        }
+        snprintf(ruta, sizeof ruta, "%s/icono-512.png", carpeta);
+        if (imagen_guardar_png(ruta, i512, 512, 512)) printf("   + icono-512.png\n");
+    }
+    /* las capturas, jugando el juego solo */
+    char fotos[1400];
+    snprintf(fotos, sizeof fotos, "%s/.fotogramas", carpeta);
+    mkdir(fotos, 0755);
+    const char *cuales = op->capturas ? op->capturas : "60,180,300";
+    int hechas = 0;
+    char primera[1600] = "";
+    if (jugar_para_capturas(juego, cuales, op->guion, fotos)) {
+        int i = 1;
+        for (const char *p = cuales; *p; i++) {
+            long f = strtol(p, (char **)&p, 10);
+            while (*p == ',' || *p == ' ') p++;
+            char de[1600], a[1600];
+            snprintf(de, sizeof de, "%s/fotograma_%ld.png", fotos, f);
+            snprintf(a, sizeof a, "%s/captura-%d.png", carpeta, i);
+            if (captura_tienda(de, a)) {
+                printf("   + captura-%d.png (del fotograma %ld)\n", i, f);
+                if (!hechas) snprintf(primera, sizeof primera, "%s", de);
+                hechas++;
+            }
+        }
+    }
+    if (hechas < 2)
+        printf("⚠  Google pide al menos 2 capturas y aquí hay %d: ¿se abre la ventana del juego? Elige otros\n"
+               "   fotogramas con --capturas 60,300,600 (y con --guion \"30:espacio\", que juegue).\n", hechas);
+    snprintf(ruta, sizeof ruta, "%s/grafico-destacado.png", carpeta);
+    if (grafico_destacado(primera[0] ? primera : NULL, i512, 512, ruta)) printf("   + grafico-destacado.png\n");
+    free(i512);
+    /* los fotogramas, fuera */
+    for (const char *p = cuales; *p; ) {
+        long f = strtol(p, (char **)&p, 10);
+        while (*p == ',' || *p == ' ') p++;
+        snprintf(ruta, sizeof ruta, "%s/fotograma_%ld.png", fotos, f);
+        remove(ruta);
+    }
+    snprintf(ruta, sizeof ruta, "%s/partidas", fotos);
+    rmdir(ruta);
+    rmdir(fotos);
+    /* el certificado de la llave de subida */
+    size_t nc = 0;
+    const unsigned char *cert = llave_certificado(ll, &nc);
+    snprintf(ruta, sizeof ruta, "%s/certificado-de-subida.pem", carpeta);
+    FILE *f = fopen(ruta, "wb");
+    if (f && cert) {
+        fprintf(f, "-----BEGIN CERTIFICATE-----\n");
+        base64_pem(f, cert, nc);
+        fprintf(f, "-----END CERTIFICATE-----\n");
+        printf("   + certificado-de-subida.pem\n");
+    }
+    if (f) fclose(f);
+    /* la guía */
+    snprintf(ruta, sizeof ruta, "%s/LEEME.txt", carpeta);
+    f = fopen(ruta, "wb");
+    if (f) {
+        int largo = 0;
+        for (const char *c = op->nombre; *c; c++) largo += ((unsigned char)*c & 0xC0) != 0x80;
+        fprintf(f, "Lo que pide Google Play para publicar «%s» (Play Console, https://play.google.com/console)\n\n", op->nombre);
+        fprintf(f, "1. Crea la app en Play Console con el nombre «%s»%s.\n", op->nombre,
+                largo > 30 ? " (OJO: tiene más de 30 letras, el máximo de Google Play)" : "");
+        fprintf(f, "   Deja que Google firme la app (la firma de apps de Google Play): tu llave\n"
+                   "   (~/.lince/android-llave.txt) es la llave de subida. Si alguna vez la pierdes,\n"
+                   "   Google te deja cambiarla; certificado-de-subida.pem es su certificado.\n\n");
+        fprintf(f, "2. Sube el .aab (%s) en Pruebas → Prueba cerrada. Google pide que unas\n"
+                   "   personas lo prueben un tiempo antes de publicarlo. Cada .aab que subas,\n"
+                   "   con --version más alto (este es el %d, «%s»).\n\n", salida, op->version,
+                op->version_nombre ? op->version_nombre : "");
+        fprintf(f, "3. La ficha de la tienda:\n"
+                   "   - Icono: icono-512.png\n"
+                   "   - Gráfico destacado: grafico-destacado.png (mejor si pones uno tuyo de 1024 × 500)\n"
+                   "   - Capturas de teléfono: captura-*.png (de 2 a 8)\n"
+                   "   - Descripción breve (hasta 80 letras) y descripción completa (hasta 4000)\n"
+                   "   - Categoría: Juegos, y el tipo de juego\n\n");
+        fprintf(f, "4. Lo que pregunta Google sobre la app:\n"
+                   "   - Seguridad de los datos: un juego de Lince no recoge ni comparte datos\n"
+                   "     (las partidas se guardan en el propio móvil), salvo que tú añadas algo.\n"
+                   "   - Anuncios: no tiene.\n"
+                   "   - Clasificación del contenido: el cuestionario, según tu juego.\n"
+                   "   - Público objetivo: si es para menores de 13, Google pide más (política de\n"
+                   "     privacidad, contenido para familias).\n"
+                   "   - Política de privacidad: una página web tuya que diga que no recoge datos.\n"
+                   "   - Permisos: solo VIBRATE (la vibración del mando y del móvil).\n");
+        fclose(f);
+        printf("   + LEEME.txt (lo que pide Google Play, paso a paso)\n");
+    }
+}
+
+int apk_crear(const char *juego, const char *salida, const ApkOpciones *op, const char *const *extras, int num_extras) {
+    const char *nombre = op->nombre, *id = op->id;
+    int version = op->version, aab = op->aab;
+    char plantilla[1200], ruta_llave[1200], error[400], paq[1200], texto_version[200];
     if (!buscar_plantilla(plantilla, sizeof plantilla)) {
         fprintf(stderr, "\n❌ No encuentro la plantilla de Android (lince-android.apk).\n"
                         "   Ponla junto al ejecutable de Lince o en %s/.lince/, o di dónde está con\n"
@@ -496,7 +782,11 @@ int apk_crear(const char *juego, const char *salida, const char *nombre, const c
        (los del .apk y, si se hace el .aab, los suyos), y el juego */
     Entrada *nuevas = calloc((size_t)num + 1, sizeof(Entrada));
     int k = 0, hay_manifiesto = 0, malo = 0;
-    snprintf(texto_version, sizeof texto_version, "%d", version);
+    if (op->version_nombre) snprintf(texto_version, sizeof texto_version, "%s", op->version_nombre);
+    else snprintf(texto_version, sizeof texto_version, "%d", version);
+    int icono_mal = 0;
+    unsigned char *icono192 = icono_rgba(juego, op->icono, 192, &icono_mal);
+    if (icono_mal) { free(e); free(pl); free(datos_paq); free(nuevas); return 1; }
     char texto_plantilla[16];
     snprintf(texto_plantilla, sizeof texto_plantilla, "%d", PLANTILLA_VERSION);
     const char *de[3] = {PLANTILLA_PAQUETE, PLANTILLA_NOMBRE, texto_plantilla}, *a[3] = {id, nombre, texto_version};
@@ -521,6 +811,10 @@ int apk_crear(const char *juego, const char *salida, const char *nombre, const c
             size_t n;
             unsigned char *r = descomprimir(&e[i], &n);
             if (r) { arsc_cambiar_paquete(r, n, id); guardar_sin_comprimir(&nuevas[k], r, n); }
+        } else if (strcmp(x, "res/drawable/icono.png") == 0 && icono192) {      /* el icono del juego */
+            size_t n;
+            unsigned char *png = imagen_png(icono192, 192, 192, &n);
+            if (png) guardar_sin_comprimir(&nuevas[k], png, n);
         } else if (strcmp(x, "aab/base/manifest/AndroidManifest.xml") == 0 || strcmp(x, "aab/base/resources.pb") == 0) {
             size_t n;
             unsigned char *pb = descomprimir(&e[i], &n);
@@ -537,7 +831,7 @@ int apk_crear(const char *juego, const char *salida, const char *nombre, const c
                               "   Lince anterior a la 0.8: descarga la nueva).\n\n"
                             : "\n❌ No se pudo cambiar el manifiesto de la plantilla '%s'.\n\n", plantilla);
         liberar_entradas(nuevas, k);
-        free(e); free(pl); free(datos_paq);
+        free(e); free(pl); free(datos_paq); free(icono192);
         return 1;
     }
     snprintf(nuevas[k].nombre, sizeof nuevas[k].nombre, "assets/juego.paq");
@@ -549,7 +843,7 @@ int apk_crear(const char *juego, const char *salida, const char *nombre, const c
     mkdir(ruta_llave, 0700);
     snprintf(ruta_llave, sizeof ruta_llave, "%s/.lince/android-llave.txt", carpeta_usuario());
     LlaveRsa *ll = llave_cargar_o_crear(ruta_llave, error, sizeof error);
-    if (!ll) { fprintf(stderr, "\n❌ %s\n\n", error); liberar_entradas(nuevas, k); free(e); free(pl); return 1; }
+    if (!ll) { fprintf(stderr, "\n❌ %s\n\n", error); liberar_entradas(nuevas, k); free(e); free(pl); free(icono192); return 1; }
 
     size_t n_fin = 0;
     unsigned char *fin;
@@ -560,18 +854,24 @@ int apk_crear(const char *juego, const char *salida, const char *nombre, const c
         fin = apk_firmar_v2(zip, n_zip, ll, &n_fin);
         free(zip);
     }
-    llave_liberar(ll);
     liberar_entradas(nuevas, k);
     free(e); free(pl);
-    if (!fin) { fprintf(stderr, "\n❌ No se pudo firmar el .apk.\n\n"); return 1; }
-    if (!escribir_archivo(salida, fin, n_fin)) {
-        free(fin);
-        fprintf(stderr, "\n❌ No se pudo escribir '%s'.\n\n", salida);
+    if (!fin || !escribir_archivo(salida, fin, n_fin)) {
+        if (fin) fprintf(stderr, "\n❌ No se pudo escribir '%s'.\n\n", salida);
+        else fprintf(stderr, "\n❌ No se pudo firmar el .apk.\n\n");
+        free(fin); free(icono192); llave_liberar(ll);
         return 1;
     }
     free(fin);
-    printf("✅ %s (%.1f MB) — %s, %s, versión %d\n", salida, n_fin / 1048576.0, nombre, id, version);
+    printf("✅ %s (%.1f MB) — %s, %s, versión %d (%s)\n", salida, n_fin / 1048576.0, nombre, id, version, texto_version);
     printf("   Firmado con tu llave: %s (guárdala para poder actualizar el juego)\n", ruta_llave);
-    if (aab) printf("   Para Google Play: súbelo en Play Console. Cada vez que subas uno, con --version más alto.\n");
+    if (aab) {
+        if (!strncmp(id, "org.lince.", 10))
+            printf("⚠  El --id es %s: en Google Play no se puede cambiar después; mejor uno tuyo (org.tunombre.juego).\n", id);
+        hacer_ficha(juego, salida, op, icono192, ll);
+        printf("   Para Google Play: sigue el LEEME.txt de la ficha. Cada .aab que subas, con --version más alto.\n");
+    }
+    llave_liberar(ll);
+    free(icono192);
     return 0;
 }
