@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.9
+# 🐆 Lince — Especificación del Lenguaje v2.10
 
 ## Filosofía
 
@@ -1720,9 +1720,9 @@ juego.mapa.dibujar_tiled(NIVEL, "Delante")                     # lo de delante
 
 | Función | Qué hace |
 |---|---|
-| `mapa.tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa.crear()`, así que `mapa.mover`, `mapa.casilla`, `mapa.solido`, `mapa.buscar` y `mapa.camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`; los que tienen imagen, también `tile` y `base`, el punto por donde pisan), `"propiedades"` (las del mapa), `"isometrico"`, `"tile"` (el tamaño de una casilla al dibujarla) y `"dibujo"` (lo que ocupa dibujado). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa.crear()`) |
+| `mapa.tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa.crear()`, así que `mapa.mover`, `mapa.casilla`, `mapa.solido`, `mapa.buscar` y `mapa.camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`; los que tienen imagen, también `tile` y `base`, el punto por donde pisan), `"tiles"` (por su número, el gid, cada tile de los tilesets con su `ancho`, su `alto` y sus `propiedades`; `nulo` en los números que no son de ningún tile), `"propiedades"` (las del mapa), `"isometrico"`, `"tile"` (el tamaño de una casilla al dibujarla) y `"dibujo"` (lo que ocupa dibujado). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa.crear()`). Se puede leer sin la ventana abierta (en una prueba): las imágenes se preparan al abrirla |
 | `mapa.dibujar_tiled(mapa[, capas[, opciones]])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan. Opciones: `capa` (todo en esa capa) y `ordenar` (cada tile en la capa `ordenar` más su profundidad, para pasar por delante y por detrás: ver abajo) |
-| `mapa.dibujar_objeto(mapa, objeto[, opciones])` · `mapa.dibujar_tile(mapa, tile, x, y[, opciones])` | un objeto de Tiled con imagen en su sitio · un tile del mapa con su base en el punto (x, y). Opciones: `capa` y `ordenar` |
+| `mapa.dibujar_objeto(mapa, objeto[, opciones])` · `mapa.dibujar_tile(mapa, tile, x, y[, opciones])` | un objeto de Tiled con imagen en su sitio · un tile del mapa con su base en el punto (x, y). Opciones: `capa`, `ordenar` y `alfa` (de 0, invisible, a 255: la casa que tapa al personaje, semitransparente) |
 | `mapa.a_dibujo(mapa, x, y)` · `mapa.a_mapa(mapa, x, y)` | dónde se dibuja un punto del mapa · el punto del mapa que se dibuja ahí (con el ratón: `mapa.a_mapa(mapa, juego.a_mundo(juego.raton()))`). En un mapa que no es isométrico no cambian nada. También aceptan `[x, y]` o una cosa (su centro) |
 | `mapa.profundidad(mapa, x, y)` | de 0 (al fondo) a casi 1 (delante): lo que se suma a la capa para que lo de delante tape lo de detrás |
 
@@ -1759,6 +1759,10 @@ juego.capa(1 + juego.mapa.profundidad(PUEBLO, yo))                 # y el person
 juego.dibujar(lince, p[0] - 8, p[1] - 16)
 juego.capa(0)
 ```
+
+Una pieza grande (una casa de 3 × 3 casillas) se ordena por el centro de su **huella**, no por
+su esquina de delante: se dice con las propiedades `huella_columnas` y `huella_filas` del tile en
+el tileset de Tiled. Así un personaje junto a su fachada queda delante, y uno detrás de ella, detrás.
 
 `"ordenar"` y `mapa.profundidad` también sirven en un mapa ortogonal visto desde arriba (lo de
 más abajo tapa lo de más arriba). Los niveles de altura (bancales, una pasarela) todavía no tienen

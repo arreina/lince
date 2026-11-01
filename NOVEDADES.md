@@ -3,6 +3,25 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.10.0
+
+Lo que pidió Bichito al usar la 2.8 para dejar de mantener su propio código, y un fallo que encontró. Solo añade: nada de la 2.0 cambia.
+
+- **Arreglado: importar `juego` desde un módulo importado con `como`** (`importar "./m" como m`, donde `m` importa `juego`) duplicaba el estado del juego: `juego.escena_nueva()` decía siempre que sí y los diálogos del programa no se dibujaban. Ahora la parte en Lince de un módulo corre una sola vez en cada programa, se importe desde donde se importe.
+- **`"alfa"` en `mapa.dibujar_tile` y `mapa.dibujar_objeto`**: lo que tapa al personaje, semitransparente (`{"alfa": 110}`), sin volver a cargar la imagen.
+- **Las piezas grandes se ordenan por el centro de su huella**: una casa de 3 × 3 casillas, con las propiedades `huella_columnas` y `huella_filas` en su tile de Tiled, ya no tapa a quien está delante de su fachada.
+- **`mapa["tiles"]`**: cada tile de los tilesets, por su número, con su `ancho`, su `alto` y sus `propiedades`.
+- **`mapa.tiled` sin la ventana abierta**, para cargar un mapa en una prueba.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.10.0-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.10.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.10.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.10.0.vsix` |
+
 ## 2.9.0
 
 Google Play de verdad: `lince repartir --aab` deja el juego listo para subirlo a la tienda. Solo añade: nada de la 2.0 cambia.

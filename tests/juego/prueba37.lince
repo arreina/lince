@@ -1,0 +1,33 @@
+# 2.10: lo que pidió Bichito tras usar la 2.8. mapa.tiled sin ventana,
+# mapa["tiles"], las piezas ordenadas por el centro de su huella y "alfa" en
+# dibujar_tile y dibujar_objeto. smoke.sh mira la salida y los píxeles.
+importar "juego"
+importar "sistema"
+
+fijo DIR = sistema.entorno("DIR_PRUEBA", ".")
+sea m = juego.mapa.tiled(DIR + "/iso/huella.tmx")                 # sin ventana
+escribir("sin ventana: {m["columnas"]}x{m["filas"]} {m["tiles"].longitud()}")
+escribir("tile 1: {m["tiles"][1]["ancho"]}x{m["tiles"][1]["alto"]} {m["tiles"][1]["propiedades"]}")
+escribir("tile 3: {m["tiles"][3]["ancho"]}x{m["tiles"][3]["alto"]} {m["tiles"][3]["propiedades"]}")
+escribir("tile 0: {m["tiles"][0]}")
+juego.abrir("2.10", 200, 120)
+sea f = 0
+mientras juego.abierto() y f < 2 {
+    juego.limpiar([0, 0, 0])
+    si f == 0 {                    # la huella de 3 × 3: el de (34, 34) ya va delante del árbol
+        juego.mapa.dibujar_tiled(m, "suelo")
+        juego.mapa.dibujar_tiled(m, "arboles", {"ordenar": 1})
+        sea d = juego.mapa.a_dibujo(m, 34, 34)
+        juego.capa(1 + juego.mapa.profundidad(m, 34, 34))
+        juego.rectangulo(d[0] - 3, d[1] - 20, 6, 20, [255, 0, 255])
+        juego.capa(0)
+        juego.presentar()
+        juego.captura("huella.bmp")
+    } sino {                       # el objeto, semitransparente
+        juego.mapa.dibujar_objeto(m, m["objetos"][0], {"alfa": 128})
+        juego.captura("alfa.bmp")
+    }
+    juego.presentar()
+    f = f + 1
+}
+intentar { juego.mapa.dibujar_tile(m, 3, 0, 0, {"alfa": 300}) } capturar (error e) { escribir("error: {e.mensaje}") }

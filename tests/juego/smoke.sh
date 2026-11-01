@@ -927,4 +927,35 @@ for bien, nombre in casos:
     mal += not bien
 sys.exit(1 if mal else 0)
 PY
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida5b.txt; exit 1; }
+# ── 2.10: lo que pidió Bichito (mapa.tiled sin ventana, mapa["tiles"], la huella, "alfa" e importar juego con «como») ──
+DIR_PRUEBA="$DIR" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=10 timeout 60 "$LINCE" "$DIR/prueba37.lince" > salida43.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de la 2.10 termina bien" || mal "la prueba de la 2.10 falló"
+for l in "sin ventana: 6x6 4" "tile 1: 32x16 {}" 'tile 3: 32x48 {"huella_columnas": 3, "huella_filas": 3, "sombra": larga}' "tile 0: nulo" \
+         'error: mapa.dibujar_tile(): "alfa" va de 0 (invisible) a 255 (opaco)'; do
+    grep -qxF "$l" salida43.txt && ok "2.10: $l" || mal "falta la línea: $l"
+done
+python3 - <<'PY' || fallos=$((fallos+1))
+import struct, sys
+def lee(n):
+    d = open(n, "rb").read()
+    off = struct.unpack_from("<I", d, 10)[0]; w, h = struct.unpack_from("<ii", d, 18); B = struct.unpack_from("<H", d, 28)[0] // 8
+    fila = (w * B + 3) & ~3
+    def px(x, y):
+        f = (abs(h) - 1 - y) if h > 0 else y
+        i = off + f * fila + x * B
+        return (d[i + 2], d[i + 1], d[i])
+    return px
+a, b = lee("huella.bmp"), lee("alfa.bmp")
+casos = [(a(96, 20) == (255, 0, 255), "huella: el de delante de su centro va delante del árbol de 3 × 3"),
+         (abs(b(143, 40)[0] - 100) <= 2 and b(143, 40)[1] < 20, "alfa: el objeto, a medias")]
+mal = 0
+for bien, nombre in casos:
+    print("  ✅ 2.10, píxel:" if bien else "  ❌ 2.10, píxel:", nombre)
+    mal += not bien
+sys.exit(1 if mal else 0)
+PY
+(cd "$DIR/como" && SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=8 timeout 20 "$LINCE" principal.lince) > salida44.txt 2>&1
+[ "$(grep -c '^nueva a$' salida44.txt)" = 1 ] && [ "$(grep -c '^nueva b$' salida44.txt)" = 1 ] && grep -qxF "hola de m: 1" salida44.txt \
+    && ok "2.10: importar juego desde un módulo con «como» no duplica el estado (la escena cambia una vez)" \
+    || { mal "importar juego con «como» duplica el estado"; cat salida44.txt; }
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida43.txt salida44.txt salida5b.txt; exit 1; }

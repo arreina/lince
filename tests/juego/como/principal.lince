@@ -1,0 +1,19 @@
+# 2.10: importar juego desde un módulo importado con «como» (lo encontró
+# Bichito): la escena tiene que cambiar igual que sin él
+importar "juego"
+importar "./m" como m
+juego.abrir("x", 100, 100)
+sea n = 0
+juego.cambiar_escena("a")
+mientras juego.abierto() {
+    elegir juego.escena() {
+        caso "a" {
+            si juego.escena_nueva() { escribir("nueva a") }
+            n++
+            si n == 3 { juego.cambiar_escena("b") }
+        }
+        caso "b" { si juego.escena_nueva() { escribir("nueva b") } }
+    }
+    juego.presentar()
+}
+escribir("hola de m: {m.hola()}")

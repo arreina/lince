@@ -96,6 +96,12 @@ static void (*_hook_sentencia)(Nodo *s, Entorno *e) = NULL;
 /* > 0 mientras corre código de una biblioteca estándar escrita en Lince: el
    depurador no se para dentro (sus líneas no son del programa) */
 static int _en_biblioteca = 0;
+/* Sube con cada intérprete (cada vez que se lanza el programa, también al
+   recargar): una biblioteca corre una sola vez en cada uno, aunque se
+   importe desde varios ficheros (un 'importar "./m" como m' que importa
+   juego otra vez). Si corriera dos veces habría dos estados del juego (la
+   escena, los diálogos) y C solo vería uno. */
+static int _generacion = 0;
 /* Cuántos 'intentar' hay abiertos: con 0, un error no lo captura nadie y el
    depurador se puede parar antes de que acabe el programa */
 static int _intentando = 0;
@@ -5834,6 +5840,7 @@ static void registrar_error_predefinido(Entorno *e, const char *nombre) {
 Interprete *interprete_crear(void) {
     Interprete *interp = malloc(sizeof(Interprete));
     interp->global = entorno_crear(NULL);
+    _generacion++;
 
     /* Registrar tipos de error predefinidos */
     registrar_error_predefinido(interp->global, "Error");
@@ -5951,8 +5958,9 @@ static void soltar_args(Valor **args, int desde, int nargs) {
    define lo usan mientras viva el programa. También su ámbito de la última
    vez, para sus variables al recargar en caliente y para llamar a sus
    funciones desde C (interprete_llamar_biblioteca). */
-static struct { const char *codigo; Nodo *ast; Entorno *ambito; } _bibliotecas[8];
+static struct { const char *codigo; Nodo *ast; Entorno *ambito; int generacion; } _bibliotecas[8];
 static int _nbibliotecas = 0;
+
 
 void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const char *codigo) {
     int k = -1;
@@ -5976,6 +5984,20 @@ void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const ch
     if (hay_error) return;
     Valor *mod = entorno_obtener(entorno, nombre_modulo, 0);
     if (hay_error || mod->tipo != VAL_DICCIONARIO) { valor_destruir(mod); return; }
+    if (k >= 0 && _bibliotecas[k].ambito && _bibliotecas[k].generacion == _generacion) {
+        /* ya corrió en este programa: las mismas funciones, con el mismo estado */
+        Entorno *ya = _bibliotecas[k].ambito;
+        for (int i = 0; i < ya->cantidad; i++) {
+            Valor *v = ya->vars[i].valor;
+            const char *nombre = ya->vars[i].nombre;
+            if (v->tipo != VAL_FUNCION || !v->funcion || nombre[0] == '_') continue;
+            int j = valor_diccionario_buscar(mod, nombre);
+            if (j >= 0) { valor_destruir(mod->diccionario.valores[j]); mod->diccionario.valores[j] = valor_retener(v); }
+            else valor_diccionario_agregar(mod, nombre, valor_retener(v));
+        }
+        valor_destruir(mod);
+        return;
+    }
 
     /* Su ámbito cuelga del de más fuera (donde están escribir, a_texto...) */
     Entorno *raiz = entorno;
@@ -6006,6 +6028,7 @@ void interprete_biblioteca(Entorno *entorno, const char *nombre_modulo, const ch
     if (k >= 0) {
         entorno_destruir(antes);
         _bibliotecas[k].ambito = bib;       /* se queda con su referencia */
+        _bibliotecas[k].generacion = _generacion;
     } else {
         entorno_destruir(bib);              /* sigue vivo: lo retienen sus funciones */
     }

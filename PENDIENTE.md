@@ -189,7 +189,15 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 - [ ] Probarlo subiendo uno de prueba: hace falta la cuenta de desarrollador de Google Play del
   autor. Si Google pide algo más al subirlo, se arregla en una 2.9.x.
 
-### 2.10 — Preparar la 3.0 (solo si hay limpieza)
+### 2.10 — Lo que pidió Bichito al usar la 2.8 (publicada)
+- [x] `"alfa"` en `mapa.dibujar_tile` y `mapa.dibujar_objeto` (lo que tapa al personaje, semitransparente).
+- [x] Las piezas grandes ordenadas por el centro de su huella (`huella_columnas` y `huella_filas` del tile).
+- [x] `mapa["tiles"]`: cada tile de los tilesets con su tamaño y sus propiedades.
+- [x] `mapa.tiled` sin la ventana abierta (en las pruebas).
+- [x] Arreglado: un módulo importado con `como` que importa `juego` duplicaba su estado (la escena
+  no cambiaba, los diálogos no se veían). Ahora una biblioteca corre una sola vez por programa.
+
+### 2.11 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.
 
 ### 3.0 — Otra limpieza, solo si hace falta

@@ -1,0 +1,2 @@
+importar "juego"
+funcion hola(): numero { devolver 1 }
