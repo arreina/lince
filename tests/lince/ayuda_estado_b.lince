@@ -1,0 +1,3 @@
+# Ayuda de test_importar_como: otro módulo que importa el mismo ayuda_estado
+importar "./ayuda_estado" como a
+funcion leer_desde_b(): cualquiera { devolver a.leer() }

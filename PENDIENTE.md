@@ -197,6 +197,10 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 - [x] Arreglado: un módulo importado con `como` que importa `juego` duplicaba su estado (la escena
   no cambiaba, los diálogos no se veían). Ahora una biblioteca corre una sola vez por programa.
 
+- [x] 2.10.1: los módulos importados con `como` son uno solo por programa, sus variables se leen
+  con su valor de ahora y sus funciones aceptan los parámetros por defecto (lo encontró Bichito);
+  y `sistema.salir()`, que se perdió en la 2.6.0.
+
 ### 2.11 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.
 

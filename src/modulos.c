@@ -1927,8 +1927,8 @@ static void cargar_sistema(Entorno *entorno) {
         {"existe",             fn_sis_existe,              1},
         {"salir",              fn_sis_salir,               1},
     };
-    registrar_modulo_diccionario(entorno, "sistema",
-        fns, 8, NULL, NULL, 0);
+    registrar_modulo_diccionario(entorno, "sistema",          /* contadas, no a mano: al añadir */
+        fns, (int)(sizeof fns / sizeof fns[0]), NULL, NULL, 0);  /* una, no se pierde la última */
 }
 
 static void cargar_json(Entorno *entorno) {

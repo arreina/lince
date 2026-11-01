@@ -2228,6 +2228,12 @@ Las funciones de la librería se ven entre ellas y leen sus propias
 constantes, porque comparten ese ámbito. El alias ocupa un nombre como
 cualquier otra definición, así que repetirlo da error.
 
+Un archivo importado con `como` es **un solo módulo en todo el programa**: corre
+una vez, y si otro archivo lo importa también (con ese u otro alias), ve el
+mismo, con su mismo estado. Sus variables se leen con su valor de ahora
+(`partida.puntos` después de `partida.sumar(10)`) y sus funciones se llaman
+como cualquier otra, también sin los parámetros que tienen valor por defecto.
+
 `como` no es palabra reservada: se reconoce sólo después de un `importar`, y
 sigue valiendo como nombre de variable o de parámetro.
 

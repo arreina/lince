@@ -1202,6 +1202,52 @@ static const char *intern(const char *s) {
  * No se destruye 'mod_e': las funciones que ha definido lo retienen como su
  * closure, y es lo que les permite verse entre ellas y leer las constantes de
  * la propia librería. Vive lo que viva el programa, como cualquier módulo. */
+/* Los ficheros importados con 'como' en este programa: cada uno corre una
+   sola vez (si b.lince importa a.lince, ve el mismo 'a' que el programa) y
+   el diccionario del alias lee sus variables de su ámbito, con su valor de
+   ahora (a.valor después de a.poner(5)). */
+#define MAX_MODULOS_COMO 128
+static struct { char *ruta; Valor *dic; Entorno *ambito; int generacion; } _modulos_como[MAX_MODULOS_COMO];
+static int _nmodulos_como = 0;
+
+static void modulos_como_olvidar_viejos(void) {
+    int k = 0;
+    for (int i = 0; i < _nmodulos_como; i++) {
+        if (_modulos_como[i].generacion == _generacion) { _modulos_como[k++] = _modulos_como[i]; continue; }
+        free(_modulos_como[i].ruta);
+        valor_destruir(_modulos_como[i].dic);
+        entorno_destruir(_modulos_como[i].ambito);
+    }
+    _nmodulos_como = k;
+}
+
+/* La ruta completa (así "a.lince" y "./a.lince" son el mismo fichero) */
+static void ruta_completa(const char *ruta, char *salida, size_t max) {
+#ifdef _WIN32
+    if (!_fullpath(salida, ruta, max)) snprintf(salida, max, "%s", ruta);
+#else
+    char r[4096];
+    if (realpath(ruta, r)) snprintf(salida, max, "%s", r);
+    else snprintf(salida, max, "%s", ruta);
+#endif
+}
+
+static Valor *modulo_como_de(const char *ruta_dada) {
+    char ruta[4096];
+    ruta_completa(ruta_dada, ruta, sizeof ruta);
+    modulos_como_olvidar_viejos();
+    for (int i = 0; i < _nmodulos_como; i++)
+        if (!strcmp(_modulos_como[i].ruta, ruta)) return _modulos_como[i].dic;
+    return NULL;
+}
+
+/* El ámbito de un módulo importado con 'como', o NULL */
+static Entorno *modulo_como_ambito(Valor *dic) {
+    for (int i = 0; i < _nmodulos_como; i++)
+        if (_modulos_como[i].dic == dic && _modulos_como[i].generacion == _generacion) return _modulos_como[i].ambito;
+    return NULL;
+}
+
 static Valor *empaquetar_modulo(Entorno *mod_e) {
     Valor *dic = valor_diccionario_crear();
     dic->es_modulo = 1;
@@ -2780,7 +2826,12 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
             snprintf(anterior, sizeof(anterior), "%s", _archivo_actual);
             interprete_fijar_archivo(ruta);
 
-            if (alias) {
+            Valor *ya = alias ? modulo_como_de(ruta) : NULL;
+            if (ya) {
+                /* ya importado con 'como' en este programa: el mismo módulo */
+                if (!redefinido(e, alias, "este 'importar ... como'", 0, n->linea))
+                    entorno_definir(e, alias, valor_retener(ya), 0);
+            } else if (alias) {
                 /* Con alias, el fichero corre en su propio ámbito y lo que
                    defina se expone bajo ese nombre, sin volcarse aquí. El
                    padre es el ámbito actual para que la librería alcance
@@ -2789,12 +2840,22 @@ static Valor *ejecutar_importar(Nodo *n, Entorno *e) {
                 valor_destruir(ejecutar(ast, mod_e));
                 if (!hay_error) {
                     Valor *dic = empaquetar_modulo(mod_e);
+                    if (_nmodulos_como < MAX_MODULOS_COMO) {
+                        char completa[4096];
+                        ruta_completa(ruta, completa, sizeof completa);
+                        _modulos_como[_nmodulos_como].ruta = strdup(completa);
+                        _modulos_como[_nmodulos_como].dic = valor_retener(dic);
+                        _modulos_como[_nmodulos_como].ambito = mod_e;
+                        mod_e->refs++;
+                        _modulos_como[_nmodulos_como++].generacion = _generacion;
+                    }
                     if (redefinido(e, alias, "este 'importar ... como'", 0,
                                    n->linea))
                         valor_destruir(dic);
                     else
                         entorno_definir(e, alias, dic, 0);
                 }
+                entorno_destruir(mod_e);
             } else {
                 valor_destruir(ejecutar(ast, e));   /* ver la nota de NODO_LLAMADA */
             }
@@ -4681,6 +4742,16 @@ static Valor *acceso_en(Nodo *n, Valor *obj, const char *campo, Entorno *e) {
     }
     /* Acceso a constante de módulo */
     if (obj->tipo == VAL_DICCIONARIO && obj->es_modulo) {
+        Entorno *amb = obj->es_modulo == 1 ? modulo_como_ambito(obj) : NULL;
+        if (amb) {                                     /* importado con 'como': su valor de ahora */
+            const char *id = intern_buscar(campo);
+            for (int i = 0; id && i < amb->cantidad; i++)
+                if (amb->vars[i].nombre == id) {
+                    Valor *r = valor_copiar(amb->vars[i].valor);
+                    valor_destruir(obj);
+                    return r;
+                }
+        }
         {
             int i = valor_diccionario_buscar(obj, campo);
             if (i >= 0) {
@@ -6073,13 +6144,15 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {
        dentro del bucle de render y sin decir de dónde viene. Al revés sí se
        admite — un callback que no necesita el delta puede declararse
        'funcion(): nulo' — que es la comodidad que justifica esta ruta. */
-    if (f->num_parametros > nargs) {
+    int requeridos = 0;                  /* los que tienen valor por defecto pueden faltar */
+    for (int i = 0; i < f->num_parametros; i++) if (!f->parametros[i].valor_defecto) requeridos++;
+    if (requeridos > nargs) {
         char msg[256];
         snprintf(msg, sizeof(msg),
             "'%s' declara %d parámetro(s), pero se le llama desde un módulo "
             "con %d. Declara como mucho esos %d.",
             f->nombre ? f->nombre : "la función",
-            f->num_parametros, nargs, nargs);
+            requeridos, nargs, nargs);
         valor_error = valor_error_nuevo("ErrorTipo", msg, 0);
         hay_error   = 1;
         soltar_args(args, 0, nargs);
@@ -6105,11 +6178,12 @@ Valor *interprete_llamar_funcion(Valor *fn, Valor **args, int nargs) {
         /* Mismo trato que en las demás rutas de llamada: si el parámetro
            declara un tipo, se comprueba. Sin esto el tipo declarado era
            mentira — un 'val texto delta' recibía el número del frame. */
-        validar_tipo(args[i], f->parametros[i].tipo, "parámetro",
+        Valor *arg = i < nargs ? args[i] : ejecutar(f->parametros[i].valor_defecto, fn_e);
+        validar_tipo(arg, f->parametros[i].tipo, "parámetro",
                      f->parametros[i].nombre, 0);
-        entorno_definir(fn_e, f->parametros[i].nombre, args[i], 0);
+        entorno_definir(fn_e, f->parametros[i].nombre, arg, 0);
     }
-    soltar_args(args, f->num_parametros, nargs);
+    if (nargs > f->num_parametros) soltar_args(args, f->num_parametros, nargs);
 
     Valor *r = valor_nulo();
     if (!hay_error) {

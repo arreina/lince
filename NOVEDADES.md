@@ -3,6 +3,24 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.10.1
+
+Arreglos de los módulos que encontró Bichito, y uno que encontramos de paso.
+
+- **Un archivo importado con `como` es un solo módulo en todo el programa**: si otro archivo lo importa también, ve el mismo, con su mismo estado (antes cada `importar ... como` hacía una copia aparte, y lo que guardaba una no lo veía la otra).
+- **Las variables de un módulo importado con `como` se leen con su valor de ahora**: `a.valor` después de `a.poner(5)` da 5 (antes daba el valor del momento de importarlo).
+- **Llamar a una función de otro módulo sin los parámetros que tienen valor por defecto** ya funciona (`a.suma(1)` con `funcion suma(numero x, numero y = 10)`); antes daba error.
+- **`sistema.salir()` vuelve a existir**: desde la 2.6.0, al añadir `sistema.ejecutable()`, se había quedado fuera del módulo.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.10.1-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.10.1-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.10.1.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.10.1.vsix` |
+
 ## 2.10.0
 
 Lo que pidió Bichito al usar la 2.8 para dejar de mantener su propio código, y un fallo que encontró. Solo añade: nada de la 2.0 cambia.

@@ -21,9 +21,19 @@ intentar {
     escribir("FACTOR no se filtra")
 }
 
-# El mismo fichero con dos alias distintos son dos espacios independientes
+# El mismo fichero con otro alias es el mismo módulo (en la 2.10 y antes eran
+# dos copias)
 importar "./ayuda_modulo" como tercero
 escribir(tercero.escala(1))
+
+# Un módulo con estado: corre una sola vez en el programa, aunque lo importe
+# también otro módulo; sus variables se leen con su valor de ahora; y sus
+# funciones aceptan los parámetros con valor por defecto
+importar "./ayuda_estado" como estado
+importar "./ayuda_estado_b" como segundo
+estado.poner(5)
+escribir("getter: {estado.leer()} variable: {estado.valor} desde otro: {segundo.leer_desde_b()}")
+escribir("defecto: {estado.suma(1)} {estado.suma(1, 2)}")
 
 # El choque de alias en el mismo ámbito da error de redefinición, igual que
 # cualquier otra definición repetida — está cubierto en test_redefinicion.

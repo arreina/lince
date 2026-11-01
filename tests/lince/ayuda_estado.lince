@@ -1,0 +1,5 @@
+# Ayuda de test_importar_como: un módulo con estado
+sea valor = nulo
+funcion poner(numero v): nulo { valor = v }
+funcion leer(): cualquiera { devolver valor }
+funcion suma(numero x, numero y = 10): numero { devolver x + y }
