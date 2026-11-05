@@ -1,0 +1,18 @@
+# @seccion: Móvil
+# @titulo: ¿Hay conexión?
+# @nota: `sistema.conexion()` dice si el aparato tiene Internet ahora mismo: `"con_conexion"`, `"sin_conexion"` o `"desconocida"`, sin abrir ninguna conexión y enseguida (lo mira como mucho una vez por segundo). `sistema.conexion_medida()` es verdadero si la red es de pago por uso (datos móviles), falso si no y `nulo` si no se sabe (en el ordenador, siempre `nulo`). Sirve para desactivar un botón que necesita la red en vez de intentarlo y fallar.
+# @nota: En Android necesita el permiso `ACCESS_NETWORK_STATE`, que Lince pone solo en el `.apk` de los juegos que llaman a `sistema.conexion()`. En las pruebas, `LINCE_CONEXION=sin` (o `con`, `medida`, `desconocida`) la fija, y `juego.jugar()` tiene la opción `"conexion"`.
+# @fotogramas: 10
+importar "juego"
+importar "sistema"
+
+juego.abrir("Conexión", 480, 270)
+mientras juego.abierto() {
+    sea estado = sistema.conexion()
+    sea color = si estado == "con_conexion" { [90, 200, 120] } sino si estado == "sin_conexion" { [220, 90, 90] } sino { [160, 160, 160] }
+    sea textos = {"con_conexion": "CON CONEXIÓN", "sin_conexion": "SIN CONEXIÓN", "desconocida": "NO SE SABE"}
+    juego.limpiar([25, 25, 35])
+    juego.circulo(240, 110, 40, color)
+    juego.texto(textos[estado], 240 - juego.ancho_texto(textos[estado], {"escala": 2}) / 2, 175, {"escala": 2})
+    juego.presentar()
+}

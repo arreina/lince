@@ -247,8 +247,9 @@ typedef struct {
     unsigned char mezcla;                /* como en SDL: 1 normal, 2 "sumar" (brilla), 4 "multiplicar" (oscurece) */
 } JgParticula;
 
-/* Una entrada del guion de prueba (LINCE_JUEGO_GUION): tecla -1 es del mando; -2, un toque en x, y */
-typedef struct { long desde, cuantos; int tecla, x, y; JgEntrada mando; } JgPaso;
+/* Una entrada del guion de prueba (LINCE_JUEGO_GUION): tecla -1 es del mando; -2, un toque en x, y;
+   -3, un deslizamiento de x, y a x2, y2 */
+typedef struct { long desde, cuantos; int tecla, x, y, x2, y2, dedo; JgEntrada mando; } JgPaso;   /* dedo 2: el segundo */
 
 static struct {
     int cargada, abierta, ancho, alto, cierre;
@@ -261,6 +262,9 @@ static struct {
     int ntoques, ntoques_prev;
     JgToque rapidos[JG_TOQUES];          /* dedos que tocaron en este fotograma (x, y de 0 a 1): un */
     int nrapidos;                        /* toque corto puede soltarse antes de mirar */
+    unsigned raton_bajado;               /* botones que bajaron en este fotograma (aunque ya hayan subido) */
+    int dedo2, dedo2_x, dedo2_y;         /* el segundo dedo del guion de prueba ("toque2", "deslizar2") */
+    int veces_fuera;                     /* cuántas veces ha pasado la app a segundo plano */
     double t_ultimo, dt, fps, t_fps;
     int cuadros;
     /* Modo de prueba (sin pantalla ni espera): LINCE_JUEGO_FOTOGRAMAS=N cierra tras N
@@ -1088,20 +1092,36 @@ static void jg_preguntar_menu(void) {
 }
 
 /* Una entrada del guion: "30:derecha:20" (tecla desde el fotograma 30 durante
-   20), "30:mando2:a:5" (un botón o un eje de un mando) o "30:toque:240:135:5"
-   (un dedo, o el ratón, ahí). 0 y el porqué en 'msg' si no se entiende. */
+   20), "30:mando2:a:5" (un botón o un eje de un mando), "30:toque:240:135:5"
+   (un dedo, o el ratón, ahí) o "30:deslizar:100:300:250:300:6" (un dedo que
+   se apoya ahí, va en línea recta durante 6 fotogramas y se levanta en el
+   otro punto). 0 y el porqué en 'msg' si no se entiende. */
 static int jg_paso_guion(const char *t, JgPaso *p, char *msg, size_t max) {
     char tecla[32], boton[32], resto[8];
     long desde, cuantos = 1;
     int tx, ty, n;
     memset(p, 0, sizeof *p);
-    if (strstr(t, ":toque:") || strstr(t, ":raton:")) {
+    if (strstr(t, ":deslizar")) {
+        int tx2, ty2;
+        cuantos = 6;
+        n = sscanf(t, "%ld:%31[^:]:%d:%d:%d:%d:%ld%7s", &desde, tecla, &tx, &ty, &tx2, &ty2, &cuantos, resto);
+        if ((n != 6 && n != 7) || (strcmp(tecla, "deslizar") && strcmp(tecla, "deslizar2")) || desde < 0 || cuantos < 1) {
+            snprintf(msg, max, "«%s»: un deslizamiento es \"fotograma:deslizar:x1:y1:x2:y2[:fotogramas]\"", t);
+            return 0;
+        }
+        p->desde = desde; p->cuantos = cuantos; p->tecla = -3;
+        p->x = tx; p->y = ty; p->x2 = tx2; p->y2 = ty2;
+        p->dedo = tecla[8] == '2' ? 2 : 1;
+        return 1;
+    }
+    if (strstr(t, ":toque:") || strstr(t, ":toque2:") || strstr(t, ":raton:")) {
         n = sscanf(t, "%ld:%31[^:]:%d:%d:%ld%7s", &desde, tecla, &tx, &ty, &cuantos, resto);
         if ((n != 4 && n != 5) || desde < 0 || cuantos < 1) {
             snprintf(msg, max, "«%s»: un toque es \"fotograma:toque:x:y[:cuántos]\"", t);
             return 0;
         }
         p->desde = desde; p->cuantos = cuantos; p->tecla = -2; p->x = tx; p->y = ty;
+        p->dedo = !strcmp(tecla, "toque2") ? 2 : 1;
         return 1;
     }
     if (strstr(t, ":mando")) {
@@ -1119,7 +1139,8 @@ static int jg_paso_guion(const char *t, JgPaso *p, char *msg, size_t max) {
     }
     n = sscanf(t, "%ld:%31[^:]:%ld%7s", &desde, tecla, &cuantos, resto);
     if ((n != 2 && n != 3) || desde < 0 || cuantos < 1) {
-        snprintf(msg, max, "«%s»: es \"fotograma:tecla[:cuántos]\", \"fotograma:mando1:botón[:cuántos]\" o \"fotograma:toque:x:y[:cuántos]\"", t);
+        snprintf(msg, max, "«%s»: es \"fotograma:tecla[:cuántos]\", \"fotograma:mando1:botón[:cuántos]\", "
+                 "\"fotograma:toque:x:y[:cuántos]\" o \"fotograma:deslizar:x1:y1:x2:y2[:fotogramas]\"", t);
         return 0;
     }
     int c = jg_tecla_codigo(tecla);
@@ -1134,6 +1155,13 @@ static Valor *fn_jg_paso_guion(Valor **a, int n) {
     JgPaso p;
     char msg[400];
     return jg_paso_guion(a[0]->texto, &p, msg, sizeof msg) ? valor_nulo() : valor_texto(msg);
+}
+
+/* _veces_fuera() (para los deslizamientos de juego.lince): cuántas veces ha
+   pasado la app a segundo plano; si cambia, el gesto a medias se olvida */
+static Valor *fn_jg_veces_fuera(Valor **a, int n) {
+    (void)a; (void)n;
+    return valor_numero(_jgs.veces_fuera);
 }
 
 /* _programa(): la ruta completa del programa que se está ejecutando (para que
@@ -1616,14 +1644,18 @@ static Valor *fn_jg_ancho_texto(Valor **a, int n) {
    Mientras se juega, apunta las teclas que se pulsan, con el formato de
    LINCE_JUEGO_GUION ("30:derecha:20,50:z:1": desde qué fotograma, qué tecla,
    cuántos fotogramas), para volver a jugar lo mismo sin tocar el teclado.
-   Esc y F5 no se apuntan (cierran y reinician el programa). El archivo se
-   reescribe cada vez que se suelta una tecla, y al cerrar para las que siguen
-   pulsadas; si el guion pasa de JG_GUION_GRABADO teclas, se queda con las primeras. */
+   Esc y F5 no se apuntan (cierran y reinician el programa). El botón
+   izquierdo del ratón (o el primer dedo) se apunta como "toque" si no se
+   movió, o como "deslizar" del punto donde bajó al punto donde subió. El
+   archivo se reescribe cada vez que se suelta una tecla, y al cerrar para las
+   que siguen pulsadas; si el guion pasa de JG_GUION_GRABADO, se queda con las primeras. */
 #define JG_GUION_GRABADO 4096
 static char *_jg_grab_ruta;
 static long  _jg_grab_ini[512];
-static struct { long desde, cuantos; int tecla; } _jg_grab[JG_GUION_GRABADO];
+static struct { long desde, cuantos; int tecla, x, y, x2, y2; } _jg_grab[JG_GUION_GRABADO];   /* tecla -2 toque, -3 deslizar */
 static int   _jg_ngrab;
+static long  _jg_grab_dedo = -1;          /* el fotograma en que bajó, o -1 */
+static int   _jg_grab_dx, _jg_grab_dy, _jg_grab_hx, _jg_grab_hy;
 
 static int jg_nombre_tecla(int c, char *t, size_t max) {
     static const struct { const char *n; int c; } T[] = {
@@ -1651,6 +1683,7 @@ static void jg_grabar_guion_empezar(void) {
     if (_jg_grab_ruta && !_jg_grab_ruta[0]) { free(_jg_grab_ruta); _jg_grab_ruta = NULL; }
     for (int c = 0; c < 512; c++) _jg_grab_ini[c] = -1;
     _jg_ngrab = 0;
+    _jg_grab_dedo = -1;
 }
 
 static void jg_grabar_guion_escribir(void) {
@@ -1665,8 +1698,16 @@ static void jg_grabar_guion_escribir(void) {
     int primera = 1;
     for (int i = 0; i < _jg_ngrab; i++) {
         char t[64];
-        if (!jg_nombre_tecla(_jg_grab[orden[i]].tecla, t, sizeof t)) continue;
-        fprintf(f, "%s%ld:%s:%ld", primera ? "" : ",", _jg_grab[orden[i]].desde, t, _jg_grab[orden[i]].cuantos);
+        const int k = orden[i];
+        if (_jg_grab[k].tecla == -2)
+            fprintf(f, "%s%ld:toque:%d:%d:%ld", primera ? "" : ",", _jg_grab[k].desde, _jg_grab[k].x, _jg_grab[k].y, _jg_grab[k].cuantos);
+        else if (_jg_grab[k].tecla == -3)
+            fprintf(f, "%s%ld:deslizar:%d:%d:%d:%d:%ld", primera ? "" : ",", _jg_grab[k].desde, _jg_grab[k].x, _jg_grab[k].y,
+                    _jg_grab[k].x2, _jg_grab[k].y2, _jg_grab[k].cuantos);
+        else {
+            if (!jg_nombre_tecla(_jg_grab[k].tecla, t, sizeof t)) continue;
+            fprintf(f, "%s%ld:%s:%ld", primera ? "" : ",", _jg_grab[k].desde, t, _jg_grab[k].cuantos);
+        }
         primera = 0;
     }
     fprintf(f, "\n");
@@ -1693,6 +1734,31 @@ static void jg_grabar_guion(int cerrando) {
             }
             _jg_grab_ini[c] = -1;
         }
+    }
+    /* el botón izquierdo (en el móvil, el primer dedo también lo mueve) */
+    int abajo = !cerrando && (_jgs.raton & 1);
+    if (abajo && _jg_grab_dedo < 0) {
+        _jg_grab_dedo = _jgs.total;
+        _jg_grab_dx = _jg_grab_hx = _jgs.rx;
+        _jg_grab_dy = _jg_grab_hy = _jgs.ry;
+    } else if (abajo) {
+        _jg_grab_hx = _jgs.rx;
+        _jg_grab_hy = _jgs.ry;
+    } else if (_jg_grab_dedo >= 0) {
+        long cuantos = _jgs.total - _jg_grab_dedo;
+        if (cuantos < 1) cuantos = 1;
+        if (_jg_ngrab < JG_GUION_GRABADO) {
+            int quieto = abs(_jg_grab_hx - _jg_grab_dx) <= 2 && abs(_jg_grab_hy - _jg_grab_dy) <= 2;
+            _jg_grab[_jg_ngrab].desde = _jg_grab_dedo;
+            _jg_grab[_jg_ngrab].tecla = quieto ? -2 : -3;
+            /* deslizar: apoyado 'cuantos' fotogramas son cuantos - 1 de recorrido */
+            _jg_grab[_jg_ngrab].cuantos = quieto || cuantos < 2 ? cuantos : cuantos - 1;
+            _jg_grab[_jg_ngrab].x = _jg_grab_dx; _jg_grab[_jg_ngrab].y = _jg_grab_dy;
+            _jg_grab[_jg_ngrab].x2 = _jg_grab_hx; _jg_grab[_jg_ngrab].y2 = _jg_grab_hy;
+            _jg_ngrab++;
+            cambio = 1;
+        }
+        _jg_grab_dedo = -1;
     }
     if (cambio) jg_grabar_guion_escribir();
 }
@@ -1784,9 +1850,12 @@ static void jg_leer_toques(void) {
         if (esta) continue;
         JgToque *t = &_jgs.toques[_jgs.ntoques++];
         t->id = _jgs.rapidos[r].id;
-        float fx = _jgs.rapidos[r].x, fy = _jgs.rapidos[r].y;
-        if (_jg.WindowToLogical) _jg.WindowToLogical(_jgs.render, (int)(fx * ww), (int)(fy * wh), &t->x, &t->y);
-        else { t->x = fx * _jgs.ancho; t->y = fy * _jgs.alto; }
+        /* el evento ya viene de 0 a 1 sobre lo que se ve del juego, sin las bandas
+           (SDL lo convierte, desde la 2.0.10, al haber tamaño lógico); el estado
+           del dedo de arriba, sobre la ventana entera. Pasarlo otra vez por
+           WindowToLogical quitaba dos veces las bandas: el toque caía más abajo */
+        t->x = _jgs.rapidos[r].x * _jgs.ancho;
+        t->y = _jgs.rapidos[r].y * _jgs.alto;
     }
     _jgs.nrapidos = 0;
 #ifndef __ANDROID__
@@ -1797,6 +1866,12 @@ static void jg_leer_toques(void) {
         _jgs.ntoques = 1;
     }
 #endif
+    if (_jgs.dedo2 && _jgs.ntoques < JG_TOQUES) {          /* el segundo dedo del guion */
+        JgToque *t = &_jgs.toques[_jgs.ntoques++];
+        t->id = -2;
+        t->x = (float)_jgs.dedo2_x;
+        t->y = (float)_jgs.dedo2_y;
+    }
 }
 
 /* ── Acelerómetro ──
@@ -1988,6 +2063,10 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         unsigned tipo = *(unsigned *)ev;
         if (tipo == 0x100) _jgs.cierre = 1;                         /* SDL_QUIT */
         else if (tipo == 0x403) _jgs.rueda += *(int *)(ev + 20);    /* rueda: y */
+        else if (tipo == 0x401) {                                   /* un botón baja: si sube antes */
+            unsigned b = ev[16];                                    /* de mirar, cuenta igual */
+            if (b >= 1 && b <= 5) _jgs.raton_bajado |= 1u << (b - 1);
+        } else if (tipo == 0x103) _jgs.veces_fuera++;               /* la app pasa a segundo plano */
         else if (tipo == 0x400) {                                   /* movimiento: xrel, yrel */
             _jgs.mov_x += *(int *)(ev + 28);
             _jgs.mov_y += *(int *)(ev + 32);
@@ -2015,6 +2094,10 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
     memcpy(_jgs.teclas, k, (size_t)nt);
     if (_jgs.atras) { _jgs.teclas[41] = 1; _jgs.atras = 0; }      /* «atrás» del móvil = Esc */
     _jgs.raton = _jg.MouseState(&_jgs.rx, &_jgs.ry);
+    /* un clic (o un toque rápido) que bajó y subió entre dos fotogramas: pulsado
+       en este, y soltado en el siguiente */
+    _jgs.raton |= _jgs.raton_bajado & ~_jgs.raton_prev;
+    _jgs.raton_bajado = 0;
     if (_jg.WindowToLogical) {                 /* con pantalla completa la ventana se escala */
         float lx, ly;
         _jg.WindowToLogical(_jgs.render, _jgs.rx, _jgs.ry, &lx, &ly);
@@ -2046,14 +2129,28 @@ static Valor *fn_jg_presentar(Valor **a, int n) {
         for (int i = 0; i < _jgs.npulsar; i++) _jgs.teclas[_jgs.pulsar[i]] = 1;
         if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; _jgs.raton |= 1; }
     } else if (_jgs.hay_clic) { _jgs.rx = _jgs.clic_x; _jgs.ry = _jgs.clic_y; }
-    for (int i = 0; i < _jgs.nguion; i++)
-        if (_jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos) {
+    _jgs.dedo2 = 0;
+    for (int i = 0; i < _jgs.nguion; i++) {
+        const JgPaso *g = &_jgs.guion[i];
+        if (g->tecla == -3 && _jgs.total >= g->desde && _jgs.total <= g->desde + g->cuantos) {
+            double f = (double)(_jgs.total - g->desde) / (double)g->cuantos;     /* de 0 a 1 */
+            int x = (int)lround(g->x + (g->x2 - g->x) * f), y = (int)lround(g->y + (g->y2 - g->y) * f);
+            if (g->dedo == 2) { _jgs.dedo2 = 1; _jgs.dedo2_x = x; _jgs.dedo2_y = y; }
+            else { _jgs.rx = x; _jgs.ry = y; _jgs.raton |= 1; }
+            continue;
+        }
+        if (g->tecla == -2 && g->dedo == 2) {
+            if (_jgs.total >= g->desde && _jgs.total < g->desde + g->cuantos) { _jgs.dedo2 = 1; _jgs.dedo2_x = g->x; _jgs.dedo2_y = g->y; }
+            continue;
+        }
+        if (g->tecla != -3 && _jgs.total >= _jgs.guion[i].desde && _jgs.total < _jgs.guion[i].desde + _jgs.guion[i].cuantos) {
             const JgEntrada *me = &_jgs.guion[i].mando;
             if (_jgs.guion[i].tecla >= 0) _jgs.teclas[_jgs.guion[i].tecla] = 1;
             else if (_jgs.guion[i].tecla == -2) { _jgs.rx = _jgs.guion[i].x; _jgs.ry = _jgs.guion[i].y; _jgs.raton |= 1; }
             else if (me->tipo == 'b') _jgs.botones[me->mando][me->codigo] = 1;
             else _jgs.ejes[me->mando][me->codigo] = (float)me->signo;
         }
+    }
     jg_grabar_guion(0);                  /* LINCE_JUEGO_GRABAR_GUION: las teclas de este fotograma */
     jg_leer_toques();                    /* después de los clics de prueba: también cuentan como dedo */
     jg_leer_inclinacion();
@@ -8323,6 +8420,7 @@ static void cargar_juego(Entorno *entorno) {
         {"capa",            fn_jg_capa,            -1},
         {"_idioma_sistema", fn_jg_idioma_sistema,   0},
         {"_paso_guion",     fn_jg_paso_guion,       1},
+        {"_veces_fuera",    fn_jg_veces_fuera,      0},
         {"_programa",       fn_jg_programa,         0},
         {"temblor",         fn_jg_temblor,         -1},
         {"congelar",        fn_jg_congelar,         1},

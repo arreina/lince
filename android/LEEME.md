@@ -130,9 +130,16 @@ errores) se ve con `adb logcat -s lince`.
   si se conectan con el juego en marcha. Mientras haya uno conectado, el mando
   de la pantalla se esconde.
 - **Táctil**: `juego.toques()` da los dedos que hay en la pantalla (un toque
-  rápido cuenta al menos un fotograma), y una acción puede tener botones propios
-  en la pantalla: `"pantalla:x,y,ancho,alto"`. El primer dedo también mueve el
-  ratón (`juego.raton()`, `juego.clic()`). `juego.tactil()` es verdadero.
+  rápido cuenta al menos un fotograma, en el mismo sitio que uno largo), y una
+  acción puede tener botones propios en la pantalla: `"pantalla:x,y,ancho,alto"`.
+  El primer dedo también mueve el ratón (`juego.raton()`, `juego.clic()`, que
+  tampoco pierde los toques rápidos). `juego.deslizamiento()` reconoce los
+  gestos de deslizar el dedo. `juego.tactil()` es verdadero.
+- **Conexión**: `sistema.conexion()` dice si hay Internet. Para eso Android
+  pide el permiso `ACCESS_NETWORK_STATE` (de los normales: no sale ninguna
+  pregunta al jugador), que solo llevan los juegos que la llaman. La plantilla
+  trae esa variante del manifiesto en `variantes/red/`, y `lince repartir` la
+  elige al ver el juego (`elegir_variante` en `src/apk.c`).
 - **Vibrar e inclinar**: `juego.vibrar(segundos)` hace vibrar el móvil (y los
   mandos), y `juego.inclinacion()` dice hacia dónde está inclinado; una acción
   puede usarlo con `"inclinacion:x-"`, `"inclinacion:x+"`...

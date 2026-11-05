@@ -225,6 +225,9 @@ static void anadir_de_mapa(const char *ruta) {
 /* Valida la sintaxis (el parser termina el proceso si hay un error) y recorre
    los 'importar' de 'codigo', añadiendo cada archivo que encuentra. 'actual' es
    el fichero desde el que se resuelven los './x'. */
+static int _usos;
+int empaquetado_usos(void) { return _usos; }
+
 static void recoger(const char *codigo, const char *actual) {
     Lexer  *lx  = lexer_crear(codigo);
     int     cnt = 0;
@@ -237,6 +240,14 @@ static void recoger(const char *codigo, const char *actual) {
     static const char *const MEDIOS[] = { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tga", ".wav", ".ogg", ".ttf", ".otf",
                                           ".tmx", ".tmj", NULL };
     for (int i = 0; i < cnt; i++) {
+        /* lo que pide permisos o bibliotecas en Android */
+        if (tok[i].tipo == TOK_IDENTIFICADOR && tok[i].valor && i > 0 && tok[i - 1].tipo == TOK_PUNTO &&
+            (!strcmp(tok[i].valor, "conexion") || !strcmp(tok[i].valor, "conexion_medida")))
+            _usos |= USO_RED;
+        if (tok[i].tipo == TOK_IMPORTAR && i + 1 < cnt && tok[i + 1].tipo == TOK_TEXTO && tok[i + 1].valor) {
+            if (!strcmp(tok[i + 1].valor, "anuncios")) _usos |= USO_ANUNCIOS | USO_RED;
+            if (!strcmp(tok[i + 1].valor, "compras")) _usos |= USO_COMPRAS | USO_RED;
+        }
         /* los idiomas (la carpeta idiomas) van dentro si el juego traduce algo */
         if (tok[i].tipo == TOK_IDENTIFICADOR && tok[i].valor && i > 0 && tok[i - 1].tipo == TOK_PUNTO &&
             (!strcmp(tok[i].valor, "traducir") || !strcmp(tok[i].valor, "idioma") ||
@@ -413,6 +424,7 @@ int empaquetado_crear(const char *archivo, const char *salida, const char *const
         return 1;
     }
     _entradas = NULL; _num_entradas = 0;
+    _usos = 0;
     anadir(principal, codigo);
     recoger(codigo, principal);
     free(codigo);

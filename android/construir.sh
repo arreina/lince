@@ -68,7 +68,7 @@ echo "🔧 Compilando Lince y SDL2 para Android..."
     SDL_RUTA="$SDL" > "$OBRA.log" 2>&1 || { tail -30 "$OBRA.log"; echo "❌ Falló la compilación para Android"; exit 1; }
 
 # 2. La parte en Java: la de SDL y la actividad de Lince (se rehace si cambia)
-if [ ! -f "$OBRA/dex/classes.dex" ] || [ "$RAIZ/android/java/org/lince/LinceActivity.java" -nt "$OBRA/dex/classes.dex" ]; then
+if [ ! -f "$OBRA/dex/classes.dex" ] || [ -n "$(find "$RAIZ/android/java" -name '*.java' -newer "$OBRA/dex/classes.dex")" ]; then
     echo "🔧 Compilando la parte en Java..."
     rm -rf "$OBRA/clases" "$OBRA/dex"; mkdir -p "$OBRA/clases" "$OBRA/dex"
     javac -nowarn --release 8 -classpath "$PLAT/android.jar" -d "$OBRA/clases" \
@@ -88,8 +88,18 @@ else
 fi
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy "$LINCE" "$RAIZ/android/icono.lince" "$T/res/drawable/icono.png" > /dev/null
 NOMBRE_XML="$(printf '%s' "$NOMBRE" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/"/\&quot;/g')"
-sed -e "s|@ID@|$ID|g" -e "s|@VERSION@|$VERSION|g" -e "s|@NOMBRE@|$NOMBRE_XML|g" \
-    "$RAIZ/android/AndroidManifest.xml" > "$T/AndroidManifest.xml"
+# el manifiesto, con los permisos que se digan (uno por argumento)
+manifiesto() {
+    local salida="$1" permisos="" p
+    shift
+    for p in "$@"; do permisos="$permisos<uses-permission android:name=\"android.permission.$p\" />"; done
+    sed -e "s|@ID@|$ID|g" -e "s|@VERSION@|$VERSION|g" -e "s|@NOMBRE@|$NOMBRE_XML|g" \
+        -e "s|<!-- @PERMISOS@.*-->|$permisos|" "$RAIZ/android/AndroidManifest.xml" > "$salida"
+}
+# un juego hecho aquí lleva el permiso de la red si llama a sistema.conexion()
+PERMISOS=()
+[ "$PLANTILLA" = 0 ] && grep -Eq '\.conexion(_medida)?\(' "$JUEGO" && PERMISOS+=(ACCESS_NETWORK_STATE)
+manifiesto "$T/AndroidManifest.xml" "${PERMISOS[@]}"
 
 # 4. El .apk: recursos, código, bibliotecas, alinear y firmar
 "$BT/aapt2" compile --dir "$T/res" -o "$T/res.zip"
@@ -116,6 +126,17 @@ if [ "$PLANTILLA" = 1 ]; then
     java -jar "$BUNDLETOOL" build-bundle --modules="$T/modulo.zip" --output="$T/plantilla.aab"
     (cd "$T/aab" && unzip -q ../plantilla.aab -x 'base/dex/*' 'base/lib/*' 'base/res/*' 'base/assets/*' 2> /dev/null)
     (cd "$T" && zip -q -r base.apk aab)
+
+    # La variante «red» (los juegos que llaman a sistema.conexion()): solo
+    # cambia el manifiesto, el del .apk y el del .aab (ver elegir_variante en src/apk.c)
+    V="$T/variantes/red"
+    mkdir -p "$V/aab/base/manifest" "$T/red"
+    manifiesto "$T/red/AndroidManifest.xml" ACCESS_NETWORK_STATE
+    "$BT/aapt2" link -o "$T/red/red.apk" -I "$PLAT/android.jar" --manifest "$T/red/AndroidManifest.xml" "$T/res.zip"
+    "$BT/aapt2" link --proto-format -o "$T/red/proto.apk" -I "$PLAT/android.jar" --manifest "$T/red/AndroidManifest.xml" "$T/res.zip"
+    (cd "$V" && unzip -q -o "$T/red/red.apk" AndroidManifest.xml)
+    (cd "$T/red" && unzip -q -o proto.apk AndroidManifest.xml && mv AndroidManifest.xml "$V/aab/base/manifest/")
+    (cd "$T" && zip -q -r base.apk variantes)
 fi
 "$BT/zipalign" -f -p 4 "$T/base.apk" "$T/alineado.apk"
 LLAVE="$A/lince-pruebas.keystore"           # una llave de pruebas, solo de esta máquina

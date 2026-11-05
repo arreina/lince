@@ -125,8 +125,20 @@ static unsigned char *axml_cambiar(const unsigned char *x, size_t n, const char 
             if (largo & 0x8000) { largo = (largo & 0x7FFF) << 16 | le16(s + 2); k = 4; }
             tx.t[i] = de_utf16(s + k, largo);
         }
-        for (int c = 0; c < cambios; c++)
-            if (strcmp(tx.t[i], de[c]) == 0) { free(tx.t[i]); tx.t[i] = strdup(a[c]); }
+        int cambiado = 0;
+        for (int c = 0; c < cambios && !cambiado; c++)
+            if (strcmp(tx.t[i], de[c]) == 0) { free(tx.t[i]); tx.t[i] = strdup(a[c]); cambiado = 1; }
+        /* lo que empieza por el paquete (org.lince.plantilla.androidx-startup...):
+           las bibliotecas de Google ponen así sus proveedores y permisos, que no
+           pueden repetirse entre dos apps del mismo móvil */
+        size_t lp = strlen(PLANTILLA_PAQUETE);
+        if (!cambiado && strncmp(tx.t[i], PLANTILLA_PAQUETE ".", lp + 1) == 0) {
+            size_t l = strlen(a[0]) + strlen(tx.t[i] + lp) + 1;
+            char *t = malloc(l);
+            snprintf(t, l, "%s%s", a[0], tx.t[i] + lp);
+            free(tx.t[i]);
+            tx.t[i] = t;
+        }
     }
     /* el bloque nuevo: cabecera, posiciones y textos */
     size_t datos = 0;
@@ -266,6 +278,14 @@ static int pb_cambiar(const unsigned char *p, size_t n, const Cambios *c, Buf *s
                     mas(sal, c->a[k], strlen(c->a[k]));
                     hecho = 1;
                 }
+            size_t lp = strlen(PLANTILLA_PAQUETE);         /* org.lince.plantilla.x → id.x (como en el .apk) */
+            if (!hecho && largo > lp + 1 && memcmp(d, PLANTILLA_PAQUETE ".", lp + 1) == 0) {
+                size_t li = strlen(c->a[0]);
+                pb_poner(sal, li + largo - lp);
+                mas(sal, c->a[0], li);
+                mas(sal, d + lp, largo - lp);
+                hecho = 1;
+            }
             if (hecho) break;
             Buf dentro = {0};
             if (largo > 0 && pb_cambiar(d, largo, c, &dentro, hondo + 1)) {
@@ -430,11 +450,16 @@ static void liberar_entradas(Entrada *e, int num) {
 static unsigned char *hacer_aab(Entrada *e, int num, const LlaveRsa *ll, size_t *n_salida) {
     Entrada *b = calloc((size_t)num + 3, sizeof(Entrada));
     int k = 3;                                     /* los tres de META-INF van primero */
+    int res_propios = 0;                           /* una variante con sus recursos del .aab (en protobuf) */
+    for (int i = 0; i < num; i++) res_propios |= strncmp(e[i].nombre, "aab/base/res/", 13) == 0;
     for (int i = 0; i < num; i++) {
         const char *x = e[i].nombre;
         char nombre[600];
+        size_t l = strlen(x);
         if (strncmp(x, "aab/", 4) == 0) snprintf(nombre, sizeof nombre, "%s", x + 4);
-        else if (strcmp(x, "classes.dex") == 0) snprintf(nombre, sizeof nombre, "base/dex/%s", x);
+        else if (strncmp(x, "classes", 7) == 0 && l > 4 && strcmp(x + l - 4, ".dex") == 0 && !strchr(x, '/'))
+            snprintf(nombre, sizeof nombre, "base/dex/%s", x);
+        else if (strncmp(x, "res/", 4) == 0 && res_propios) continue;
         else if (strncmp(x, "lib/", 4) == 0 || strncmp(x, "res/", 4) == 0 || strncmp(x, "assets/", 7) == 0)
             snprintf(nombre, sizeof nombre, "base/%s", x);
         else continue;                             /* el manifiesto y resources.arsc del .apk */
@@ -750,6 +775,55 @@ static void hacer_ficha(const char *juego, const char *salida, const ApkOpciones
     }
 }
 
+/* ── Variantes ──
+   Lo que solo llevan los juegos que lo usan (un permiso, la biblioteca de
+   anuncios o la de compras de Google) va en la plantilla en
+   variantes/<nombre>/, con los archivos que cambian: el manifiesto, los
+   recursos, el código (classes*.dex) y lo mismo para el .aab (en aab/). Se
+   elige la que necesita el juego, sus archivos pasan a su sitio en lugar de
+   los de siempre, y las demás variantes no van. 0 si el juego necesita algo
+   que esta plantilla no trae. */
+static int es_dex(const char *x) {
+    size_t l = strlen(x);
+    return strncmp(x, "classes", 7) == 0 && l > 4 && strcmp(x + l - 4, ".dex") == 0 && !strchr(x, '/');
+}
+
+static int elegir_variante(Entrada *e, int num, int usos, const char *plantilla) {
+    const char *v = (usos & USO_ANUNCIOS) && (usos & USO_COMPRAS) ? "anuncios_compras" :
+                    (usos & USO_ANUNCIOS) ? "anuncios" : (usos & USO_COMPRAS) ? "compras" :
+                    (usos & USO_RED) ? "red" : NULL;
+    char prefijo[64];
+    snprintf(prefijo, sizeof prefijo, "variantes/%s/", v ? v : "");
+    size_t lp = strlen(prefijo);
+    int hay = 0, dex_propio = 0;
+    for (int i = 0; v && i < num; i++)
+        if (strncmp(e[i].nombre, prefijo, lp) == 0) { hay = 1; dex_propio |= es_dex(e[i].nombre + lp); }
+    if (v && !hay) {
+        if (usos & (USO_ANUNCIOS | USO_COMPRAS)) {
+            fprintf(stderr, "\n❌ El juego usa %s, y la plantilla '%s' no los trae\n"
+                            "   (es de una versión de Lince anterior): descarga la nueva.\n\n",
+                    usos & USO_ANUNCIOS ? "anuncios" : "compras", plantilla);
+            return 0;
+        }
+        fprintf(stderr, "⚠  La plantilla '%s' no trae el permiso de la red (es de una versión de\n"
+                        "   Lince anterior): en el móvil, sistema.conexion() dará \"desconocida\".\n", plantilla);
+    }
+    for (int i = 0; i < num; i++) {
+        char *x = e[i].nombre;
+        if (strncmp(x, "variantes/", 10) == 0) continue;
+        int tapado = hay && dex_propio && es_dex(x);
+        for (int j = 0; hay && !tapado && j < num; j++)
+            tapado = strncmp(e[j].nombre, prefijo, lp) == 0 && strcmp(e[j].nombre + lp, x) == 0;
+        if (tapado) x[0] = '\0';                  /* va el de la variante */
+    }
+    for (int i = 0; i < num; i++) {
+        char *x = e[i].nombre;
+        if (hay && strncmp(x, prefijo, lp) == 0) memmove(x, x + lp, strlen(x + lp) + 1);
+        else if (strncmp(x, "variantes/", 10) == 0) x[0] = '\0';
+    }
+    return 1;
+}
+
 int apk_crear(const char *juego, const char *salida, const ApkOpciones *op, const char *const *extras, int num_extras) {
     const char *nombre = op->nombre, *id = op->id;
     int version = op->version, aab = op->aab;
@@ -778,6 +852,7 @@ int apk_crear(const char *juego, const char *salida, const ApkOpciones *op, cons
         free(pl); free(datos_paq);
         return 1;
     }
+    if (!elegir_variante(e, num, empaquetado_usos(), plantilla)) { free(e); free(pl); free(datos_paq); return 1; }
     /* todo menos la firma vieja, con el manifiesto y los recursos cambiados
        (los del .apk y, si se hace el .aab, los suyos), y el juego */
     Entrada *nuevas = calloc((size_t)num + 1, sizeof(Entrada));
@@ -793,7 +868,7 @@ int apk_crear(const char *juego, const char *salida, const ApkOpciones *op, cons
     Cambios cambios = {de, a, 3, version};
     for (int i = 0; i < num && !malo; i++) {
         const char *x = e[i].nombre;
-        if (strncmp(x, "META-INF/", 9) == 0 || strcmp(x, "assets/juego.paq") == 0) continue;
+        if (!x[0] || strncmp(x, "META-INF/", 9) == 0 || strcmp(x, "assets/juego.paq") == 0) continue;
         int del_aab = strncmp(x, "aab/", 4) == 0;
         if (del_aab != aab && (del_aab || strcmp(x, "AndroidManifest.xml") == 0 || strcmp(x, "resources.arsc") == 0))
             continue;                              /* lo de un .apk no va en el .aab, ni al revés */
@@ -811,7 +886,7 @@ int apk_crear(const char *juego, const char *salida, const ApkOpciones *op, cons
             size_t n;
             unsigned char *r = descomprimir(&e[i], &n);
             if (r) { arsc_cambiar_paquete(r, n, id); guardar_sin_comprimir(&nuevas[k], r, n); }
-        } else if (strcmp(x, "res/drawable/icono.png") == 0 && icono192) {      /* el icono del juego */
+        } else if ((strcmp(x, "res/drawable/icono.png") == 0 || strcmp(x, "aab/base/res/drawable/icono.png") == 0) && icono192) {
             size_t n;
             unsigned char *png = imagen_png(icono192, 192, 192, &n);
             if (png) guardar_sin_comprimir(&nuevas[k], png, n);

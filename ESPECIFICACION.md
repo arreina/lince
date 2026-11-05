@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.10
+# 🐆 Lince — Especificación del Lenguaje v2.11
 
 ## Filosofía
 
@@ -1129,8 +1129,22 @@ sistema.existe("archivo.txt")
 sistema.ejecutable()                   # la ruta del propio lince (para lanzar otro programa con él)
 sistema.entorno("CLAVE")               # una variable de entorno (nulo si no está)
 sistema.establecer_entorno("CLAVE", "valor")   # con nulo, la quita
+sistema.conexion()                     # "con_conexion", "sin_conexion" o "desconocida"
+sistema.conexion_medida()              # verdadero con datos móviles (de pago por uso), nulo si no se sabe
 sistema.salir(0)
 ```
+
+`sistema.conexion()` dice si el aparato tiene Internet ahora mismo, sin abrir
+ninguna conexión y enseguida (lo mira como mucho una vez por segundo): en
+Linux, si hay una ruta por defecto por una interfaz encendida; en Windows, lo
+que dice el sistema (`INetworkListManager`); en Android, la red activa con
+Internet comprobado (un wifi con portal cautivo es `"sin_conexion"`). Si el
+sistema no deja saberlo, `"desconocida"`, nunca un error. En Android necesita
+el permiso `ACCESS_NETWORK_STATE`, que `lince repartir --android` / `--aab`
+pone solo en los juegos que llaman a `conexion()` o `conexion_medida()`.
+`conexion_medida()` solo se sabe en Android (en el ordenador, `nulo`). En las
+pruebas, `LINCE_CONEXION=con`, `sin`, `medida` (con conexión de pago por uso)
+o `desconocida` la fija, y `juego.jugar()` tiene la opción `"conexion"`.
 
 ### `json`
 
@@ -1340,7 +1354,9 @@ minúsculas, la letra sin tilde, o `?`. Los archivos de fuentes van dentro del j
 | `inclinacion()` | `[x, y]` de -1 a 1: hacia dónde rodaría una bola sobre la pantalla del móvil (x a la derecha, y hacia abajo), según cómo se incline; `[0, 0]` sin acelerómetro (en el ordenador) |
 | `acciones()` | `{nombre: [entradas]}`: las acciones definidas, con sus entradas como se escribieron (para enseñar los controles en un menú) |
 | `mando_virtual(botones, ejes)` | para hacer un mando propio: deja pulsados esos botones (`["a"]`) y esos ejes (`{"izq_x": -0.5}`) en el mando 1 hasta que se cambien |
-| `toques()` · `tactil()` | los dedos que hay en la pantalla táctil: una lista de `{"id", "x", "y", "nuevo"}` en coordenadas del juego (`nuevo`: empezó a tocar en este fotograma; `id` sigue al mismo dedo mientras no se levante). Sin pantalla táctil, el botón izquierdo del ratón cuenta como un dedo, para probarlo en el ordenador · ¿hay pantalla táctil? (en un móvil, siempre) |
+| `toques()` · `tactil()` | los dedos que hay en la pantalla táctil: una lista de `{"id", "x", "y", "nuevo"}` en coordenadas del juego (`nuevo`: empezó a tocar en este fotograma; `id` sigue al mismo dedo mientras no se levante). Sin pantalla táctil, el botón izquierdo del ratón cuenta como un dedo, para probarlo en el ordenador. Un toque muy rápido (baja y sube entre dos fotogramas) cuenta en un fotograma, en el mismo sitio que uno largo, y también como `clic()` · ¿hay pantalla táctil? (en un móvil, siempre) |
+| `deslizamiento([opciones])` | el gesto de deslizar el dedo (o arrastrar con el botón izquierdo del ratón), en el fotograma en que se levanta; si no, `nulo`: `{"direccion": "arriba", "abajo", "izquierda" o "derecha", "dx", "dy", "desde": [x, y], "hasta": [x, y], "duracion"}` en coordenadas del juego. Solo cuenta el primer dedo que se apoya (los demás no cuentan hasta que se levantan todos), y un recorrido más corto que `"distancia"` es un toque. La dirección es la del eje con más recorrido; con los dos iguales, `nulo`. Opciones: `"distancia"` (en píxeles del juego, 48), `"zona"` (`[x, y, ancho, alto]`: solo los que empiezan ahí, acaben donde acaben), `"duracion_maxima"` (segundos, de tiempo real), `"diagonal"` (`"dominante"`, o `"ignorar"`: descarta los que van a `"margen_diagonal"` grados o menos de una diagonal). Si la app pasa a segundo plano a medias, el gesto se olvida. No cambia `toques()`, `raton()` ni `clic()` |
+| `deslizando([opciones])` | mientras el primer dedo sigue apoyado, el gesto en curso: `{"desde", "hasta", "dx", "dy"}`; si no, `nulo` (para dibujar una flecha mientras se arrastra). Opción: `"zona"` |
 | `editar(texto[, maximo])` · `texto_escrito()` | el texto con lo tecleado añadido y «borrar» aplicado (tildes y ñ incluidas) · lo tecleado en este fotograma |
 
 **Acciones.** Un nombre para varias teclas, botones y ejes, así el juego funciona igual con teclado, ratón y mando:
@@ -2118,8 +2134,10 @@ hace que el juego **empiece en esa escena**, como si lo primero que hiciera fuer
 lleva a la escena de siempre) se salta, y las demás van como siempre; así se prueba una escena sin
 recorrer el juego. Y `LINCE_JUEGO_GRABAR_GUION=ruta.txt` **apunta las teclas que se pulsan mientras se
 juega**, con el mismo formato de `LINCE_JUEGO_GUION` (`10:espacio:5,30:derecha:20`, una línea): lo
-grabado se reproduce tal cual con `LINCE_JUEGO_GUION="$(cat ruta.txt)"`. Esc y F5 no se apuntan; el
-archivo se reescribe cada vez que se suelta una tecla y al cerrar.
+grabado se reproduce tal cual con `LINCE_JUEGO_GUION="$(cat ruta.txt)"`. El botón izquierdo del
+ratón (o el dedo) se apunta como `toque` si no se movió y como `deslizar` si se movió (en línea recta,
+de donde bajó a donde subió). Esc y F5 no se apuntan; el archivo se reescribe cada vez que se suelta
+una tecla y al cerrar.
 
 ### `bytes`
 
@@ -2580,13 +2598,13 @@ el código del juego que se ha ejecutado al jugarlo.
 
 | Función | Qué hace |
 |---|---|
-| `juego.jugar(archivo[, opciones])` | juega ese juego en otro proceso y devuelve `{"ok", "codigo", "salida", "error", "capturas"}` (las rutas, en el orden pedido). Opciones: `guion` (lista de entradas: `"30:derecha:20"` mantiene derecha desde el fotograma 30 durante 20, `"50:espacio"` la pulsa en el 50, `"40:mando1:a"` es un botón o un eje del mando 1, `"70:toque:240:135"` toca la pantalla —o hace clic— ahí), `capturas` (los fotogramas, contando desde 0), `fotogramas` (cuántos juega: por defecto, hasta la última captura, o 300), `carpeta` (dónde van las capturas; por defecto, una para cada `jugar`), `semilla` (1), `escena` (empezar en esa escena), `escribir` (lo que teclea cuando el juego pide texto) y `argumentos` |
+| `juego.jugar(archivo[, opciones])` | juega ese juego en otro proceso y devuelve `{"ok", "codigo", "salida", "error", "capturas"}` (las rutas, en el orden pedido). Opciones: `guion` (lista de entradas: `"30:derecha:20"` mantiene derecha desde el fotograma 30 durante 20, `"50:espacio"` la pulsa en el 50, `"40:mando1:a"` es un botón o un eje del mando 1, `"70:toque:240:135"` toca la pantalla —o hace clic— ahí, `"30:deslizar:100:300:250:300:6"` apoya el dedo en el primer punto en el fotograma 30, lo lleva en línea recta durante 6 fotogramas —6 si no se dice— y lo levanta en el segundo; `"toque2"` y `"deslizar2"` son un segundo dedo, para probar gestos con dos), `capturas` (los fotogramas, contando desde 0), `fotogramas` (cuántos juega: por defecto, hasta la última captura, o 300), `carpeta` (dónde van las capturas; por defecto, una para cada `jugar`), `semilla` (1), `escena` (empezar en esa escena), `escribir` (lo que teclea cuando el juego pide texto), `conexion` (lo que da `sistema.conexion()`: `"con"`, `"sin"`, `"medida"` o `"desconocida"`) y `argumentos` |
 | `juego.igual_que_antes(captura, nombre[, opciones])` | ¿se ve como la referencia? (la primera vez la guarda y dice que sí). Opciones: `carpeta` (`"referencias"`), `tolerancia` (cuánto puede cambiar cada color sin contar, de 0 a 255) y `margen` (qué parte de la imagen puede cambiar, de 0 a 1) |
 | `juego.pixel(ruta, x, y)` | `[r, g, b, a]` de ese punto de una imagen guardada |
 | `juego.comparar_imagenes(a, b[, opciones])` | `{"distintos", "total", "parte", "ancho", "alto", "mismo_tamaño"}`: cuántos píxeles cambian. Opciones: `tolerancia` y `diferencias` (la ruta de un PNG con lo que cambia en magenta) |
 
 El guion es el mismo que el de `LINCE_JUEGO_GUION` y se puede grabar jugando con
-`LINCE_JUEGO_GRABAR_GUION=guion.txt lince mi_juego.lince` (con las teclas), y ese texto vale tal
+`LINCE_JUEGO_GRABAR_GUION=guion.txt lince mi_juego.lince` (con las teclas, los toques y los deslizamientos), y ese texto vale tal
 cual: `"guion": archivos.leer("guion.txt")`. `jugar` e `igual_que_antes` están escritos en Lince,
 en `juego.lince`; `pixel` y `comparar_imagenes`, en C, por la velocidad.
 

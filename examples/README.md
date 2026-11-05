@@ -33,6 +33,8 @@ Y se reparten como un único ejecutable:
 
 | `13_fisica.lince` | flechas o A/D, espacio para saltar, R para empezar otra vez | **física sencilla** (`juego.fisica.mundo`, `juego.fisica.cuerpo`, `juego.fisica.avanzar`): cajas que se empujan según su masa y se apilan, pelotas que rebotan, un ascensor que lleva lo que tiene encima y monedas que solo avisan al tocarlas (`juego.fisica.tocando`) |
 
+| `14_deslizar.lince` | deslizar el dedo (o arrastrar con el ratón) | **gestos de deslizamiento** (`juego.deslizamiento`): un cuadrado que salta de casilla en una rejilla de 4 × 4, y la flecha del gesto en curso (`juego.deslizando`) |
+
 Todos terminan con **Esc** (en la aventura, Esc abre la pausa, que tiene «Salir»).
 
 ## Probar el equipo

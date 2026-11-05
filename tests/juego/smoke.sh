@@ -958,4 +958,34 @@ PY
 [ "$(grep -c '^nueva a$' salida44.txt)" = 1 ] && [ "$(grep -c '^nueva b$' salida44.txt)" = 1 ] && grep -qxF "hola de m: 1" salida44.txt \
     && ok "2.10: importar juego desde un módulo con «como» no duplica el estado (la escena cambia una vez)" \
     || { mal "importar juego con «como» duplica el estado"; cat salida44.txt; }
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida43.txt salida44.txt salida5b.txt; exit 1; }
+# ── 2.11: deslizamientos (con el guion y un segundo dedo), sistema.conexion y el guion grabado ──
+G211="10:deslizar:150:150:250:150,30:deslizar:250:150:150:150,50:deslizar:150:200:150:100,70:deslizar:150:100:150:200,90:deslizar:50:50:150:90,110:deslizar:150:150:200:200,130:deslizar:150:150:180:150,150:deslizar:150:150:250:190:1,170:deslizar:150:150:250:230,190:deslizar:150:150:250:150:10,192:deslizar2:50:50:50:200:4,240:toque2:20:20:20,245:deslizar:150:150:250:150:4"
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=280 LINCE_CONEXION=sin LINCE_JUEGO_GUION="$G211" timeout 60 "$LINCE" "$DIR/prueba38.lince" > salida45.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de la 2.11 termina bien" || mal "la prueba de la 2.11 falló"
+# los cuatro sentidos, la diagonal con un eje que domina (dos veces), la casi
+# diagonal y el primero de dos dedos; el empate, el corto y el que empezó con
+# otro dedo apoyado no dan nada; cada gesto, en un solo fotograma
+esperado="G derecha 100 0|G izquierda -100 0|G arriba 0 -100|G abajo 0 100|G derecha 100 40|G derecha 100 40|G derecha 100 80|G derecha 100 0"
+[ "$(grep '^G ' salida45.txt | paste -sd'|')" = "$esperado" ] && ok "2.11: los deslizamientos del guion, uno por gesto y solo con el primer dedo" \
+    || { mal "2.11: los deslizamientos no son los esperados"; grep '^G ' salida45.txt; }
+[ "$(grep -c '^Z ' salida45.txt)" = 1 ] && ok "2.11: \"zona\": cuenta dónde empieza (aunque acabe fuera)" || mal "2.11: la zona"
+[ "$(grep -c '^D ' salida45.txt)" = 7 ] && ok "2.11: \"diagonal\": \"ignorar\" descarta el que va casi en diagonal" || mal "2.11: la diagonal"
+[ "$(grep -c '^R ' salida45.txt)" = 1 ] && ok "2.11: \"duracion_maxima\"" || mal "2.11: la duración máxima"
+for l in "distintos: 0" "conexion: sin_conexion nulo rapida: verdadero" "guion bien: nulo" \
+         'error: deslizamiento(): "distancia" es un número mayor que 0 (en píxeles del juego)' \
+         'error: deslizamiento(): "zona" es [x, y, ancho, alto], con ancho y alto mayores que 0' \
+         "error: deslizamiento(): no conozco la opción 'x' (hay \"distancia\", \"zona\", \"duracion_maxima\", \"diagonal\" y \"margen_diagonal\")" \
+         'guion: «10:deslizar:1:2»: un deslizamiento es "fotograma:deslizar:x1:y1:x2:y2[:fotogramas]"'; do
+    grep -qxF "$l" salida45.txt && ok "2.11: $l" || mal "falta la línea: $l"
+done
+printf 'importar "sistema"\nescribir("{sistema.conexion()} {sistema.conexion_medida()}")\n' > conexion.lince
+for c in "con:con_conexion falso" "medida:con_conexion verdadero" "desconocida:desconocida nulo"; do
+    [ "$(LINCE_CONEXION="${c%%:*}" "$LINCE" conexion.lince)" = "${c#*:}" ] && ok "2.11: LINCE_CONEXION=${c%%:*}" || mal "2.11: LINCE_CONEXION=${c%%:*}"
+done
+case "$("$LINCE" conexion.lince)" in con_conexion*|sin_conexion*|desconocida*) ok "2.11: sistema.conexion() sin simular" ;; *) mal "2.11: sistema.conexion() sin simular" ;; esac
+rm -f grabado.txt
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=60 LINCE_JUEGO_GUION="10:deslizar:10:10:100:10:5,30:toque:5:6:3,40:a:2" \
+    LINCE_JUEGO_GRABAR_GUION=grabado.txt timeout 30 "$LINCE" "$DIR/prueba38.lince" > /dev/null 2>&1
+[ "$(cat grabado.txt 2>/dev/null)" = "10:deslizar:10:10:100:10:5,30:toque:5:6:3,40:a:2" ] && ok "2.11: el guion grabado apunta toques y deslizamientos" \
+    || { mal "2.11: el guion grabado"; cat grabado.txt; }
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida43.txt salida44.txt salida45.txt salida5b.txt; exit 1; }

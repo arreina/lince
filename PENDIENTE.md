@@ -201,7 +201,21 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   con su valor de ahora y sus funciones aceptan los parámetros por defecto (lo encontró Bichito);
   y `sistema.salir()`, que se perdió en la 2.6.0.
 
-### 2.11 — Preparar la 3.0 (solo si hay limpieza)
+### 2.11 — Lo que pidió Chatarrabot: toques, deslizamientos y conexión (publicada)
+- [x] Arreglado: en Android, un toque muy rápido caía más abajo en `toques()` (se quitaban dos veces
+  las bandas) y `clic()` lo perdía.
+- [x] `juego.deslizamiento()` y `juego.deslizando()`, y `"deslizar"` en el guion de pruebas (también
+  se graba), con un segundo dedo para las pruebas (`"toque2"`, `"deslizar2"`).
+- [x] `sistema.conexion()` y `sistema.conexion_medida()`; en Android, el permiso de la red solo en los
+  juegos que la llaman (las variantes de la plantilla).
+
+### 2.12 — Lo que pidió Chatarrabot: anuncios recompensados y compras únicas
+- [ ] Módulo `anuncios` (solo el formato recompensado, solo cuando el juego lo pide, con el
+  consentimiento UMP) y módulo `compras` (productos únicos con Google Play Billing), con
+  simulación en el ordenador. Las bibliotecas de Google y sus permisos, solo en los juegos que
+  importan cada módulo (variantes `anuncios`, `compras` y `anuncios_compras` de la plantilla).
+
+### 2.13 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.
 
 ### 3.0 — Otra limpieza, solo si hace falta

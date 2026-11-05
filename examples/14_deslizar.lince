@@ -1,0 +1,35 @@
+# 🐆 Deslizar el dedo: el cuadrado salta de casilla en una rejilla de 4 × 4 con
+# cada deslizamiento (en el ordenador, arrastrando con el ratón). La flecha
+# muestra el gesto mientras se hace, con juego.deslizando().
+importar "juego"
+
+fijo LADO = 50
+fijo X0 = 140
+fijo Y0 = 35
+sea casilla = [0, 0]
+sea ultima = "ninguna"
+juego.abrir("Deslizar", 480, 270)
+mientras juego.abierto() {
+    sea g = juego.deslizamiento({"distancia": 40})
+    si g != nulo {
+        ultima = g["direccion"]
+        si ultima == "derecha" y casilla[0] < 3 { casilla[0] = casilla[0] + 1 }
+        si ultima == "izquierda" y casilla[0] > 0 { casilla[0] = casilla[0] - 1 }
+        si ultima == "abajo" y casilla[1] < 3 { casilla[1] = casilla[1] + 1 }
+        si ultima == "arriba" y casilla[1] > 0 { casilla[1] = casilla[1] - 1 }
+    }
+    juego.limpiar([25, 25, 35])
+    para (fila = 0; fila < 4; fila++) {
+        para (col = 0; col < 4; col++) {
+            juego.rectangulo(X0 + col * LADO + 2, Y0 + fila * LADO + 2, LADO - 4, LADO - 4, [50, 50, 70])
+        }
+    }
+    juego.rectangulo(X0 + casilla[0] * LADO + 8, Y0 + casilla[1] * LADO + 8, LADO - 16, LADO - 16, [240, 190, 60])
+    sea d = juego.deslizando()
+    si d != nulo {
+        juego.linea(d["desde"][0], d["desde"][1], d["hasta"][0], d["hasta"][1], [255, 255, 255])
+        juego.circulo(d["hasta"][0], d["hasta"][1], 6, [255, 255, 255])
+    }
+    juego.texto("ÚLTIMA: {ultima}", 20, 245, {"escala": 1})
+    juego.presentar()
+}

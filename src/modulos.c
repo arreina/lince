@@ -6,6 +6,7 @@
 #ifndef _WIN32
 #define _GNU_SOURCE      /* timegm */
 #endif
+#include "servicios.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1209,6 +1210,21 @@ static Valor *fn_sis_plataforma(Valor **a, int n) {
 #endif
 }
 
+/* conexion(): "con_conexion", "sin_conexion" o "desconocida" (sin abrir
+   conexiones; LINCE_CONEXION la fija en las pruebas) */
+static Valor *fn_sis_conexion(Valor **a, int n) {
+    (void)a; (void)n;
+    return valor_texto(servicio_conexion());
+}
+
+/* conexion_medida(): verdadero si la red es de pago por uso (datos móviles),
+   falso si no, nulo si no se sabe (en el ordenador, siempre nulo) */
+static Valor *fn_sis_conexion_medida(Valor **a, int n) {
+    (void)a; (void)n;
+    int m = servicio_conexion_medida();
+    return m < 0 ? valor_nulo() : valor_booleano(m);
+}
+
 /* ejecutable(): la ruta del propio lince (para lanzar otro programa con él) */
 static Valor *fn_sis_ejecutable(Valor **a, int n) {
     (void)a; (void)n;
@@ -1926,6 +1942,8 @@ static void cargar_sistema(Entorno *entorno) {
         {"ejecutable",         fn_sis_ejecutable,          0},
         {"existe",             fn_sis_existe,              1},
         {"salir",              fn_sis_salir,               1},
+        {"conexion",           fn_sis_conexion,            0},
+        {"conexion_medida",    fn_sis_conexion_medida,     0},
     };
     registrar_modulo_diccionario(entorno, "sistema",          /* contadas, no a mano: al añadir */
         fns, (int)(sizeof fns / sizeof fns[0]), NULL, NULL, 0);  /* una, no se pierde la última */

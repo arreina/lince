@@ -48,4 +48,11 @@ void empaquetado_poner_dato(const char *clave, const char *datos, size_t largo);
    hace el instalador de Windows con el juego que instala). 0 si va bien. */
 int empaquetado_copiar_propio(const char *salida, const char *quitar, const char *clave, const char *datos, size_t largo);
 
+/* Lo que usa el programa que se acaba de empaquetar (para el .apk: qué
+   permisos y bibliotecas de Android necesita) */
+#define USO_RED      1      /* sistema.conexion() */
+#define USO_ANUNCIOS 2      /* importar "anuncios" */
+#define USO_COMPRAS  4      /* importar "compras" */
+int empaquetado_usos(void);
+
 #endif /* LINCE_EMPAQUETADO_H */

@@ -102,6 +102,27 @@ else
     echo "  ⏭  sin bundletool: no se comprueba el .aab con él"
 fi
 
+# 2.11: el permiso de la red, solo en el juego que llama a sistema.conexion()
+printf 'importar "juego"\nimportar "sistema"\njuego.abrir("red", 100, 100)\nescribir(sistema.conexion())\n' > "$T/red.lince"
+HOME="$T" LINCE_ANDROID_PLANTILLA="$PL" "$LINCE" repartir "$T/red.lince" --android -o "$T/red.apk" > "$T/salida8.txt" 2>&1
+HOME="$T" LINCE_ANDROID_PLANTILLA="$PL" "$LINCE" repartir "$T/red.lince" --aab --id org.ejemplo.red -o "$T/red.aab" > "$T/salida9.txt" 2>&1
+tiene_permiso() {       # el manifiesto binario (textos en UTF-8 o UTF-16) o el del .aab (protobuf)
+    python3 - "$1" "$2" <<'PY2'
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1]); d = z.read(sys.argv[2])
+p = "android.permission.ACCESS_NETWORK_STATE"
+sys.exit(0 if p.encode() in d or p.encode("utf-16-le") in d else 1)
+PY2
+}
+tiene_permiso "$T/red.apk" AndroidManifest.xml && ok "2.11: el .apk que usa sistema.conexion() lleva ACCESS_NETWORK_STATE" || mal "2.11: falta el permiso de la red"
+tiene_permiso "$T/pong.apk" AndroidManifest.xml && mal "2.11: un juego sin sistema.conexion() lleva el permiso de la red" || ok "2.11: el que no la usa, sin permiso de la red"
+tiene_permiso "$T/red.aab" base/manifest/AndroidManifest.xml && ok "2.11: también en el .aab" || mal "2.11: el .aab sin el permiso de la red"
+tiene_permiso "$T/pong.aab" base/manifest/AndroidManifest.xml && mal "2.11: el .aab sin sistema.conexion() lleva el permiso" || ok "2.11: el .aab que no la usa, sin el permiso"
+unzip -l "$T/red.apk" 2>/dev/null | grep -q " variantes/" && mal "2.11: el .apk lleva las variantes de la plantilla" || ok "2.11: sin las variantes de la plantilla"
+if [ -n "$BUNDLETOOL" ] && [ -f "$BUNDLETOOL" ] && command -v java > /dev/null; then
+    java -jar "$BUNDLETOOL" validate --bundle="$T/red.aab" > /dev/null 2>&1 && ok "2.11: bundletool da por bueno el .aab con el permiso" || mal "2.11: bundletool no da por bueno el .aab con el permiso"
+fi
+
 APKSIGNER="$(ls -d "${ANDROID_SDK_ROOT:-$HOME/lince-android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
 if [ -n "$APKSIGNER" ] && command -v java > /dev/null; then
     "$APKSIGNER" verify "$T/pong.apk" && ok "apksigner: la firma es válida" || mal "apksigner no la da por buena"

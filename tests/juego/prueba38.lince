@@ -1,0 +1,36 @@
+# 2.11: deslizamientos (juego.deslizamiento y juego.deslizando, con el guion
+# "deslizar" y un segundo dedo, "toque2" y "deslizar2") y sistema.conexion.
+# smoke.sh le pasa el guion y mira la salida.
+importar "juego"
+importar "sistema"
+importar "tiempo"
+
+para cada cualquiera mala en [{"distancia": 0}, {"zona": [1, 2]}, {"x": 1}, {"diagonal": "x"}, {"margen_diagonal": 50}] {
+    intentar { juego.deslizamiento(mala) } capturar (error e) { escribir("error: {e.mensaje}") }
+}
+escribir("guion: {juego._paso_guion("10:deslizar:1:2")}")
+escribir("guion bien: {juego._paso_guion("10:deslizar:1:2:3:4:5")}")
+sea t0 = tiempo.ahora()
+para (i = 0; i < 1000; i++) { sistema.conexion() }
+escribir("conexion: {sistema.conexion()} {sistema.conexion_medida()} rapida: {(tiempo.ahora() - t0) < 1}")
+
+juego.abrir("2.11", 320, 240)
+sea distintos = 0
+mientras juego.abierto() {
+    sea g = juego.deslizamiento()
+    si g != nulo { escribir("G {g["direccion"]} {g["dx"]} {g["dy"]}") }
+    sea z = juego.deslizamiento({"zona": [0, 0, 100, 100]})
+    si z != nulo { escribir("Z {z["direccion"]}") }
+    sea d = juego.deslizamiento({"diagonal": "ignorar", "margen_diagonal": 10})
+    si d != nulo { escribir("D {d["direccion"]}") }
+    sea corto = juego.deslizamiento({"duracion_maxima": 0.05})
+    si corto != nulo { escribir("R {corto["direccion"]}") }
+    # el guion mueve el dedo como uno de verdad: toques() y deslizando() dicen lo mismo
+    sea en_curso = juego.deslizando()
+    sea dedos = juego.toques()
+    si en_curso != nulo y dedos.longitud() == 1 y (dedos[0]["x"] != en_curso["hasta"][0] o dedos[0]["y"] != en_curso["hasta"][1]) {
+        distintos++
+    }
+    juego.presentar()
+}
+escribir("distintos: {distintos}")

@@ -38,6 +38,7 @@ done <<'LISTA'
 11_movil.lince|LINCE_JUEGO_CLIC|430,230
 12_aventura.lince|LINCE_JUEGO_PULSAR|espacio,derecha
 13_fisica.lince|LINCE_JUEGO_PULSAR|derecha,espacio
+14_deslizar.lince|LINCE_JUEGO_GUION|5:deslizar:200:150:330:150:6,30:deslizar:200:60:200:180:6
 LISTA
 # El juego completo: el principio jugado con teclas (la portada, la sabia, el
 # pueblo, guardar en el pozo y entrar en el bosque); tiene que acabar en el bosque.

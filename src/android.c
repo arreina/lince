@@ -13,7 +13,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <jni.h>
 #include "empaquetado.h"
+#include "servicios.h"
 
 /* Lo que el juego escribe (escribir(), los errores) va al registro del
    sistema: se ve con 'adb logcat -s lince' */
@@ -61,6 +63,54 @@ int android_preparar(void) {
     free(datos);
     if (!ok) avisar("assets/juego.paq no es un juego de Lince");
     return ok;
+}
+
+/* La puerta a la parte en Java: org.lince.Servicios.llamar(actividad, orden,
+   datos), con los textos en UTF-8 (byte[]: así pasan bien también los que no
+   caben en el UTF-8 «modificado» de JNI). Ahí se mira la conexión, y van los
+   anuncios y las compras si el .apk los lleva. */
+char *android_servicio(const char *orden, const char *datos) {
+    static void *(*env_de)(void), *(*actividad_de)(void);
+    static jclass clase;
+    static jmethodID metodo;
+    if (!env_de) {
+        void *sdl = dlopen("libSDL2.so", RTLD_NOW);
+        if (!sdl) return NULL;
+        env_de = (void *(*)(void))dlsym(sdl, "SDL_AndroidGetJNIEnv");
+        actividad_de = (void *(*)(void))dlsym(sdl, "SDL_AndroidGetActivity");
+        if (!env_de || !actividad_de) { env_de = NULL; return NULL; }
+    }
+    JNIEnv *env = (JNIEnv *)env_de();
+    if (!env) return NULL;
+    if (!clase) {
+        jclass c = (*env)->FindClass(env, "org/lince/Servicios");
+        if (!c) { (*env)->ExceptionClear(env); return NULL; }
+        clase = (jclass)(*env)->NewGlobalRef(env, c);
+        (*env)->DeleteLocalRef(env, c);
+        metodo = (*env)->GetStaticMethodID(env, clase, "llamar", "(Landroid/app/Activity;[B[B)[B");
+        if (!metodo) { (*env)->ExceptionClear(env); return NULL; }
+    }
+    if (!metodo) return NULL;
+    jobject act = (jobject)actividad_de();
+    size_t lo = strlen(orden), ld = datos ? strlen(datos) : 0;
+    jbyteArray jo = (*env)->NewByteArray(env, (jsize)lo), jd = (*env)->NewByteArray(env, (jsize)ld);
+    char *r = NULL;
+    if (jo && jd) {
+        (*env)->SetByteArrayRegion(env, jo, 0, (jsize)lo, (const jbyte *)orden);
+        if (ld) (*env)->SetByteArrayRegion(env, jd, 0, (jsize)ld, (const jbyte *)datos);
+        jbyteArray jr = (jbyteArray)(*env)->CallStaticObjectMethod(env, clase, metodo, act, jo, jd);
+        if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionDescribe(env); (*env)->ExceptionClear(env); jr = NULL; }
+        if (jr) {
+            jsize n = (*env)->GetArrayLength(env, jr);
+            r = malloc((size_t)n + 1);
+            if (r) { (*env)->GetByteArrayRegion(env, jr, 0, n, (jbyte *)r); r[n] = '\0'; }
+            (*env)->DeleteLocalRef(env, jr);
+        }
+    }
+    if (jo) (*env)->DeleteLocalRef(env, jo);
+    if (jd) (*env)->DeleteLocalRef(env, jd);
+    if (act) (*env)->DeleteLocalRef(env, act);
+    return r;
 }
 #else
 typedef int lince_android_vacio;        /* en otros sistemas no hay nada aquí */

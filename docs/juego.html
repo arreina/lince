@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v2.10</span>
+  <span class="version">v2.11</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -157,7 +157,7 @@
 <div class="grupo"><a href="#hojas-de-sprites" class="sec">Hojas de sprites</a><a href="#hojas-de-sprites-0" class="sub">Una hoja con todos los fotogramas</a><a href="#hojas-de-sprites-1" class="sub">Hojas desordenadas</a><a href="#hojas-de-sprites-2" class="sub">Animaciones a partir de un dibujo</a></div>
 <div class="grupo"><a href="#animador" class="sec">Animador</a><a href="#animador-0" class="sub">El animador</a></div>
 <div class="grupo"><a href="#entrada" class="sec">Entrada</a><a href="#entrada-0" class="sub">Teclas y ratón</a><a href="#entrada-1" class="sub">Acciones: teclado y mando a la vez</a><a href="#entrada-2" class="sub">Escribir un nombre</a></div>
-<div class="grupo"><a href="#movil" class="sec">Móvil</a><a href="#movil-0" class="sub">El mando de la pantalla táctil</a><a href="#movil-1" class="sub">Dedos, vibrar e inclinar</a></div>
+<div class="grupo"><a href="#movil" class="sec">Móvil</a><a href="#movil-0" class="sub">El mando de la pantalla táctil</a><a href="#movil-1" class="sub">Dedos, vibrar e inclinar</a><a href="#movil-2" class="sub">Deslizar el dedo</a><a href="#movil-3" class="sub">¿Hay conexión?</a></div>
 <div class="grupo"><a href="#sonido" class="sec">Sonido</a><a href="#sonido-0" class="sub">Efectos sin archivos</a><a href="#sonido-1" class="sub">Sonidos y música de archivos</a><a href="#sonido-2" class="sub">Grupos de volumen, sonido con sitio y fundidos</a></div>
 <div class="grupo"><a href="#movimiento" class="sec">Movimiento</a><a href="#movimiento-0" class="sub">Movimiento suave</a></div>
 <div class="grupo"><a href="#camara" class="sec">Cámara</a><a href="#camara-0" class="sub">Cámara y temblor</a><a href="#camara-1" class="sub">Zoom, giro y pantalla partida</a></div>
@@ -182,7 +182,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>46 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>48 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -483,7 +483,50 @@ juego.abrir(<span class="s">&quot;Dedos&quot;</span>, <span class="n">480</span>
     }
     juego.<span class="t">texto</span>(<span class="s">&quot;TÁCTIL: {juego.tactil()}   INCLINACIÓN: {juego.inclinacion()}&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
     juego.presentar()
-}</code></pre></div><figure><img src="img/juego/720_toques.png" alt="Captura de «Dedos, vibrar e inclinar»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/720_toques.lince</span></article></section>
+}</code></pre></div><figure><img src="img/juego/720_toques.png" alt="Captura de «Dedos, vibrar e inclinar»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/720_toques.lince</span></article><article class="ej" id="movil-2"><h3>Deslizar el dedo</h3><p class="nota"><code>juego.deslizamiento()</code> da el gesto en el fotograma en que se levanta el dedo: <code>&quot;direccion&quot;</code> (&quot;arriba&quot;, &quot;abajo&quot;, &quot;izquierda&quot; o &quot;derecha&quot;), <code>&quot;dx&quot;</code>, <code>&quot;dy&quot;</code>, <code>&quot;desde&quot;</code>, <code>&quot;hasta&quot;</code> y <code>&quot;duracion&quot;</code>; si no, <code>nulo</code>. Un recorrido más corto que <code>&quot;distancia&quot;</code> (48 por defecto) es un toque, no un deslizamiento. Con <code>&quot;zona&quot;: [x, y, ancho, alto]</code> solo cuentan los que empiezan ahí. En el ordenador, arrastrar con el botón izquierdo del ratón hace lo mismo.</p><p class="nota"><code>juego.deslizando()</code> da el gesto mientras el dedo sigue apoyado: aquí, para dibujar la flecha. En las pruebas, <code>&quot;30:deslizar:100:300:250:300&quot;</code> en el guion desliza de un punto al otro.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+
+<span class="k">fijo</span> LADO = <span class="n">50</span>
+<span class="k">fijo</span> X0 = <span class="n">140</span>
+<span class="k">fijo</span> Y0 = <span class="n">35</span>
+<span class="k">sea</span> casilla = [<span class="n">0</span>, <span class="n">0</span>]
+<span class="k">sea</span> ultima = <span class="s">&quot;ninguna&quot;</span>
+juego.abrir(<span class="s">&quot;Deslizar&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">sea</span> g = juego.deslizamiento({<span class="s">&quot;distancia&quot;</span>: <span class="n">40</span>})
+    <span class="k">si</span> g != <span class="k">nulo</span> {
+        ultima = g[<span class="s">&quot;direccion&quot;</span>]
+        <span class="k">si</span> ultima == <span class="s">&quot;derecha&quot;</span> <span class="k">y</span> casilla[<span class="n">0</span>] &lt; <span class="n">3</span> { casilla[<span class="n">0</span>] = casilla[<span class="n">0</span>] + <span class="n">1</span> }
+        <span class="k">si</span> ultima == <span class="s">&quot;izquierda&quot;</span> <span class="k">y</span> casilla[<span class="n">0</span>] &gt; <span class="n">0</span> { casilla[<span class="n">0</span>] = casilla[<span class="n">0</span>] - <span class="n">1</span> }
+        <span class="k">si</span> ultima == <span class="s">&quot;abajo&quot;</span> <span class="k">y</span> casilla[<span class="n">1</span>] &lt; <span class="n">3</span> { casilla[<span class="n">1</span>] = casilla[<span class="n">1</span>] + <span class="n">1</span> }
+        <span class="k">si</span> ultima == <span class="s">&quot;arriba&quot;</span> <span class="k">y</span> casilla[<span class="n">1</span>] &gt; <span class="n">0</span> { casilla[<span class="n">1</span>] = casilla[<span class="n">1</span>] - <span class="n">1</span> }
+    }
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">35</span>])
+    <span class="k">para</span> (fila = <span class="n">0</span>; fila &lt; <span class="n">4</span>; fila++) {
+        <span class="k">para</span> (col = <span class="n">0</span>; col &lt; <span class="n">4</span>; col++) {
+            juego.rectangulo(X0 + col * LADO + <span class="n">2</span>, Y0 + fila * LADO + <span class="n">2</span>, LADO - <span class="n">4</span>, LADO - <span class="n">4</span>, [<span class="n">50</span>, <span class="n">50</span>, <span class="n">70</span>])
+        }
+    }
+    juego.rectangulo(X0 + casilla[<span class="n">0</span>] * LADO + <span class="n">8</span>, Y0 + casilla[<span class="n">1</span>] * LADO + <span class="n">8</span>, LADO - <span class="n">16</span>, LADO - <span class="n">16</span>, [<span class="n">240</span>, <span class="n">190</span>, <span class="n">60</span>])
+    <span class="k">sea</span> d = juego.deslizando()
+    <span class="k">si</span> d != <span class="k">nulo</span> {
+        juego.linea(d[<span class="s">&quot;desde&quot;</span>][<span class="n">0</span>], d[<span class="s">&quot;desde&quot;</span>][<span class="n">1</span>], d[<span class="s">&quot;hasta&quot;</span>][<span class="n">0</span>], d[<span class="s">&quot;hasta&quot;</span>][<span class="n">1</span>], [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>])
+        juego.circulo(d[<span class="s">&quot;hasta&quot;</span>][<span class="n">0</span>], d[<span class="s">&quot;hasta&quot;</span>][<span class="n">1</span>], <span class="n">6</span>, [<span class="n">255</span>, <span class="n">255</span>, <span class="n">255</span>])
+    }
+    juego.<span class="t">texto</span>(<span class="s">&quot;ÚLTIMA: {ultima}&quot;</span>, <span class="n">20</span>, <span class="n">245</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/730_deslizar.png" alt="Captura de «Deslizar el dedo»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/730_deslizar.lince</span></article><article class="ej" id="movil-3"><h3>¿Hay conexión?</h3><p class="nota"><code>sistema.conexion()</code> dice si el aparato tiene Internet ahora mismo: <code>&quot;con_conexion&quot;</code>, <code>&quot;sin_conexion&quot;</code> o <code>&quot;desconocida&quot;</code>, sin abrir ninguna conexión y enseguida (lo mira como mucho una vez por segundo). <code>sistema.conexion_medida()</code> es verdadero si la red es de pago por uso (datos móviles), falso si no y <code>nulo</code> si no se sabe (en el ordenador, siempre <code>nulo</code>). Sirve para desactivar un botón que necesita la red en vez de intentarlo y fallar.</p><p class="nota">En Android necesita el permiso <code>ACCESS_NETWORK_STATE</code>, que Lince pone solo en el <code>.apk</code> de los juegos que llaman a <code>sistema.conexion()</code>. En las pruebas, <code>LINCE_CONEXION=sin</code> (o <code>con</code>, <code>medida</code>, <code>desconocida</code>) la fija, y <code>juego.jugar()</code> tiene la opción <code>&quot;conexion&quot;</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;sistema&quot;</span>
+
+juego.abrir(<span class="s">&quot;Conexión&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">sea</span> estado = sistema.conexion()
+    <span class="k">sea</span> color = <span class="k">si</span> estado == <span class="s">&quot;con_conexion&quot;</span> { [<span class="n">90</span>, <span class="n">200</span>, <span class="n">120</span>] } <span class="k">sino</span> <span class="k">si</span> estado == <span class="s">&quot;sin_conexion&quot;</span> { [<span class="n">220</span>, <span class="n">90</span>, <span class="n">90</span>] } <span class="k">sino</span> { [<span class="n">160</span>, <span class="n">160</span>, <span class="n">160</span>] }
+    <span class="k">sea</span> textos = {<span class="s">&quot;con_conexion&quot;</span>: <span class="s">&quot;CON CONEXIÓN&quot;</span>, <span class="s">&quot;sin_conexion&quot;</span>: <span class="s">&quot;SIN CONEXIÓN&quot;</span>, <span class="s">&quot;desconocida&quot;</span>: <span class="s">&quot;NO SE SABE&quot;</span>}
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">35</span>])
+    juego.circulo(<span class="n">240</span>, <span class="n">110</span>, <span class="n">40</span>, color)
+    juego.<span class="t">texto</span>(textos[estado], <span class="n">240</span> - juego.ancho_texto(textos[estado], {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>}) / <span class="n">2</span>, <span class="n">175</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>})
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/740_conexion.png" alt="Captura de «¿Hay conexión?»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/740_conexion.lince</span></article></section>
 <section id="sonido"><h2>Sonido</h2><article class="ej" id="sonido-0"><h3>Efectos sin archivos</h3><p class="nota"><code>juego.efecto(&quot;moneda&quot;)</code> genera y hace sonar un efecto al estilo de los juegos de 8 bits: <code>&quot;moneda&quot;</code>, <code>&quot;salto&quot;</code>, <code>&quot;disparo&quot;</code>, <code>&quot;explosion&quot;</code>, <code>&quot;golpe&quot;</code>, <code>&quot;subir&quot;</code>, <code>&quot;clic&quot;</code> o <code>&quot;perder&quot;</code>. Cada vez suena un poco distinto. <code>juego.crear_efecto()</code> lo da como sonido, para <code>juego.reproducir()</code> o para guardarlo con <code>juego.guardar_sonido()</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Sonido&quot;</span>, <span class="n">320</span>, <span class="n">180</span>)

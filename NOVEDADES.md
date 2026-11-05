@@ -3,6 +3,26 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.11.0
+
+Lo que pidió Chatarrabot, un puzle para Android hecho con Lince: un arreglo de los toques en el móvil, gestos de deslizar y saber si hay conexión. Solo añade: nada de la 2.0 cambia.
+
+- **Arreglado: en Android, un toque muy rápido caía más abajo.** Si el dedo bajaba y subía entre dos fotogramas, `juego.toques()` lo daba desplazado cuando el juego tenía bandas arriba y abajo (unos 65 píxeles en un móvil de 1080 × 2400 con un juego de 360 × 640): SDL ya da esas coordenadas sin las bandas, y Lince las quitaba otra vez. Ahora sale en el mismo sitio que un toque largo.
+- **Arreglado: `juego.clic()` perdía los clics y los toques rápidos** que bajan y suben entre dos fotogramas (uno de cada dos con `adb shell input tap`). Ahora cuentan en un fotograma.
+- **`juego.deslizamiento([opciones])`**: el gesto de deslizar el dedo (o arrastrar con el ratón), en el fotograma en que se levanta: su dirección (`"arriba"`, `"abajo"`, `"izquierda"` o `"derecha"`), `dx`, `dy`, `desde`, `hasta` y `duracion`. Opciones: `distancia`, `zona`, `duracion_maxima`, `diagonal` y `margen_diagonal`. **`juego.deslizando()`**, el gesto mientras se hace, para dibujar una flecha. Ejemplo nuevo: `examples/14_deslizar.lince`.
+- **`"30:deslizar:100:300:250:300"` en el guion de pruebas** (en `juego.jugar` y `LINCE_JUEGO_GUION`), y un segundo dedo (`"toque2"`, `"deslizar2"`) para probar gestos con dos. `LINCE_JUEGO_GRABAR_GUION` apunta también los toques y los deslizamientos.
+- **`sistema.conexion()`**: `"con_conexion"`, `"sin_conexion"` o `"desconocida"`, sin abrir ninguna conexión, en Linux, Windows y Android; y **`sistema.conexion_medida()`**, si son datos móviles. En las pruebas, `LINCE_CONEXION` y la opción `"conexion"` de `juego.jugar`.
+- **El permiso de la red, solo en los juegos que lo usan**: `lince repartir --android` / `--aab` pone `ACCESS_NETWORK_STATE` solo si el juego llama a `sistema.conexion()`. La plantilla de Android trae ahora *variantes* (lo que solo llevan algunos juegos), que es por donde vendrán los anuncios y las compras en la 2.12.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.11.0-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.11.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.11.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.11.0.vsix` |
+
 ## 2.10.1
 
 Arreglos de los módulos que encontró Bichito, y uno que encontramos de paso.

@@ -8,7 +8,9 @@
 # botones que usan las acciones. Cada dedo en la pantalla se ve como un círculo con
 # su número. Inclinar el móvil también mueve al lince, y al saltar vibra. Una
 # estrella parpadea con una tarea, y el juego cuenta en un archivo cuántas
-# veces se ha abierto. El botón «atrás» del móvil (o Esc) sale.
+# veces se ha abierto. El botón «atrás» del móvil (o Esc) sale. Un toque muy
+# rápido (el dedo baja y sube entre dos fotogramas) también se ve: un círculo
+# en el mismo sitio que uno largo (desde la 2.11).
 #
 # Muestra: juego.mando_tactil() (las acciones con "mando:..." funcionan igual
 #          con el de la pantalla), juego.toques(), tareas, efectos de sonido
