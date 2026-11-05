@@ -1,0 +1,201 @@
+# 🐆 Lince — el módulo 'anuncios': anuncios recompensados («mira un anuncio y
+# consigue algo»), solo cuando el juego los pide.
+#
+# Va dentro del ejecutable (src/lince/incrustar.py) y se carga con
+# 'importar "anuncios"'. En Android habla con la parte en Java
+# (android/servicios/anuncios/org/lince/Anuncios.java, con la biblioteca de
+# anuncios de Google) por anuncios._android(orden, datos); esa biblioteca, el
+# permiso INTERNET y el identificador de la app solo van en el .apk de los
+# juegos que importan este módulo. En el ordenador no hay anuncios: con
+# LINCE_ANUNCIOS=completar, cerrar, fallar, sin_conexion o no_disponible se
+# simulan (un segundo de «anuncio de prueba» en la ventana).
+#
+# Solo el formato recompensado: ni banners, ni anuncios al abrir, ni a ratos.
+# Lince no enseña ninguno si el juego no llama a mostrar().
+
+importar "juego"
+importar "sistema"
+importar "texto"
+importar "json"
+importar "tiempo"
+
+fijo _SIMULAR = ["completar", "cerrar", "fallar", "sin_conexion", "no_disponible"]
+fijo _OPCIONES = ["app", "bloque", "pruebas", "espera"]
+
+sea _config = nulo           # lo de configurar()
+sea _simular = nulo          # lo de LINCE_ANUNCIOS, o nulo (o "no_disponible" sin Android)
+sea _estado = "sin_preparar" # en la simulación
+sea _listo_en = 0            # cuándo pasa de "cargando" a "listo" (simulación)
+sea _resultado = nulo
+sea _mostrando = falso
+
+# opciones[c], o 'defecto' si no está
+funcion _de(diccionario opciones, texto c, cualquiera defecto): cualquiera {
+    si opciones.contiene(c) { devolver opciones[c] }
+    devolver defecto
+}
+
+funcion _ahora(): numero {
+    si juego.abierto() { devolver juego.tiempo_real() }
+    devolver tiempo.ahora()
+}
+
+# ¿Hay Android de verdad? Si no, se simula
+funcion _en_android(): logico {
+    devolver _simular == nulo
+}
+
+funcion _configurado(texto fn): nulo {
+    si _config == nulo {
+        lanzar ErrorJuego("anuncios.{fn}(): antes hay que llamar a anuncios.configurar(), con el \"app\" y el \"bloque\" de AdMob")
+    }
+}
+
+# configurar(opciones): los identificadores de AdMob. Opciones: "app"
+# ("ca-app-pub-...~..."), "bloque" (el bloque de anuncios recompensados,
+# "ca-app-pub-.../..."), "pruebas" (verdadero si no se dice: los anuncios de
+# prueba de Google, que se pueden tocar sin miedo; con falso, los de verdad)
+# y "espera" (segundos que puede tardar en cargar: 10).
+funcion configurar(cualquiera opciones): nulo {
+    si no (opciones es diccionario) { lanzar ErrorTipo("anuncios.configurar() espera un diccionario con \"app\", \"bloque\", \"pruebas\" y \"espera\"") }
+    para cada texto c en opciones {
+        si no _OPCIONES.contiene(c) {
+            lanzar ErrorArgumento("anuncios.configurar(): no conozco la opción '{c}' (hay \"app\", \"bloque\", \"pruebas\" y \"espera\")")
+        }
+    }
+    sea app = _de(opciones, "app", "")
+    sea bloque = _de(opciones, "bloque", "")
+    si no (app es texto) o (app != "" y (no app.empieza_con("ca-app-pub-") o no app.contiene("~"))) {
+        lanzar ErrorArgumento("anuncios.configurar(): \"app\" es el identificador de la app de AdMob, como \"ca-app-pub-1234567890123456~1234567890\"")
+    }
+    si no (bloque es texto) o (bloque != "" y (no bloque.empieza_con("ca-app-pub-") o no bloque.contiene("/"))) {
+        lanzar ErrorArgumento("anuncios.configurar(): \"bloque\" es el del bloque de anuncios, como \"ca-app-pub-1234567890123456/1234567890\"")
+    }
+    sea pruebas = _de(opciones, "pruebas", verdadero)
+    si no (pruebas es logico) { lanzar ErrorTipo("anuncios.configurar(): \"pruebas\" es verdadero o falso") }
+    si no pruebas y (app == "" o bloque == "") {
+        lanzar ErrorArgumento("anuncios.configurar(): con \"pruebas\": falso hacen falta \"app\" y \"bloque\" (los de AdMob)")
+    }
+    sea espera = _de(opciones, "espera", 10)
+    si no (espera es numero) o espera <= 0 { lanzar ErrorArgumento("anuncios.configurar(): \"espera\" son segundos, más que 0") }
+    _config = {"app": app, "bloque": bloque, "pruebas": pruebas, "espera": espera}
+    sea s = sistema.entorno("LINCE_ANUNCIOS", "")
+    si s != "" {
+        si no _SIMULAR.contiene(s) {
+            lanzar ErrorArgumento("LINCE_ANUNCIOS es completar, cerrar, fallar, sin_conexion o no_disponible (no '{s}')")
+        }
+        _simular = s
+    } sino si anuncios._android("estado", "") == nulo {
+        _simular = "no_disponible"          # en el ordenador, sin simular: no hay anuncios
+    }
+    si _en_android() {
+        anuncios._android("configurar", "{bloque}\n{si pruebas { 1 } sino { 0 }}\n{espera}")
+    }
+}
+
+# preparar(): empieza a cargar un anuncio (no enseña nada). Mejor un rato
+# antes de que haga falta: en cuanto estado() es "listo", se puede mostrar.
+funcion preparar(): nulo {
+    _configurado("preparar")
+    si _en_android() {
+        anuncios._android("preparar", "")
+        devolver nulo
+    }
+    si _mostrando o _estado == "cargando" o _estado == "listo" { devolver nulo }
+    si _simular == "no_disponible" { _estado = "no_disponible" }
+    sino si _simular == "sin_conexion" { _estado = "sin_conexion" }
+    sino {
+        _estado = "cargando"
+        _listo_en = _ahora() + 0.5
+    }
+}
+
+# estado(): "sin_preparar", "cargando", "listo", "sin_conexion", "error",
+# "falta_consentimiento" (hay que llamar antes a pedir_consentimiento()) o
+# "no_disponible" (aquí no hay anuncios: en el ordenador, o sin Google Play).
+funcion estado(): texto {
+    _configurado("estado")
+    si _en_android() {
+        sea e = anuncios._android("estado", "")
+        devolver si e == nulo o e.empieza_con("error:") { "error" } sino { e }
+    }
+    si _simular == "no_disponible" { devolver "no_disponible" }
+    si _estado == "cargando" y _ahora() >= _listo_en { _estado = "listo" }
+    devolver _estado
+}
+
+# mostrar(): enseña el anuncio que está listo. Mientras se ve, el juego se
+# queda en pausa (como al salir de la app). Lo que pasó lo dice resultado().
+funcion mostrar(): nulo {
+    _configurado("mostrar")
+    si _en_android() {                  # Java mira si ya se está mostrando y si hay uno listo
+        sea r = anuncios._android("mostrar", "")
+        si r != nulo y r.empieza_con("error:") { lanzar ErrorJuego("anuncios.mostrar(): {r.extraer(6, r.longitud())}") }
+        devolver nulo
+    }
+    si _mostrando { lanzar ErrorJuego("anuncios.mostrar(): ya se está mostrando un anuncio") }
+    sea e = estado()
+    si e != "listo" { lanzar ErrorJuego("anuncios.mostrar(): no hay ningún anuncio listo (estado() es \"{e}\"): antes, preparar()") }
+    # simulación: un segundo de «anuncio de prueba», con el juego parado
+    _mostrando = verdadero
+    _estado = "sin_preparar"
+    si juego.abierto() {
+        para (i = 0; i < 60 y juego.abierto(); i++) {
+            juego.limpiar([250, 250, 250])
+            sea alto = juego.alto()
+            sea ancho = juego.ancho()
+            juego.texto("ANUNCIO DE PRUEBA", ancho / 2 - juego.ancho_texto("ANUNCIO DE PRUEBA", {"escala": 2}) / 2, alto / 2 - 10, {"escala": 2, "color": [40, 40, 40]})
+            juego.rectangulo(0, alto - 6, ancho * (i + 1) / 60, 6, [66, 133, 244])
+            juego.presentar()
+        }
+    }
+    _mostrando = falso
+    sea motivo = si _simular == "completar" { "completado" } sino si _simular == "cerrar" { "cerrado" } sino { "error" }
+    sea premio = motivo == "completado"
+    _resultado = {"recompensa": premio, "motivo": motivo, "tipo": si premio { "recompensa" } sino { "" }, "cantidad": si premio { 1 } sino { 0 }}
+}
+
+# resultado(): nulo mientras no acaba; luego, una sola vez,
+# {"recompensa": lógico, "motivo": "completado", "cerrado", "error" o
+# "sin_conexion", "tipo", "cantidad"} (los de la recompensa puesta en AdMob).
+# Solo hay recompensa si Google confirma que se vio entero.
+funcion resultado(): cualquiera {
+    _configurado("resultado")
+    si _en_android() {
+        sea r = anuncios._android("resultado", "")
+        si r == nulo o r == "" o r.empieza_con("error:") { devolver nulo }
+        devolver json.parsear(r)
+    }
+    sea r = _resultado
+    _resultado = nulo
+    devolver r
+}
+
+# consentimiento(): "no_hace_falta" (fuera de Europa y lugares así),
+# "concedido", "denegado" (sin anuncios personalizados) o "pendiente".
+# En la simulación, LINCE_ANUNCIOS_CONSENTIMIENTO (por defecto, "no_hace_falta").
+funcion consentimiento(): texto {
+    _configurado("consentimiento")
+    si _en_android() {
+        sea c = anuncios._android("consentimiento", "")
+        devolver si c == nulo o c.empieza_con("error:") { "pendiente" } sino { c }
+    }
+    sea c = sistema.entorno("LINCE_ANUNCIOS_CONSENTIMIENTO", "no_hace_falta")
+    si no ["no_hace_falta", "concedido", "denegado", "pendiente"].contiene(c) { devolver "pendiente" }
+    devolver c
+}
+
+# personalizados(): ¿pueden ser personalizados los anuncios? Solo si el
+# jugador lo concedió (o no hace falta preguntar).
+funcion personalizados(): logico {
+    sea c = consentimiento()
+    devolver c == "concedido" o c == "no_hace_falta"
+}
+
+# pedir_consentimiento(): enseña el formulario de consentimiento de Google
+# (UMP) si en ese país hace falta; si no, nada. Mejor al empezar el juego, o
+# antes del primer anuncio.
+funcion pedir_consentimiento(): nulo {
+    _configurado("pedir_consentimiento")
+    si _en_android() { anuncios._android("pedir_consentimiento", "") }
+}

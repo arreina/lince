@@ -226,7 +226,19 @@ static void anadir_de_mapa(const char *ruta) {
    los 'importar' de 'codigo', añadiendo cada archivo que encuentra. 'actual' es
    el fichero desde el que se resuelven los './x'. */
 static int _usos;
+static char _anuncios_app[128];
 int empaquetado_usos(void) { return _usos; }
+const char *empaquetado_anuncios_app(void) { return _anuncios_app[0] ? _anuncios_app : NULL; }
+
+/* "ca-app-pub-" + 16 cifras + "~" + 10 cifras (las cifras, de 1 a 24 por si cambian) */
+static int es_app_admob(const char *t) {
+    if (strncmp(t, "ca-app-pub-", 11) != 0) return 0;
+    const char *p = t + 11;
+    size_t a = strspn(p, "0123456789");
+    if (a < 1 || a > 24 || p[a] != '~') return 0;
+    size_t b = strspn(p + a + 1, "0123456789");
+    return b >= 1 && b <= 24 && p[a + 1 + b] == '\0';
+}
 
 static void recoger(const char *codigo, const char *actual) {
     Lexer  *lx  = lexer_crear(codigo);
@@ -248,6 +260,8 @@ static void recoger(const char *codigo, const char *actual) {
             if (!strcmp(tok[i + 1].valor, "anuncios")) _usos |= USO_ANUNCIOS | USO_RED;
             if (!strcmp(tok[i + 1].valor, "compras")) _usos |= USO_COMPRAS | USO_RED;
         }
+        if (tok[i].tipo == TOK_TEXTO && tok[i].valor && !_anuncios_app[0] && es_app_admob(tok[i].valor))
+            snprintf(_anuncios_app, sizeof _anuncios_app, "%s", tok[i].valor);
         /* los idiomas (la carpeta idiomas) van dentro si el juego traduce algo */
         if (tok[i].tipo == TOK_IDENTIFICADOR && tok[i].valor && i > 0 && tok[i - 1].tipo == TOK_PUNTO &&
             (!strcmp(tok[i].valor, "traducir") || !strcmp(tok[i].valor, "idioma") ||
@@ -425,6 +439,7 @@ int empaquetado_crear(const char *archivo, const char *salida, const char *const
     }
     _entradas = NULL; _num_entradas = 0;
     _usos = 0;
+    _anuncios_app[0] = '\0';
     anadir(principal, codigo);
     recoger(codigo, principal);
     free(codigo);

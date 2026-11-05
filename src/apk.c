@@ -32,6 +32,7 @@ char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen)
 #define PLANTILLA_PAQUETE "org.lince.plantilla"
 #define PLANTILLA_NOMBRE  "LINCE_NOMBRE"
 #define PLANTILLA_VERSION 1234321         /* versionCode y versionName de la plantilla */
+#define PLANTILLA_ADMOB   "ca-app-pub-3940256099942544~3347511713"   /* la app de pruebas de Google */
 
 static uint16_t le16(const unsigned char *p) { return (uint16_t)(p[0] | p[1] << 8); }
 static uint32_t le32(const unsigned char *p) { return p[0] | p[1] << 8 | p[2] << 16 | (uint32_t)p[3] << 24; }
@@ -761,15 +762,35 @@ static void hacer_ficha(const char *juego, const char *salida, const ApkOpciones
                    "   - Capturas de teléfono: captura-*.png (de 2 a 8)\n"
                    "   - Descripción breve (hasta 80 letras) y descripción completa (hasta 4000)\n"
                    "   - Categoría: Juegos, y el tipo de juego\n\n");
-        fprintf(f, "4. Lo que pregunta Google sobre la app:\n"
-                   "   - Seguridad de los datos: un juego de Lince no recoge ni comparte datos\n"
-                   "     (las partidas se guardan en el propio móvil), salvo que tú añadas algo.\n"
-                   "   - Anuncios: no tiene.\n"
-                   "   - Clasificación del contenido: el cuestionario, según tu juego.\n"
+        int usos = empaquetado_usos();
+        if (usos & USO_ANUNCIOS)
+            fprintf(f, "4. Lo que pregunta Google sobre la app:\n"
+                       "   - Anuncios: SÍ tiene (anuncios recompensados de AdMob).\n"
+                       "   - Seguridad de los datos: la biblioteca de anuncios de Google recoge y\n"
+                       "     comparte el identificador de publicidad y datos de uso de la app (para los\n"
+                       "     anuncios y contra el fraude). Míralo en la guía de AdMob sobre la sección\n"
+                       "     de seguridad de los datos.\n"
+                       "   - Identificador de publicidad: sí lo usa (para anuncios).\n"
+                       "   - Consentimiento: configura el mensaje de GDPR en AdMob (Privacidad y\n"
+                       "     mensajes) y llama a anuncios.pedir_consentimiento() al empezar.\n");
+        else
+            fprintf(f, "4. Lo que pregunta Google sobre la app:\n"
+                       "   - Seguridad de los datos: un juego de Lince no recoge ni comparte datos\n"
+                       "     (las partidas se guardan en el propio móvil), salvo que tú añadas algo.\n"
+                       "   - Anuncios: no tiene.\n");
+        if (usos & USO_COMPRAS)
+            fprintf(f, "   - Compras en la aplicación: SÍ tiene. Crea los productos en Monetizar →\n"
+                       "     Productos integrados en la aplicación (con este .aab ya subido), y prueba\n"
+                       "     con cuentas de «Pruebas de licencias».\n");
+        fprintf(f, "   - Clasificación del contenido: el cuestionario, según tu juego.\n"
                    "   - Público objetivo: si es para menores de 13, Google pide más (política de\n"
-                   "     privacidad, contenido para familias).\n"
-                   "   - Política de privacidad: una página web tuya que diga que no recoge datos.\n"
-                   "   - Permisos: solo VIBRATE (la vibración del mando y del móvil).\n");
+                   "     privacidad, contenido para familias%s).\n"
+                   "   - Política de privacidad: una página web tuya que diga qué datos se recogen.\n"
+                   "   - Permisos: VIBRATE (la vibración)%s%s%s.\n",
+                usos & USO_ANUNCIOS ? "; con anuncios, solo los aptos para niños" : "",
+                usos & USO_RED ? ", ACCESS_NETWORK_STATE (saber si hay conexión)" : "",
+                usos & USO_ANUNCIOS ? ", INTERNET y AD_ID (los anuncios)" : usos & USO_COMPRAS ? ", INTERNET" : "",
+                usos & USO_COMPRAS ? " y BILLING (las compras)" : "");
         fclose(f);
         printf("   + LEEME.txt (lo que pide Google Play, paso a paso)\n");
     }
@@ -864,8 +885,18 @@ int apk_crear(const char *juego, const char *salida, const ApkOpciones *op, cons
     if (icono_mal) { free(e); free(pl); free(datos_paq); free(nuevas); return 1; }
     char texto_plantilla[16];
     snprintf(texto_plantilla, sizeof texto_plantilla, "%d", PLANTILLA_VERSION);
-    const char *de[3] = {PLANTILLA_PAQUETE, PLANTILLA_NOMBRE, texto_plantilla}, *a[3] = {id, nombre, texto_version};
-    Cambios cambios = {de, a, 3, version};
+    /* la app de AdMob: --anuncios-app, o la que esté en el código; si no, la de pruebas de Google */
+    const char *admob = op->anuncios_app ? op->anuncios_app : empaquetado_anuncios_app();
+    if (!admob) admob = PLANTILLA_ADMOB;
+    if (empaquetado_usos() & USO_ANUNCIOS) {
+        if (strcmp(admob, PLANTILLA_ADMOB) == 0)
+            printf("ℹ  Anuncios con la app de pruebas de Google: para los de verdad, pon el \"app\" de AdMob en\n"
+                   "   anuncios.configurar() (o --anuncios-app ca-app-pub-...~...).\n");
+        else printf("   Anuncios de la app de AdMob %s\n", admob);
+    }
+    const char *de[4] = {PLANTILLA_PAQUETE, PLANTILLA_NOMBRE, texto_plantilla, PLANTILLA_ADMOB},
+               *a[4] = {id, nombre, texto_version, admob};
+    Cambios cambios = {de, a, 4, version};
     for (int i = 0; i < num && !malo; i++) {
         const char *x = e[i].nombre;
         if (!x[0] || strncmp(x, "META-INF/", 9) == 0 || strcmp(x, "assets/juego.paq") == 0) continue;
@@ -876,7 +907,7 @@ int apk_crear(const char *juego, const char *salida, const ApkOpciones *op, cons
         if (strcmp(x, "AndroidManifest.xml") == 0) {
             size_t n, n2;
             unsigned char *xml = descomprimir(&e[i], &n);
-            unsigned char *cambiado = xml ? axml_cambiar(xml, n, de, a, 3, &n2) : NULL;
+            unsigned char *cambiado = xml ? axml_cambiar(xml, n, de, a, 4, &n2) : NULL;
             free(xml);
             if (!cambiado) { malo = 1; break; }
             axml_cambiar_version(cambiado, n2, version);

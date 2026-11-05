@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 🐆 Lo que añade la variante de anuncios al manifiesto (el resto lo pone la
+     biblioteca de Google al unirlos: INTERNET, ACCESS_NETWORK_STATE, AD_ID...).
+     El identificador de la app de AdMob es el de pruebas de Google: 'lince
+     repartir' lo cambia por el del juego (src/apk.c). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <application>
+        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
+    </application>
+</manifest>

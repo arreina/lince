@@ -25,3 +25,7 @@ lince.exe
 *.apk
 *.idsig
 __pycache__/
+
+# Gradle (android/servicios: solo si se lanza sin construir.sh)
+android/servicios/obra/
+android/servicios/.gradle/

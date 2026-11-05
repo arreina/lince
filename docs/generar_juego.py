@@ -16,6 +16,8 @@ Metadatos de cada ejemplo (líneas '# @clave: valor' al principio):
   teclas, guion, clic las teclas o clics de prueba (LINCE_JUEGO_PULSAR,
                       LINCE_JUEGO_GUION, LINCE_JUEGO_CLIC)
   escribe             lo que teclea cuando el juego lo pide (LINCE_JUEGO_ESCRIBIR)
+  entorno             CLAVE=valor para ejecutarlo (LINCE_ANUNCIOS=completar: la
+                      simulación de un módulo); no se enseña en la página
   captura: no         sin captura (lo que no dibuja nada: sonido, partidas...)
   ejecutar: no        solo se enseña, sin ejecutarlo (necesita archivos que no hay)
   lenguaje: terminal  son órdenes de la terminal, no Lince (sin resaltar ni ejecutar)
@@ -86,6 +88,9 @@ def ejecutar(ej, ruta, captura):
                            ("clic", "LINCE_JUEGO_CLIC"), ("escribe", "LINCE_JUEGO_ESCRIBIR")):
             if ej.get(clave):
                 entorno[var] = ej[clave]
+        if ej.get("entorno"):
+            clave, _, valor = ej["entorno"].partition("=")
+            entorno[clave.strip()] = valor.strip()
         if captura:
             entorno["LINCE_JUEGO_CAPTURA"] = str(captura)
         # se ejecuta desde docs/juego, donde están los recursos de los ejemplos

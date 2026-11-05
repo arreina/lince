@@ -4084,7 +4084,7 @@ funcion ve(cualquiera ser, cualquiera objetivo, cualquiera opciones = nulo): log
 # prueba, se lance 'lince probar' desde donde se lance, y el juego se juega
 # desde su carpeta, como cuando se lanza a mano.
 
-fijo _JUGAR_OPCIONES = ["fotogramas", "guion", "capturas", "carpeta", "semilla", "escena", "escribir", "argumentos", "conexion"]
+fijo _JUGAR_OPCIONES = ["fotogramas", "guion", "capturas", "carpeta", "semilla", "escena", "escribir", "argumentos", "conexion", "anuncios", "compras"]
 sea _jugadas = 0     # cuántas veces ha jugado este programa: cada vez, sus capturas en su carpeta
 
 # La ruta completa del programa (la prueba), con "/"
@@ -4155,7 +4155,8 @@ funcion _crear_carpeta(texto ruta): nulo {
 # "semilla" (la de los números aleatorios: 1), "escena" (para empezar en una
 # escena), "escribir" (lo que teclea cuando el juego pide texto),
 # "conexion" (lo que dirá sistema.conexion(): "con", "sin", "medida" o
-# "desconocida") y "argumentos". Las partidas guardadas empiezan vacías en cada jugar().
+# "desconocida"), "anuncios" y "compras" (la simulación de esos módulos, como
+# LINCE_ANUNCIOS y LINCE_COMPRAS) y "argumentos". Las partidas guardadas empiezan vacías en cada jugar().
 # Devuelve {"ok", "codigo", "salida", "error", "capturas"} (las rutas, en el
 # orden pedido).
 funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
@@ -4233,7 +4234,9 @@ funcion jugar(cualquiera archivo, cualquiera opciones = nulo): diccionario {
         "LINCE_JUEGO_ESCENA": "{_de(aj, "escena", "")}",
         "LINCE_JUEGO_ESCRIBIR": "{_de(aj, "escribir", "")}",
         "LINCE_JUEGO_GUARDADO": partidas,
-        "LINCE_CONEXION": conexion
+        "LINCE_CONEXION": conexion,
+        "LINCE_ANUNCIOS": "{_de(aj, "anuncios", "")}",
+        "LINCE_COMPRAS": "{_de(aj, "compras", "")}"
     }
     # el juego las hereda; luego se dejan como estaban (nulo: no estaba)
     sea antes = {}

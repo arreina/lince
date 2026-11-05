@@ -34,7 +34,7 @@
 
       <!-- Módulos estándar -->
       <Keywords name="Keywords6">
-        a_logico a_numero a_texto argumentos escribir esperar filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json pruebas juego bytes bits
+        a_logico a_numero a_texto argumentos escribir esperar filtrar leer mapear rango reducir matematica texto archivos tiempo sistema json pruebas juego bytes bits anuncios compras
       </Keywords>
 
       <!-- Operadores -->

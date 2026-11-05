@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.11
+# 🐆 Lince — Especificación del Lenguaje v2.12
 
 ## Filosofía
 
@@ -1048,6 +1048,8 @@ importar "sistema"
 importar "json"
 importar "pruebas"
 importar "juego"
+importar "anuncios"     # anuncios recompensados (Android)
+importar "compras"      # compras en Google Play (Android)
 ```
 
 ### `matematica`
@@ -1145,6 +1147,79 @@ pone solo en los juegos que llaman a `conexion()` o `conexion_medida()`.
 `conexion_medida()` solo se sabe en Android (en el ordenador, `nulo`). En las
 pruebas, `LINCE_CONEXION=con`, `sin`, `medida` (con conexión de pago por uso)
 o `desconocida` la fija, y `juego.jugar()` tiene la opción `"conexion"`.
+
+### `anuncios` (Android)
+
+Anuncios **recompensados**: el jugador decide ver uno para conseguir algo (una vida, una pista,
+seguir la partida). Solo ese formato, y solo cuando el juego llama a `mostrar()`: Lince no enseña
+ningún anuncio por su cuenta (ni al abrir, ni al volver a la app, ni a ratos).
+
+```lince
+importar "anuncios"
+
+anuncios.configurar({"app": "ca-app-pub-...~...", "bloque": "ca-app-pub-.../...", "pruebas": verdadero})
+anuncios.pedir_consentimiento()     # el formulario de Google (UMP), donde haga falta
+anuncios.preparar()                 # empieza a cargar uno, sin enseñar nada
+anuncios.estado()                   # "sin_preparar", "cargando", "listo", "sin_conexion", "error",
+                                    # "falta_consentimiento" o "no_disponible"
+anuncios.mostrar()                  # solo con estado() "listo"; si no, ErrorJuego
+anuncios.resultado()                # nulo mientras no acaba; luego, una sola vez:
+                                    # {"recompensa", "motivo", "tipo", "cantidad"}
+anuncios.consentimiento()           # "no_hace_falta", "concedido", "denegado" o "pendiente"
+anuncios.personalizados()           # ¿pueden ser personalizados? (concedido o no hace falta)
+```
+
+- `configurar` va antes que lo demás (si no, `ErrorJuego`). `"app"` y `"bloque"` son los
+  identificadores de AdMob; con `"pruebas"` (verdadero si no se dice) salen los anuncios de prueba
+  de Google, que se pueden tocar sin miedo; con `"pruebas": falso`, los de verdad. `"espera"` son
+  los segundos que puede tardar en cargar (10): después, `"error"` o `"sin_conexion"`, nunca una
+  espera sin fin. Un anuncio cargado caduca a la hora; `preparar()` trae otro.
+- `resultado()["motivo"]` es `"completado"`, `"cerrado"` (lo cerró antes de acabar), `"error"` o
+  `"sin_conexion"`. Solo hay `"recompensa"` si Google confirma que se vio entero; `"tipo"` y
+  `"cantidad"` son los de la recompensa puesta en AdMob. Mientras se ve el anuncio el juego queda en
+  pausa, como al salir de la app. Si el juego se cierra antes, el resultado se pierde.
+- Sin consentimiento (en Europa), `estado()` es `"falta_consentimiento"` hasta que el jugador
+  responde al formulario de `pedir_consentimiento()`. Con `"denegado"` los anuncios no son
+  personalizados.
+- `lince repartir --android` / `--aab` mete la biblioteca de anuncios de Google, los permisos
+  `INTERNET`, `ACCESS_NETWORK_STATE` y `AD_ID` y el identificador de la app de AdMob (el que está en
+  el código, o `--anuncios-app`) **solo** en los juegos que importan `anuncios`.
+- En el ordenador no hay anuncios (`estado()` es `"no_disponible"`). `LINCE_ANUNCIOS=completar`,
+  `cerrar`, `fallar`, `sin_conexion` o `no_disponible` los simula: `mostrar()` enseña un segundo
+  de «anuncio de prueba» y `resultado()` da ese final; `LINCE_ANUNCIOS_CONSENTIMIENTO` simula el
+  consentimiento. `juego.jugar()` tiene la opción `"anuncios"`.
+
+### `compras` (Android)
+
+Productos que se compran **una vez y son para siempre** (no consumibles), con Google Play Billing:
+la versión completa, un paquete de aspectos, quitar anuncios. Ni consumibles ni suscripciones.
+
+```lince
+importar "compras"
+
+compras.estado()                    # "lista", "conectando", "sin_conexion" o "no_disponible"
+compras.consultar_productos(["version_completa"])
+compras.productos()                 # nulo mientras no llegan; luego [{"id", "titulo", "descripcion", "precio"}]
+compras.comprar("version_completa") # abre la compra de Google Play
+compras.resultado_compra()          # nulo mientras no acaba; luego, una vez: {"id", "resultado", "mensaje"}
+compras.restaurar()                 # pregunta a Google Play lo que tiene el jugador
+compras.comprados()                 # nulo mientras no llega; luego {"ok", "productos": [ids]}
+```
+
+- Todo es asíncrono: se pide y la respuesta llega unos fotogramas después.
+- `"resultado"` es `"comprado"`, `"ya_comprado"`, `"cancelado"`, `"pendiente"` (se pagará más tarde:
+  cuando se complete, sale en `comprados()`), `"error"`, `"sin_conexion"` o `"no_disponible"`.
+  Lince confirma cada compra a Google (*acknowledge*) y no da `"comprado"` hasta que la
+  confirmación termina (si no, Google la devuelve a los tres días).
+- `comprados()` da solo lo que está en vigor (no lo devuelto). Lince no guarda nada: el juego
+  decide qué recordar para jugar sin conexión. `comprar()` con otra compra en curso, `ErrorJuego`.
+- La biblioteca de Google Play Billing y los permisos `BILLING` e `INTERNET` van **solo** en los
+  juegos que importan `compras`.
+- En el ordenador no hay tienda (`estado()` es `"no_disponible"`). `LINCE_COMPRAS` la simula:
+  `"comprar=comprado;tiene=id_1;precio=3,99 €"`, con `comprar=` el resultado de las compras
+  (`comprado`, `ya_comprado`, `cancelado`, `pendiente`, `error`, `sin_conexion`), `tiene=` lo que ya
+  tiene el jugador, `productos=` los que existen (si no, todos) y `precio=`; o `sin_conexion` o
+  `no_disponible`. `juego.jugar()` tiene la opción `"compras"`.
 
 ### `json`
 
@@ -2598,7 +2673,7 @@ el código del juego que se ha ejecutado al jugarlo.
 
 | Función | Qué hace |
 |---|---|
-| `juego.jugar(archivo[, opciones])` | juega ese juego en otro proceso y devuelve `{"ok", "codigo", "salida", "error", "capturas"}` (las rutas, en el orden pedido). Opciones: `guion` (lista de entradas: `"30:derecha:20"` mantiene derecha desde el fotograma 30 durante 20, `"50:espacio"` la pulsa en el 50, `"40:mando1:a"` es un botón o un eje del mando 1, `"70:toque:240:135"` toca la pantalla —o hace clic— ahí, `"30:deslizar:100:300:250:300:6"` apoya el dedo en el primer punto en el fotograma 30, lo lleva en línea recta durante 6 fotogramas —6 si no se dice— y lo levanta en el segundo; `"toque2"` y `"deslizar2"` son un segundo dedo, para probar gestos con dos), `capturas` (los fotogramas, contando desde 0), `fotogramas` (cuántos juega: por defecto, hasta la última captura, o 300), `carpeta` (dónde van las capturas; por defecto, una para cada `jugar`), `semilla` (1), `escena` (empezar en esa escena), `escribir` (lo que teclea cuando el juego pide texto), `conexion` (lo que da `sistema.conexion()`: `"con"`, `"sin"`, `"medida"` o `"desconocida"`) y `argumentos` |
+| `juego.jugar(archivo[, opciones])` | juega ese juego en otro proceso y devuelve `{"ok", "codigo", "salida", "error", "capturas"}` (las rutas, en el orden pedido). Opciones: `guion` (lista de entradas: `"30:derecha:20"` mantiene derecha desde el fotograma 30 durante 20, `"50:espacio"` la pulsa en el 50, `"40:mando1:a"` es un botón o un eje del mando 1, `"70:toque:240:135"` toca la pantalla —o hace clic— ahí, `"30:deslizar:100:300:250:300:6"` apoya el dedo en el primer punto en el fotograma 30, lo lleva en línea recta durante 6 fotogramas —6 si no se dice— y lo levanta en el segundo; `"toque2"` y `"deslizar2"` son un segundo dedo, para probar gestos con dos), `capturas` (los fotogramas, contando desde 0), `fotogramas` (cuántos juega: por defecto, hasta la última captura, o 300), `carpeta` (dónde van las capturas; por defecto, una para cada `jugar`), `semilla` (1), `escena` (empezar en esa escena), `escribir` (lo que teclea cuando el juego pide texto), `conexion` (lo que da `sistema.conexion()`: `"con"`, `"sin"`, `"medida"` o `"desconocida"`), `anuncios` y `compras` (su simulación, como `LINCE_ANUNCIOS` y `LINCE_COMPRAS`) y `argumentos` |
 | `juego.igual_que_antes(captura, nombre[, opciones])` | ¿se ve como la referencia? (la primera vez la guarda y dice que sí). Opciones: `carpeta` (`"referencias"`), `tolerancia` (cuánto puede cambiar cada color sin contar, de 0 a 255) y `margen` (qué parte de la imagen puede cambiar, de 0 a 1) |
 | `juego.pixel(ruta, x, y)` | `[r, g, b, a]` de ese punto de una imagen guardada |
 | `juego.comparar_imagenes(a, b[, opciones])` | `{"distintos", "total", "parte", "ancho", "alto", "mismo_tamaño"}`: cuántos píxeles cambian. Opciones: `tolerancia` y `diferencias` (la ruta de un PNG con lo que cambia en magenta) |

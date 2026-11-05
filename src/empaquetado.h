@@ -54,5 +54,8 @@ int empaquetado_copiar_propio(const char *salida, const char *quitar, const char
 #define USO_ANUNCIOS 2      /* importar "anuncios" */
 #define USO_COMPRAS  4      /* importar "compras" */
 int empaquetado_usos(void);
+/* El identificador de la app de AdMob que aparece en el código
+   ("ca-app-pub-...~..."), o NULL */
+const char *empaquetado_anuncios_app(void);
 
 #endif /* LINCE_EMPAQUETADO_H */

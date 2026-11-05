@@ -136,6 +136,37 @@ if [ "$PLANTILLA" = 1 ]; then
     "$BT/aapt2" link --proto-format -o "$T/red/proto.apk" -I "$PLAT/android.jar" --manifest "$T/red/AndroidManifest.xml" "$T/res.zip"
     (cd "$V" && unzip -q -o "$T/red/red.apk" AndroidManifest.xml)
     (cd "$T/red" && unzip -q -o proto.apk AndroidManifest.xml && mv AndroidManifest.xml "$V/aab/base/manifest/")
+
+    # Las variantes con bibliotecas de Google (anuncios, compras o las dos):
+    # las hace Gradle (android/servicios), que trae las bibliotecas y une los
+    # manifiestos, y de lo que hace se queda con el manifiesto, los recursos y
+    # el código, del .apk y del .aab. Las bibliotecas .so son las de siempre.
+    GRADLE_V=8.14.3
+    GRADLE="$A/gradle-$GRADLE_V/bin/gradle"
+    if [ ! -x "$GRADLE" ]; then
+        mkdir -p "$A/descargas"
+        curl -sSL -o "$A/descargas/gradle-$GRADLE_V.zip" "https://services.gradle.org/distributions/gradle-$GRADLE_V-bin.zip"
+        unzip -q -o "$A/descargas/gradle-$GRADLE_V.zip" -d "$A"
+    fi
+    # el manifiesto de siempre, sin lo que en Gradle va en build.gradle
+    manifiesto "$T/gradle.xml"
+    sed -i -e 's|package="[^"]*"||' -e 's|android:versionCode="[^"]*"||' -e 's|android:versionName="[^"]*"||' \
+        -e '/<uses-sdk/d' "$T/gradle.xml"
+    echo "🔧 Las variantes con anuncios y compras (Gradle)..."
+    LINCE_MANIFIESTO="$T/gradle.xml" LINCE_RES="$T/res" LINCE_SDL="$SDL" LINCE_OBRA="$OBRA/servicios" ANDROID_HOME="$SDK" \
+        "$GRADLE" -q --no-daemon -p "$RAIZ/android/servicios" --project-cache-dir "$OBRA/gradle-cache" \
+        assembleAnunciosRelease assembleComprasRelease assembleAmbosRelease \
+        bundleAnunciosRelease bundleComprasRelease bundleAmbosRelease > "$OBRA/gradle.log" 2>&1 ||
+        { tail -40 "$OBRA/gradle.log"; echo "❌ Falló Gradle (las variantes con anuncios y compras)"; exit 1; }
+    for par in anuncios:anuncios compras:compras ambos:anuncios_compras; do
+        sabor="${par%%:*}"; V="$T/variantes/${par#*:}"
+        APK_V="$(find "$OBRA/servicios/outputs/apk/$sabor/release" -name '*.apk' | head -1)"
+        AAB_V="$(find "$OBRA/servicios/outputs/bundle/${sabor}Release" -name '*.aab' | head -1)"
+        [ -f "$APK_V" ] && [ -f "$AAB_V" ] || { echo "❌ Gradle no hizo la variante $sabor"; exit 1; }
+        rm -rf "$V" "$T/v"; mkdir -p "$V/aab/base" "$T/v"
+        (cd "$V" && unzip -q -o "$APK_V" AndroidManifest.xml resources.arsc 'classes*.dex' 'res/*')
+        (cd "$T/v" && unzip -q -o "$AAB_V" 'base/manifest/*' base/resources.pb 'base/res/*' && cp -r base/manifest base/resources.pb base/res "$V/aab/base/")
+    done
     (cd "$T" && zip -q -r base.apk variantes)
 fi
 "$BT/zipalign" -f -p 4 "$T/base.apk" "$T/alineado.apk"

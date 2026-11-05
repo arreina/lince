@@ -1,0 +1,228 @@
+# 🐆 Lince — el módulo 'compras': productos que se compran una vez y son
+# para siempre (la versión completa, un paquete de aspectos, quitar
+# anuncios), con Google Play.
+#
+# Va dentro del ejecutable (src/lince/incrustar.py) y se carga con
+# 'importar "compras"'. En Android habla con la parte en Java
+# (android/servicios/compras/org/lince/Compras.java, con Google Play
+# Billing) por compras._android(orden, datos); esa biblioteca y el permiso
+# BILLING solo van en el .apk de los juegos que importan este módulo. En el
+# ordenador no hay tienda: con LINCE_COMPRAS se simula, por ejemplo
+# LINCE_COMPRAS="comprar=comprado;tiene=id_1;precio=3,99 €".
+#
+# Todo es asíncrono: se pide (consultar_productos, comprar, restaurar) y la
+# respuesta llega unos fotogramas después (productos, resultado_compra,
+# comprados), nulo mientras no llega. Lince no guarda nada: lo que se tiene
+# se pregunta a Google Play, y el juego decide qué recordar sin conexión.
+# Solo productos únicos: ni consumibles, ni suscripciones.
+
+importar "juego"
+importar "sistema"
+importar "texto"
+importar "json"
+importar "tiempo"
+
+fijo _RESULTADOS = ["comprado", "ya_comprado", "cancelado", "pendiente", "error", "sin_conexion"]
+fijo _CLAVES = ["comprar", "tiene", "precio", "productos"]
+
+sea _sim = nulo              # la simulación: {"estado", "comprar", "tiene", "precio", "productos"}, o nulo en Android
+sea _visto = falso           # ¿ya se miró si es Android o se simula?
+sea _comprando = falso
+sea _pendientes = []         # en la simulación: [{"cuando", "que", "valor"}] que llegan más tarde
+sea _productos = nulo
+sea _resultado = nulo
+sea _comprados = nulo
+
+funcion _ahora(): numero {
+    si juego.abierto() { devolver juego.tiempo_real() }
+    devolver tiempo.ahora()
+}
+
+funcion _lista_ids(texto t): lista {
+    sea r = []
+    para cada texto p en t.dividir(",") {
+        si p.recortar() != "" { r.agregar(p.recortar()) }
+    }
+    devolver r
+}
+
+# Lee LINCE_COMPRAS la primera vez: "sin_conexion", "no_disponible" o
+# claves=valor separadas por ';' (comprar, tiene, precio, productos)
+funcion _mirar(): nulo {
+    si _visto { devolver nulo }
+    _visto = verdadero
+    sea s = sistema.entorno("LINCE_COMPRAS", "")
+    si s == "" {
+        si compras._android("estado", "") != nulo { devolver nulo }       # Android de verdad
+        _sim = {"estado": "no_disponible", "comprar": "error", "tiene": [], "precio": "", "productos": nulo}
+        devolver nulo
+    }
+    _sim = {"estado": "lista", "comprar": "comprado", "tiene": [], "precio": "0,99 €", "productos": nulo}
+    para cada texto parte en s.dividir(";") {
+        sea p = parte.recortar()
+        si p == "" { continuar }
+        si p == "sin_conexion" o p == "no_disponible" {
+            _sim["estado"] = p
+            continuar
+        }
+        si _RESULTADOS.contiene(p) {
+            _sim["comprar"] = p
+            continuar
+        }
+        sea i = p.posicion("=")
+        sea clave = si i > 0 { p.extraer(0, i) } sino { p }
+        si i <= 0 o no _CLAVES.contiene(clave) {
+            lanzar ErrorArgumento("LINCE_COMPRAS: no entiendo '{p}' (es comprar=..., tiene=id,id, precio=..., productos=id,id, sin_conexion o no_disponible)")
+        }
+        sea valor = p.extraer(i + 1, p.longitud())
+        si clave == "comprar" {
+            si no _RESULTADOS.contiene(valor) {
+                lanzar ErrorArgumento("LINCE_COMPRAS: comprar= es comprado, ya_comprado, cancelado, pendiente, error o sin_conexion")
+            }
+            _sim["comprar"] = valor
+        } sino si clave == "tiene" {
+            _sim["tiene"] = _lista_ids(valor)
+        } sino si clave == "productos" {
+            _sim["productos"] = _lista_ids(valor)
+        } sino {
+            _sim["precio"] = valor
+        }
+    }
+}
+
+# lo que la simulación tiene que dar ya (lo pedido hace un momento)
+funcion _avanzar(): nulo {
+    si _sim == nulo { devolver nulo }
+    sea quedan = []
+    para cada diccionario p en _pendientes {
+        si _ahora() < p["cuando"] {
+            quedan.agregar(p)
+            continuar
+        }
+        si p["que"] == "productos" { _productos = p["valor"] }
+        si p["que"] == "resultado" {
+            _resultado = p["valor"]
+            _comprando = falso
+        }
+        si p["que"] == "comprados" { _comprados = p["valor"] }
+    }
+    _pendientes = quedan
+}
+
+funcion _luego(texto que, cualquiera valor): nulo {
+    _pendientes.agregar({"cuando": _ahora() + 0.2, "que": que, "valor": valor})
+}
+
+funcion _json(cualquiera r): cualquiera {
+    si r == nulo o r == "" o r.empieza_con("error:") { devolver nulo }
+    devolver json.parsear(r)
+}
+
+# estado(): "lista" (se puede comprar), "conectando", "sin_conexion" o
+# "no_disponible" (en el ordenador, o sin Google Play). Se reconecta sola.
+funcion estado(): texto {
+    _mirar()
+    si _sim == nulo {
+        sea e = compras._android("estado", "")
+        devolver si e == nulo o e.empieza_con("error:") { "no_disponible" } sino { e }
+    }
+    devolver _sim["estado"]
+}
+
+# consultar_productos(ids): pide a Google Play esos productos (los de
+# Play Console). Llegan en productos().
+funcion consultar_productos(cualquiera ids): nulo {
+    si no (ids es lista) { lanzar ErrorTipo("compras.consultar_productos() espera una lista de identificadores, como [\"version_completa\"]") }
+    para cada cualquiera id en ids {
+        si no (id es texto) o id == "" o id.contiene("\n") { lanzar ErrorArgumento("compras.consultar_productos(): cada producto es su identificador de Play Console (un texto)") }
+    }
+    _mirar()
+    _productos = nulo
+    si _sim == nulo {
+        compras._android("consultar", texto.unir(ids, "\n"))
+        devolver nulo
+    }
+    si _sim["estado"] != "lista" {
+        _luego("productos", [])
+        devolver nulo
+    }
+    sea hay = []
+    para cada texto id en ids {
+        si _sim["productos"] == nulo o _sim["productos"].contiene(id) {
+            hay.agregar({"id": id, "titulo": "Producto de prueba ({id})", "descripcion": "Simulado con LINCE_COMPRAS", "precio": _sim["precio"]})
+        }
+    }
+    _luego("productos", hay)
+}
+
+# productos(): nulo mientras no llegan; luego [{"id", "titulo",
+# "descripcion", "precio": "3,99 €"}] (el precio, como lo dice Google Play
+# en la moneda del jugador). Los que no existen no salen.
+funcion productos(): cualquiera {
+    _mirar()
+    si _sim == nulo { devolver _json(compras._android("productos", "")) }
+    _avanzar()
+    devolver _productos
+}
+
+# comprar(id): abre la compra de Google Play (antes, consultar_productos con
+# ese id). Lo que pasó llega en resultado_compra().
+funcion comprar(cualquiera id): nulo {
+    si no (id es texto) { lanzar ErrorTipo("compras.comprar() espera el identificador del producto") }
+    _mirar()
+    si _sim == nulo {
+        sea r = compras._android("comprar", id)
+        si r != nulo y r.empieza_con("error:") { lanzar ErrorJuego("compras.comprar(): {r.extraer(6, r.longitud())}") }
+        devolver nulo
+    }
+    _avanzar()
+    si _comprando { lanzar ErrorJuego("compras.comprar(): ya hay una compra en curso") }
+    _resultado = nulo
+    sea r = _sim["comprar"]
+    si _sim["estado"] != "lista" { r = _sim["estado"] }
+    sino si _sim["tiene"].contiene(id) { r = "ya_comprado" }
+    si r == "comprado" { _sim["tiene"].agregar(id) }
+    _comprando = verdadero
+    _luego("resultado", {"id": id, "resultado": r, "mensaje": nulo})
+}
+
+# resultado_compra(): nulo mientras no acaba; luego, una sola vez,
+# {"id", "resultado": "comprado", "ya_comprado", "cancelado", "pendiente"
+# (se pagará más tarde: saldrá en comprados() cuando se complete), "error",
+# "sin_conexion" o "no_disponible", "mensaje"}. "comprado" llega cuando
+# Google ya ha confirmado la compra: se puede dar por buena.
+funcion resultado_compra(): cualquiera {
+    _mirar()
+    si _sim == nulo { devolver _json(compras._android("resultado_compra", "")) }
+    _avanzar()
+    sea r = _resultado
+    _resultado = nulo
+    devolver r
+}
+
+# restaurar(): pide a Google Play lo que tiene el jugador (al empezar, o
+# tras reinstalar). Llega en comprados().
+funcion restaurar(): nulo {
+    _mirar()
+    _comprados = nulo
+    si _sim == nulo {
+        compras._android("restaurar", "")
+        devolver nulo
+    }
+    sea bien = _sim["estado"] == "lista"
+    sea ids = []
+    si bien {
+        para cada texto id en _sim["tiene"] { ids.agregar(id) }
+    }
+    _luego("comprados", {"ok": bien, "productos": ids})
+}
+
+# comprados(): nulo mientras no llega; luego {"ok": lógico, "productos":
+# [ids]}: solo lo que está en vigor (no lo devuelto). Con "ok" falso (sin
+# conexión), mejor usar lo último que guardó el juego.
+funcion comprados(): cualquiera {
+    _mirar()
+    si _sim == nulo { devolver _json(compras._android("comprados", "")) }
+    _avanzar()
+    devolver _comprados
+}

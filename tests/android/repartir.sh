@@ -123,6 +123,53 @@ if [ -n "$BUNDLETOOL" ] && [ -f "$BUNDLETOOL" ] && command -v java > /dev/null; 
     java -jar "$BUNDLETOOL" validate --bundle="$T/red.aab" > /dev/null 2>&1 && ok "2.11: bundletool da por bueno el .aab con el permiso" || mal "2.11: bundletool no da por bueno el .aab con el permiso"
 fi
 
+# 2.12: las bibliotecas de Google y sus permisos, solo en los juegos que importan anuncios o compras
+if unzip -l "$PL" 2>/dev/null | grep -q " variantes/anuncios/"; then
+    printf 'importar "anuncios"\nanuncios.configurar({"app": "ca-app-pub-1111111111111111~2222222222", "bloque": "ca-app-pub-1111111111111111/3333333333"})\n' > "$T/an.lince"
+    printf 'importar "compras"\ncompras.restaurar()\n' > "$T/co.lince"
+    printf 'importar "anuncios"\nimportar "compras"\nanuncios.configurar({})\n' > "$T/ambos.lince"
+    for j in an co ambos; do
+        HOME="$T" LINCE_ANDROID_PLANTILLA="$PL" "$LINCE" repartir "$T/$j.lince" --android --id "org.ejemplo.$j" -o "$T/$j.apk" > "$T/salida_$j.txt" 2>&1 || { mal "2.12: no se hizo $j.apk"; cat "$T/salida_$j.txt"; }
+        HOME="$T" LINCE_ANDROID_PLANTILLA="$PL" "$LINCE" repartir "$T/$j.lince" --aab --id "org.ejemplo.$j" -o "$T/$j.aab" > /dev/null 2>&1 || mal "2.12: no se hizo $j.aab"
+    done
+    lleva() {       # lleva archivo.apk|aab entrada texto
+        python3 - "$@" <<'PY2'
+import sys, zipfile
+z = zipfile.ZipFile(sys.argv[1]); t = sys.argv[3]
+if sys.argv[2] == "dex":
+    d = b"".join(z.read(n) for n in z.namelist() if n.endswith(".dex"))
+else:
+    d = z.read(sys.argv[2])
+sys.exit(0 if t.encode() in d or t.encode("utf-16-le") in d else 1)
+PY2
+    }
+    lleva "$T/an.apk" AndroidManifest.xml android.permission.INTERNET && ok "2.12: anuncios: INTERNET" || mal "2.12: anuncios sin INTERNET"
+    lleva "$T/an.apk" dex com/google/android/gms/ads/rewarded/RewardedAd && ok "2.12: anuncios: lleva la biblioteca de anuncios" || mal "2.12: anuncios sin la biblioteca"
+    lleva "$T/an.apk" AndroidManifest.xml ca-app-pub-1111111111111111~2222222222 && ok "2.12: anuncios: la app de AdMob del código en el manifiesto" || mal "2.12: el manifiesto sin la app de AdMob del juego"
+    lleva "$T/an.apk" AndroidManifest.xml org.ejemplo.an.mobileadsinitprovider && ok "2.12: anuncios: los proveedores con el paquete del juego" || mal "2.12: los proveedores siguen con el de la plantilla"
+    lleva "$T/an.apk" AndroidManifest.xml org.lince.plantilla && mal "2.12: queda org.lince.plantilla en el manifiesto" || ok "2.12: nada de org.lince.plantilla en el manifiesto"
+    lleva "$T/an.apk" AndroidManifest.xml com.android.vending.BILLING && mal "2.12: anuncios lleva BILLING" || ok "2.12: anuncios sin BILLING"
+    lleva "$T/co.apk" AndroidManifest.xml com.android.vending.BILLING && ok "2.12: compras: BILLING" || mal "2.12: compras sin BILLING"
+    lleva "$T/co.apk" dex com/android/billingclient/api/BillingClient && ok "2.12: compras: lleva Play Billing" || mal "2.12: compras sin Play Billing"
+    lleva "$T/co.apk" dex com/google/android/gms/ads/rewarded && mal "2.12: compras lleva lo de anuncios" || ok "2.12: compras sin lo de anuncios"
+    lleva "$T/co.apk" AndroidManifest.xml com.google.android.gms.permission.AD_ID && mal "2.12: compras pide AD_ID" || ok "2.12: compras sin AD_ID"
+    lleva "$T/ambos.apk" AndroidManifest.xml com.android.vending.BILLING && lleva "$T/ambos.apk" dex com/google/android/gms/ads/rewarded/RewardedAd \
+        && ok "2.12: los dos módulos: las dos bibliotecas" || mal "2.12: con los dos módulos falta alguna"
+    for j in pong red; do
+        lleva "$T/$j.apk" AndroidManifest.xml android.permission.INTERNET && mal "2.12: $j lleva INTERNET" || ok "2.12: $j, sin INTERNET"
+        lleva "$T/$j.apk" dex com/google/android/gms && mal "2.12: $j lleva bibliotecas de Google" || ok "2.12: $j, sin bibliotecas de Google"
+    done
+    lleva "$T/an.aab" base/manifest/AndroidManifest.xml ca-app-pub-1111111111111111~2222222222 && ok "2.12: el .aab con la app de AdMob" || mal "2.12: el .aab sin la app de AdMob"
+    lleva "$T/co.aab" base/manifest/AndroidManifest.xml com.android.vending.BILLING && ok "2.12: el .aab de compras con BILLING" || mal "2.12: el .aab de compras sin BILLING"
+    if [ -n "$BUNDLETOOL" ] && [ -f "$BUNDLETOOL" ] && command -v java > /dev/null; then
+        for j in an co ambos; do
+            java -jar "$BUNDLETOOL" validate --bundle="$T/$j.aab" > /dev/null 2>&1 && ok "2.12: bundletool da por bueno $j.aab" || mal "2.12: bundletool no da por bueno $j.aab"
+        done
+    fi
+else
+    echo "  ⏭  la plantilla no trae las variantes de anuncios y compras (2.12): se omite"
+fi
+
 APKSIGNER="$(ls -d "${ANDROID_SDK_ROOT:-$HOME/lince-android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)"
 if [ -n "$APKSIGNER" ] && command -v java > /dev/null; then
     "$APKSIGNER" verify "$T/pong.apk" && ok "apksigner: la firma es válida" || mal "apksigner no la da por buena"

@@ -15,6 +15,7 @@ typedef struct {
     const char *icono;           /* una imagen (NULL: icono.png junto al juego, o el de Lince) */
     const char *capturas;        /* los fotogramas de las capturas de la ficha ("60,180,300") */
     const char *guion;           /* lo que se pulsa mientras (como LINCE_JUEGO_GUION: "30:espacio") */
+    const char *anuncios_app;    /* el identificador de la app de AdMob (NULL: el que esté en el código) */
 } ApkOpciones;
 
 /* El .apk (o el .aab y la carpeta con lo que pide la ficha de Google Play). 0 si va bien. */

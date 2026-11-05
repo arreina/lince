@@ -1,0 +1,40 @@
+# @seccion: Móvil
+# @titulo: Compras en Google Play
+# @nota: Con `importar "compras"`, productos que se compran una vez y son para siempre (la versión completa, quitar anuncios...), con Google Play. Todo es asíncrono: `compras.consultar_productos(ids)` pide los productos (llegan en `compras.productos()`, con su precio en la moneda del jugador; para «€» y otros símbolos hace falta una fuente TTF), `compras.comprar(id)` abre la compra de Google Play (lo que pasó llega una vez en `compras.resultado_compra()`) y `compras.restaurar()` pregunta lo que ya tiene el jugador (llega en `compras.comprados()`). Mientras no llega, `nulo`.
+# @nota: `"comprado"` llega cuando Google ya ha confirmado la compra. Lince no guarda nada: el juego decide qué recordar para jugar sin conexión. Los productos se crean en Play Console (ver **Compartir el juego**). La biblioteca de Google Play Billing y el permiso `BILLING` solo van en los juegos que importan `compras`. En el ordenador, `LINCE_COMPRAS="comprar=comprado;precio=3,99 €"` lo simula (también `tiene=id`, `cancelado`, `pendiente`, `sin_conexion`...).
+# @entorno: LINCE_COMPRAS=precio=3,99 EUR
+# @fotogramas: 30
+importar "juego"
+importar "compras"
+
+fijo PRODUCTO = "version_completa"
+sea completa = falso
+sea precio = "..."
+juego.abrir("Compras", 480, 270)
+compras.consultar_productos([PRODUCTO])
+compras.restaurar()
+mientras juego.abierto() {
+    sea ofertas = compras.productos()
+    si ofertas != nulo y ofertas.longitud() > 0 { precio = ofertas[0]["precio"] }
+    sea tiene = compras.comprados()
+    si tiene != nulo y tiene["ok"] y tiene["productos"].contiene(PRODUCTO) { completa = verdadero }
+    sea r = compras.resultado_compra()
+    si r != nulo y (r["resultado"] == "comprado" o r["resultado"] == "ya_comprado") { completa = verdadero }
+    juego.limpiar([25, 25, 35])
+    si completa {
+        juego.texto("¡VERSIÓN COMPLETA!", 130, 60, {"escala": 2, "color": [240, 190, 60]})
+    } sino si compras.estado() == "lista" {
+        juego.rectangulo(100, 95, 280, 50, [66, 133, 244])
+        juego.texto("COMPRAR VERSIÓN COMPLETA ({precio})", 112, 115, {"escala": 1})
+        juego.rectangulo(160, 170, 160, 30, [70, 70, 80])
+        juego.texto("RESTAURAR COMPRAS", 172, 181, {"escala": 1})
+        si juego.clic(1) {
+            sea p = juego.raton()
+            si p[0] >= 100 y p[0] < 380 y p[1] >= 95 y p[1] < 145 { compras.comprar(PRODUCTO) }
+            si p[0] >= 160 y p[0] < 320 y p[1] >= 170 y p[1] < 200 { compras.restaurar() }
+        }
+    } sino {
+        juego.texto("LA TIENDA NO ESTÁ DISPONIBLE: {compras.estado()}", 60, 120, {"escala": 1})
+    }
+    juego.presentar()
+}

@@ -1,0 +1,55 @@
+# 2.12: anuncios y compras, simulados (LINCE_ANUNCIOS y LINCE_COMPRAS, que
+# pone smoke.sh). Escribe lo que pasa; smoke.sh mira la salida.
+importar "juego"
+importar "anuncios"
+importar "compras"
+
+intentar { anuncios.preparar() } capturar (error e) { escribir("error: {e.mensaje}") }
+para cada cualquiera malo en [{"x": 1}, {"app": "hola"}, {"bloque": "ca-app-pub-1"}, {"pruebas": falso}, {"espera": 0}] {
+    intentar { anuncios.configurar(malo) } capturar (error e) { escribir("error: {e.mensaje}") }
+}
+anuncios.configurar({"app": "ca-app-pub-1234567890123456~1234567890", "bloque": "ca-app-pub-1234567890123456/1234567890"})
+escribir("anuncios: {anuncios.estado()} {anuncios.consentimiento()} {anuncios.personalizados()}")
+intentar { anuncios.mostrar() } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { compras.comprar(1) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { compras.consultar_productos("a") } capturar (error e) { escribir("error: {e.mensaje}") }
+escribir("compras: {compras.estado()}")
+
+juego.abrir("2.12", 200, 100)
+anuncios.preparar()
+compras.consultar_productos(["completa", "otro"])
+compras.restaurar()
+sea f = 0
+sea pedido = falso
+sea mostrado = 0
+sea resultados = 0
+mientras juego.abierto() {
+    f++
+    sea e = anuncios.estado()
+    si e == "listo" y mostrado == 0 {
+        mostrado = f
+        anuncios.mostrar()
+    }
+    sea r = anuncios.resultado()
+    si r != nulo {
+        resultados++
+        escribir("anuncio: {r["recompensa"]} {r["motivo"]} {r["cantidad"]}")
+    }
+    sea p = compras.productos()
+    si p != nulo y no pedido {
+        pedido = verdadero
+        sea ids = []
+        para cada diccionario x en p { ids.agregar("{x["id"]} {x["precio"]}") }
+        escribir("productos: {ids}")
+        compras.comprar("completa")
+        intentar { compras.comprar("completa") } capturar (error x) { escribir("error: {x.mensaje}") }
+    }
+    sea c = compras.resultado_compra()
+    si c != nulo { escribir("compra: {c["id"]} {c["resultado"]}") }
+    si f == 2 { escribir("antes: {compras.comprados()}") }
+    si f == 30 { escribir("tenia: {compras.comprados()["productos"]}") }
+    si f == 60 { compras.restaurar() }
+    si f == 90 { escribir("tiene: {compras.comprados()["ok"]} {compras.comprados()["productos"]}") }
+    juego.presentar()
+}
+escribir("estado al final: {anuncios.estado()}, resultados: {resultados}")

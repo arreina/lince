@@ -988,4 +988,34 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=60 LINCE_JUEG
     LINCE_JUEGO_GRABAR_GUION=grabado.txt timeout 30 "$LINCE" "$DIR/prueba38.lince" > /dev/null 2>&1
 [ "$(cat grabado.txt 2>/dev/null)" = "10:deslizar:10:10:100:10:5,30:toque:5:6:3,40:a:2" ] && ok "2.11: el guion grabado apunta toques y deslizamientos" \
     || { mal "2.11: el guion grabado"; cat grabado.txt; }
+# ── 2.12: anuncios y compras, simulados (cada resultado, una sola vez) ──
+n212=0
+while IFS='|' read -r an co esperado; do
+    n212=$((n212+1))
+    SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=150 LINCE_ANUNCIOS="$an" LINCE_COMPRAS="$co" \
+        timeout 60 "$LINCE" "$DIR/prueba39.lince" > "salida46_$n212.txt" 2>&1
+    bien=1
+    IFS='#' read -ra lineas <<< "$esperado"
+    for l in "${lineas[@]}"; do grep -qxF "$l" "salida46_$n212.txt" || { bien=0; echo "    falta: $l"; }; done
+    [ "$bien" = 1 ] && ok "2.12: anuncios $an y compras $co" || { mal "2.12: anuncios $an y compras $co"; cat "salida46_$n212.txt"; }
+done <<'CASOS'
+completar|comprar=comprado;tiene=otro|anuncio: verdadero completado 1#compra: completa comprado#tenia: ["otro"]#tiene: verdadero ["otro", "completa"]#estado al final: sin_preparar, resultados: 1#productos: ["completa 0,99 €", "otro 0,99 €"]
+cerrar|tiene=completa|anuncio: falso cerrado 0#compra: completa ya_comprado#tiene: verdadero ["completa"]
+fallar|cancelado|anuncio: falso error 0#compra: completa cancelado#tiene: verdadero []
+sin_conexion|sin_conexion|estado al final: sin_conexion, resultados: 0#compras: sin_conexion#productos: []#compra: completa sin_conexion#tiene: falso []
+no_disponible|pendiente|anuncios: no_disponible no_hace_falta verdadero#estado al final: no_disponible, resultados: 0#compra: completa pendiente
+|productos=otro|anuncios: no_disponible no_hace_falta verdadero#productos: ["otro 0,99 €"]
+CASOS
+for l in 'error: anuncios.preparar(): antes hay que llamar a anuncios.configurar(), con el "app" y el "bloque" de AdMob' \
+         "error: anuncios.configurar(): no conozco la opción 'x' (hay \"app\", \"bloque\", \"pruebas\" y \"espera\")" \
+         'error: anuncios.configurar(): con "pruebas": falso hacen falta "app" y "bloque" (los de AdMob)' \
+         'error: anuncios.mostrar(): no hay ningún anuncio listo (estado() es "sin_preparar"): antes, preparar()' \
+         'error: compras.comprar(): ya hay una compra en curso' 'antes: nulo'; do
+    grep -qxF "$l" salida46_1.txt && ok "2.12: $l" || mal "falta la línea: $l"
+done
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=5 LINCE_ANUNCIOS=completar LINCE_ANUNCIOS_CONSENTIMIENTO=denegado \
+    timeout 30 "$LINCE" "$DIR/prueba39.lince" 2>&1 | grep -qxF "anuncios: sin_preparar denegado falso" \
+    && ok "2.12: con el consentimiento denegado, sin anuncios personalizados" || mal "2.12: el consentimiento denegado"
+LINCE_COMPRAS="raro=1" timeout 30 "$LINCE" "$DIR/prueba39.lince" 2>&1 | grep -qF "LINCE_COMPRAS: no entiendo 'raro=1'" \
+    && ok "2.12: LINCE_COMPRAS mal escrita da un error claro" || mal "2.12: LINCE_COMPRAS mal escrita"
 [ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida43.txt salida44.txt salida45.txt salida5b.txt; exit 1; }

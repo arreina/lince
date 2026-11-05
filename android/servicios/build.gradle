@@ -1,0 +1,79 @@
+// 🐆 Las variantes «anuncios», «compras» y «ambos» (anuncios y compras) de la
+// plantilla. construir.sh pone en LINCE_MANIFIESTO el manifiesto de siempre
+// (con los valores de la plantilla: org.lince.plantilla, LINCE_NOMBRE...),
+// en LINCE_RES los recursos (el icono), en LINCE_SDL las fuentes de SDL2 y en
+// LINCE_OBRA dónde dejar lo hecho.
+plugins {
+    id 'com.android.application' version '8.13.2'
+}
+
+def raiz = file('../..')
+layout.buildDirectory = file(System.getenv('LINCE_OBRA') ?: "$rootDir/obra")
+
+android {
+    namespace 'org.lince.plantilla'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'org.lince.plantilla'
+        minSdk 24
+        targetSdk 36
+        versionCode 1234321
+        versionName '1234321'
+    }
+    flavorDimensions += 'servicios'
+    productFlavors {
+        anuncios { dimension 'servicios' }
+        compras { dimension 'servicios' }
+        ambos { dimension 'servicios' }
+    }
+    sourceSets {
+        main {
+            manifest.srcFile System.getenv('LINCE_MANIFIESTO') ?: "$raiz/android/AndroidManifest.xml"
+            java.srcDirs = ["$raiz/android/java", "${System.getenv('LINCE_SDL')}/android-project/app/src/main/java"]
+            res.srcDirs = [System.getenv('LINCE_RES') ?: 'res']
+        }
+        anuncios {
+            java.srcDirs = ['anuncios']
+            manifest.srcFile 'anuncios/AndroidManifest.xml'
+        }
+        compras {
+            java.srcDirs = ['compras']
+            manifest.srcFile 'compras/AndroidManifest.xml'
+        }
+        ambos {
+            java.srcDirs = ['anuncios', 'compras']
+            manifest.srcFile 'anuncios/AndroidManifest.xml'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    buildTypes {
+        release { minifyEnabled false }
+    }
+    // las .so van comprimidas en la plantilla, como en el .apk de siempre: sin
+    // esto, el manifiesto unido pide extractNativeLibs="false" y no se instala
+    packaging {
+        jniLibs { useLegacyPackaging = true }
+    }
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+// Las versiones, a mano: al subirlas, mirar que la API que usan Anuncios.java
+// y Compras.java sigue igual
+def ANUNCIOS = 'com.google.android.gms:play-services-ads:24.9.0'
+def CONSENTIMIENTO = 'com.google.android.ump:user-messaging-platform:3.2.0'
+def COMPRAS = 'com.android.billingclient:billing:8.3.0'
+dependencies {
+    anunciosImplementation ANUNCIOS
+    anunciosImplementation CONSENTIMIENTO
+    comprasImplementation COMPRAS
+    ambosImplementation ANUNCIOS
+    ambosImplementation CONSENTIMIENTO
+    ambosImplementation COMPRAS
+}
+

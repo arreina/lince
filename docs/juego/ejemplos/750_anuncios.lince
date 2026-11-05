@@ -1,0 +1,37 @@
+# @seccion: Móvil
+# @titulo: Anuncios recompensados
+# @nota: Con `importar "anuncios"`, un anuncio que el jugador **decide ver** para conseguir algo: `anuncios.configurar({"app": ..., "bloque": ...})` con los identificadores de AdMob, `anuncios.preparar()` lo carga (sin enseñar nada), `anuncios.estado()` dice si está `"listo"` (o `"cargando"`, `"sin_conexion"`, `"error"`...), `anuncios.mostrar()` lo enseña y `anuncios.resultado()` dice, una sola vez, si hay recompensa. Lince no enseña ningún anuncio si el juego no llama a `mostrar()`.
+# @nota: Con `"pruebas": verdadero` (si no se dice nada) salen los anuncios de prueba de Google. Antes del primero, `anuncios.pedir_consentimiento()` enseña el formulario de consentimiento donde haga falta (en Europa). La biblioteca de anuncios y el permiso de Internet solo van en el `.apk` de los juegos que importan `anuncios`. En el ordenador no hay anuncios: `LINCE_ANUNCIOS=completar` (o `cerrar`, `fallar`, `sin_conexion`, `no_disponible`) los simula.
+# @entorno: LINCE_ANUNCIOS=completar
+# @fotogramas: 45
+importar "juego"
+importar "anuncios"
+
+anuncios.configurar({"pruebas": verdadero})
+anuncios.pedir_consentimiento()
+sea vidas = 1
+sea reintento = 0
+juego.abrir("Anuncios", 480, 270)
+anuncios.preparar()
+mientras juego.abierto() {
+    sea estado = anuncios.estado()
+    # otro en cuanto se usa el que había; si falla, se vuelve a intentar a los 30 segundos
+    si estado == "sin_preparar" o ((estado == "error" o estado == "sin_conexion") y juego.tiempo_real() > reintento) {
+        anuncios.preparar()
+        reintento = juego.tiempo_real() + 30
+    }
+    sea listo = estado == "listo"
+    sea r = anuncios.resultado()
+    si r != nulo y r["recompensa"] { vidas = vidas + 1 }
+    juego.limpiar([25, 25, 35])
+    juego.texto("VIDAS: {vidas}", 20, 20, {"escala": 2})
+    juego.rectangulo(120, 125, 240, 50, si listo { [66, 133, 244] } sino { [70, 70, 80] })
+    sea boton = si listo { "VER ANUNCIO: +1 VIDA" } sino si estado == "sin_conexion" { "NECESITA CONEXIÓN" } sino { "CARGANDO..." }
+    juego.texto(boton, 240 - juego.ancho_texto(boton, {"escala": 1}) / 2, 145, {"escala": 1})
+    juego.texto("ESTADO: {estado}", 20, 245, {"escala": 1})
+    si listo y juego.clic(1) {
+        sea p = juego.raton()
+        si p[0] >= 120 y p[0] < 360 y p[1] >= 125 y p[1] < 175 { anuncios.mostrar() }
+    }
+    juego.presentar()
+}

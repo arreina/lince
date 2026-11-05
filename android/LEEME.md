@@ -70,6 +70,54 @@ el paquete y la versión. Para probar un `.aab` en un móvil conectado por USB:
 `java -jar bundletool.jar build-apks --bundle=mi_juego.aab --output=mi_juego.apks --connected-device`
 y `java -jar bundletool.jar install-apks --apks=mi_juego.apks`.
 
+## Anuncios recompensados y compras
+
+Los módulos `anuncios` y `compras` (ver la especificación) usan bibliotecas
+de Google: la de anuncios (Google Mobile Ads y el consentimiento, UMP) y la
+de compras (Google Play Billing). Solo van en el `.apk` y el `.aab` de los
+juegos que importan esos módulos, con sus permisos (`INTERNET`, `AD_ID`,
+`com.android.vending.BILLING`...): un juego que no los importa queda igual
+que siempre.
+
+**Anuncios.** En [AdMob](https://admob.google.com) se crea la app y un bloque
+de anuncios **recompensados**: sus identificadores (`ca-app-pub-...~...` y
+`ca-app-pub-.../...`) van en `anuncios.configurar({"app": ..., "bloque": ...})`.
+`lince repartir` pone el de la app en el manifiesto (lo busca en el código; o
+`--anuncios-app ca-app-pub-...~...`). Mientras se prueba, deja `"pruebas"`
+como está (verdadero): salen los anuncios de prueba de Google, que se pueden
+tocar sin que te cierren la cuenta de AdMob. Pon `"pruebas": falso` solo en la
+versión que publiques. En Europa hay que pedir el consentimiento: llama a
+`anuncios.pedir_consentimiento()` al empezar y configura el mensaje de
+consentimiento (GDPR) en AdMob, en «Privacidad y mensajes». En la ficha de
+Play Console: «Contiene anuncios», y en «Seguridad de los datos», que la app
+comparte el identificador de publicidad con Google para anuncios.
+
+**Compras.** En Play Console, en «Monetizar → Productos → Productos
+integrados en la aplicación», se crea cada producto (su id es el que va en
+`compras.consultar_productos` y `compras.comprar`). Antes hay que subir un
+`.aab` del juego que importe `compras` (Google no deja crear productos sin
+él). Para probar sin pagar, añade tu cuenta como *license tester*
+(«Configuración → Pruebas de licencias») e instala el juego desde la pista de
+pruebas interna: las compras salen como de prueba. En la ficha, «Contiene
+compras en la aplicación».
+
+**Probarlo sin móvil.** `LINCE_ANUNCIOS=completar` (o `cerrar`, `fallar`,
+`sin_conexion`, `no_disponible`) y `LINCE_COMPRAS="comprar=comprado;precio=3,99 €"`
+simulan los dos en el ordenador y en `juego.jugar()`. Lo que dice Google
+cuando un anuncio no carga se ve con `adb logcat -s lince`.
+
+**Cómo va dentro.** `android/construir.sh --plantilla` hace con Gradle
+(`android/servicios/`, que descarga Gradle y las bibliotecas la primera vez)
+tres variantes de la app: «anuncios», «compras» y las dos. De cada una guarda
+en la plantilla, en `variantes/`, lo que cambia: el manifiesto unido, los
+recursos y el código (`classes*.dex`, con la parte en Java:
+`android/servicios/anuncios/org/lince/Anuncios.java` y
+`android/servicios/compras/org/lince/Compras.java`). `lince repartir` elige la
+variante según lo que importa el juego y cambia en el manifiesto lo que
+empieza por el paquete de la plantilla (los proveedores de las bibliotecas
+de Google llevan el paquete del juego, para que no choquen dos juegos en el
+mismo móvil). Con eso la plantilla pasa de unos 2,5 MB a unos 15 MB.
+
 ## Hacer el .apk con el SDK
 
 `android/construir.sh` hace lo mismo con las herramientas de Android (y es lo
@@ -103,6 +151,7 @@ En `~/lince-android`, o donde diga `LINCE_ANDROID`:
 | `sdk/` | el SDK de Android con `platforms;android-36`, `build-tools;34.0.0` y `ndk;26.3.11579264` |
 | `SDL2/` | las fuentes de SDL2 (2.30.9), tal cual (o `SDL_RUTA`) |
 | `descargas/bundletool.jar` | bundletool (o `BUNDLETOOL`), para la plantilla: si no está, `construir.sh --plantilla` lo descarga |
+| `gradle-8.14.3/` | Gradle, para las variantes con anuncios y compras: si no está, `construir.sh --plantilla` lo descarga (y Gradle, las bibliotecas de Google) |
 
 `sdkmanager --sdk_root=... "platforms;android-36" "build-tools;34.0.0" "ndk;26.3.11579264"`
 las instala (hay que aceptar la licencia del SDK). La primera vez se compilan

@@ -140,7 +140,7 @@
 <header>
   <button class="menu" id="alternar" aria-label="Menú">☰</button>
   <a class="logo" href="index.html"><span>🐆</span> Lince</a>
-  <span class="version">v2.11</span>
+  <span class="version">v2.12</span>
   <div class="crece"></div>
   <a class="pag" href="manual.html">Lenguaje</a>
   <a class="pag aqui" href="juego.html">Módulo juego</a>
@@ -157,7 +157,7 @@
 <div class="grupo"><a href="#hojas-de-sprites" class="sec">Hojas de sprites</a><a href="#hojas-de-sprites-0" class="sub">Una hoja con todos los fotogramas</a><a href="#hojas-de-sprites-1" class="sub">Hojas desordenadas</a><a href="#hojas-de-sprites-2" class="sub">Animaciones a partir de un dibujo</a></div>
 <div class="grupo"><a href="#animador" class="sec">Animador</a><a href="#animador-0" class="sub">El animador</a></div>
 <div class="grupo"><a href="#entrada" class="sec">Entrada</a><a href="#entrada-0" class="sub">Teclas y ratón</a><a href="#entrada-1" class="sub">Acciones: teclado y mando a la vez</a><a href="#entrada-2" class="sub">Escribir un nombre</a></div>
-<div class="grupo"><a href="#movil" class="sec">Móvil</a><a href="#movil-0" class="sub">El mando de la pantalla táctil</a><a href="#movil-1" class="sub">Dedos, vibrar e inclinar</a><a href="#movil-2" class="sub">Deslizar el dedo</a><a href="#movil-3" class="sub">¿Hay conexión?</a></div>
+<div class="grupo"><a href="#movil" class="sec">Móvil</a><a href="#movil-0" class="sub">El mando de la pantalla táctil</a><a href="#movil-1" class="sub">Dedos, vibrar e inclinar</a><a href="#movil-2" class="sub">Deslizar el dedo</a><a href="#movil-3" class="sub">¿Hay conexión?</a><a href="#movil-4" class="sub">Anuncios recompensados</a><a href="#movil-5" class="sub">Compras en Google Play</a></div>
 <div class="grupo"><a href="#sonido" class="sec">Sonido</a><a href="#sonido-0" class="sub">Efectos sin archivos</a><a href="#sonido-1" class="sub">Sonidos y música de archivos</a><a href="#sonido-2" class="sub">Grupos de volumen, sonido con sitio y fundidos</a></div>
 <div class="grupo"><a href="#movimiento" class="sec">Movimiento</a><a href="#movimiento-0" class="sub">Movimiento suave</a></div>
 <div class="grupo"><a href="#camara" class="sec">Cámara</a><a href="#camara-0" class="sub">Cámara y temblor</a><a href="#camara-1" class="sub">Zoom, giro y pantalla partida</a></div>
@@ -182,7 +182,7 @@
     <p>Todo lo que hace falta para un juego 2D: la ventana, el dibujo, los sprites y sus
     animaciones, el teclado, el ratón, los mandos y la pantalla táctil, el sonido, los mapas,
     la física, los menús... Se usa con <code>importar "juego"</code>.</p>
-    <p>Los <strong>48 ejemplos</strong> de esta página <strong>se ejecutan al
+    <p>Los <strong>50 ejemplos</strong> de esta página <strong>se ejecutan al
     generarla</strong>, sin pantalla, y la imagen de cada uno es una captura real de lo que
     dibuja. Si algo deja de funcionar, la página deja de cuadrar y la integración continua lo
     detecta. Para la lista completa de funciones y opciones, mira la
@@ -526,7 +526,70 @@ juego.abrir(<span class="s">&quot;Conexión&quot;</span>, <span class="n">480</s
     juego.circulo(<span class="n">240</span>, <span class="n">110</span>, <span class="n">40</span>, color)
     juego.<span class="t">texto</span>(textos[estado], <span class="n">240</span> - juego.ancho_texto(textos[estado], {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>}) / <span class="n">2</span>, <span class="n">175</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>})
     juego.presentar()
-}</code></pre></div><figure><img src="img/juego/740_conexion.png" alt="Captura de «¿Hay conexión?»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/740_conexion.lince</span></article></section>
+}</code></pre></div><figure><img src="img/juego/740_conexion.png" alt="Captura de «¿Hay conexión?»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/740_conexion.lince</span></article><article class="ej" id="movil-4"><h3>Anuncios recompensados</h3><p class="nota">Con <code>importar &quot;anuncios&quot;</code>, un anuncio que el jugador <strong>decide ver</strong> para conseguir algo: <code>anuncios.configurar({&quot;app&quot;: ..., &quot;bloque&quot;: ...})</code> con los identificadores de AdMob, <code>anuncios.preparar()</code> lo carga (sin enseñar nada), <code>anuncios.estado()</code> dice si está <code>&quot;listo&quot;</code> (o <code>&quot;cargando&quot;</code>, <code>&quot;sin_conexion&quot;</code>, <code>&quot;error&quot;</code>...), <code>anuncios.mostrar()</code> lo enseña y <code>anuncios.resultado()</code> dice, una sola vez, si hay recompensa. Lince no enseña ningún anuncio si el juego no llama a <code>mostrar()</code>.</p><p class="nota">Con <code>&quot;pruebas&quot;: verdadero</code> (si no se dice nada) salen los anuncios de prueba de Google. Antes del primero, <code>anuncios.pedir_consentimiento()</code> enseña el formulario de consentimiento donde haga falta (en Europa). La biblioteca de anuncios y el permiso de Internet solo van en el <code>.apk</code> de los juegos que importan <code>anuncios</code>. En el ordenador no hay anuncios: <code>LINCE_ANUNCIOS=completar</code> (o <code>cerrar</code>, <code>fallar</code>, <code>sin_conexion</code>, <code>no_disponible</code>) los simula.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;anuncios&quot;</span>
+
+anuncios.configurar({<span class="s">&quot;pruebas&quot;</span>: <span class="k">verdadero</span>})
+anuncios.pedir_consentimiento()
+<span class="k">sea</span> vidas = <span class="n">1</span>
+<span class="k">sea</span> reintento = <span class="n">0</span>
+juego.abrir(<span class="s">&quot;Anuncios&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+anuncios.preparar()
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">sea</span> estado = anuncios.estado()
+    <span class="c"># otro en cuanto se usa el que había; si falla, se vuelve a intentar a los 30 segundos</span>
+    <span class="k">si</span> estado == <span class="s">&quot;sin_preparar&quot;</span> <span class="k">o</span> ((estado == <span class="s">&quot;error&quot;</span> <span class="k">o</span> estado == <span class="s">&quot;sin_conexion&quot;</span>) <span class="k">y</span> juego.tiempo_real() &gt; reintento) {
+        anuncios.preparar()
+        reintento = juego.tiempo_real() + <span class="n">30</span>
+    }
+    <span class="k">sea</span> listo = estado == <span class="s">&quot;listo&quot;</span>
+    <span class="k">sea</span> r = anuncios.resultado()
+    <span class="k">si</span> r != <span class="k">nulo</span> <span class="k">y</span> r[<span class="s">&quot;recompensa&quot;</span>] { vidas = vidas + <span class="n">1</span> }
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">35</span>])
+    juego.<span class="t">texto</span>(<span class="s">&quot;VIDAS: {vidas}&quot;</span>, <span class="n">20</span>, <span class="n">20</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>})
+    juego.rectangulo(<span class="n">120</span>, <span class="n">125</span>, <span class="n">240</span>, <span class="n">50</span>, <span class="k">si</span> listo { [<span class="n">66</span>, <span class="n">133</span>, <span class="n">244</span>] } <span class="k">sino</span> { [<span class="n">70</span>, <span class="n">70</span>, <span class="n">80</span>] })
+    <span class="k">sea</span> boton = <span class="k">si</span> listo { <span class="s">&quot;VER ANUNCIO: +1 VIDA&quot;</span> } <span class="k">sino</span> <span class="k">si</span> estado == <span class="s">&quot;sin_conexion&quot;</span> { <span class="s">&quot;NECESITA CONEXIÓN&quot;</span> } <span class="k">sino</span> { <span class="s">&quot;CARGANDO...&quot;</span> }
+    juego.<span class="t">texto</span>(boton, <span class="n">240</span> - juego.ancho_texto(boton, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>}) / <span class="n">2</span>, <span class="n">145</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
+    juego.<span class="t">texto</span>(<span class="s">&quot;ESTADO: {estado}&quot;</span>, <span class="n">20</span>, <span class="n">245</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
+    <span class="k">si</span> listo <span class="k">y</span> juego.clic(<span class="n">1</span>) {
+        <span class="k">sea</span> p = juego.raton()
+        <span class="k">si</span> p[<span class="n">0</span>] &gt;= <span class="n">120</span> <span class="k">y</span> p[<span class="n">0</span>] &lt; <span class="n">360</span> <span class="k">y</span> p[<span class="n">1</span>] &gt;= <span class="n">125</span> <span class="k">y</span> p[<span class="n">1</span>] &lt; <span class="n">175</span> { anuncios.mostrar() }
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/750_anuncios.png" alt="Captura de «Anuncios recompensados»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/750_anuncios.lince</span></article><article class="ej" id="movil-5"><h3>Compras en Google Play</h3><p class="nota">Con <code>importar &quot;compras&quot;</code>, productos que se compran una vez y son para siempre (la versión completa, quitar anuncios...), con Google Play. Todo es asíncrono: <code>compras.consultar_productos(ids)</code> pide los productos (llegan en <code>compras.productos()</code>, con su precio en la moneda del jugador; para «€» y otros símbolos hace falta una fuente TTF), <code>compras.comprar(id)</code> abre la compra de Google Play (lo que pasó llega una vez en <code>compras.resultado_compra()</code>) y <code>compras.restaurar()</code> pregunta lo que ya tiene el jugador (llega en <code>compras.comprados()</code>). Mientras no llega, <code>nulo</code>.</p><p class="nota"><code>&quot;comprado&quot;</code> llega cuando Google ya ha confirmado la compra. Lince no guarda nada: el juego decide qué recordar para jugar sin conexión. Los productos se crean en Play Console (ver <strong>Compartir el juego</strong>). La biblioteca de Google Play Billing y el permiso <code>BILLING</code> solo van en los juegos que importan <code>compras</code>. En el ordenador, <code>LINCE_COMPRAS=&quot;comprar=comprado;precio=3,99 €&quot;</code> lo simula (también <code>tiene=id</code>, <code>cancelado</code>, <code>pendiente</code>, <code>sin_conexion</code>...).</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
+<span class="k">importar</span> <span class="s">&quot;compras&quot;</span>
+
+<span class="k">fijo</span> PRODUCTO = <span class="s">&quot;version_completa&quot;</span>
+<span class="k">sea</span> completa = <span class="k">falso</span>
+<span class="k">sea</span> precio = <span class="s">&quot;...&quot;</span>
+juego.abrir(<span class="s">&quot;Compras&quot;</span>, <span class="n">480</span>, <span class="n">270</span>)
+compras.consultar_productos([PRODUCTO])
+compras.restaurar()
+<span class="k">mientras</span> juego.abierto() {
+    <span class="k">sea</span> ofertas = compras.productos()
+    <span class="k">si</span> ofertas != <span class="k">nulo</span> <span class="k">y</span> ofertas.longitud() &gt; <span class="n">0</span> { precio = ofertas[<span class="n">0</span>][<span class="s">&quot;precio&quot;</span>] }
+    <span class="k">sea</span> tiene = compras.comprados()
+    <span class="k">si</span> tiene != <span class="k">nulo</span> <span class="k">y</span> tiene[<span class="s">&quot;ok&quot;</span>] <span class="k">y</span> tiene[<span class="s">&quot;productos&quot;</span>].contiene(PRODUCTO) { completa = <span class="k">verdadero</span> }
+    <span class="k">sea</span> r = compras.resultado_compra()
+    <span class="k">si</span> r != <span class="k">nulo</span> <span class="k">y</span> (r[<span class="s">&quot;resultado&quot;</span>] == <span class="s">&quot;comprado&quot;</span> <span class="k">o</span> r[<span class="s">&quot;resultado&quot;</span>] == <span class="s">&quot;ya_comprado&quot;</span>) { completa = <span class="k">verdadero</span> }
+    juego.limpiar([<span class="n">25</span>, <span class="n">25</span>, <span class="n">35</span>])
+    <span class="k">si</span> completa {
+        juego.<span class="t">texto</span>(<span class="s">&quot;¡VERSIÓN COMPLETA!&quot;</span>, <span class="n">130</span>, <span class="n">60</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">2</span>, <span class="s">&quot;color&quot;</span>: [<span class="n">240</span>, <span class="n">190</span>, <span class="n">60</span>]})
+    } <span class="k">sino</span> <span class="k">si</span> compras.estado() == <span class="s">&quot;lista&quot;</span> {
+        juego.rectangulo(<span class="n">100</span>, <span class="n">95</span>, <span class="n">280</span>, <span class="n">50</span>, [<span class="n">66</span>, <span class="n">133</span>, <span class="n">244</span>])
+        juego.<span class="t">texto</span>(<span class="s">&quot;COMPRAR VERSIÓN COMPLETA ({precio})&quot;</span>, <span class="n">112</span>, <span class="n">115</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
+        juego.rectangulo(<span class="n">160</span>, <span class="n">170</span>, <span class="n">160</span>, <span class="n">30</span>, [<span class="n">70</span>, <span class="n">70</span>, <span class="n">80</span>])
+        juego.<span class="t">texto</span>(<span class="s">&quot;RESTAURAR COMPRAS&quot;</span>, <span class="n">172</span>, <span class="n">181</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
+        <span class="k">si</span> juego.clic(<span class="n">1</span>) {
+            <span class="k">sea</span> p = juego.raton()
+            <span class="k">si</span> p[<span class="n">0</span>] &gt;= <span class="n">100</span> <span class="k">y</span> p[<span class="n">0</span>] &lt; <span class="n">380</span> <span class="k">y</span> p[<span class="n">1</span>] &gt;= <span class="n">95</span> <span class="k">y</span> p[<span class="n">1</span>] &lt; <span class="n">145</span> { compras.comprar(PRODUCTO) }
+            <span class="k">si</span> p[<span class="n">0</span>] &gt;= <span class="n">160</span> <span class="k">y</span> p[<span class="n">0</span>] &lt; <span class="n">320</span> <span class="k">y</span> p[<span class="n">1</span>] &gt;= <span class="n">170</span> <span class="k">y</span> p[<span class="n">1</span>] &lt; <span class="n">200</span> { compras.restaurar() }
+        }
+    } <span class="k">sino</span> {
+        juego.<span class="t">texto</span>(<span class="s">&quot;LA TIENDA NO ESTÁ DISPONIBLE: {compras.estado()}&quot;</span>, <span class="n">60</span>, <span class="n">120</span>, {<span class="s">&quot;escala&quot;</span>: <span class="n">1</span>})
+    }
+    juego.presentar()
+}</code></pre></div><figure><img src="img/juego/760_compras.png" alt="Captura de «Compras en Google Play»" loading="lazy"><figcaption>Captura real, sacada al generar esta página.</figcaption></figure><span class="fuente">docs/juego/ejemplos/760_compras.lince</span></article></section>
 <section id="sonido"><h2>Sonido</h2><article class="ej" id="sonido-0"><h3>Efectos sin archivos</h3><p class="nota"><code>juego.efecto(&quot;moneda&quot;)</code> genera y hace sonar un efecto al estilo de los juegos de 8 bits: <code>&quot;moneda&quot;</code>, <code>&quot;salto&quot;</code>, <code>&quot;disparo&quot;</code>, <code>&quot;explosion&quot;</code>, <code>&quot;golpe&quot;</code>, <code>&quot;subir&quot;</code>, <code>&quot;clic&quot;</code> o <code>&quot;perder&quot;</code>. Cada vez suena un poco distinto. <code>juego.crear_efecto()</code> lo da como sonido, para <code>juego.reproducir()</code> o para guardarlo con <code>juego.guardar_sonido()</code>.</p><div class="codigo"><button class="copiar" aria-label="Copiar">copiar</button><pre><code><span class="k">importar</span> <span class="s">&quot;juego&quot;</span>
 
 juego.abrir(<span class="s">&quot;Sonido&quot;</span>, <span class="n">320</span>, <span class="n">180</span>)

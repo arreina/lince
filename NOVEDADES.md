@@ -3,6 +3,27 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.12.0
+
+Lo otro que pidió Chatarrabot: anuncios recompensados y compras en Google Play, para los juegos de Android que los quieran. Solo añade: nada de la 2.0 cambia, y un juego que no los importa queda exactamente igual.
+
+- **Módulo `anuncios`**: anuncios recompensados («mira un anuncio y consigue una vida»), solo cuando el juego llama a `anuncios.mostrar()`: ni banners, ni anuncios al abrir, ni a ratos. `configurar`, `preparar`, `estado`, `mostrar`, `resultado` (una sola vez, con recompensa solo si Google confirma que se vio entero), el consentimiento de Europa (`pedir_consentimiento`, `consentimiento`, `personalizados`) y los anuncios de prueba de Google mientras no se diga otra cosa.
+- **Módulo `compras`**: productos que se compran una vez y son para siempre, con Google Play Billing. `consultar_productos` y `productos` (con el precio en la moneda del jugador), `comprar` y `resultado_compra` (`"comprado"` solo cuando Google ha confirmado la compra; las pendientes, aparte), `restaurar` y `comprados`.
+- **Las bibliotecas de Google y sus permisos, solo en los juegos que importan cada módulo**: `lince repartir --android` / `--aab` elige la variante de la plantilla (anuncios, compras o las dos), pone en el manifiesto el identificador de la app de AdMob que está en el código (o `--anuncios-app`) y el paquete del juego en los proveedores de Google. La guía de la ficha de Google Play dice lo que hay que declarar.
+- **Se simulan en el ordenador**: `LINCE_ANUNCIOS=completar` (o `cerrar`, `fallar`, `sin_conexion`, `no_disponible`) y `LINCE_COMPRAS="comprar=comprado;tiene=id;precio=3,99 €"`, también con las opciones `"anuncios"` y `"compras"` de `juego.jugar()`.
+- La plantilla de Android pasa de unos 2,5 MB a unos 15 MB (las bibliotecas de Google de las variantes); se hace con Gradle (`android/servicios/`).
+
+Probado en el emulador de Android 16: el consentimiento y la petición del anuncio llegan a Google, y las compras sin Play Store dicen «no_disponible». Falta verlo en un móvil de verdad con el anuncio de prueba entero (en el emulador sin pantalla, el vídeo de prueba de Google no se reproduce) y una compra con una cuenta de pruebas de Play Console.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.12.0-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.12.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.12.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.12.0.vsix` |
+
 ## 2.11.0
 
 Lo que pidió Chatarrabot, un puzle para Android hecho con Lince: un arreglo de los toques en el móvil, gestos de deslizar y saber si hay conexión. Solo añade: nada de la 2.0 cambia.

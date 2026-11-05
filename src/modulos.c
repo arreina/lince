@@ -2186,6 +2186,43 @@ static void cargar_bits(Entorno *entorno) {
     registrar_modulo_diccionario(entorno, "bits", fns, (int)(sizeof fns / sizeof fns[0]), NULL, NULL, 0);
 }
 
+/* ── anuncios y compras ──
+   Escritos en Lince (src/lince/anuncios.lince y compras.lince); de C solo la
+   puerta a la parte en Java de Android: _android(orden, datos) da la
+   respuesta de org.lince.Anuncios / org.lince.Compras, o nulo si no es
+   Android (y entonces se simulan). */
+#include "biblioteca_anuncios.h"
+#include "biblioteca_compras.h"
+static Valor *servicio_android(const char *modulo, Valor **a, int n) {
+#ifdef __ANDROID__
+    if (n < 1 || a[0]->tipo != VAL_TEXTO) return valor_nulo();
+    char orden[160];
+    snprintf(orden, sizeof orden, "%s.%s", modulo, a[0]->texto);
+    char *r = android_servicio(orden, n > 1 && a[1]->tipo == VAL_TEXTO ? a[1]->texto : "");
+    if (!r) return valor_nulo();
+    Valor *v = valor_texto(r);
+    free(r);
+    return v;
+#else
+    (void)modulo; (void)a; (void)n;
+    return valor_nulo();
+#endif
+}
+static Valor *fn_anuncios_android(Valor **a, int n) { return servicio_android("anuncios", a, n); }
+static Valor *fn_compras_android(Valor **a, int n)  { return servicio_android("compras", a, n); }
+
+static void cargar_anuncios(Entorno *entorno) {
+    FuncionNativa fns[] = { {"_android", fn_anuncios_android, 2} };
+    registrar_modulo_diccionario(entorno, "anuncios", fns, (int)(sizeof fns / sizeof fns[0]), NULL, NULL, 0);
+    interprete_biblioteca(entorno, "anuncios", BIBLIOTECA_ANUNCIOS);
+}
+
+static void cargar_compras(Entorno *entorno) {
+    FuncionNativa fns[] = { {"_android", fn_compras_android, 2} };
+    registrar_modulo_diccionario(entorno, "compras", fns, (int)(sizeof fns / sizeof fns[0]), NULL, NULL, 0);
+    interprete_biblioteca(entorno, "compras", BIBLIOTECA_COMPRAS);
+}
+
 /* Única lista de módulos estándar: cargador y nombre van juntos. */
 static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_ESTANDAR[] = {
     {"matematica", cargar_matematica},
@@ -2198,6 +2235,8 @@ static const struct { const char *nombre; void (*cargar)(Entorno *); } MODULOS_E
     {"juego", cargar_juego},
     {"bytes", cargar_bytes},
     {"bits", cargar_bits},
+    {"anuncios", cargar_anuncios},
+    {"compras", cargar_compras},
 };
 #define NUM_MODULOS_ESTANDAR ((int)(sizeof(MODULOS_ESTANDAR) / sizeof(MODULOS_ESTANDAR[0])))
 
@@ -2223,7 +2262,7 @@ void modulo_cargar(const char *nombre, Entorno *entorno) {
     hay_error = 1;
     char msg[512];
     snprintf(msg, sizeof(msg),
-        "El módulo '%s' no existe. Módulos disponibles: juego, matematica, texto, archivos, tiempo, sistema, json, pruebas, bytes y bits",
+        "El módulo '%s' no existe. Módulos disponibles: juego, matematica, texto, archivos, tiempo, sistema, json, pruebas, bytes, bits, anuncios y compras",
         nombre);
     valor_error = valor_error_nuevo("Error", msg, 0);
 }

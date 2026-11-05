@@ -209,11 +209,14 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 - [x] `sistema.conexion()` y `sistema.conexion_medida()`; en Android, el permiso de la red solo en los
   juegos que la llaman (las variantes de la plantilla).
 
-### 2.12 — Lo que pidió Chatarrabot: anuncios recompensados y compras únicas
-- [ ] Módulo `anuncios` (solo el formato recompensado, solo cuando el juego lo pide, con el
+### 2.12 — Lo que pidió Chatarrabot: anuncios recompensados y compras únicas (publicada)
+- [x] Módulo `anuncios` (solo el formato recompensado, solo cuando el juego lo pide, con el
   consentimiento UMP) y módulo `compras` (productos únicos con Google Play Billing), con
   simulación en el ordenador. Las bibliotecas de Google y sus permisos, solo en los juegos que
   importan cada módulo (variantes `anuncios`, `compras` y `anuncios_compras` de la plantilla).
+- [ ] Verlo en un móvil de verdad: el anuncio de prueba entero (en el emulador sin pantalla el
+  vídeo de prueba no se reproduce) y una compra con una cuenta de pruebas de Play Console (hace
+  falta la cuenta de desarrollador del autor).
 
 ### 2.13 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.

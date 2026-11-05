@@ -484,7 +484,8 @@ int main(int argc, char *argv[]) {
                           "                       [--nombre \"Mi juego\"] [--icono icono.png] [--para windows|linux]\n"
                           "        lince repartir <juego.lince> --android [--aab] [-o juego.apk] [--nombre \"Mi juego\"]\n"
                           "                       [--id org.lince.mijuego] [--version 1] [--version-nombre 1.0]\n"
-                          "                       [--icono icono.png] [--capturas 60,180,300] [--guion \"30:espacio\"]\n\n";
+                          "                       [--icono icono.png] [--capturas 60,180,300] [--guion \"30:espacio\"]\n"
+                          "                       [--anuncios-app ca-app-pub-...~...]\n\n";
         if (argc < 3) { fprintf(stderr, "\n❌ Falta el juego.\n%s", uso); return 1; }
         const char *ext = strrchr(argv[2], '.');
         if (!ext || strcmp(ext, ".lince") != 0) {
@@ -492,7 +493,7 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         const char *carpeta = NULL, *nombre = NULL, *id = NULL, *icono = NULL, *para = NULL, *version_nombre = NULL,
-                   *capturas = NULL, *guion = NULL;
+                   *capturas = NULL, *guion = NULL, *anuncios_app = NULL;
         const char *extras[64];
         int num_extras = 0, android = 0, aab = 0, version = 1;
         for (int i = 3; i < argc; i++) {
@@ -513,6 +514,7 @@ int main(int argc, char *argv[]) {
             else if (strcmp(argv[i], "--icono") == 0 && i + 1 < argc) icono = argv[++i];
             else if (strcmp(argv[i], "--version-nombre") == 0 && i + 1 < argc) version_nombre = argv[++i];
             else if (strcmp(argv[i], "--guion") == 0 && i + 1 < argc) guion = argv[++i];
+            else if (strcmp(argv[i], "--anuncios-app") == 0 && i + 1 < argc) anuncios_app = argv[++i];
             else if (strcmp(argv[i], "--capturas") == 0 && i + 1 < argc) {
                 capturas = argv[++i];
                 int bien = capturas[0] != '\0';
@@ -565,7 +567,7 @@ int main(int argc, char *argv[]) {
             const char *nombre_auto = base;                /* 01_pong → pong */
             while ((*nombre_auto >= '0' && *nombre_auto <= '9') || *nombre_auto == '_') nombre_auto++;
             ApkOpciones ao = {nombre ? nombre : (*nombre_auto ? nombre_auto : base), id, version, version_nombre, aab, icono,
-                              capturas, guion};
+                              capturas, guion, anuncios_app};
             return apk_crear(argv[2], carpeta, &ao, extras, num_extras);
         }
         if (nombre && !nombre[0]) { fprintf(stderr, "\n❌ --nombre no puede ir vacío.\n\n"); return 1; }
