@@ -214,9 +214,12 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   consentimiento UMP) y módulo `compras` (productos únicos con Google Play Billing), con
   simulación en el ordenador. Las bibliotecas de Google y sus permisos, solo en los juegos que
   importan cada módulo (variantes `anuncios`, `compras` y `anuncios_compras` de la plantilla).
-- [ ] Verlo en un móvil de verdad: el anuncio de prueba entero (en el emulador sin pantalla el
-  vídeo de prueba no se reproduce) y una compra con una cuenta de pruebas de Play Console (hace
-  falta la cuenta de desarrollador del autor).
+- [x] El anuncio de prueba entero: Chatarrabot lo vio en el AVD de Android 16 (tras el
+  formulario de consentimiento; `resultado()` con recompensa y "completado").
+- [ ] Una compra con una cuenta de pruebas de Play Console (hace falta la Play Store y la cuenta de
+  desarrollador del autor).
+- [ ] Subir la biblioteca de anuncios (24.9.0): Google avisa en el registro de que está
+  desactualizada (hoy va por la 25.x); mirar antes que la API de Anuncios.java sigue igual.
 
 ### 2.13 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.

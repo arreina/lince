@@ -1179,7 +1179,9 @@ anuncios.personalizados()           # ¿pueden ser personalizados? (concedido o 
   `"cantidad"` son los de la recompensa puesta en AdMob. Mientras se ve el anuncio el juego queda en
   pausa, como al salir de la app. Si el juego se cierra antes, el resultado se pierde.
 - Sin consentimiento (en Europa), `estado()` es `"falta_consentimiento"` hasta que el jugador
-  responde al formulario de `pedir_consentimiento()`. Con `"denegado"` los anuncios no son
+  responde al formulario de `pedir_consentimiento()` (mientras el formulario está abierto,
+  `estado()` sigue así y `consentimiento()` es `"pendiente"`: no hay que dar el anuncio por fallido
+  por tardar; después, `preparar()` otra vez). Con `"denegado"` los anuncios no son
   personalizados.
 - `lince repartir --android` / `--aab` mete la biblioteca de anuncios de Google, los permisos
   `INTERNET`, `ACCESS_NETWORK_STATE` y `AD_ID` y el identificador de la app de AdMob (el que está en
