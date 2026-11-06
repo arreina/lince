@@ -783,7 +783,9 @@ def px(x, y):
     f = (abs(h) - 1 - y) if h > 0 else y
     i = off + f * fila + x * B
     return (d[i + 2], d[i + 1], d[i])
-casos = [(px(11, 11) == (0, 0, 0) and px(9, 9) == (255, 255, 255), "sin temblor: el cuadro, justo en su sitio"),
+# con margen: el filtro de color lo redondea cada versión de SDL a su manera
+casos = [(max(px(11, 11)) < 40 and min(px(9, 9)) > 215 and min(px(15, 15)) > 215,
+          "sin temblor: el cuadro, justo en su sitio %s %s %s" % (px(9, 9), px(11, 11), px(15, 15))),
          (px(50, 20)[2] > 40 and px(50, 20)[1] < 30, "filtro de deuteranopía: el rojo tira a magenta %s" % (px(50, 20),)),
          (px(80, 20) == (0, 255, 0), "filtro: el verde se queda"),
          (px(110, 20)[0] > 200 and px(110, 20)[1] < 30, "sin destellos: el sprite sigue rojo"),
