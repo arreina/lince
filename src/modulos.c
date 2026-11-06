@@ -1253,7 +1253,15 @@ static Valor *fn_sis_existe(Valor **a, int n) {
 static Valor *fn_sis_salir(Valor **a, int n) {
     (void)n;
     int codigo = (a[0]->tipo == VAL_NUMERO) ? (int)a[0]->numero : 0;
+#ifdef __ANDROID__
+    /* como al acabar el programa (SDL_main en main.c): exit() correría los
+       destructores mientras otros hilos de Android los usan (SIGABRT) */
+    fflush(stdout);
+    fflush(stderr);
+    _exit(codigo);
+#else
     exit(codigo);
+#endif
     return valor_nulo();
 }
 

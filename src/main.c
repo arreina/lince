@@ -627,7 +627,11 @@ __attribute__((visibility("default"))) int SDL_main(int argc, char *argv[]) {
     /* Al acabar se cierra el proceso: si no, Android lo guarda y al volver a
        abrir la app Lince empezaría con lo que dejó el juego anterior */
     int r = ejecutar_empaquetado(argc, argv);
-    fflush(NULL);
+    /* stdout y stderr, no fflush(NULL): este también espera al FILE de la tubería
+       que el hilo del registro (android.c) tiene cogido mientras lee, y como ya
+       nadie escribe, esperaría para siempre (la app se quedaba congelada al salir) */
+    fflush(stdout);
+    fflush(stderr);
     _exit(r);       /* sin destructores: otros hilos de Android aún los usan */
 }
 #endif

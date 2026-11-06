@@ -1,0 +1,12 @@
+# Para tests/android/cerrar.sh: al tocar la pantalla, juego.salir(). En
+# Android la app tiene que cerrarse (en la 2.12.0 se quedaba congelada).
+importar "juego"
+juego.abrir("Salir", 360, 640)
+mientras juego.abierto() {
+    si juego.clic(1) {
+        escribir("salir")
+        juego.salir()
+    }
+    juego.limpiar([20, 20, 30])
+    juego.presentar()
+}

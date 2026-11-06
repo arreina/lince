@@ -3,6 +3,22 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.12.1
+
+Un arreglo de Android que encontró Chatarrabot.
+
+- **Arreglado: en Android, la app se quedaba congelada al acabar el juego** (`juego.salir()`, la X o «atrás»). Al cerrar, Lince vaciaba todos los archivos abiertos (`fflush(NULL)`), también el que lee el hilo que pasa lo escrito a `adb logcat`, que lo tiene cogido mientras espera; como ya nadie escribía, esperaba para siempre. Ahora vacía solo la salida del juego. Probado 20 veces seguidas en el emulador de Android 16, también con un juego que importa `anuncios` (`tests/android/cerrar.sh`).
+- **`sistema.salir()` en Android cierra sin fallo** (antes acababa en un `SIGABRT` de Android al cerrar).
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.12.1-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.12.1-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.12.1.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.12.1.vsix` |
+
 ## 2.12.0
 
 Lo otro que pidió Chatarrabot: anuncios recompensados y compras en Google Play, para los juegos de Android que los quieran. Solo añade: nada de la 2.0 cambia, y un juego que no los importa queda exactamente igual.

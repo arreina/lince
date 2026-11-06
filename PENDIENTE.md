@@ -216,6 +216,8 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   importan cada módulo (variantes `anuncios`, `compras` y `anuncios_compras` de la plantilla).
 - [x] El anuncio de prueba entero: Chatarrabot lo vio en el AVD de Android 16 (tras el
   formulario de consentimiento; `resultado()` con recompensa y "completado").
+- [x] 2.12.1: en Android la app se quedaba congelada al salir (fflush(NULL) esperaba al hilo del
+  registro); lo encontró Chatarrabot. Y `sistema.salir()` en Android, sin SIGABRT.
 - [ ] Una compra con una cuenta de pruebas de Play Console (hace falta la Play Store y la cuenta de
   desarrollador del autor).
 - [ ] Subir la biblioteca de anuncios (24.9.0): Google avisa en el registro de que está
