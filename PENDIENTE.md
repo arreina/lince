@@ -173,8 +173,7 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   opacidad, el desplazamiento, los tiles animados y los tiles más altos que la casilla.
 - [x] Orden de dibujo: los tiles de una capa, cada uno en la capa de la fila de su base, para que
   los personajes pasen por delante y por detrás (`{"ordenar": capa}` y `mapa.profundidad`).
-- [ ] Niveles de altura (bancales, escaleras, pasarelas) en el orden de dibujo: cuando Bichito los
-  necesite y veamos juntos cómo.
+- [x] Niveles de altura (bancales, escaleras, pasarelas): en la 2.13, como los pidió Bichito.
 - [x] Casilla ↔ pantalla en isométrico; `mapa.mover`, `mapa.camino`, `mapa.casilla_en` y
   `mapa.solido` sobre la rejilla lógica; los objetos de Tiled convertidos a ella.
 - [x] Tilesets de imágenes sueltas («colección de imágenes») y objetos con imagen, con su punto de
