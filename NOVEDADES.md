@@ -3,6 +3,19 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.12.2
+
+- **La biblioteca de anuncios de Google, al día**: Google Mobile Ads 25.5.0 (era la 24.9.0, que ya avisaba de que estaba desactualizada) y el consentimiento (UMP) 4.0.0. Para el juego no cambia nada. Probado en el emulador de Android 16: el formulario de consentimiento, el anuncio de prueba entero y `resultado()` con la recompensa.
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.12.2-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.12.2-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.12.2.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.12.2.vsix` |
+
 ## 2.12.1
 
 Un arreglo de Android que encontró Chatarrabot.

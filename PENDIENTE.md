@@ -220,8 +220,8 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
   registro); lo encontró Chatarrabot. Y `sistema.salir()` en Android, sin SIGABRT.
 - [ ] Una compra con una cuenta de pruebas de Play Console (hace falta la Play Store y la cuenta de
   desarrollador del autor).
-- [ ] Subir la biblioteca de anuncios (24.9.0): Google avisa en el registro de que está
-  desactualizada (hoy va por la 25.x); mirar antes que la API de Anuncios.java sigue igual.
+- [x] 2.12.2: la biblioteca de anuncios 25.5.0 y UMP 4.0.0 (la API que usa Anuncios.java no
+  cambió); probado en el emulador con el anuncio entero.
 
 ### 2.13 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.
