@@ -1,0 +1,48 @@
+# @seccion: Mapas de Tiled
+# @titulo: Bancales, rampas y pasarelas
+# @nota: Un mapa con **niveles de altura**: cada nivel es una capa de suelo de Tiled con la propiedad `altura` (0 el suelo, 1 el bancal...) y su desplazamiento vertical. `mapa.mover` apunta en la cosa su `"altura"` y solo la deja pisar el suelo de su nivel: no se cae por el borde del bancal ni se mete en él desde abajo. Para subir, una **rampa**: un tile con la propiedad `rampa` (`"y-"`: sube hacia atrás). Por debajo de una **pasarela** (una capa con la propiedad `pasarela`) pasa lo que va por abajo.
+# @nota: Con `"ordenar"`, lo de encima de un bancal queda delante de su bancal y lo de delante lo tapa; `mapa.a_dibujo(mapa, yo)` lo dibuja en su nivel, y `mapa.velocidad` hace que arriba en el mando sea arriba en la pantalla. Lo que tapa al personaje se puede ver semitransparente: `"transparente"` en `dibujar_tiled` y `mapa.tapa` con los objetos. `"ajuste": -1` deja la sombra justo detrás de él.
+# @fotogramas: 70
+# @guion: 1:arriba:70
+importar "juego"
+importar "matematica"
+
+juego.abrir("Huerto", 320, 180, {"escala": 2, "escala_entera": verdadero})
+juego.definir_accion("izquierda", ["izquierda", "a", "mando:izq_x-"])
+juego.definir_accion("derecha", ["derecha", "d", "mando:izq_x+"])
+juego.definir_accion("arriba", ["arriba", "w", "mando:izq_y-"])
+juego.definir_accion("abajo", ["abajo", "s", "mando:izq_y+"])
+fijo HUERTO = juego.mapa.tiled("recursos/huerto.tmx")
+sea yo = {"x": 0, "y": 0, "ancho": 6, "alto": 6, "vx": 0, "vy": 0}
+sea arboles = []
+para cada diccionario cosa en HUERTO["objetos"] {
+    si cosa["tipo"] == "jugador" {
+        yo["x"] = cosa["x"] - 3
+        yo["y"] = cosa["y"] - 3
+    }
+    si cosa["tipo"] == "arbol" { arboles.agregar(cosa) }
+}
+
+mientras juego.abierto() {
+    sea v = juego.mapa.velocidad(HUERTO, juego.direccion("izquierda", "derecha"), juego.direccion("arriba", "abajo"), 40)
+    yo["vx"] = v[0]
+    yo["vy"] = v[1]
+    juego.mapa.mover(HUERTO, yo)                                  # y su "altura": 0, en la rampa 0.5, 1 arriba
+    sea p = juego.mapa.a_dibujo(HUERTO, yo)                       # dónde se ve, en su nivel
+    juego.camara(p[0] - 160, p[1] - 100)
+
+    juego.limpiar([30, 40, 60])
+    juego.mapa.dibujar_tiled(HUERTO, "suelo")
+    juego.mapa.dibujar_tiled(HUERTO, ["bancal", "pasarela"], {"ordenar": 1, "transparente": {"punto": yo, "alto": 14}})
+    para cada diccionario a en arboles {
+        juego.mapa.dibujar_objeto(HUERTO, a, {"ordenar": 1, "alfa": si juego.mapa.tapa(HUERTO, a, yo, 14) { 110 } sino { 255 }})
+    }
+    juego.capa(1 + juego.mapa.profundidad(HUERTO, yo, {"ajuste": -1}))
+    juego.circulo(p[0], p[1], 4, [0, 0, 0, 80])                  # la sombra, justo detrás
+    juego.capa(1 + juego.mapa.profundidad(HUERTO, yo))
+    juego.circulo(p[0], p[1] - 6, 5, [235, 150, 60])
+    juego.capa(0)
+    juego.camara()                                                # el texto, fijo en la pantalla
+    juego.texto("ALTURA: {matematica.redondear(yo["altura"] * 10) / 10}", 8, 8)
+    juego.presentar()
+}

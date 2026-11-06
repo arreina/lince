@@ -223,7 +223,13 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 - [x] 2.12.2: la biblioteca de anuncios 25.5.0 y UMP 4.0.0 (la API que usa Anuncios.java no
   cambió); probado en el emulador con el anuncio entero.
 
-### 2.13 — Preparar la 3.0 (solo si hay limpieza)
+### 2.13 — Niveles de altura en los isométricos (lo pidió Bichito) (publicada)
+- [x] Capas con la propiedad `altura`, rampas (`rampa` en el tile) y pasarelas (`pasarela` en la
+  capa); `mapa.mover` por niveles; el orden de dibujo con niveles; `mapa.altura`, `a_dibujo` y
+  `a_mapa` con altura; `"ajuste"` en `mapa.profundidad`; `mapa.tapa` y `"transparente"` en
+  `dibujar_tiled`; `mapa.velocidad`.
+
+### 2.14 — Preparar la 3.0 (solo si hay limpieza)
 - [ ] Como la 1.9: lo que vaya a cambiar avisa y `lince migrar` lo cambia solo.
 
 ### 3.0 — Otra limpieza, solo si hace falta
@@ -232,8 +238,7 @@ rompe. El orden puede cambiar si un juego de verdad (o lince-motor) pide antes o
 
 Fuera del plan (decisión del autor): juego en red (se quitó a propósito), consolas (depende de
 que Nintendo y Sony aprueben; iría en un repositorio privado), macOS y navegador (descartados).
-Solo si un juego lo pide: la máquina virtual (ver Rendimiento) y los mapas isométricos y
-hexagonales de Tiled.
+Solo si un juego lo pide: la máquina virtual (ver Rendimiento) y los mapas hexagonales de Tiled.
 
 ## Lenguaje
 

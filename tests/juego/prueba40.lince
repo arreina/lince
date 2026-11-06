@@ -1,0 +1,72 @@
+# 2.13: niveles de altura en un isométrico (lo que pidió Bichito): mapa.altura,
+# mapa.mover por niveles (rampa, borde del bancal, pasarela), a_dibujo y
+# a_mapa con altura, mapa.velocidad, profundidad con "ajuste", y el orden de
+# dibujo y la transparencia, mirando los píxeles. smoke.sh mira la salida.
+importar "juego"
+importar "sistema"
+
+fijo DIR = sistema.entorno("DIR_PRUEBA", ".")
+sea m = juego.mapa.tiled(DIR + "/niveles/niveles.tmx")
+escribir("niveles: {m["niveles"]} {m["paso_altura"]}")
+para cada lista p en [[80, 80], [80, 48], [80, 90], [144, 144]] {
+    escribir("altura {p}: {juego.mapa.altura(m, p)}")
+}
+escribir("bajo la pasarela: {juego.mapa.altura(m, 80, 144)} {juego.mapa.altura(m, 80, 144, 0)}")
+escribir("el arbusto: altura {m["objetos"][1]["altura"]}")
+
+funcion andar(diccionario c, numero veces): diccionario {
+    para (i = 0; i < veces; i++) { juego.mapa.mover(m, c, 1 / 30) }
+    devolver c
+}
+sea c = andar({"x": 76, "y": 110, "ancho": 8, "alto": 8, "vx": 0, "vy": -40}, 60)
+escribir("por la rampa: {c["y"]} {c["altura"]}")
+c = andar({"x": 140, "y": 110, "ancho": 8, "alto": 8, "vx": 0, "vy": -40}, 60)
+escribir("contra el bancal: {c["y"]} {c["altura"]}")
+c = andar({"x": 140, "y": 40, "ancho": 8, "alto": 8, "vx": 0, "vy": 40, "altura": 1}, 60)
+escribir("borde del bancal: {c["y"]} {c["altura"]}")
+c = andar({"x": 40, "y": 140, "ancho": 6, "alto": 6, "vx": 40, "vy": 0, "altura": 0}, 60)
+escribir("por debajo de la pasarela: {c["x"]} {c["altura"]}")
+c = andar({"x": 70, "y": 140, "ancho": 6, "alto": 6, "vx": 40, "vy": 0, "altura": 1}, 60)
+escribir("por la pasarela: {c["x"]} {c["altura"]}")
+escribir("a_mapa: {juego.mapa.a_mapa(m, juego.mapa.a_dibujo(m, 80, 40, 1))} {juego.mapa.a_mapa(m, juego.mapa.a_dibujo(m, 176, 176))}")
+escribir("velocidad: {juego.mapa.velocidad(m, 1, 0, 50)} {juego.mapa.velocidad(m, 0, 0, 50)}")
+sea d0 = juego.mapa.profundidad(m, 100, 100)
+escribir("ajuste: {juego.mapa.profundidad(m, 100, 100, {"ajuste": -1}) < d0} {juego.mapa.profundidad(m, 100, 100, {"ajuste": 1}) > d0}")
+escribir("delante del bancal: {juego.mapa.profundidad(m, 112, 72) > juego.mapa.profundidad(m, 112, 40, {"altura": 1})}")
+intentar { juego.mapa.profundidad(m, 1, 1, {"x": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
+intentar { juego.mapa.altura(m, 1, 1, -2) } capturar (error e) { escribir("error: {e.mensaje}") }
+
+# el dibujo: el suelo debajo de todo, y lo demás ordenado en la capa 1
+juego.abrir("niveles", 400, 280)
+sea arriba = {"x": 108, "y": 36, "ancho": 8, "alto": 8, "altura": 1}       # encima del bancal, en (3, 1)
+sea delante = {"x": 172, "y": 68, "ancho": 8, "alto": 8, "altura": 0}      # delante del bancal, en (5, 2)
+sea bicho = {"x": 93, "y": 141, "ancho": 6, "alto": 6, "altura": 0}        # en el agua, bajo la pasarela
+sea tras_arbol = {"x": 12, "y": 84, "ancho": 8, "alto": 8, "altura": 0}    # detrás del árbol de (0, 3)
+
+funcion persona(diccionario c, lista color, numero alto): nulo {
+    sea p = juego.mapa.a_dibujo(m, c)
+    juego.capa(1 + juego.mapa.profundidad(m, c))
+    juego.rectangulo(p[0] - 4, p[1] - alto, 8, alto, color)
+    juego.capa(0)
+}
+sea f = 0
+mientras juego.abierto() y f < 2 {
+    juego.limpiar([0, 0, 0])
+    juego.camara(0, -80)
+    juego.mapa.dibujar_tiled(m, "Suelo")
+    juego.mapa.dibujar_tiled(m, ["Bancal", "Pasarela", "Piezas"], {"ordenar": 1, "transparente": {"punto": tras_arbol, "alto": 30, "alfa": 100}})
+    persona(arriba, [255, 0, 0], 30)
+    persona(delante, [255, 0, 255], 30)
+    persona(bicho, [255, 255, 255], 6)
+    persona(tras_arbol, [0, 255, 255], 30)
+    juego.camara()
+    juego.presentar()
+    si f == 0 { juego.captura("niveles.bmp") }
+    f++
+}
+# dónde se ven, en la pantalla (con la cámara 80 más abajo)
+funcion en_pantalla(diccionario c, numero arriba_px): lista {
+    sea p = juego.mapa.a_dibujo(m, c)
+    devolver [p[0], p[1] + 80 - arriba_px]
+}
+escribir("puntos: {en_pantalla(arriba, 10)} {en_pantalla(delante, 25)} {en_pantalla(bicho, 4)} {en_pantalla(tras_arbol, 25)}")

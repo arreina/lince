@@ -5,7 +5,6 @@
 # @fotogramas: 20
 # @guion: 1:derecha:12
 importar "juego"
-importar "matematica"
 
 juego.abrir("Pueblo", 384, 216, {"escala": 2, "escala_entera": verdadero})
 juego.definir_accion("izquierda", ["izquierda", "a", "mando:izq_x-"])
@@ -25,11 +24,9 @@ para cada diccionario cosa en PUEBLO["objetos"] {
 
 mientras juego.abierto() {
     # las flechas mueven en la pantalla; en la rejilla lógica, eso es en diagonal
-    sea dx = juego.direccion("izquierda", "derecha")
-    sea dy = juego.direccion("arriba", "abajo")
-    sea v = matematica.normalizar(dy + dx / 2, dy - dx / 2)
-    yo["vx"] = v[0] * 50
-    yo["vy"] = v[1] * 50
+    sea v = juego.mapa.velocidad(PUEBLO, juego.direccion("izquierda", "derecha"), juego.direccion("arriba", "abajo"), 50)
+    yo["vx"] = v[0]
+    yo["vy"] = v[1]
     juego.mapa.mover(PUEBLO, yo)
     sea p = juego.mapa.a_dibujo(PUEBLO, yo)
     juego.camara(p[0] - 192, p[1] - 108)

@@ -1,4 +1,4 @@
-# 🐆 Lince — Especificación del Lenguaje v2.12
+# 🐆 Lince — Especificación del Lenguaje v2.13
 
 ## Filosofía
 
@@ -1814,10 +1814,13 @@ juego.mapa.dibujar_tiled(NIVEL, "Delante")                     # lo de delante
 | Función | Qué hace |
 |---|---|
 | `mapa.tiled(ruta[, opciones])` | lee un mapa de Tiled: `.tmx` (lo que Tiled guarda por defecto) o `.tmj` (JSON), con sus tilesets dentro o aparte (`.tsx`, `.tsj`) y las capas en CSV o en base64 (sin comprimir, con zlib o con gzip). Devuelve un mapa como los de `mapa.crear()`, así que `mapa.mover`, `mapa.casilla`, `mapa.solido`, `mapa.buscar` y `mapa.camino` funcionan igual, con `"#"` en las casillas sólidas, `"="` en las plataformas y `"."` en las libres. Lleva además `"capas"` (los nombres de las capas que se dibujan), `"objetos"` (cada uno con `nombre`, `tipo`, `x`, `y`, `ancho`, `alto`, `rotacion`, `forma`: `"rectangulo"`, `"punto"`, `"elipse"`, `"poligono"`, `"linea"` o `"tile"`, `puntos` en los polígonos y las líneas, `capa` y `propiedades`; los que tienen imagen, también `tile` y `base`, el punto por donde pisan), `"tiles"` (por su número, el gid, cada tile de los tilesets con su `ancho`, su `alto` y sus `propiedades`; `nulo` en los números que no son de ningún tile), `"propiedades"` (las del mapa), `"isometrico"`, `"tile"` (el tamaño de una casilla al dibujarla) y `"dibujo"` (lo que ocupa dibujado). Opciones: `"solidos"` y `"plataformas"` (nombres de capas) y `"bordes"` (como en `mapa.crear()`). Se puede leer sin la ventana abierta (en una prueba): las imágenes se preparan al abrirla |
-| `mapa.dibujar_tiled(mapa[, capas[, opciones]])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan. Opciones: `capa` (todo en esa capa) y `ordenar` (cada tile en la capa `ordenar` más su profundidad, para pasar por delante y por detrás: ver abajo) |
-| `mapa.dibujar_objeto(mapa, objeto[, opciones])` · `mapa.dibujar_tile(mapa, tile, x, y[, opciones])` | un objeto de Tiled con imagen en su sitio · un tile del mapa con su base en el punto (x, y). Opciones: `capa`, `ordenar` y `alfa` (de 0, invisible, a 255: la casa que tapa al personaje, semitransparente) |
-| `mapa.a_dibujo(mapa, x, y)` · `mapa.a_mapa(mapa, x, y)` | dónde se dibuja un punto del mapa · el punto del mapa que se dibuja ahí (con el ratón: `mapa.a_mapa(mapa, juego.a_mundo(juego.raton()))`). En un mapa que no es isométrico no cambian nada. También aceptan `[x, y]` o una cosa (su centro) |
-| `mapa.profundidad(mapa, x, y)` | de 0 (al fondo) a casi 1 (delante): lo que se suma a la capa para que lo de delante tape lo de detrás |
+| `mapa.dibujar_tiled(mapa[, capas[, opciones]])` | dibuja las capas visibles, o las nombradas (un nombre o una lista), con la cámara, la opacidad, el desplazamiento y el paralaje de cada capa, los tiles volteados y girados y los tiles animados. Las capas de imagen también se dibujan. Opciones: `capa` (todo en esa capa), `ordenar` (cada tile en la capa `ordenar` más su profundidad, para pasar por delante y por detrás: ver abajo) y `transparente` (`{"punto": yo, "alto": 32, "alfa": 110}`: con `ordenar`, lo que está delante de esa cosa y le tapa el pecho o la cabeza, semitransparente; `alto` son los píxeles que mide en la pantalla) |
+| `mapa.dibujar_objeto(mapa, objeto[, opciones])` · `mapa.dibujar_tile(mapa, tile, x, y[, opciones])` | un objeto de Tiled con imagen en su sitio · un tile del mapa con su base en el punto (x, y). Opciones: `capa`, `ordenar`, `alfa` (de 0, invisible, a 255: la casa que tapa al personaje, semitransparente) y `altura` (su nivel: se dibuja más arriba; `dibujar_objeto` pone sola la de la capa del objeto) |
+| `mapa.a_dibujo(mapa, x, y[, altura])` · `mapa.a_mapa(mapa, x, y)` | dónde se dibuja un punto del mapa (en su nivel de altura: el que se dice, o el `"altura"` de la cosa) · el punto del mapa que se dibuja ahí (con el ratón: `mapa.a_mapa(mapa, juego.a_mundo(juego.raton()))`; con niveles, `[x, y, altura]`, el del nivel más alto que se ve ahí). En un mapa que no es isométrico y sin niveles no cambian nada. También aceptan `[x, y]` o una cosa (su centro) |
+| `mapa.profundidad(mapa, x, y[, opciones])` | de 0 (al fondo) a casi 1 (delante): lo que se suma a la capa para que lo de delante tape lo de detrás. Opciones: `altura` (su nivel; si no, el `"altura"` de la cosa) y `ajuste` (−1, −2… un poco detrás de lo que está en el mismo sitio; 1, 2… un poco delante: la sombra, con −1, justo detrás del personaje) |
+| `mapa.altura(mapa, x, y[, desde])` | el nivel de altura del suelo en ese punto (en una rampa, lo que ha subido: 0.5 a la mitad). Con suelo en varios niveles (debajo de una pasarela), el más cercano a `desde`; sin él, el más alto. Sin niveles, 0 |
+| `mapa.tapa(mapa, objeto, cosa[, alto])` | ¿el objeto de Tiled (con imagen) está delante de la cosa y le tapa el pecho o la cabeza? `alto`: los píxeles que mide la cosa en la pantalla (32). Para dibujarlo semitransparente: `{"alfa": si juego.mapa.tapa(m, casa, yo) { 110 } sino { 255 }}` |
+| `mapa.velocidad(mapa, dx, dy, rapidez)` | la velocidad `[vx, vy]` en el mapa para ir hacia `(dx, dy)` **en la pantalla** (lo que dan `juego.direccion` o la palanca): en un isométrico, arriba en el mando es arriba en la pantalla, no en diagonal sobre la rejilla. `rapidez`, en píxeles del mapa por segundo; la palanca a medias, más despacio |
 
 Qué es sólido se dice en Tiled de tres maneras: una capa que se llama **Colisiones** (o Sólidos o
 Paredes), una capa o un tile del tileset con la propiedad `solido` (lógica, verdadera), o la
@@ -1858,9 +1861,30 @@ su esquina de delante: se dice con las propiedades `huella_columnas` y `huella_f
 el tileset de Tiled. Así un personaje junto a su fachada queda delante, y uno detrás de ella, detrás.
 
 `"ordenar"` y `mapa.profundidad` también sirven en un mapa ortogonal visto desde arriba (lo de
-más abajo tapa lo de más arriba). Los niveles de altura (bancales, una pasarela) todavía no tienen
-nada propio: una capa de Tiled por nivel, con su desplazamiento vertical, se dibuja bien, pero
-quien pasa por delante y por detrás de otro nivel lo tiene que ordenar el juego.
+más abajo tapa lo de más arriba).
+
+**Niveles de altura** (bancales, una pasarela, escaleras). Cada nivel es una capa de suelo en Tiled
+con la propiedad `altura` (0 el suelo, 1 el primer bancal…, hasta 7) y su desplazamiento vertical
+(`offsety`: en un isométrico, normalmente la mitad del alto de la casilla por nivel; lo que sube
+cada nivel se toma de ahí). Las capas de objetos con `altura` dan esa `"altura"` a sus objetos. Un
+mapa sin ninguna capa con `altura` funciona como siempre.
+Con niveles:
+
+- **Orden de dibujo**: con `"ordenar"`, lo de encima de un bancal queda delante de su bancal, lo
+  que está delante de un bancal lo tapa, y lo de debajo de una pasarela queda detrás de ella. El
+  personaje, en `1 + mapa.profundidad(mapa, yo)` con su `"altura"`, y dibujado con
+  `mapa.a_dibujo(mapa, yo)`, que lo sube a su nivel.
+- **Moverse**: `mapa.mover` apunta en la cosa su `"altura"` y solo la deja pisar el suelo de su
+  nivel: no se cae por el borde de un bancal ni se mete en él desde abajo. En cada casilla se pisa
+  el suelo más alto (lo de debajo de un bancal es tierra), salvo debajo de una **pasarela** (una
+  capa con la propiedad `pasarela`: verdadero), por donde pasa lo que va por abajo. Para cambiar
+  de nivel, una **rampa** o una escalera: un tile de suelo con la propiedad `rampa` (`"x+"`, `"x-"`,
+  `"y+"` o `"y-"`: hacia dónde sube en la rejilla lógica), que lleva de su nivel al de encima.
+  Una pared (una capa de colisiones o un tile sólido) en una capa con `altura` solo es pared en ese
+  nivel; sin `altura`, en todos.
+- `mapa.altura` dice el nivel en un punto, `mapa.a_mapa` el punto y el nivel de lo que se ve, y
+  `mapa["niveles"]` (el más alto; 0 sin niveles) y `mapa["paso_altura"]` (lo que sube en la
+  pantalla cada nivel) lo que tiene el mapa.
 
 **Enemigos con cabeza.** Para lo que se mueve solo (enemigos, animales, compañeros): una «cosa»
 es un diccionario con `x` e `y` (si tiene `ancho` y `alto`, se mide desde su centro) y `vx`,

@@ -894,7 +894,7 @@ for l in 'mapa: verdadero 16 [32, 16] 6x6 96x96 [192, 96] ["suelo", "arboles", "
          "a_dibujo: [96, 0] [112, 8] [80, 8] [96, 48]" "a_mapa: [0, 0] [16, 0] [48, 48]" "profundidad: 0 0.5 0.999999" \
          "de una cosa: [96, 48] 0.5" "objeto fuente: tile 72 24 verdadero [72, 24]" "objeto salida: punto 8 88 falso nulo" \
          "solido: verdadero falso [2, 2]" "camino: [[1, 1], [2, 1], [3, 1], [3, 2]]" "mover: 24 1" "plano: [3, 4] 0.5" \
-         "error: mapa.dibujar_tiled(): no conozco la opción 'ordenr' (hay \"capa\" y \"ordenar\")" \
+         "error: mapa.dibujar_tiled(): no conozco la opción 'ordenr' (hay \"capa\", \"ordenar\" y \"transparente\")" \
          'error: mapa.dibujar_tiled(): "ordenar" es un número entero (0 o más)' \
          "error: mapa.dibujar_tile(): el mapa no tiene el tile 99" \
          'error: abrir(): "escala_entera" es verdadero o falso'; do
@@ -1020,4 +1020,35 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy LINCE_JUEGO_FOTOGRAMAS=5 LINCE_ANUNC
     && ok "2.12: con el consentimiento denegado, sin anuncios personalizados" || mal "2.12: el consentimiento denegado"
 LINCE_COMPRAS="raro=1" timeout 30 "$LINCE" "$DIR/prueba39.lince" 2>&1 | grep -qF "LINCE_COMPRAS: no entiendo 'raro=1'" \
     && ok "2.12: LINCE_COMPRAS mal escrita da un error claro" || mal "2.12: LINCE_COMPRAS mal escrita"
-[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida43.txt salida44.txt salida45.txt salida5b.txt; exit 1; }
+# ── 2.13: niveles de altura en un isométrico (lo que pidió Bichito) ──
+DIR_PRUEBA="$DIR" SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy timeout 60 "$LINCE" "$DIR/prueba40.lince" > salida47.txt 2>&1
+[ $? -eq 0 ] && ok "la prueba de la 2.13 termina bien" || mal "la prueba de la 2.13 falló"
+for l in "niveles: 1 16" "altura [80, 80]: 0.5" "altura [80, 48]: 1" "altura [80, 90]: 0.1875" "altura [144, 144]: 0" \
+         "bajo la pasarela: 1 0" "el arbusto: altura 1" "por la rampa: 30 1" "contra el bancal: 64 0" "borde del bancal: 56 1" \
+         "por debajo de la pasarela: 120 0" "por la pasarela: 122 1" "a_mapa: [80, 40, 1] [176, 176, 0]" \
+         "velocidad: [35.3553, -35.3553] [0, 0]" "ajuste: verdadero verdadero" "delante del bancal: verdadero" \
+         "error: mapa.profundidad(): no conozco la opción 'x' (hay \"altura\" y \"ajuste\")" \
+         'error: mapa.altura(): "desde" es un nivel (0 o más)' "puntos: [264, 130] [296, 179] [144, 196] [120, 107]"; do
+    grep -qxF "$l" salida47.txt && ok "2.13: $l" || mal "falta la línea: $l"
+done
+python3 - <<'PY2' || fallos=$((fallos+1))
+import struct, sys
+d = open("niveles.bmp", "rb").read()
+off = struct.unpack_from("<I", d, 10)[0]; w, h = struct.unpack_from("<ii", d, 18); B = struct.unpack_from("<H", d, 28)[0] // 8
+fila = (w * B + 3) & ~3
+def px(x, y):
+    f = (abs(h) - 1 - y) if h > 0 else y
+    i = off + f * fila + x * B
+    return (d[i + 2], d[i + 1], d[i])
+tras = px(120, 107)
+casos = [(px(264, 130) == (255, 0, 0), "encima del bancal, delante de su bancal"),
+         (px(296, 179) == (255, 0, 255), "delante del bancal: su cabeza tapa el bancal de detrás"),
+         (px(144, 196) != (255, 255, 255), "bajo la pasarela: la pasarela lo tapa %s" % (px(144, 196),)),
+         (tras not in [(0, 255, 255), (0, 90, 0)] and tras[2] > 60, "detrás del árbol: el árbol, semitransparente %s" % (tras,))]
+mal = 0
+for bien, nombre in casos:
+    print("  ✅ 2.13, píxel:" if bien else "  ❌ 2.13, píxel:", nombre)
+    mal += not bien
+sys.exit(1 if mal else 0)
+PY2
+[ "$fallos" -eq 0 ] && echo "✅ Juego: todo correcto" || { cat salida.txt salida2.txt salida3.txt salida4.txt errores4.txt salida5.txt salida6.txt salida7.txt salida8.txt salida9.txt salida10.txt salida11.txt salida12.txt salida13.txt salida14.txt salida15.txt salida16.txt salida17.txt salida18.txt salida19.txt salida20.txt salida21.txt salida22.txt salida23.txt salida24.txt salida25.txt salida26.txt salida27.txt salida28.txt salida29.txt salida30.txt salida31.txt salida32.txt salida33.txt salida34.txt salida35.txt salida36.txt salida37.txt salida38.txt salida39.txt salida40.txt salida41.txt salida42.txt salida43.txt salida44.txt salida45.txt salida47.txt salida5b.txt; exit 1; }

@@ -3,6 +3,28 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.13.0
+
+Los niveles de altura en los mapas isométricos de Tiled, como los pidió Bichito: huertos en bancales, una pasarela sobre el arroyo y escaleras entre ellos. Solo añade: un mapa sin niveles funciona exactamente como antes.
+
+- **Niveles**: cada nivel es una capa de suelo con la propiedad `altura` (0, 1, 2...) y su desplazamiento vertical; las capas de objetos con `altura` la dan a sus objetos (`objeto["altura"]`). `mapa["niveles"]` y `mapa["paso_altura"]` dicen lo que tiene el mapa.
+- **El orden de dibujo, con niveles**: lo de encima de un bancal queda delante de su bancal, lo que está delante de un bancal lo tapa, y lo de debajo de una pasarela queda detrás de ella.
+- **`mapa.mover` por niveles**: apunta en la cosa su `"altura"` y solo la deja pisar el suelo de su nivel (no se cae por el borde de un bancal ni se mete en él desde abajo). Las **rampas** y escaleras (un tile con la propiedad `rampa`: `"x+"`, `"x-"`, `"y+"` o `"y-"`) llevan de un nivel al de encima, subiendo poco a poco. Por debajo de una **pasarela** (una capa con la propiedad `pasarela`) pasa lo que va por abajo. Las paredes de una capa con `altura` solo lo son en su nivel.
+- **`mapa.altura(mapa, x, y)`**: el nivel del suelo en un punto (en una rampa, lo que ha subido). **`mapa.a_dibujo`** dibuja en su nivel y **`mapa.a_mapa`** da también el nivel de lo que se ve.
+- **`"ajuste"` en `mapa.profundidad`**: un poco detrás (−1) o delante (1) de lo que está en el mismo sitio, como la sombra justo detrás del personaje.
+- **Lo que tapa al personaje, semitransparente**: `mapa.tapa(mapa, objeto, cosa)` (¿le tapa el pecho o la cabeza?) y la opción `"transparente"` de `mapa.dibujar_tiled`, que lo hace sola con los tiles.
+- **`mapa.velocidad(mapa, dx, dy, rapidez)`**: arriba en el mando es arriba en la pantalla, no en diagonal sobre la rejilla.
+- Ejemplo nuevo en la página del módulo `juego`: «Bancales, rampas y pasarelas».
+
+### Descargas
+
+| Archivo | Qué es |
+|---|---|
+| `lince-2.13.0-linux.tar.gz` | Lince para Linux (x86_64), con SDL2 al lado por si el sistema no la tiene |
+| `lince-2.13.0-windows.zip` | Lince para Windows (x86_64), con SDL2 dentro |
+| `lince-android.apk` | La plantilla de Android que usan `lince repartir --android` y `--aab` (ya va dentro de los dos anteriores) |
+| `lince-language-2.13.0.vsix` | La extensión de VS Code: `code --install-extension lince-language-2.13.0.vsix` |
+
 ## 2.12.2
 
 - **La biblioteca de anuncios de Google, al día**: Google Mobile Ads 25.5.0 (era la 24.9.0, que ya avisaba de que estaba desactualizada) y el consentimiento (UMP) 4.0.0. Para el juego no cambia nada. Probado en el emulador de Android 16: el formulario de consentimiento, el anuncio de prueba entero y `resultado()` con la recompensa.

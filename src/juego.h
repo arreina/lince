@@ -211,6 +211,11 @@ typedef struct {
     double tam;
     unsigned char solido[128], plataforma[128];
     int bordes;                 /* 0 ninguno, 1 los lados (por defecto), 2 todos */
+    /* Niveles de altura (mapas de Tiled con capas con "altura"); NULL sin niveles.
+       Por casilla: en qué niveles hay suelo y en cuáles es pared (un bit por
+       nivel, del 0 al 7), y si es una rampa, hacia dónde sube (1 x+, 2 x-, 3 y+,
+       4 y-) y desde qué nivel */
+    unsigned char *niveles, *solido_nivel, *rampa, *rampa_base;
 } JgMapa;
 
 /* Mapa de Tiled: sus tilesets (una imagen cada uno) y sus capas para dibujar;
@@ -232,10 +237,13 @@ typedef struct {
     unsigned *gids;                     /* columnas × filas; NULL en una capa de imagen */
     int imagen, visible;                /* capa de imagen: su imagen */
     double opacidad, dx, dy, px, py;    /* desplazamiento y paralaje */
+    int altura;                         /* su nivel de altura (propiedad "altura", o por su desplazamiento) */
 } JgCapaTiled;
 typedef struct {
     int usado, cols, filas, tw, th, nts, ncapas;
     int iso;                            /* isométrico: casillas en rombo de tw × th */
+    int niveles;                        /* el nivel de altura más alto (0: sin niveles) */
+    double paso;                        /* lo que sube en la pantalla cada nivel */
     JgTileset ts[JG_TILED_TS];
     JgCapaTiled *capas;
 } JgTiled;
@@ -409,6 +417,11 @@ static void jg_glifo(int ch, int px, int py, int e, int ac);
 static int jg_vigilar(void);
 static double jg_reloj(void);
 static void jg_tiled_liberar(JgTiled *t);
+static void jg_mapa_liberar(JgMapa *m);
+static double jg_altura_en(const JgMapa *m, double x, double y, double desde);
+static double jg_tiled_hondo_n(JgTiled *t, double x, double y, double nivel, int suelo);
+static int jg_tiled_tapa(JgTiled *t, unsigned g, double bx, double by, double bh, double subida,
+                         double px, double py, double ph, double alto);
 static double jg_reloj_real(void);
 static void jg_historial(void);
 static void jg_aviso_error(const char *msg, int pantalla);
@@ -1013,7 +1026,7 @@ static void jg_cerrar_todo(void) {
     memset(_jgs.voces, 0, sizeof _jgs.voces);
     for (int i = 0; i < _jgs.nsonidos; i++) { free(_jgs.sonidos[i].datos); free(_jgs.sonidos[i].ruta); }
     _jgs.nsonidos = 0;
-    for (int i = 0; i < _jgs.nmapas; i++) { free(_jgs.mapas[i].celdas); _jgs.mapas[i].celdas = NULL; }
+    for (int i = 0; i < _jgs.nmapas; i++) jg_mapa_liberar(&_jgs.mapas[i]);
     _jgs.nmapas = 0;
     for (int i = 0; i < _jgs.ntiled; i++) jg_tiled_liberar(&_jgs.tiled[i]);
     _jgs.ntiled = 0;
@@ -1155,6 +1168,49 @@ static Valor *fn_jg_paso_guion(Valor **a, int n) {
     JgPaso p;
     char msg[400];
     return jg_paso_guion(a[0]->texto, &p, msg, sizeof msg) ? valor_nulo() : valor_texto(msg);
+}
+
+/* Para los niveles de altura de juego.lince (mapa.altura, mapa.profundidad y
+   mapa.tapa con un mapa de Tiled): lo mismo que usa C al dibujar y al mover.
+   _altura(mapa, x, y, desde), _hondo(tiled, x, y, altura) y
+   _tapa(tiled, tile, bx, by, bh, px, py, ph, alto) */
+static int jg_num_args(Valor **a, int n, int cuantos) {
+    if (n < cuantos) return 0;
+    for (int i = 0; i < cuantos; i++) if (a[i]->tipo != VAL_NUMERO) return 0;
+    return 1;
+}
+static Valor *fn_jg_altura_nativo(Valor **a, int n) {
+    if (!jg_num_args(a, n, 4)) return valor_nulo();
+    int k = (int)a[0]->numero;
+    if (k < 0 || k >= _jgs.nmapas || !_jgs.mapas[k].celdas) return valor_nulo();
+    return valor_numero(jg_altura_en(&_jgs.mapas[k], a[1]->numero, a[2]->numero, a[3]->numero));
+}
+/* _suelo(mapa, x, y, h): ¿hay suelo del nivel h en ese punto (o una rampa que pasa por él)? */
+static Valor *fn_jg_suelo_nativo(Valor **a, int n) {
+    if (!jg_num_args(a, n, 4)) return valor_booleano(0);
+    int k = (int)a[0]->numero;
+    if (k < 0 || k >= _jgs.nmapas || !_jgs.mapas[k].celdas) return valor_booleano(0);
+    JgMapa *m = &_jgs.mapas[k];
+    int c = (int)floor(a[1]->numero / m->tam), f = (int)floor(a[2]->numero / m->tam), h = (int)floor(a[3]->numero + 0.5);
+    if (c < 0 || f < 0 || c >= m->cols || f >= m->filas) return valor_booleano(0);
+    if (!m->niveles) return valor_booleano(h == 0);
+    int i = f * m->cols + c;
+    if (m->rampa[i]) return valor_booleano(h == m->rampa_base[i] || h == m->rampa_base[i] + 1);
+    return valor_booleano(h >= 0 && h < 8 && (m->niveles[i] >> h & 1));
+}
+static JgTiled *jg_tiled_num(Valor *v) {
+    int k = (int)v->numero;
+    return k >= 0 && k < _jgs.ntiled && _jgs.tiled[k].usado ? &_jgs.tiled[k] : NULL;
+}
+static Valor *fn_jg_hondo_nativo(Valor **a, int n) {
+    if (!jg_num_args(a, n, 4) || !jg_tiled_num(a[0])) return valor_nulo();
+    return valor_numero(jg_tiled_hondo_n(jg_tiled_num(a[0]), a[1]->numero, a[2]->numero, a[3]->numero, 0));
+}
+static Valor *fn_jg_tapa_nativo(Valor **a, int n) {
+    if (!jg_num_args(a, n, 9) || !jg_tiled_num(a[0])) return valor_nulo();
+    JgTiled *t = jg_tiled_num(a[0]);
+    return valor_booleano(jg_tiled_tapa(t, (unsigned)a[1]->numero, a[2]->numero, a[3]->numero, a[4]->numero,
+                                        a[4]->numero * t->paso, a[5]->numero, a[6]->numero, a[7]->numero, a[8]->numero));
 }
 
 /* _veces_fuera() (para los deslizamientos de juego.lince): cuántas veces ha
@@ -7201,10 +7257,52 @@ static int jg_celda(const JgMapa *m, int c, int f) {
     return (unsigned char)m->celdas[f * m->cols + c];
 }
 
+/* La altura de quien se mueve con mapa.mover (en un mapa con niveles), o -1:
+   las casillas de otros niveles le son pared */
+static double _jg_altura_mover = -1;
+
 static int jg_es_solida(const JgMapa *m, int c, int f) {
     if (c < 0 || c >= m->cols) return m->bordes >= 1;
     if (f < 0 || f >= m->filas) return m->bordes >= 2;
-    return m->solido[jg_celda(m, c, f) & 127];
+    if (m->solido[jg_celda(m, c, f) & 127]) return 1;
+    if (!m->niveles) return 0;
+    int i = f * m->cols + c;
+    if (_jg_altura_mover < 0) return m->solido_nivel[i] != 0;     /* sin saber el nivel: cualquier pared */
+    double a = _jg_altura_mover;
+    int h = (int)floor(a + 0.5);
+    if (h >= 0 && h < 8 && (m->solido_nivel[i] >> h & 1)) return 1;
+    if (m->rampa[i]) return !(a > m->rampa_base[i] - 0.6 && a < m->rampa_base[i] + 1.6);   /* una rampa une dos */
+    if (!m->niveles[i]) return 0;                                 /* sin suelo de ningún nivel: como siempre */
+    return !(h >= 0 && h < 8 && (m->niveles[i] >> h & 1));        /* el borde de un bancal: se cae o es pared */
+}
+
+/* La altura en el punto (x, y): en una rampa, lo que ha subido; si no, de los
+   niveles con suelo ahí, el más cercano a 'desde' (o el más alto si desde < 0).
+   Sin suelo o fuera del mapa, 'desde' (o 0). */
+static double jg_altura_en(const JgMapa *m, double x, double y, double desde) {
+    if (!m->niveles) return 0;
+    int c = (int)floor(x / m->tam), f = (int)floor(y / m->tam);
+    if (c < 0 || f < 0 || c >= m->cols || f >= m->filas) return desde < 0 ? 0 : desde;
+    int i = f * m->cols + c;
+    if (m->rampa[i]) {
+        double fx = x / m->tam - c, fy = y / m->tam - f;
+        double sube = m->rampa[i] == 1 ? fx : m->rampa[i] == 2 ? 1 - fx : m->rampa[i] == 3 ? fy : 1 - fy;
+        return m->rampa_base[i] + sube;
+    }
+    unsigned mask = m->niveles[i];
+    if (!mask) return desde < 0 ? 0 : desde;
+    int mejor = -1;
+    for (int h = 0; h < 8; h++)
+        if (mask >> h & 1) {
+            if (desde < 0) mejor = h;
+            else if (mejor < 0 || fabs(h - desde) < fabs(mejor - desde)) mejor = h;
+        }
+    return mejor;
+}
+
+static void jg_mapa_liberar(JgMapa *m) {
+    free(m->celdas); free(m->niveles); free(m->solido_nivel); free(m->rampa); free(m->rampa_base);
+    m->celdas = NULL; m->niveles = m->solido_nivel = m->rampa = m->rampa_base = NULL;
 }
 
 /* mapa(filas, tamaño[, opciones]): opciones "solidos" (texto con los caracteres
@@ -7382,7 +7480,12 @@ static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
     double dt = _jgs.dt;
     if (n > 2 && !jg_num(a, n, 2, &dt, "mapa.mover")) return valor_nulo();
     double dx = vx * dt, dy = vy * dt;
-    /* en pasos de media casilla como mucho, para no atravesar paredes finas */
+    /* con niveles de altura: en qué nivel está (su "altura", o el más alto con suelo
+       donde está); las casillas de otros niveles le son pared, y en una rampa sube o baja */
+    if (m->niveles) {
+        Valor *va = jg_opcion_valor(d, "altura");
+        _jg_altura_mover = va && va->tipo == VAL_NUMERO && va->numero >= 0 ? va->numero : jg_altura_en(m, x + w / 2, y + h / 2, -1);
+    }
     int pasos = (int)ceil(fmax(fabs(dx), fabs(dy)) / (m->tam / 2));
     if (pasos < 1) pasos = 1;
     if (pasos > 1000) pasos = 1000;
@@ -7398,6 +7501,7 @@ static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
                 px = 0; vx = 0;
             }
             x = nx;
+            if (m->niveles) _jg_altura_mover = jg_altura_en(m, x + w / 2, y + h / 2, _jg_altura_mover);
         }
         if (py != 0) {
             double ny = y + py, tope;
@@ -7410,6 +7514,7 @@ static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
                 ny = tope - h; suelo = 1; py = 0; vy = 0;
             }
             y = ny;
+            if (m->niveles) _jg_altura_mover = jg_altura_en(m, x + w / 2, y + h / 2, _jg_altura_mover);
         }
     }
     /* ¿Está apoyado aunque no se haya movido hacia abajo? */
@@ -7424,6 +7529,8 @@ static Valor *fn_jg_mover_en_mapa(Valor **a, int n) {
     jg_dic_poner(d, "en_suelo", valor_booleano(suelo));
     jg_dic_poner(d, "techo", valor_booleano(techo));
     jg_dic_poner(d, "pared", valor_numero(pared));
+    if (m->niveles) jg_dic_poner(d, "altura", valor_numero(_jg_altura_mover));
+    _jg_altura_mover = -1;
     return valor_booleano(pared || techo || (suelo && dy > 0));
 }
 
@@ -7670,6 +7777,10 @@ static void jg_tiled_tipos(JgTileset *ts, Valor *x, unsigned char *tipo_gid, uns
         if (g <= max_gid) {
             if (jg_propiedad_si(props, "solido") || jg_propiedad_si(props, "sólido")) tipo_gid[g] = 1;
             else if (jg_propiedad_si(props, "plataforma")) tipo_gid[g] = 2;
+            /* una rampa o una escalera entre dos niveles: hacia dónde sube ("x+", "x-", "y+", "y-") */
+            const char *r = jg_campo_texto(props, "rampa");
+            int dir = !strcmp(r, "x+") ? 1 : !strcmp(r, "x-") ? 2 : !strcmp(r, "y+") ? 3 : !strcmp(r, "y-") ? 4 : 0;
+            tipo_gid[g] = (unsigned char)(tipo_gid[g] | dir << 2);
         }
         double hc = jg_campo_num(props, "huella_columnas", 1), hf = jg_campo_num(props, "huella_filas", 1);
         if ((hc != 1 || hf != 1) && hc >= 1 && hf >= 1) {        /* una pieza grande: la casa de 3 × 3 */
@@ -7827,6 +7938,12 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     memset(mp->celdas, '.', (size_t)cols * filas);
     mp->solido['#'] = 1;
     mp->plataforma['='] = 1;
+    /* los niveles de altura: se apuntan siempre y se quedan solo si hay alguno */
+    size_t ncas = (size_t)cols * filas;
+    mp->niveles = calloc(ncas, 1); mp->solido_nivel = calloc(ncas, 1);
+    mp->rampa = calloc(ncas, 1); mp->rampa_base = calloc(ncas, 1);
+    unsigned char *pasarela = calloc(ncas, 1);         /* los niveles que dejan pasar por debajo */
+    t->paso = th / 2.0;
     Valor *b = jg_opcion_valor(op, "bordes");
     if (b && b->tipo == VAL_TEXTO) mp->bordes = !strcmp(b->texto, "todos") ? 2 : !strcmp(b->texto, "ninguno") ? 0 : 1;
     t->capas = calloc((size_t)ncapas + 1, sizeof(JgCapaTiled));
@@ -7835,6 +7952,14 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
         Valor *c = capas[i];
         const char *tipo = jg_campo_texto(c, "type"), *nombre = jg_campo_texto(c, "name");
         Valor *props = jg_propiedades(c);
+        /* su nivel de altura: la propiedad "altura" (solo con ella: un desplazamiento
+           sin más es un adorno, como siempre) */
+        Valor *va = jg_campo(props, "altura");
+        int con_altura = va && va->tipo == VAL_NUMERO;
+        int altura = con_altura ? (int)floor(va->numero + 0.5) : 0;
+        if (altura < 0) altura = 0;
+        if (altura > 7) altura = 7;
+        if (altura > t->niveles) t->niveles = altura;
         if (!strcmp(tipo, "objectgroup")) {
             Valor *objs = jg_campo(c, "objects");
             for (int j = 0; objs && objs->tipo == VAL_LISTA && j < objs->lista.cantidad; j++) {
@@ -7878,6 +8003,7 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
                     valor_diccionario_agregar(d, "puntos", l);
                 }
                 valor_diccionario_agregar(d, "propiedades", jg_propiedades(o));
+                valor_diccionario_agregar(d, "altura", valor_numero(altura));
                 lista_agregar(objetos, d);
             }
             valor_destruir(props);
@@ -7893,7 +8019,7 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
             valor_destruir(arg);
             ct->imagen = hay_error ? -1 : jg_id_de(iv, "imagen");
             valor_destruir(iv);
-            if (ct->imagen < 0) { valor_destruir(props); valor_destruir(objetos); valor_destruir(nombres); free(tipo_gid); valor_destruir(m); return valor_nulo(); }
+            if (ct->imagen < 0) { valor_destruir(props); valor_destruir(objetos); valor_destruir(nombres); free(tipo_gid); free(pasarela); valor_destruir(m); return valor_nulo(); }
         } else if (strcmp(tipo, "tilelayer")) { valor_destruir(props); continue; }
         ct->nombre = strdup(nombre);
         ct->visible = jg_campo_num(c, "visible", 1) != 0;
@@ -7902,6 +8028,8 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
         ct->dy = jg_campo_num(c, "offsety", 0);
         ct->px = jg_campo_num(c, "parallaxx", 1);
         ct->py = jg_campo_num(c, "parallaxy", 1);
+        ct->altura = altura;
+        if (altura > 0 && ct->dy < 0 && t->paso == th / 2.0) t->paso = -ct->dy / altura;   /* lo que sube cada nivel */
         t->ncapas++;
         lista_agregar(nombres, valor_texto(nombre));
         if (ct->imagen >= 0) { valor_destruir(props); continue; }
@@ -7909,6 +8037,7 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
         Valor *datos = jg_campo(c, "data");
         int capa_sol = jg_propiedad_si(props, "solido") || jg_propiedad_si(props, "sólido") || jg_opcion_nombra(op, "solidos", nombre);
         int capa_pla = jg_propiedad_si(props, "plataforma") || jg_opcion_nombra(op, "plataformas", nombre);
+        int es_pasarela = jg_propiedad_si(props, "pasarela");
         if (!capa_sol && !capa_pla && !jg_opcion_valor(op, "solidos")) {
             char bajo[64];                    /* una capa que se llama «colisiones» o «sólidos» */
             snprintf(bajo, sizeof bajo, "%s", nombre);
@@ -7921,12 +8050,35 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
             ct->gids[q] = g;
             unsigned id = g & 0x1FFFFFFFu;
             if (!id) continue;
-            int tp = capa_sol ? 1 : capa_pla ? 2 : id <= max_gid ? tipo_gid[id] : 0;
-            if (tp == 1) mp->celdas[q] = '#';
+            int tp = capa_sol ? 1 : capa_pla ? 2 : id <= max_gid ? tipo_gid[id] & 3 : 0;
+            int rampa = !capa_sol && !capa_pla && id <= max_gid ? tipo_gid[id] >> 2 : 0;
+            if (tp == 1 && con_altura) mp->solido_nivel[q] |= (unsigned char)(1u << altura);   /* pared de su nivel */
+            else if (tp == 1) mp->celdas[q] = '#';
             else if (tp == 2 && mp->celdas[q] == '.') mp->celdas[q] = '=';
+            else if (rampa) { mp->rampa[q] = (unsigned char)rampa; mp->rampa_base[q] = (unsigned char)altura; }
+            else if (!capa_pla) {                                                                   /* suelo de su nivel */
+                mp->niveles[q] |= (unsigned char)(1u << altura);
+                if (es_pasarela) pasarela[q] |= (unsigned char)(1u << altura);
+            }
         }
     }
     free(tipo_gid);
+    /* en cada casilla se pisa el suelo más alto (lo de debajo de un bancal es
+       tierra), y también los de debajo de una pasarela, hasta el primero que no lo es */
+    for (size_t q = 0; t->niveles && q < ncas; q++) {
+        unsigned mask = mp->niveles[q], queda = 0;
+        for (int h = 7; h >= 0; h--) {
+            if (!(mask >> h & 1)) continue;
+            queda |= 1u << h;
+            if (!(pasarela[q] >> h & 1)) break;
+        }
+        mp->niveles[q] = (unsigned char)queda;
+    }
+    free(pasarela);
+    if (!t->niveles) {                                 /* sin niveles: como siempre */
+        free(mp->niveles); free(mp->solido_nivel); free(mp->rampa); free(mp->rampa_base);
+        mp->niveles = mp->solido_nivel = mp->rampa = mp->rampa_base = NULL;
+    }
     /* los tiles de los tilesets, por su número (gid): su tamaño y sus propiedades */
     unsigned ultimo = 1;
     for (int i = 0; i < t->nts; i++) if (t->ts[i].primero + (unsigned)t->ts[i].cuantos > ultimo) ultimo = t->ts[i].primero + (unsigned)t->ts[i].cuantos;
@@ -7956,6 +8108,8 @@ static Valor *fn_jg_mapa_tiled(Valor **a, int n) {
     valor_diccionario_agregar(d, "columnas", valor_numero(cols));
     valor_diccionario_agregar(d, "filas", valor_numero(filas));
     valor_diccionario_agregar(d, "tamaño", valor_numero(mp->tam));
+    valor_diccionario_agregar(d, "niveles", valor_numero(t->niveles));
+    valor_diccionario_agregar(d, "paso_altura", valor_numero(t->paso));
     valor_diccionario_agregar(d, "ancho", valor_numero(cols * mp->tam));
     valor_diccionario_agregar(d, "alto", valor_numero(filas * mp->tam));
     valor_diccionario_agregar(d, "isometrico", valor_booleano(iso));
@@ -8069,6 +8223,66 @@ static double jg_tiled_hondo(JgTiled *t, double x, double y) {
     return p < 0 ? 0 : p > 0.999999 ? 0.999999 : p;
 }
 
+/* Con niveles de altura: por la diagonal de la casilla que se pisa (de atrás
+   adelante); dentro de ella, por nivel (lo de abajo de una pasarela, antes que
+   la pasarela); y dentro de cada nivel, primero su suelo ('suelo') y luego lo
+   demás por su sitio. Así lo de encima de un bancal queda delante de su
+   bancal, lo de debajo de una pasarela detrás de ella, y lo que está delante
+   de un bancal, delante. Sin niveles, como siempre. */
+static double jg_tiled_hondo_n(JgTiled *t, double x, double y, double nivel, int suelo) {
+    if (!t->niveles) return jg_tiled_hondo(t, x, y);
+    double tam = t->iso ? t->th : t->tw;
+    int bmax = t->iso ? t->cols + t->filas - 2 : t->filas - 1;
+    int b = t->iso ? (int)floor(x / tam) + (int)floor(y / tam) : (int)floor(y / tam);
+    if (b < 0) b = 0;
+    if (b > bmax) b = bmax;
+    double frac = t->iso ? ((x + y) / tam - b) / 2 : y / tam - b;
+    frac = frac < 0 ? 0 : frac > 1 ? 1 : frac;
+    int h = (int)floor(nivel + 1e-6);
+    if (h < 0) h = 0;
+    if (h > t->niveles) h = t->niveles;
+    double v = suelo ? 0 : 0.001 + 0.998 * frac;
+    double p = ((double)b * (t->niveles + 1) + h + v) / ((bmax + 1.0) * (t->niveles + 1));
+    return p < 0 ? 0 : p > 0.999999 ? 0.999999 : p;
+}
+
+/* ¿Tapa el tile g (su base, el centro de abajo, en (bx, by) de la rejilla
+   lógica, subido 'subida' píxeles, en el nivel bh) el pecho o la cabeza de
+   quien está en (px, py), nivel ph, de 'alto' píxeles? Tiene que estar delante
+   y que su silueta (su huella levantada hasta lo alto de la imagen) los cubra. */
+static int jg_tiled_tapa(JgTiled *t, unsigned g, double bx, double by, double bh, double subida,
+                         double px, double py, double ph, double alto) {
+    JgRect src;
+    int img;
+    if (!jg_tiled_tile(t, g & 0x1FFFFFFFu, &src, &img)) return 0;
+    int hc, hf;
+    jg_tile_huella(t, g, &hc, &hf);
+    double tam = t->iso ? t->th : t->tw;
+    double hx = t->iso ? bx - hc * tam / 2 : bx, hy = by - hf * tam / 2;
+    int plano = src.h <= t->th + 1 && hc == 1 && hf == 1;
+    if (jg_tiled_hondo_n(t, hx, hy, bh, plano) <= jg_tiled_hondo_n(t, px, py, ph, 0)) return 0;   /* detrás */
+    /* el personaje en la pantalla: su pecho y su cabeza */
+    double sx, sy;
+    if (t->iso) { sx = (px - py) * (t->tw / 2.0) / t->th; sy = (px + py) / 2.0 - ph * t->paso; }
+    else { sx = px; sy = py - ph * t->paso; }
+    double pecho = sy - alto * 0.5, cabeza = sy - alto * 0.9;
+    if (!t->iso) {                                            /* la imagen, desde su esquina de abajo a la izquierda */
+        double x0 = bx, y1 = by - subida, y0 = y1 - src.h;
+        return sx >= x0 && sx <= x0 + src.w && ((pecho >= y0 && pecho <= y1) || (cabeza >= y0 && cabeza <= y1));
+    }
+    /* el rombo de la huella: de la base (abajo) hacia atrás */
+    double k = (t->tw / 2.0) / t->th;
+    double baj_x = (bx - by) * k, baj_y = (bx + by) / 2.0 - subida;   /* el vértice de abajo */
+    double izq_x = baj_x - hc * tam * k, izq_y = baj_y - hc * tam / 2.0;   /* el de la izquierda: (bx - hc tam, by) */
+    double der_x = baj_x + hf * tam * k, der_y = baj_y - hf * tam / 2.0;   /* el de la derecha: (bx, by - hf tam) */
+    double x0 = fmax(izq_x, baj_x - src.w / 2.0), x1 = fmin(der_x, baj_x + src.w / 2.0);
+    if (sx < x0 || sx > x1) return 0;
+    double abajo = sx <= baj_x ? izq_y + (baj_y - izq_y) * (sx - izq_x) / (baj_x - izq_x + 1e-9)
+                               : der_y + (baj_y - der_y) * (der_x - sx) / (der_x - baj_x + 1e-9);
+    double arriba = baj_y - src.h;
+    return (pecho >= arriba && pecho <= abajo) || (cabeza >= arriba && cabeza <= abajo);
+}
+
 /* Un dibujo guardado a mano en una capa (sin copiar argumentos: ya son suyos) */
 static void jg_diferir_valores(JgFnDibujo fn, Valor **args, int n, double capa) {
     if (_jgs.ndif == _jgs.cap_dif) {
@@ -8105,6 +8319,26 @@ static void jg_guardar_tile(int k, unsigned g, double izq, double abajo, int alf
 
 /* Una capa: con 'ordenar' >= 0, cada tile va a la capa ordenar + su profundidad
    (para pasar por delante y por detrás con los personajes); si no, se dibuja ya */
+/* La opción "transparente" de dibujar_tiled: lo de delante que tapa a quien
+   está en (x, y), nivel h, de 'alto' píxeles, se dibuja con 'alfa' */
+static struct { int activo; double x, y, h, alto, alfa; } _jg_transp;
+
+/* La profundidad de un tile de una capa, por el centro de su huella (la pieza
+   pisa hacia atrás de su base, el centro de abajo en (bx, by)), y su alfa si tapa */
+static double jg_tile_capa_hondo(JgTiled *t, JgCapaTiled *c, unsigned g, double bx, double by, int *alfa) {
+    int hc, hf;
+    jg_tile_huella(t, g, &hc, &hf);
+    double tam = t->iso ? t->th : t->tw;
+    double hx = t->iso ? bx - hc * tam / 2 : bx, hy = by - hf * tam / 2;
+    JgRect src;
+    int img, plano = 1;
+    if (jg_tiled_tile(t, g & 0x1FFFFFFFu, &src, &img)) plano = src.h <= t->th + 1 && hc == 1 && hf == 1;
+    if (_jg_transp.activo && jg_tiled_tapa(t, g, bx, by, c->altura, -c->dy, _jg_transp.x, _jg_transp.y, _jg_transp.h, _jg_transp.alto))
+        *alfa = (int)(*alfa * _jg_transp.alfa / 255.0 + 0.5);
+    if (!t->niveles) return t->iso ? (bx + by - (hc + hf) * tam / 2) / (tam * (t->cols + t->filas)) : (by - hf * tam / 2) / (tam * t->filas);
+    return jg_tiled_hondo_n(t, hx, hy, c->altura, plano);
+}
+
 static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c, double ordenar) {
     double cx = _jgs.cam_x * c->px - c->dx, cy = _jgs.cam_y * c->py - c->dy;
     int alfa = (int)(c->opacidad * 255 + 0.5);
@@ -8133,12 +8367,12 @@ static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c, double ordenar) {
                 unsigned g = c->gids[f * t->cols + col];
                 if (!(g & 0x1FFFFFFFu)) continue;
                 double izq = (col - f) * mitad + origen - mitad;  /* la izquierda del rombo */
-                if (ordenar >= 0) {
-                    int hc, hf;                          /* por el centro de su huella (la pieza pisa hacia atrás) */
-                    jg_tile_huella(t, g, &hc, &hf);
-                    if (jg_tile_se_ve(t, g, izq - cx, y))
-                        jg_guardar_tile(k, g, izq, d * t->th / 2.0 + t->th, alfa, c,
-                                        ordenar + (d + 2 - (hc + hf) / 2.0) / (t->cols + t->filas));
+                if (ordenar >= 0) {                      /* por el centro de su huella (la pieza pisa hacia atrás) */
+                    if (jg_tile_se_ve(t, g, izq - cx, y)) {
+                        int al = alfa;
+                        double hondo = jg_tile_capa_hondo(t, c, g, (col + 1) * (double)t->th, (f + 1) * (double)t->th, &al);
+                        jg_guardar_tile(k, g, izq, d * t->th / 2.0 + t->th, al, c, ordenar + hondo);
+                    }
                 }
                 else jg_tile_en(t, g, izq - cx, y, alfa, &ultima);
             }
@@ -8158,10 +8392,11 @@ static void jg_tiled_dibujar_capa(JgTiled *t, JgCapaTiled *c, double ordenar) {
                 if (!(g & 0x1FFFFFFFu)) continue;
                 /* abajo a la izquierda de la casilla, como en Tiled */
                 if (ordenar >= 0) {
-                    int hc, hf;
-                    jg_tile_huella(t, g, &hc, &hf);
-                    if (jg_tile_se_ve(t, g, col * t->tw - cx, (f + 1) * t->th - cy))
-                        jg_guardar_tile(k, g, col * t->tw, (f + 1) * t->th, alfa, c, ordenar + (f + 1 - hf / 2.0) / t->filas);
+                    if (jg_tile_se_ve(t, g, col * t->tw - cx, (f + 1) * t->th - cy)) {
+                        int al = alfa;
+                        double hondo = jg_tile_capa_hondo(t, c, g, col * (double)t->tw, (f + 1) * (double)t->th, &al);
+                        jg_guardar_tile(k, g, col * t->tw, (f + 1) * t->th, al, c, ordenar + hondo);
+                    }
                 }
                 else jg_tile_en(t, g, col * t->tw - cx, (f + 1) * t->th - cy, alfa, &ultima);
             }
@@ -8178,8 +8413,33 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
     JG_ABIERTA();
     Valor *op = n > 2 && a[2]->tipo == VAL_DICCIONARIO ? a[2] : NULL;
     if (n > 2 && !op && a[2]->tipo != VAL_NULO) return jg_error("ErrorTipo", "mapa.dibujar_tiled(): las opciones van en un diccionario");
-    static const char *const V[] = {"capa", "ordenar", NULL};
+    static const char *const V[] = {"capa", "ordenar", "transparente", NULL};
     if (!jg_opciones_validas(op, "mapa.dibujar_tiled", V)) return valor_nulo();
+    /* "transparente": {"punto": [x, y] o la cosa, "alto", "altura", "alfa"}: lo de
+       delante que tapa a esa cosa, semitransparente (con "ordenar") */
+    _jg_transp.activo = 0;
+    Valor *tr = jg_opcion_valor(op, "transparente");
+    if (tr && tr->tipo != VAL_NULO) {
+        static const char *const VT[] = {"punto", "alto", "altura", "alfa", NULL};
+        if (tr->tipo != VAL_DICCIONARIO || !jg_opciones_validas(tr, "mapa.dibujar_tiled (\"transparente\")", VT))
+            return hay_error ? valor_nulo() : jg_error("ErrorTipo", "mapa.dibujar_tiled(): \"transparente\" es un diccionario: {\"punto\": cosa, \"alto\": 32, \"alfa\": 110}");
+        Valor *pt = jg_opcion_valor(tr, "punto");
+        double x, y, h = 0, alto = 32, al = 110;
+        Valor *vh = NULL;
+        if (pt && pt->tipo == VAL_LISTA && pt->lista.cantidad >= 2 && pt->lista.elementos[0]->tipo == VAL_NUMERO &&
+            pt->lista.elementos[1]->tipo == VAL_NUMERO) { x = pt->lista.elementos[0]->numero; y = pt->lista.elementos[1]->numero; }
+        else if (pt && pt->tipo == VAL_DICCIONARIO && jg_opcion(pt, "x", &x) && jg_opcion(pt, "y", &y)) {
+            double w = 0, hh = 0;                        /* una cosa: su centro, como en mapa.profundidad */
+            if (jg_opcion(pt, "ancho", &w)) x += w / 2;
+            if (jg_opcion(pt, "alto", &hh)) y += hh / 2;
+            vh = jg_opcion_valor(pt, "altura");
+        } else return jg_error("ErrorArgumento", "mapa.dibujar_tiled(): \"transparente\" necesita \"punto\": [x, y] o la cosa (con \"x\" e \"y\")");
+        if (vh && vh->tipo == VAL_NUMERO) h = vh->numero;
+        if (jg_opcion_valor(tr, "altura") && !jg_opcion(tr, "altura", &h)) return jg_error("ErrorTipo", "mapa.dibujar_tiled(): en \"transparente\", \"altura\" es un número");
+        if (jg_opcion_valor(tr, "alto") && (!jg_opcion(tr, "alto", &alto) || alto <= 0)) return jg_error("ErrorArgumento", "mapa.dibujar_tiled(): en \"transparente\", \"alto\" son los píxeles que mide (más que 0)");
+        if (jg_opcion_valor(tr, "alfa") && (!jg_opcion(tr, "alfa", &al) || al < 0 || al > 255)) return jg_error("ErrorArgumento", "mapa.dibujar_tiled(): en \"transparente\", \"alfa\" va de 0 a 255");
+        _jg_transp.activo = 1; _jg_transp.x = x; _jg_transp.y = y; _jg_transp.h = h; _jg_transp.alto = alto; _jg_transp.alfa = al;
+    }
     double ordenar = -1;
     if (jg_opcion_valor(op, "ordenar") && !jg_opcion(op, "ordenar", &ordenar))
         return jg_error("ErrorTipo", "mapa.dibujar_tiled(): \"ordenar\" es un número: la capa de los tiles (más su profundidad)");
@@ -8194,6 +8454,7 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
     if (_jgs.repitiendo) ordenar = -1;                   /* ya en su capa: se dibuja ya, en orden */
     if (n < 2 || a[1]->tipo == VAL_NULO) {
         for (int i = 0; i < t->ncapas; i++) if (t->capas[i].visible) jg_tiled_dibujar_capa(t, &t->capas[i], ordenar);
+        _jg_transp.activo = 0;
         return valor_nulo();
     }
     Valor *l = a[1];
@@ -8207,10 +8468,12 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
             if (!strcmp(t->capas[i].nombre, nv->texto)) { jg_tiled_dibujar_capa(t, &t->capas[i], ordenar); hecho = 1; }
         if (!hecho) {
             char m[300];
+            _jg_transp.activo = 0;
             snprintf(m, sizeof m, "mapa.dibujar_tiled(): el mapa no tiene la capa '%s' (mira mapa[\"capas\"])", nv->texto);
             return jg_error("ErrorArgumento", m);
         }
     }
+    _jg_transp.activo = 0;
     return valor_nulo();
 }
 
@@ -8221,8 +8484,11 @@ static Valor *fn_jg_dibujar_tiled(Valor **a, int n) {
 static Valor *fn_jg_dibujar_tile(Valor **a, int n) {
     JG_ABIERTA();
     Valor *op = n > 4 && a[4]->tipo == VAL_DICCIONARIO ? a[4] : NULL;
-    static const char *const V[] = {"capa", "ordenar", "alfa", NULL};
+    static const char *const V[] = {"capa", "ordenar", "alfa", "altura", NULL};
     if (!jg_opciones_validas(op, "mapa.dibujar_tile", V)) return valor_nulo();
+    double nivel = 0;                                   /* su nivel de altura: se dibuja más arriba */
+    if (jg_opcion_valor(op, "altura") && (!jg_opcion(op, "altura", &nivel) || nivel < 0))
+        return jg_error("ErrorArgumento", "mapa.dibujar_tile(): \"altura\" es el nivel (0 el suelo, 1 el primer bancal...)");
     double alfa = 255;                                  /* semitransparente: la casa que tapa al personaje */
     if (jg_opcion_valor(op, "alfa") && (!jg_opcion(op, "alfa", &alfa) || alfa < 0 || alfa > 255))
         return jg_error("ErrorArgumento", "mapa.dibujar_tile(): \"alfa\" va de 0 (invisible) a 255 (opaco)");
@@ -8249,13 +8515,15 @@ static Valor *fn_jg_dibujar_tile(Valor **a, int n) {
         izq = (x - y) * (t->tw / 2.0) / t->th + t->filas * t->tw / 2.0 - src.w / 2.0;
         abajo = (x + y) / 2.0;
     }
+    abajo -= nivel * t->paso;
     int hc, hf, al = (int)(alfa + 0.5);
     jg_tile_huella(t, g, &hc, &hf);
     double tam = t->iso ? t->th : t->tw;                /* el centro de su huella, que va hacia atrás de la base */
     double hx = t->iso ? x - hc * tam / 2 : x, hy = y - hf * tam / 2;
     if (hc == 1 && hf == 1) { hx = x; hy = y; }
     if (ordenar >= 0 && !_jgs.repitiendo) {
-        if (jg_tile_se_ve(t, g, izq - _jgs.cam_x, abajo - _jgs.cam_y)) jg_guardar_tile(k, g, izq, abajo, al, NULL, ordenar + jg_tiled_hondo(t, hx, hy));
+        if (jg_tile_se_ve(t, g, izq - _jgs.cam_x, abajo - _jgs.cam_y))
+            jg_guardar_tile(k, g, izq, abajo, al, NULL, ordenar + jg_tiled_hondo_n(t, hx, hy, nivel, 0));
     }
     else jg_tile_en(t, g, izq - _jgs.cam_x, abajo - _jgs.cam_y, al, NULL);
     return valor_nulo();
@@ -8421,6 +8689,10 @@ static void cargar_juego(Entorno *entorno) {
         {"_idioma_sistema", fn_jg_idioma_sistema,   0},
         {"_paso_guion",     fn_jg_paso_guion,       1},
         {"_veces_fuera",    fn_jg_veces_fuera,      0},
+        {"_altura",         fn_jg_altura_nativo,    4},
+        {"_hondo",          fn_jg_hondo_nativo,     4},
+        {"_suelo",          fn_jg_suelo_nativo,     4},
+        {"_tapa",           fn_jg_tapa_nativo,      9},
         {"_programa",       fn_jg_programa,         0},
         {"temblor",         fn_jg_temblor,         -1},
         {"congelar",        fn_jg_congelar,         1},
@@ -8499,7 +8771,8 @@ static void cargar_juego(Entorno *entorno) {
         {"solido", "solido"}, {"casilla_en", "casilla_en"}, {"buscar", "buscar_en_mapa"}, {"mover", "mover_en_mapa"},
         {"dibujar", "dibujar_mapa"}, {"dibujar_tiled", "dibujar_tiled"}, {"camino", "camino"},
         {"dibujar_tile", "dibujar_tile"}, {"a_dibujo", "mapa_a_dibujo"}, {"a_mapa", "mapa_a_mapa"},
-        {"profundidad", "mapa_profundidad"}, {"dibujar_objeto", "mapa_dibujar_objeto"}, {NULL, NULL}};
+        {"profundidad", "mapa_profundidad"}, {"dibujar_objeto", "mapa_dibujar_objeto"},
+        {"altura", "mapa_altura"}, {"tapa", "mapa_tapa"}, {"velocidad", "mapa_velocidad"}, {NULL, NULL}};
     jg_parte(mod, "fisica", FISICA);
     jg_parte(mod, "mapa", MAPA);
 }

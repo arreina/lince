@@ -4332,21 +4332,35 @@ funcion _punto_mapa(cualquiera x, cualquiera y, texto fn): lista {
     devolver _punto(x, y, fn)
 }
 
-# mapa.a_dibujo(mapa, x, y): dónde se dibuja el punto (x, y) del mapa
-funcion mapa_a_dibujo(cualquiera m, cualquiera x, cualquiera y = nulo): lista {
-    _mapa_de(m, "mapa.a_dibujo")
-    sea p = _punto_mapa(x, y, "mapa.a_dibujo")
-    si no _de(m, "isometrico", falso) { devolver p }
-    sea tw = m["tile"][0]
-    sea th = m["tile"][1]
-    devolver [(p[0] - p[1]) * tw / 2 / th + m["filas"] * tw / 2, (p[0] + p[1]) / 2]
+# La altura de una cosa: la que se dice, o su "altura" (la que pone mapa.mover
+# en un mapa con niveles), o 0
+funcion _altura_de(cualquiera x, cualquiera altura, texto fn): numero {
+    si altura != nulo {
+        si no (altura es numero) o altura < 0 { lanzar ErrorArgumento("{fn}(): la altura es el nivel: 0 el suelo, 1 el primer bancal...") }
+        devolver altura
+    }
+    si x es diccionario y x.contiene("altura") y x["altura"] es numero { devolver x["altura"] }
+    devolver 0
 }
 
-# mapa.a_mapa(mapa, x, y): el punto del mapa que se dibuja en (x, y); con la
-# cámara, el del ratón es mapa.a_mapa(mapa, juego.a_mundo(juego.raton()))
-funcion mapa_a_mapa(cualquiera m, cualquiera x, cualquiera y = nulo): lista {
-    _mapa_de(m, "mapa.a_mapa")
-    sea p = _punto(x, y, "mapa.a_mapa")
+# mapa.a_dibujo(mapa, x, y[, altura]): dónde se dibuja el punto (x, y) del
+# mapa; con niveles, en su nivel de altura (el de la cosa, si es una cosa con
+# "altura"): más arriba en la pantalla
+funcion mapa_a_dibujo(cualquiera m, cualquiera x, cualquiera y = nulo, cualquiera altura = nulo): lista {
+    _mapa_de(m, "mapa.a_dibujo")
+    si x es diccionario y y != nulo y altura == nulo y y es numero {     # a_dibujo(mapa, cosa, altura)
+        altura = y
+        y = nulo
+    }
+    sea p = _punto_mapa(x, y, "mapa.a_dibujo")
+    sea sube = _altura_de(x, altura, "mapa.a_dibujo") * _de(m, "paso_altura", 0)
+    si no _de(m, "isometrico", falso) { devolver [p[0], p[1] - sube] }
+    sea tw = m["tile"][0]
+    sea th = m["tile"][1]
+    devolver [(p[0] - p[1]) * tw / 2 / th + m["filas"] * tw / 2, (p[0] + p[1]) / 2 - sube]
+}
+
+funcion _a_mapa_plano(diccionario m, lista p): lista {
     si no _de(m, "isometrico", falso) { devolver p }
     sea tw = m["tile"][0]
     sea th = m["tile"][1]
@@ -4354,15 +4368,102 @@ funcion mapa_a_mapa(cualquiera m, cualquiera x, cualquiera y = nulo): lista {
     devolver [p[1] + dx, p[1] - dx]
 }
 
-# mapa.profundidad(mapa, x, y): de 0 (al fondo) a casi 1 (delante); para un
-# personaje: juego.capa(1 + juego.mapa.profundidad(mapa, yo)) con los tiles
-# de la misma capa ordenados: mapa.dibujar_tiled(mapa, "arboles", {"ordenar": 1})
-funcion mapa_profundidad(cualquiera m, cualquiera x, cualquiera y = nulo): numero {
+# mapa.a_mapa(mapa, x, y): el punto del mapa que se dibuja en (x, y); con la
+# cámara, el del ratón es mapa.a_mapa(mapa, juego.a_mundo(juego.raton())).
+# Con niveles de altura da [x, y, altura]: el del nivel más alto que se ve ahí.
+funcion mapa_a_mapa(cualquiera m, cualquiera x, cualquiera y = nulo): lista {
+    _mapa_de(m, "mapa.a_mapa")
+    sea p = _punto(x, y, "mapa.a_mapa")
+    sea niveles = _de(m, "niveles", 0)
+    si niveles == 0 { devolver _a_mapa_plano(m, p) }
+    sea paso = m["paso_altura"]
+    para (h = niveles; h >= 0; h--) {
+        sea q = _a_mapa_plano(m, [p[0], p[1] + h * paso])
+        si juego._suelo(m["mapa"], q[0], q[1], h) { devolver [q[0], q[1], juego._altura(m["mapa"], q[0], q[1], h)] }
+    }
+    sea q = _a_mapa_plano(m, p)
+    devolver [q[0], q[1], 0]
+}
+
+# mapa.altura(mapa, x, y[, desde]): el nivel de altura del suelo en ese punto
+# (en una rampa, lo que ha subido: 0.5 a mitad de una que va del 0 al 1). Si
+# hay suelo en varios niveles (debajo de una pasarela), el más cercano a
+# "desde"; sin él, el más alto. En un mapa sin niveles, 0.
+funcion mapa_altura(cualquiera m, cualquiera x, cualquiera y = nulo, cualquiera desde = nulo): numero {
+    _mapa_de(m, "mapa.altura")
+    si x es diccionario y y != nulo y desde == nulo y y es numero {     # altura(mapa, cosa, desde)
+        desde = y
+        y = nulo
+    }
+    sea p = _punto_mapa(x, y, "mapa.altura")
+    si _de(m, "niveles", 0) == 0 { devolver 0 }
+    si desde != nulo y (no (desde es numero) o desde < 0) { lanzar ErrorArgumento("mapa.altura(): \"desde\" es un nivel (0 o más)") }
+    devolver juego._altura(m["mapa"], p[0], p[1], si desde == nulo { -1 } sino { desde })
+}
+
+fijo _PROFUNDIDAD_OPCIONES = ["altura", "ajuste"]
+
+# mapa.profundidad(mapa, x, y[, opciones]): de 0 (al fondo) a casi 1
+# (delante); para un personaje: juego.capa(1 + juego.mapa.profundidad(mapa, yo))
+# con los tiles de la misma capa ordenados: mapa.dibujar_tiled(mapa, "arboles",
+# {"ordenar": 1}). Opciones: "altura" (su nivel; si no, el "altura" de la cosa)
+# y "ajuste" (un poco detrás, -1, -2..., o delante, 1, 2..., de lo que está en
+# el mismo sitio: la sombra, detrás del personaje, con -1)
+funcion mapa_profundidad(cualquiera m, cualquiera x, cualquiera y = nulo, cualquiera opciones = nulo): numero {
     _mapa_de(m, "mapa.profundidad")
+    si x es diccionario y y es diccionario y opciones == nulo {         # profundidad(mapa, cosa, opciones)
+        opciones = y
+        y = nulo
+    }
     sea p = _punto_mapa(x, y, "mapa.profundidad")
-    sea tam = m["tamaño"]
-    sea hondo = si _de(m, "isometrico", falso) { (p[0] + p[1]) / (tam * (m["columnas"] + m["filas"])) } sino { p[1] / (tam * m["filas"]) }
-    devolver matematica.limitar(hondo, 0, 0.999999)
+    sea o = _ui_opciones(opciones, _PROFUNDIDAD_OPCIONES, "mapa.profundidad")
+    sea ajuste = _de(o, "ajuste", 0)
+    si no (ajuste es numero) o matematica.abs(ajuste) > 1000 {
+        lanzar ErrorArgumento("mapa.profundidad(): \"ajuste\" es un número pequeño (de -1000 a 1000): -1 justo detrás, 1 justo delante")
+    }
+    sea h = _altura_de(x, _de(o, "altura", nulo), "mapa.profundidad")
+    sea hondo = 0
+    si m.contiene("tiled") {
+        hondo = juego._hondo(m["tiled"], p[0], p[1], h)
+    } sino {
+        sea tam = m["tamaño"]
+        hondo = si _de(m, "isometrico", falso) { (p[0] + p[1]) / (tam * (m["columnas"] + m["filas"])) } sino { p[1] / (tam * m["filas"]) }
+    }
+    devolver matematica.limitar(hondo + ajuste * 0.000001, 0, 0.999999)
+}
+
+# mapa.tapa(mapa, objeto, cosa[, alto]): ¿el objeto de Tiled (uno con imagen,
+# de mapa["objetos"]) está delante de la cosa (un punto o un diccionario, con
+# su "altura") y le tapa el pecho o la cabeza? 'alto' son los píxeles que mide
+# la cosa en la pantalla (32). Para dibujarlo semitransparente:
+#   mapa.dibujar_objeto(m, casa, {"ordenar": 1, "alfa": si mapa.tapa(m, casa, yo) { 110 } sino { 255 }})
+funcion mapa_tapa(cualquiera m, cualquiera objeto, cualquiera cosa, numero alto = 32): logico {
+    _mapa_de(m, "mapa.tapa")
+    si no m.contiene("tiled") { lanzar ErrorTipo("mapa.tapa() es para los mapas de Tiled (juego.mapa.tiled)") }
+    si no (objeto es diccionario) o no objeto.contiene("tile") {
+        lanzar ErrorTipo("mapa.tapa() espera un objeto de Tiled con imagen (uno de mapa[\"objetos\"] con \"tile\")")
+    }
+    si alto <= 0 { lanzar ErrorArgumento("mapa.tapa(): el alto son los píxeles que mide la cosa (más que 0)") }
+    sea p = _punto_mapa(cosa, nulo, "mapa.tapa")
+    devolver juego._tapa(m["tiled"], objeto["tile"], objeto["base"][0], objeto["base"][1], _de(objeto, "altura", 0),
+        p[0], p[1], _altura_de(cosa, nulo, "mapa.tapa"), alto)
+}
+
+# mapa.velocidad(mapa, dx, dy, rapidez): la velocidad [vx, vy] en el mapa para
+# ir en la pantalla hacia (dx, dy) (lo que dan juego.direccion o la palanca:
+# arriba en el mando es arriba en la pantalla, no en diagonal sobre la
+# rejilla de un isométrico), a 'rapidez' píxeles del mapa por segundo
+funcion mapa_velocidad(cualquiera m, numero dx, numero dy, numero rapidez): lista {
+    _mapa_de(m, "mapa.velocidad")
+    si dx == 0 y dy == 0 { devolver [0, 0] }
+    sea v = [dx, dy]
+    si _de(m, "isometrico", falso) {
+        sea k = m["tile"][1] / m["tile"][0]
+        v = [dy + dx * k, dy - dx * k]
+    }
+    sea largo = matematica.distancia(0, 0, v[0], v[1])
+    sea fuerza = matematica.minimo(1, matematica.distancia(0, 0, dx, dy))     # la palanca a medias, más despacio
+    devolver [v[0] / largo * rapidez * fuerza, v[1] / largo * rapidez * fuerza]
 }
 
 # mapa.dibujar_objeto(mapa, objeto[, opciones]): un objeto de Tiled con imagen
@@ -4373,5 +4474,13 @@ funcion mapa_dibujar_objeto(cualquiera m, cualquiera objeto, cualquiera opciones
     si no (objeto es diccionario) o no objeto.contiene("tile") {
         lanzar ErrorTipo("mapa.dibujar_objeto() espera un objeto de Tiled con imagen (uno de mapa[\"objetos\"] con \"tile\")")
     }
-    juego.mapa.dibujar_tile(m, objeto["tile"], objeto["base"][0], objeto["base"][1], opciones)
+    # en su nivel de altura (el de su capa), si las opciones no dicen otro
+    sea o = si opciones == nulo { {} } sino { opciones }
+    si o es diccionario y no o.contiene("altura") y _de(objeto, "altura", 0) > 0 {
+        sea con = {}
+        para cada texto c en o {con[c] = o[c]}
+        con["altura"] = objeto["altura"]
+        o = con
+    }
+    juego.mapa.dibujar_tile(m, objeto["tile"], objeto["base"][0], objeto["base"][1], o)
 }

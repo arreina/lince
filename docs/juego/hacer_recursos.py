@@ -273,4 +273,66 @@ objetos = "".join(f'  <object id="{i + 2}" type="arbol" gid="4" x="{c * 16 + 8}"
 </map>
 ''', encoding="utf-8")
 
+# ── Un huerto con niveles de altura (2.13): bancal, rampa y una pasarela sobre el arroyo ──
+random.seed(213)
+niveles = Image.new("RGBA", (160, 16), (0, 0, 0, 0))      # hierba, tierra del bancal, rampa, agua, rampa
+for i, (base, var) in enumerate([((96, 168, 80), 14), ((150, 110, 70), 10), ((150, 150, 150), 12), ((70, 130, 200), 12),
+                                 ((150, 150, 150), 12)]):
+    for y in range(16):
+        ancho = (y + 1) * 2 if y < 8 else (16 - y) * 2
+        for x in range(16 - ancho, 16 + ancho):
+            if 0 <= x < 32:
+                niveles.putpixel((i * 32 + x, y), ruido(base, var))
+niveles.save(AQUI / "rombos_niveles.png")
+filas_huerto = [
+    "BBBBBBBBBB", "BBBBBBBBBB", "BBBBBBBBBB", "0000R00000", "0000000000",
+    "0000000000", "00AA000000", "00AA000000", "00AA000000", "0000000000"]
+suelo_h = [{"0": 1, "B": 1, "R": 3, "A": 4}[ch] for fila in filas_huerto for ch in fila]
+bancal = [2 if ch == "B" else 0 for fila in filas_huerto for ch in fila]
+pasarela = [0] * 100
+for f in range(6, 9):
+    pasarela[f * 10 + 2] = pasarela[f * 10 + 3] = 2
+for c in (2, 3):
+    suelo_h[5 * 10 + c] = 5; suelo_h[9 * 10 + c] = 3       # rampas a los dos lados de la pasarela (suben hacia ella)
+agua = [1 if ch == "A" else 0 for fila in filas_huerto for ch in fila]
+def csv10(l):
+    return ",\n".join(",".join(str(v) for v in l[r * 10:(r + 1) * 10]) for r in range(10))
+(AQUI / "huerto.tmx").write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.10" tiledversion="1.10.2" orientation="isometric" renderorder="right-down" width="10" height="10" tilewidth="32" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="4">
+ <tileset firstgid="1" name="rombos" tilewidth="32" tileheight="16" tilecount="5" columns="5">
+  <image source="rombos_niveles.png" width="160" height="16"/>
+  <tile id="2"><properties><property name="rampa" value="y-"/></properties></tile>
+  <tile id="4"><properties><property name="rampa" value="y+"/></properties></tile>
+ </tileset>
+ <tileset firstgid="6" name="piezas" tilewidth="32" tileheight="48" tilecount="1" columns="0">
+  <grid orientation="orthogonal" width="1" height="1"/>
+  <tile id="0"><image source="arbol.png" width="32" height="48"/></tile>
+ </tileset>
+ <layer id="1" name="suelo" width="10" height="10">
+  <properties><property name="altura" type="int" value="0"/></properties>
+  <data encoding="csv">{csv10(suelo_h)}</data>
+ </layer>
+ <layer id="2" name="bancal" width="10" height="10" offsety="-8">
+  <properties><property name="altura" type="int" value="1"/></properties>
+  <data encoding="csv">{csv10(bancal)}</data>
+ </layer>
+ <layer id="3" name="pasarela" width="10" height="10" offsety="-8">
+  <properties><property name="altura" type="int" value="1"/><property name="pasarela" type="bool" value="true"/></properties>
+  <data encoding="csv">{csv10(pasarela)}</data>
+ </layer>
+ <layer id="4" name="agua" width="10" height="10" visible="0">
+  <properties><property name="altura" type="int" value="0"/><property name="solido" type="bool" value="true"/></properties>
+  <data encoding="csv">{csv10(agua)}</data>
+ </layer>
+ <objectgroup id="5" name="cosas">
+  <object id="1" type="jugador" x="88" y="72"><point/></object>
+ </objectgroup>
+ <objectgroup id="6" name="cosas del bancal">
+  <properties><property name="altura" type="int" value="1"/></properties>
+  <object id="2" type="arbol" gid="6" x="40" y="24" width="32" height="48"/>
+  <object id="3" type="arbol" gid="6" x="136" y="40" width="32" height="48"/>
+ </objectgroup>
+</map>
+''', encoding="utf-8")
+
 print("✅ recursos en", AQUI)
