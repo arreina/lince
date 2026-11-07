@@ -1028,7 +1028,10 @@ for l in "niveles: 1 16" "altura [80, 80]: 0.5" "altura [80, 48]: 1" "altura [80
          "por debajo de la pasarela: 120 0" "por la pasarela: 122 1" "a_mapa: [80, 40, 1] [176, 176, 0]" \
          "velocidad: [35.3553, -35.3553] [0, 0]" "ajuste: verdadero verdadero" "delante del bancal: verdadero" \
          "error: mapa.profundidad(): no conozco la opción 'x' (hay \"altura\" y \"ajuste\")" \
-         'error: mapa.altura(): "desde" es un nivel (0 o más)' "puntos: [264, 130] [296, 179] [144, 196] [120, 107]"; do
+         'error: mapa.altura(): "desde" es un nivel (0 o más)' "puntos: [264, 130] [296, 179] [144, 196] [120, 107]" \
+         "rampa x+: cruza a 6 con altura 0" "rampa x-: cruza a 0 con altura 0" \
+         "subir en diagonal: entero verdadero sigue verdadero" \
+         "la pasarela no tiene salida al arroyo: 2"; do
     grep -qxF "$l" salida47.txt && ok "2.13: $l" || mal "falta la línea: $l"
 done
 python3 - <<'PY2' || fallos=$((fallos+1))

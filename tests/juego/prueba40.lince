@@ -4,6 +4,7 @@
 # dibujo y la transparencia, mirando los píxeles. smoke.sh mira la salida.
 importar "juego"
 importar "sistema"
+importar "matematica"
 
 fijo DIR = sistema.entorno("DIR_PRUEBA", ".")
 sea m = juego.mapa.tiled(DIR + "/niveles/niveles.tmx")
@@ -35,6 +36,38 @@ escribir("ajuste: {juego.mapa.profundidad(m, 100, 100, {"ajuste": -1}) < d0} {ju
 escribir("delante del bancal: {juego.mapa.profundidad(m, 112, 72) > juego.mapa.profundidad(m, 112, 40, {"altura": 1})}")
 intentar { juego.mapa.profundidad(m, 1, 1, {"x": 1}) } capturar (error e) { escribir("error: {e.mensaje}") }
 intentar { juego.mapa.altura(m, 1, 1, -2) } capturar (error e) { escribir("error: {e.mensaje}") }
+
+# ── Rampas en el eje x, y subir en diagonal (lo que encontró Bichito) ──
+# Las de niveles.tmx son "y-", así que el eje x no se probaba; y ninguna se
+# subía en diagonal, que es donde el personaje se quedaba encajado: a media
+# rampa no se está en un nivel sino entre dos, y valen los dos.
+sea mx = juego.mapa.tiled(DIR + "/niveles/rampas_x.tmx")
+
+funcion andar_en(cualquiera mapa, diccionario c, numero veces): diccionario {
+    para (i = 0; i < veces; i++) { juego.mapa.mover(mapa, c, 1 / 30) }
+    devolver c
+}
+# el personaje mide media casilla (16 de 32) y va centrado en la fila 2
+funcion en_rampa(numero col, numero vx, numero vy): diccionario {
+    devolver {"x": col * 32 + 8, "y": 2 * 32 + 8, "ancho": 16, "alto": 16, "vx": vx, "vy": vy}
+}
+sea cx = andar_en(mx, en_rampa(1, 60, 0), 90)
+escribir("rampa x+: cruza a {matematica.piso(cx["x"] / 32)} con altura {cx["altura"]}")
+cx = andar_en(mx, en_rampa(6, -60, 0), 90)
+escribir("rampa x-: cruza a {matematica.piso(cx["x"] / 32)} con altura {cx["altura"]}")
+# A mitad de la rampa, en diagonal: antes se quedaba clavado a 0.5 y con la
+# velocidad a cero, sin poder ni seguir ni apartarse. Ahora se sale de la
+# rampa al suelo y sigue andando. Lo que se comprueba es eso: que acaba en un
+# nivel entero y que no se ha quedado parado.
+sea diag = andar_en(mx, en_rampa(1, 60, 20), 90)
+sea dx = diag["x"]
+sea dy = diag["y"]
+diag = andar_en(mx, diag, 30)
+escribir("subir en diagonal: entero {diag["altura"] == matematica.piso(diag["altura"])} sigue {(diag["x"] != dx) o (diag["y"] != dy)}")
+# y el borde del bancal sigue siendo pared: desde la pasarela no se baja al arroyo
+sea borde = andar_en(mx, {"x": 3 * 32 + 8, "y": 2 * 32 + 8, "ancho": 16, "alto": 16,
+                          "vx": 0, "vy": 60, "altura": 1}, 90)
+escribir("la pasarela no tiene salida al arroyo: {matematica.piso(borde["y"] / 32)}")
 
 # el dibujo: el suelo debajo de todo, y lo demás ordenado en la capa 1
 juego.abrir("niveles", 400, 280)

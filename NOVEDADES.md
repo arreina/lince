@@ -3,6 +3,21 @@
 Lo que trae cada versión de Lince. La CI publica cada versión en GitHub con el
 apartado que le toca de este archivo.
 
+## 2.13.1
+
+Un arreglo de los niveles de altura, encontrado por Bichito.
+
+- **Ya no se queda uno encajado a media rampa.** Subiendo una rampa en diagonal, el personaje se
+  paraba a mitad (altura 0,5) y no podía ni seguir ni apartarse. A media rampa no se está en un
+  nivel sino entre dos, y antes se redondeaba a uno solo: con eso, las casillas del otro nivel
+  —incluido el bancal o la pasarela a la que se subía— se volvían pared. Ahora valen los dos
+  niveles que la rampa une, así que se puede salir de ella hacia el suelo de donde se venía y
+  entrar en el bancal al que se sube sin tener que llegar justo al final.
+
+  Lo que no cambia: el borde de un bancal sigue siendo pared, por debajo de una pasarela se sigue
+  pasando, y una altura entera (lo normal, fuera de las rampas) se comporta exactamente igual que
+  antes. Pasaba con las rampas de los cuatro sentidos por igual, no solo con las del eje x.
+
 ## 2.13.0
 
 Los niveles de altura en los mapas isométricos de Tiled, como los pidió Bichito: huertos en bancales, una pasarela sobre el arroyo y escaleras entre ellos. Solo añade: un mapa sin niveles funciona exactamente como antes.

@@ -7269,11 +7269,23 @@ static int jg_es_solida(const JgMapa *m, int c, int f) {
     int i = f * m->cols + c;
     if (_jg_altura_mover < 0) return m->solido_nivel[i] != 0;     /* sin saber el nivel: cualquier pared */
     double a = _jg_altura_mover;
-    int h = (int)floor(a + 0.5);
-    if (h >= 0 && h < 8 && (m->solido_nivel[i] >> h & 1)) return 1;
+    /* A media rampa no se está en un nivel sino entre dos, y valen los dos: el
+       de abajo para poder salirse de la rampa por donde se vino, y el de arriba
+       para entrar en el bancal al que se sube sin tener que llegar justo al
+       final. Redondear a uno solo dejaba al personaje encajado a mitad de la
+       rampa, sin poder ni seguir ni apartarse. Con una altura entera (lo
+       normal, fuera de las rampas) los dos niveles son el mismo. */
+    int hb = (int)floor(a), ha = (int)ceil(a);
+    int pared_b = hb >= 0 && hb < 8 && (m->solido_nivel[i] >> hb & 1);
+    int pared_a = ha >= 0 && ha < 8 && (m->solido_nivel[i] >> ha & 1);
+    if (pared_b && pared_a) return 1;                             /* pared en los dos: no hay por dónde */
     if (m->rampa[i]) return !(a > m->rampa_base[i] - 0.6 && a < m->rampa_base[i] + 1.6);   /* una rampa une dos */
     if (!m->niveles[i]) return 0;                                 /* sin suelo de ningún nivel: como siempre */
-    return !(h >= 0 && h < 8 && (m->niveles[i] >> h & 1));        /* el borde de un bancal: se cae o es pared */
+    /* se pasa si en alguno de los dos niveles hay suelo y no es pared; si no,
+       es el borde de un bancal: se cae o es pared */
+    if (!pared_b && hb >= 0 && hb < 8 && (m->niveles[i] >> hb & 1)) return 0;
+    if (!pared_a && ha >= 0 && ha < 8 && (m->niveles[i] >> ha & 1)) return 0;
+    return 1;
 }
 
 /* La altura en el punto (x, y): en una rampa, lo que ha subido; si no, de los
