@@ -77,11 +77,11 @@ fijo MUNECO = juego.sprite([
     "R": [112, 118, 124], "M": [86, 90, 78], "Z": [70, 92, 108]})
 
 fijo QUIETO = juego.animar(MUNECO, "respirar")
-fijo ANDAR  = juego.animar(MUNECO, "andar")
+fijo ANDAR = juego.animar(MUNECO, "andar")
 
 sea pj = juego.animador(QUIETO, {
     "quieto": {"hoja": QUIETO, "por_segundo": 4},
-    "andar":  {"hoja": ANDAR,  "por_segundo": 9}
+    "andar": {"hoja": ANDAR, "por_segundo": 9}
 })
 
 # ── Las fuentes de sonido del aula ──────────────────────────────────
@@ -92,21 +92,21 @@ sea pj = juego.animador(QUIETO, {
 # se oyen como un murmullo, no como palabras, y la ventana llega a través del
 # cristal. "sube" es la que se va colando con el rato (el paso 2).
 fijo FUENTES = [
-    {"nombre": "RELOJ",   "x": 300,  "y": 110, "alcance": 420, "base": 0.10,
-     "color": [214, 196, 128], "ritmo": 1.0, "sube": verdadero,
-     "onda": "cuadrada", "hz": 1400, "apagado": 0.15, "vol": 0.05},
-    {"nombre": "VENTANA", "x": 650,  "y": 150, "alcance": 380, "base": 0.06,
-     "color": [150, 190, 200], "ritmo": 0.35,
-     "onda": "ruido", "hz": 400, "apagado": 0.80, "vol": 0.30},
-    {"nombre": "ZUMBIDO", "x": 1150, "y": 70,  "alcance": 900, "base": 0.22,
-     "color": [206, 206, 178], "ritmo": 7.0, "sube": verdadero,
-     "onda": "cuadrada", "hz": 100, "apagado": 0.30, "vol": 0.10},
-    {"nombre": "VOCES",   "x": 1600, "y": 250, "alcance": 560, "base": 0.14,
-     "color": [198, 150, 150], "ritmo": 2.4,
-     "onda": "ruido", "hz": 300, "apagado": 0.62, "vol": 0.35},
-    {"nombre": "LAPIZ",   "x": 1980, "y": 300, "alcance": 260, "base": 0.03,
-     "color": [170, 180, 150], "ritmo": 5.0,
-     "onda": "sierra", "hz": 2200, "apagado": 0.25, "vol": 0.05}
+    {"nombre": "RELOJ", "x": 300, "y": 110, "alcance": 420, "base": 0.10,
+        "color": [214, 196, 128], "ritmo": 1.0, "sube": verdadero,
+        "onda": "cuadrada", "hz": 1400, "apagado": 0.15, "vol": 0.05},
+    {"nombre": "VENTANA", "x": 650, "y": 150, "alcance": 380, "base": 0.06,
+        "color": [150, 190, 200], "ritmo": 0.35,
+        "onda": "ruido", "hz": 400, "apagado": 0.80, "vol": 0.30},
+    {"nombre": "ZUMBIDO", "x": 1150, "y": 70, "alcance": 900, "base": 0.22,
+        "color": [206, 206, 178], "ritmo": 7.0, "sube": verdadero,
+        "onda": "cuadrada", "hz": 100, "apagado": 0.30, "vol": 0.10},
+    {"nombre": "VOCES", "x": 1600, "y": 250, "alcance": 560, "base": 0.14,
+        "color": [198, 150, 150], "ritmo": 2.4,
+        "onda": "ruido", "hz": 300, "apagado": 0.62, "vol": 0.35},
+    {"nombre": "LAPIZ", "x": 1980, "y": 300, "alcance": 260, "base": 0.03,
+        "color": [170, 180, 150], "ritmo": 5.0,
+        "onda": "sierra", "hz": 2200, "apagado": 0.25, "vol": 0.05}
 ]
 
 # Cada capa es un tono sostenido en bucle, sin un solo archivo de audio.
@@ -115,7 +115,7 @@ fijo FUENTES = [
 para cada diccionario f en FUENTES {
     sea son = juego.crear_tono(f["hz"], 1.5, {"forma": f["onda"], "volumen": f["vol"]})
     f["voz"] = juego.reproducir(son, {"bucle": verdadero, "volumen": 0,
-                                      "amortiguado": f["apagado"]})
+        "amortiguado": f["apagado"]})
 }
 
 # Los pupitres, a distancia regular. El ritmo del que habla el paso 5 es
@@ -240,7 +240,7 @@ funcion dibujar_mezcla(numero c): nulo {
 funcion dibujar_ayuda(): nulo {
     juego.camara()
     juego.texto("FLECHAS ANDAR   ABAJO QUEDARSE QUIETO   Z MIRAR   1 SUAVE   ESC SALIR",
-                14, ALTO - 20, {"escala": 1, "color": [245, 245, 242]})
+        14, ALTO - 20, {"escala": 1, "color": [245, 245, 242]})
 }
 
 # ── El bucle ────────────────────────────────────────────────────────
@@ -293,8 +293,8 @@ mientras juego.abierto() {
     # Lo que se ve en el panel es exactamente lo que se oye.
     para cada diccionario f en FUENTES {
         juego.cambiar_voz(f["voz"], {"volumen": matematica.limitar(presencia(f), 0, 1),
-                                     "lado": matematica.limitar((f["x"] - x) / 420, -1, 1),
-                                     "fundido": 0.08})
+            "lado": matematica.limitar((f["x"] - x) / 420, -1, 1),
+            "fundido": 0.08})
     }
     # Amortiguar el conjunto: el aula se aleja cuando se acumula, al pararse y
     # al mirar el patrón. Es el recurso del documento — apagar la mezcla sin
